@@ -2,40 +2,106 @@
 
 Future enhancements and planned features.
 
+## Recently Completed
+
+- **API Playground** - HTTP request builder with collections, history, JSON viewer
+- **Accordion Sidebar** - Expandable sections with contextual sub-items
+- **10 Themes** - Terminal, Amber, Carbon, Light, Ocean, Sunset, Forest, Midnight, Neon, Slate
+- **JsonViewer Component** - Theme-aware syntax highlighting with collapsible nodes
+
 ## In Progress
 
-### Settings Section (Partial)
-Current: Theme customizer only
+### Settings Section Expansion
+Current: Theme/appearance customizer
 Needed:
-- Theme selection (4 themes)
-- Background dropdown (gradient, mesh, textured, minimal, none)
-- Feed refresh interval
-- Default sources/subreddits
+- Feed Configuration (sources, subreddits, refresh interval)
+- API Keys management (for authenticated APIs)
 
-## Planned
+## Planned Sections
 
-### AI Curation (Optional)
+### Quick Notes / Scratchpad
+A persistent notepad for quick capture:
+- Markdown support
+- localStorage persistence
+- Code snippets with syntax highlighting
+- **Complexity**: Low-Medium
 
-The feed currently fetches live from APIs. To add AI curation:
+### Bookmarks / Quick Links
+Curated link manager for browser start page:
+- Categorized bookmarks with icons
+- Keyboard shortcuts for quick access
+- Import/export capability
+- Search across bookmarks
+- **Complexity**: Low
 
-1. Set up Claude API key
-2. Create cron job to run daily
-3. Have Claude filter/summarize items
-4. Save to `public/feed/YYYY-MM-DD.json`
-5. Update feed to read from static JSON
+### Tasks / Quick Todo
+Lightweight task tracking:
+- Simple checkbox list for daily tasks
+- Drag-and-drop reordering (Framer Motion)
+- localStorage persistence
+- Optional: Todoist API sync
+- **Complexity**: Low-Medium
 
-### API Playground
+### System Status / Uptime Monitor
+Monitor personal services:
+- Check if portfolio/sites are up
+- Visual status indicators
+- Response time tracking
+- Alerts when something goes down
+- **Complexity**: Medium
 
-A separate page for testing/learning APIs (in Settings section)
+### AI Chat Widget
+Quick AI access from homepage:
+- Claude/GPT API integration
+- Conversation history
+- Suggested prompts
+- Code highlighting in responses
+- **Complexity**: Medium-High (API key management)
+
+### Data Viz / Personal Analytics
+Visualize personal data:
+- GitHub contribution stats
+- Custom metrics tracking
+- Charts with Recharts
+- **Complexity**: Medium
+
+### Calendar / Agenda View
+Show upcoming events:
+- Today's schedule at a glance
+- Google Calendar API integration
+- Countdown to important dates
+- **Complexity**: Medium (OAuth)
+
+## Quick Wins (Low Effort)
+
+| Feature | Description | Complexity |
+|---------|-------------|------------|
+| **Pomodoro Timer** | Focus timer with sessions | Low |
+| **World Clocks** | Multiple timezone display | Low |
+| **Quote of the Day** | Motivational quotes API | Low |
+| **Search Hub** | Multi-engine search bar | Low |
 
 ## Ideas / Backlog
 
-- Bookmarks section
-- Notes/Quick capture
-- Calendar integration
-- Custom widgets
-- Keyboard shortcuts
-- PWA support for mobile
+- PWA support for mobile installation
+- Keyboard shortcuts system (global hotkeys)
+- Custom widgets API (user-defined sections)
+- WebSocket connections for real-time data
+- Sync settings across devices
+- Dark/light mode auto-switch based on time
+
+## Reference Templates
+
+These templates from `~/projects/portfolio-style-guides/app/templates/` can be adapted:
+
+| Template | Use For |
+|----------|---------|
+| `kanban-board` | Tasks with drag-and-drop |
+| `chat-helpbot` | AI Chat Widget |
+| `uptime-monitor` | System Status |
+| `analytics-dashboard` | Data Viz |
+| `docs-hub` | Bookmarks search |
+| `form-builder` | Quick Notes editor |
 
 ---
 
