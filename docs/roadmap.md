@@ -4,6 +4,10 @@ Future enhancements and planned features.
 
 ## Recently Completed
 
+- **Bookmarks** - Folder-based organization, icon/list view toggle, search, GitHub sync, favicon auto-fetch
+- **Sidebar Jump Links** - Sub-items now navigate to specific sections (scroll/switch tabs)
+- **Weather Alert Badge** - Shows count in sidebar (green for 0, red for active alerts)
+- **Quick Notes Improvements** - Default to View mode, anchor links work, code block spacing fixed, path input for new notes
 - **Quick Notes** - GitHub-synced markdown editor with file browser, theme-aware preview, auto-save
 - **GitHub Integration** - Settings panel for token/repo, auto-injection into API Playground
 - **Markdown Preview Styles** - Theme-aware rendering with `.md-*` CSS classes
@@ -20,15 +24,16 @@ Needed:
 - Feed Configuration (sources, subreddits, refresh interval)
 - API Keys management (for authenticated APIs)
 
-## Planned Sections
+## Up Next (Low Effort)
 
-### Bookmarks / Quick Links
-Curated link manager for browser start page:
-- Categorized bookmarks with icons
-- Keyboard shortcuts for quick access
-- Import/export capability
-- Search across bookmarks
-- **Complexity**: Low
+| Feature | Description | Complexity |
+|---------|-------------|------------|
+| **Search Hub** | Multi-engine search bar (Google, GitHub, SO, etc.) | Low |
+| **Pomodoro Timer** | Focus timer with work/break sessions | Low |
+| **World Clocks** | Multiple timezone display | Low |
+| **Quote of the Day** | Motivational quotes API | Low |
+
+## Planned Sections
 
 ### Tasks / Quick Todo
 Lightweight task tracking:
@@ -68,15 +73,6 @@ Show upcoming events:
 - Countdown to important dates
 - **Complexity**: Medium (OAuth)
 
-## Quick Wins (Low Effort)
-
-| Feature | Description | Complexity |
-|---------|-------------|------------|
-| **Pomodoro Timer** | Focus timer with sessions | Low |
-| **World Clocks** | Multiple timezone display | Low |
-| **Quote of the Day** | Motivational quotes API | Low |
-| **Search Hub** | Multi-engine search bar | Low |
-
 ## Ideas / Backlog
 
 - PWA support for mobile installation
@@ -85,6 +81,8 @@ Show upcoming events:
 - WebSocket connections for real-time data
 - Sync settings across devices
 - Dark/light mode auto-switch based on time
+- Bookmarks import/export (Chrome format)
+- Bookmarks keyboard shortcuts
 
 ## Reference Templates
 

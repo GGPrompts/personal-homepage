@@ -25,6 +25,7 @@ A personal dashboard/homepage designed as a browser start page. Features an acco
 | **Daily Feed** | Complete | Aggregated content from HN, GitHub, Reddit, Lobsters, Dev.to |
 | **API Playground** | Complete | HTTP request builder with collections, history, JSON viewer |
 | **Quick Notes** | Complete | GitHub-synced markdown editor with file browser |
+| **Bookmarks** | Complete | Folder-based links with icon/list view, search, GitHub sync |
 | **Settings** | Partial | Theme/appearance + GitHub integration (Feed Config coming soon) |
 
 ## Tech Stack
@@ -47,7 +48,8 @@ personal-homepage/
 │   │   ├── weather.tsx
 │   │   ├── daily-feed.tsx
 │   │   ├── api-playground.tsx
-│   │   └── quick-notes.tsx
+│   │   ├── quick-notes.tsx
+│   │   └── bookmarks.tsx
 │   └── api/feed/               # Feed API endpoint + fetchers
 ├── components/
 │   ├── ui/                     # shadcn/ui components
