@@ -1453,13 +1453,16 @@
     background: hsl(var(--muted) / 0.5);
     border: 1px solid hsl(var(--border) / 0.3);
     overflow-x: auto;
+    white-space: pre;
+    line-height: 1.4;
   }
 
   .md-code-block {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 0.875rem;
-    line-height: 1.6;
+    line-height: 1.4;
     color: hsl(var(--foreground) / 0.9);
+    white-space: pre;
   }
 
   /* Blockquotes */
