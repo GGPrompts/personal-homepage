@@ -34,6 +34,7 @@ import {
   CheckCircle2,
   Grid,
   Search,
+  Globe,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -53,12 +54,13 @@ import DailyFeedSection from "./sections/daily-feed"
 import ApiPlaygroundSection from "./sections/api-playground"
 import QuickNotesSection from "./sections/quick-notes"
 import BookmarksSection from "./sections/bookmarks"
+import SearchHubSection from "./sections/search-hub"
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type Section = "home" | "weather" | "feed" | "api-playground" | "notes" | "bookmarks" | "settings"
+type Section = "home" | "weather" | "feed" | "api-playground" | "notes" | "bookmarks" | "search" | "settings"
 
 interface SubItem {
   id: string
@@ -129,6 +131,17 @@ const navigationItems: NavigationItem[] = [
     subItems: [
       { id: "all", label: "All Links", icon: Grid },
       { id: "search", label: "Search", icon: Search },
+    ]
+  },
+  {
+    id: "search",
+    label: "Search Hub",
+    icon: Search,
+    description: "Search, AI & Image",
+    subItems: [
+      { id: "search", label: "Search", icon: Globe },
+      { id: "ai", label: "AI Chat", icon: Zap },
+      { id: "image", label: "Image AI", icon: Palette },
     ]
   },
   {
@@ -525,6 +538,18 @@ function HomeSection({ onNavigate }: { onNavigate: (section: Section) => void })
           <p className="text-sm text-muted-foreground">Organized quick links</p>
         </button>
 
+        {/* Search Hub Card */}
+        <button
+          onClick={() => onNavigate("search")}
+          className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+        >
+          <div className="flex items-start justify-between mb-4">
+            <Search className="h-8 w-8 text-primary" />
+          </div>
+          <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Search Hub</h3>
+          <p className="text-sm text-muted-foreground">Multi-engine web search</p>
+        </button>
+
         {/* Settings Card */}
         <button
           onClick={() => onNavigate("settings")}
@@ -754,6 +779,8 @@ export default function PersonalHomepage() {
         return <QuickNotesSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("settings")} />
       case "bookmarks":
         return <BookmarksSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("settings")} />
+      case "search":
+        return <SearchHubSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "settings":
         return <SettingsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       default:

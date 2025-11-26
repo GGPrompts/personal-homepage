@@ -4,6 +4,7 @@ Future enhancements and planned features.
 
 ## Recently Completed
 
+- **Search Hub** - Multi-engine search + AI chat + Image AI (7 search engines, 6 AI assistants, 7 image generators including Sora) with keyboard shortcuts
 - **Bookmarks** - Folder-based organization, icon/list view toggle, search, GitHub sync, favicon auto-fetch
 - **Sidebar Jump Links** - Sub-items now navigate to specific sections (scroll/switch tabs)
 - **Weather Alert Badge** - Shows count in sidebar (green for 0, red for active alerts)
@@ -28,7 +29,6 @@ Needed:
 
 | Feature | Description | Complexity |
 |---------|-------------|------------|
-| **Search Hub** | Multi-engine search bar (Google, GitHub, SO, etc.) | Low |
 | **Pomodoro Timer** | Focus timer with work/break sessions | Low |
 | **World Clocks** | Multiple timezone display | Low |
 | **Quote of the Day** | Motivational quotes API | Low |
@@ -72,6 +72,16 @@ Show upcoming events:
 - Google Calendar API integration
 - Countdown to important dates
 - **Complexity**: Medium (OAuth)
+
+### Stocks Dashboard / Paper Trading
+Practice trading with real market data:
+- Real-time quotes (15-min delay) via Alpha Vantage, Finnhub, or Twelve Data
+- Paper trading with fake money ($100k starting balance)
+- Portfolio tracking, watchlists, P&L
+- Technical indicators (RSI, MACD, etc.)
+- Historical charts with Recharts
+- See [docs/stocks-dashboard.md](stocks-dashboard.md) for API details
+- **Complexity**: Medium-High
 
 ## Ideas / Backlog
 
