@@ -91,7 +91,10 @@ function getFileIcon(file: GitHubFile) {
 
 // Simple markdown to HTML converter (basic implementation)
 function renderMarkdown(markdown: string): string {
-  let html = markdown
+  // Normalize line endings (Windows \r\n -> \n)
+  let html = markdown.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+
+  html = html
     // Escape HTML
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -110,8 +113,11 @@ function renderMarkdown(markdown: string): string {
     .replace(/_(.+?)_/g, '<em class="md-em">$1</em>')
     // Strikethrough
     .replace(/~~(.+?)~~/g, '<del class="md-del">$1</del>')
-    // Code blocks
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="md-pre"><code class="md-code-block">$2</code></pre>')
+    // Code blocks (normalize multiple newlines to single)
+    .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+      const normalizedCode = code.replace(/\n{2,}/g, '\n').trim()
+      return `<pre class="md-pre"><code class="md-code-block">${normalizedCode}</code></pre>`
+    })
     // Inline code
     .replace(/`([^`]+)`/g, '<code class="md-code">$1</code>')
     // Images
