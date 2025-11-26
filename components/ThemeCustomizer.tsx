@@ -1,6 +1,6 @@
 'use client'
 
-import { Settings, Palette, Layers } from 'lucide-react'
+import { Settings, Palette, Layers, PaintBucket } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -15,11 +15,24 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useTheme } from '@/components/ThemeProvider'
-import { useBackground } from '@/components/BackgroundProvider'
+import { useBackground, type BackgroundTone } from '@/components/BackgroundProvider'
+
+const toneLabels: Record<BackgroundTone, string> = {
+  'charcoal': 'Charcoal',
+  'deep-purple': 'Deep Purple',
+  'pure-black': 'Pure Black',
+  'light': 'Light',
+  'ocean': 'Ocean',
+  'sunset': 'Sunset',
+  'forest': 'Forest',
+  'midnight': 'Midnight',
+  'neon-dark': 'Neon Dark',
+  'slate': 'Slate'
+}
 
 export function ThemeCustomizer() {
   const { theme, setTheme } = useTheme()
-  const { background, setBackground } = useBackground()
+  const { background, setBackground, backgroundTone, setBackgroundTone, backgroundTones } = useBackground()
 
   return (
     <Popover>
@@ -61,8 +74,27 @@ export function ThemeCustomizer() {
 
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+              <PaintBucket className="h-3 w-3" />
+              Background Tone
+            </label>
+            <Select value={backgroundTone} onValueChange={setBackgroundTone}>
+              <SelectTrigger className="w-full h-8 font-mono text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="font-mono">
+                {backgroundTones.map((tone) => (
+                  <SelectItem key={tone} value={tone}>
+                    {toneLabels[tone]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
               <Layers className="h-3 w-3" />
-              Background
+              Background Style
             </label>
             <Select value={background} onValueChange={setBackground}>
               <SelectTrigger className="w-full h-8 font-mono text-sm">

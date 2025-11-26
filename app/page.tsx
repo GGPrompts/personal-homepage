@@ -26,6 +26,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { ThemeCustomizer } from "@/components/ThemeCustomizer"
+import { ThemeSettingsPanel } from "@/components/ThemeSettingsPanel"
 
 // Import page content components
 import WeatherDashboard from "./sections/weather"
@@ -351,10 +352,10 @@ function SettingsSection() {
       <h1 className="text-3xl font-bold terminal-glow mb-2">Settings</h1>
       <p className="text-muted-foreground mb-8">Customize your dashboard</p>
 
-      <div className="max-w-2xl">
+      <div className="max-w-3xl">
         <div className="glass rounded-lg p-6 mb-6">
-          <h3 className="font-semibold mb-4">Theme & Appearance</h3>
-          <ThemeCustomizer />
+          <h3 className="font-semibold mb-6">Theme & Appearance</h3>
+          <ThemeSettingsPanel />
         </div>
 
         <div className="glass rounded-lg p-6">
@@ -394,7 +395,7 @@ export default function PersonalHomepage() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen">
+      <div className="min-h-screen relative z-10">
         {/* Mobile Menu Button */}
         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
           <SheetTrigger asChild>
