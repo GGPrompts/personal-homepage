@@ -282,7 +282,11 @@ const DEFAULT_LOCATION: GeoLocation = {
   name: "San Francisco, CA",
 }
 
-async function fetchWeatherData(lat: number, lon: number): Promise<OpenMeteoResponse> {
+async function fetchWeatherData(
+  lat: number,
+  lon: number,
+  unit: "fahrenheit" | "celsius" = "fahrenheit"
+): Promise<OpenMeteoResponse> {
   const params = new URLSearchParams({
     latitude: lat.toString(),
     longitude: lon.toString(),
@@ -317,9 +321,9 @@ async function fetchWeatherData(lat: number, lon: number): Promise<OpenMeteoResp
       "uv_index_max",
       "precipitation_probability_max",
     ].join(","),
-    temperature_unit: "fahrenheit",
-    wind_speed_unit: "mph",
-    precipitation_unit: "inch",
+    temperature_unit: unit,
+    wind_speed_unit: unit === "fahrenheit" ? "mph" : "kmh",
+    precipitation_unit: unit === "fahrenheit" ? "inch" : "mm",
     timezone: "auto",
     forecast_days: "7",
   })
@@ -360,6 +364,71 @@ async function searchLocation(query: string): Promise<GeoLocation[]> {
     longitude: r.longitude,
     name: r.admin1 ? `${r.name}, ${r.admin1}, ${r.country}` : `${r.name}, ${r.country}`,
   }))
+}
+
+// Fetch NWS (National Weather Service) alerts - free for US locations
+async function fetchNWSAlerts(lat: number, lon: number): Promise<WeatherAlert[]> {
+  try {
+    const response = await fetch(
+      `https://api.weather.gov/alerts/active?point=${lat.toFixed(4)},${lon.toFixed(4)}`,
+      {
+        headers: {
+          "User-Agent": "PersonalHomepage/1.0 (weather dashboard)",
+          "Accept": "application/geo+json",
+        },
+      }
+    )
+    if (!response.ok) return []
+
+    const data = await response.json()
+    if (!data.features || data.features.length === 0) return []
+
+    return data.features.map((feature: any, index: number) => {
+      const props = feature.properties
+
+      // Map NWS event types to our alert types
+      const eventLower = (props.event || "").toLowerCase()
+      let alertType: AlertType = "wind"
+      if (eventLower.includes("tornado")) alertType = "tornado"
+      else if (eventLower.includes("flood")) alertType = "flood"
+      else if (eventLower.includes("heat") || eventLower.includes("hot")) alertType = "heat"
+      else if (eventLower.includes("winter") || eventLower.includes("snow") || eventLower.includes("ice") || eventLower.includes("freeze") || eventLower.includes("cold")) alertType = "winter-storm"
+      else if (eventLower.includes("fire")) alertType = "fire"
+      else if (eventLower.includes("wind") || eventLower.includes("gust")) alertType = "wind"
+
+      // Map NWS severity
+      let severity: AlertSeverity = "minor"
+      const nwsSeverity = (props.severity || "").toLowerCase()
+      if (nwsSeverity === "extreme") severity = "extreme"
+      else if (nwsSeverity === "severe") severity = "severe"
+      else if (nwsSeverity === "moderate") severity = "moderate"
+
+      // Parse affected areas from areaDesc
+      const affectedAreas = props.areaDesc
+        ? props.areaDesc.split(";").map((a: string) => a.trim()).slice(0, 3)
+        : []
+
+      // Extract safety instructions from description or instruction field
+      const instructions = props.instruction
+        ? props.instruction.split(/[.!]/).filter((s: string) => s.trim().length > 10).slice(0, 3).map((s: string) => s.trim())
+        : []
+
+      return {
+        id: props.id || `nws-alert-${index}`,
+        type: alertType,
+        severity,
+        title: props.event || "Weather Alert",
+        description: props.headline || props.description?.slice(0, 200) || "Weather alert in effect",
+        affectedAreas,
+        startTime: new Date(props.effective || Date.now()),
+        endTime: new Date(props.expires || Date.now() + 86400000),
+        safetyInstructions: instructions.length > 0 ? instructions : ["Stay weather aware", "Monitor local news"],
+      }
+    })
+  } catch (error) {
+    console.error("Failed to fetch NWS alerts:", error)
+    return []
+  }
 }
 
 // Fetch RainViewer radar data
@@ -516,23 +585,6 @@ const generateDailyForecast = (currentTemp: number): DailyForecast[] => {
   return forecast
 }
 
-const WEATHER_ALERTS: WeatherAlert[] = [
-  {
-    id: "alert-1",
-    type: "wind",
-    severity: "moderate",
-    title: "Wind Advisory",
-    description: "Strong winds expected with gusts up to 45 mph",
-    affectedAreas: ["San Francisco", "Oakland", "Berkeley"],
-    startTime: new Date(Date.now() + 3600000),
-    endTime: new Date(Date.now() + 21600000),
-    safetyInstructions: [
-      "Secure outdoor objects",
-      "Avoid parking under trees",
-      "Drive with caution",
-    ],
-  },
-]
 
 const AIR_QUALITY: AirQuality = {
   aqi: 42,
@@ -583,23 +635,45 @@ export default function WeatherDashboard() {
   const [searchResults, setSearchResults] = useState<GeoLocation[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [showSearchResults, setShowSearchResults] = useState(false)
+  const [locationResolved, setLocationResolved] = useState(false)
 
   // Radar map state
   const [radarData, setRadarData] = useState<RainViewerData | null>(null)
   const [radarFrameIndex, setRadarFrameIndex] = useState(0)
   const [isRadarPlaying, setIsRadarPlaying] = useState(true)
 
+  // Weather alerts state (from NWS API)
+  const [weatherAlerts, setWeatherAlerts] = useState<WeatherAlert[]>([])
+
+  // Temperature unit preference (persisted in localStorage)
+  const [tempUnit, setTempUnit] = useState<"fahrenheit" | "celsius">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("weather-temp-unit")
+      if (saved === "celsius" || saved === "fahrenheit") return saved
+    }
+    return "fahrenheit"
+  })
+
+  // Persist temperature unit preference
+  useEffect(() => {
+    localStorage.setItem("weather-temp-unit", tempUnit)
+  }, [tempUnit])
+
   // Fetch weather data from Open-Meteo API
-  const fetchAllWeatherData = async (lat: number, lon: number) => {
+  const fetchAllWeatherData = async (lat: number, lon: number, unit: "fahrenheit" | "celsius") => {
     setIsLoading(true)
     setError(null)
 
     try {
-      // Fetch weather and air quality in parallel
-      const [weatherData, aqData] = await Promise.all([
-        fetchWeatherData(lat, lon),
+      // Fetch weather, air quality, and NWS alerts in parallel
+      const [weatherData, aqData, alertsData] = await Promise.all([
+        fetchWeatherData(lat, lon, unit),
         fetchAirQuality(lat, lon).catch(() => null), // Air quality is optional
+        fetchNWSAlerts(lat, lon).catch(() => []), // Alerts are optional (US only)
       ])
+
+      // Update weather alerts
+      setWeatherAlerts(alertsData)
 
       // Parse current weather
       const current = weatherData.current
@@ -618,10 +692,16 @@ export default function WeatherDashboard() {
         condition: weatherInfo.condition,
         description: weatherInfo.description,
         humidity: current.relative_humidity_2m,
-        pressure: current.pressure_msl * 0.02953, // Convert hPa to inHg
+        pressure: unit === "fahrenheit"
+          ? current.pressure_msl * 0.02953 // Convert hPa to inHg
+          : current.pressure_msl, // Keep as hPa for metric
         windSpeed: current.wind_speed_10m,
         windDirection: current.wind_direction_10m,
-        visibility: currentHourIndex >= 0 ? weatherData.hourly.visibility[currentHourIndex] / 1609.34 : 10, // Convert m to miles
+        visibility: currentHourIndex >= 0
+          ? unit === "fahrenheit"
+            ? weatherData.hourly.visibility[currentHourIndex] / 1609.34 // Convert m to miles
+            : weatherData.hourly.visibility[currentHourIndex] / 1000 // Convert m to km
+          : 10,
         cloudCover: current.cloud_cover,
         uvIndex: currentHourIndex >= 0 ? weatherData.hourly.uv_index[currentHourIndex] : 0,
         dewPoint: currentHourIndex >= 0 ? weatherData.hourly.dew_point_2m[currentHourIndex] : 50,
@@ -714,31 +794,36 @@ export default function WeatherDashboard() {
             longitude,
             name: locationName,
           })
+          setLocationResolved(true)
         },
         () => {
           // Geolocation denied or failed, use default location
           console.log("Geolocation not available, using default location")
+          setLocationResolved(true)
         }
       )
+    } else {
+      // Geolocation not supported, use default
+      setLocationResolved(true)
     }
   }, [])
 
-  // Fetch weather data when location changes
+  // Fetch weather data when location or temperature unit changes
   useEffect(() => {
-    fetchAllWeatherData(geoLocation.latitude, geoLocation.longitude)
-  }, [geoLocation])
+    fetchAllWeatherData(geoLocation.latitude, geoLocation.longitude, tempUnit)
+  }, [geoLocation, tempUnit])
 
   // Auto-refresh weather data when live mode is enabled
   useEffect(() => {
     if (!isLive) return
 
     const interval = setInterval(() => {
-      fetchAllWeatherData(geoLocation.latitude, geoLocation.longitude)
+      fetchAllWeatherData(geoLocation.latitude, geoLocation.longitude, tempUnit)
       setRadarAnimation((prev) => (prev + 1) % 100)
     }, 300000) // Refresh every 5 minutes (300000ms)
 
     return () => clearInterval(interval)
-  }, [isLive, geoLocation])
+  }, [isLive, geoLocation, tempUnit])
 
   // Fetch RainViewer radar data
   useEffect(() => {
@@ -853,7 +938,7 @@ export default function WeatherDashboard() {
           <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground terminal-glow">Live Weather Monitoring</h1>
           <div className="mt-1 flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
             <MapPin className="h-3 w-3 sm:h-4 sm:w-4" />
-            {geoLocation.name}
+            {locationResolved ? geoLocation.name : "Detecting location..."}
             <Separator orientation="vertical" className="h-3 sm:h-4" />
             <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
             <span suppressHydrationWarning>{currentTime}</span>
@@ -927,6 +1012,29 @@ export default function WeatherDashboard() {
               </div>
             )}
           </div>
+          {/* Temperature Unit Toggle */}
+          <div className="flex items-center rounded-lg border border-border overflow-hidden">
+            <button
+              onClick={() => setTempUnit("fahrenheit")}
+              className={`px-2 py-1 text-xs font-medium transition-colors ${
+                tempUnit === "fahrenheit"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background hover:bg-muted text-muted-foreground"
+              }`}
+            >
+              °F
+            </button>
+            <button
+              onClick={() => setTempUnit("celsius")}
+              className={`px-2 py-1 text-xs font-medium transition-colors ${
+                tempUnit === "celsius"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background hover:bg-muted text-muted-foreground"
+              }`}
+            >
+              °C
+            </button>
+          </div>
           <Badge variant="outline" className="gap-1 text-xs">
             <Activity className="h-3 w-3" />
             Updated {timeAgo(lastUpdate)}
@@ -980,7 +1088,7 @@ export default function WeatherDashboard() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => fetchAllWeatherData(geoLocation.latitude, geoLocation.longitude)}
+                onClick={() => fetchAllWeatherData(geoLocation.latitude, geoLocation.longitude, tempUnit)}
               >
                 Retry
               </Button>
@@ -989,20 +1097,20 @@ export default function WeatherDashboard() {
         </motion.div>
       )}
 
-      {/* Severe Weather Alerts */}
-      {WEATHER_ALERTS.length > 0 && (
+      {/* Severe Weather Alerts (from NWS API) */}
+      {weatherAlerts.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-6"
         >
           <Card className="border-amber-500/50 bg-amber-500/10">
-            <CardContent className="pt-4">
-              {WEATHER_ALERTS.map((alert) => (
+            <CardContent className="pt-4 space-y-4">
+              {weatherAlerts.map((alert) => (
                 <div key={alert.id} className="flex items-start gap-3">
-                  <AlertTriangle className="h-6 w-6 text-amber-500" />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-6 w-6 text-amber-500 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
                       <p className="font-semibold text-amber-500">{alert.title}</p>
                       <Badge
                         variant={
@@ -1015,15 +1123,19 @@ export default function WeatherDashboard() {
                         {alert.severity}
                       </Badge>
                     </div>
-                    <p className="mt-1 text-sm">{alert.description}</p>
-                    <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
+                    <p className="mt-1 text-sm line-clamp-2">{alert.description}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                       <span suppressHydrationWarning>
-                        Starts: {alert.startTime.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                        Until: {alert.endTime.toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit"
+                        })}
                       </span>
-                      <span suppressHydrationWarning>
-                        Ends: {alert.endTime.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                      <span>Areas: {alert.affectedAreas.join(", ")}</span>
+                      {alert.affectedAreas.length > 0 && (
+                        <span className="truncate max-w-[200px]">Areas: {alert.affectedAreas.join(", ")}</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1041,15 +1153,32 @@ export default function WeatherDashboard() {
             <div className="text-center lg:text-left">
               <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 lg:justify-start">
                 <motion.div
-                  animate={{
-                    scale: [1, 1.05, 1],
-                    rotate: currentWeather.condition === "clear" ? [0, 360] : 0,
-                  }}
-                  transition={{
-                    duration: currentWeather.condition === "clear" ? 20 : 3,
-                    repeat: Infinity,
-                    ease: "linear",
-                  }}
+                  animate={
+                    currentWeather.condition === "clear"
+                      ? {
+                          // Sunny: smooth rotation
+                          rotate: [0, 360],
+                          scale: [1, 1.05, 1],
+                        }
+                      : {
+                          // Balatro-style floating effect for other conditions
+                          y: [0, -8, 0, -4, 0],
+                          rotate: [-2, 2, -1, 1, -2],
+                          scale: [1, 1.02, 1, 1.01, 1],
+                        }
+                  }
+                  transition={
+                    currentWeather.condition === "clear"
+                      ? {
+                          rotate: { duration: 20, repeat: Infinity, ease: "linear" },
+                          scale: { duration: 3, repeat: Infinity, ease: "easeInOut" },
+                        }
+                      : {
+                          duration: 4,
+                          repeat: Infinity,
+                          ease: "easeInOut",
+                        }
+                  }
                 >
                   <WeatherIcon className="h-20 w-20 sm:h-24 sm:w-24 lg:h-32 lg:w-32 text-cyan-500" />
                 </motion.div>
@@ -1109,7 +1238,7 @@ export default function WeatherDashboard() {
                   animate={{ opacity: 1 }}
                   className="mt-1 sm:mt-2 text-lg sm:text-2xl font-bold"
                 >
-                  {Math.round(currentWeather.windSpeed)} mph
+                  {Math.round(currentWeather.windSpeed)} {tempUnit === "fahrenheit" ? "mph" : "km/h"}
                 </motion.p>
                 <div className="mt-1 sm:mt-2 flex items-center gap-2">
                   <Navigation
@@ -1131,7 +1260,9 @@ export default function WeatherDashboard() {
                   animate={{ opacity: 1 }}
                   className="mt-1 sm:mt-2 text-lg sm:text-2xl font-bold"
                 >
-                  {currentWeather.pressure.toFixed(2)} in
+                  {tempUnit === "fahrenheit"
+                    ? `${currentWeather.pressure.toFixed(2)} in`
+                    : `${Math.round(currentWeather.pressure)} hPa`}
                 </motion.p>
               </div>
 
@@ -1140,7 +1271,9 @@ export default function WeatherDashboard() {
                   <Eye className="h-4 w-4" />
                   <p className="text-xs sm:text-sm">Visibility</p>
                 </div>
-                <p className="mt-1 sm:mt-2 text-lg sm:text-2xl font-bold">{currentWeather.visibility} mi</p>
+                <p className="mt-1 sm:mt-2 text-lg sm:text-2xl font-bold">
+                  {currentWeather.visibility.toFixed(1)} {tempUnit === "fahrenheit" ? "mi" : "km"}
+                </p>
               </div>
 
               <div className="rounded-lg border border-border bg-background/50 p-3 sm:p-4">
@@ -1384,25 +1517,21 @@ export default function WeatherDashboard() {
               </p>
             </CardHeader>
             <CardContent>
-              <div className="relative h-[300px] overflow-hidden rounded-lg border border-border bg-slate-900">
+              <div className="relative h-[300px] overflow-hidden rounded-lg border border-border bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
                 {/* Radar tile grid */}
                 {selectedMapLayer === "radar" && getRadarTileUrl ? (
-                  <div className="absolute inset-0 grid grid-cols-3 grid-rows-3">
+                  <div className="absolute inset-0 flex flex-wrap">
                     {getRadarTileUrl.tiles.map((tileUrl, i) => (
-                      <div key={i} className="relative overflow-hidden">
+                      <div key={i} className="w-1/3 h-1/3">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={tileUrl}
                           alt=""
-                          className="w-full h-full object-cover opacity-80"
-                          style={{ imageRendering: "pixelated" }}
+                          className="w-full h-full"
+                          style={{ display: "block" }}
                         />
                       </div>
                     ))}
-                    {/* Center marker */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-                      <div className="w-3 h-3 rounded-full bg-cyan-500 border-2 border-white shadow-lg" />
-                    </div>
                   </div>
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center">
@@ -1415,27 +1544,34 @@ export default function WeatherDashboard() {
                   </div>
                 )}
 
-                {/* Radar legend */}
-                <div className="absolute bottom-2 left-2 bg-black/60 rounded px-2 py-1 text-xs">
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full bg-green-500" />
-                    <span className="text-green-400">Light</span>
-                    <div className="w-2 h-2 rounded-full bg-yellow-500 ml-2" />
-                    <span className="text-yellow-400">Moderate</span>
-                    <div className="w-2 h-2 rounded-full bg-red-500 ml-2" />
-                    <span className="text-red-400">Heavy</span>
-                  </div>
-                </div>
-
-                {/* Timestamp */}
+                {/* Center marker */}
                 {getRadarTileUrl && (
-                  <div className="absolute top-2 right-2 bg-black/60 rounded px-2 py-1 text-xs text-white" suppressHydrationWarning>
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
+                    <div className="w-3 h-3 rounded-full bg-cyan-500 border-2 border-white shadow-lg" />
+                  </div>
+                )}
+
+                {/* Timestamp - bottom right to avoid tile corners */}
+                {getRadarTileUrl && (
+                  <div className="absolute bottom-2 right-2 z-20 bg-black/70 backdrop-blur-sm rounded px-2 py-0.5 text-[10px] text-white font-mono" suppressHydrationWarning>
                     {new Date(getRadarTileUrl.timestamp * 1000).toLocaleTimeString("en-US", {
                       hour: "2-digit",
                       minute: "2-digit",
                     })}
                   </div>
                 )}
+
+                {/* Radar legend - bottom left */}
+                <div className="absolute bottom-2 left-2 z-20 bg-black/70 backdrop-blur-sm rounded px-2 py-1 text-[10px]">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                    <span className="text-green-400">Light</span>
+                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-500 ml-1" />
+                    <span className="text-yellow-400">Med</span>
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 ml-1" />
+                    <span className="text-red-400">Heavy</span>
+                  </div>
+                </div>
               </div>
 
               <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
@@ -1542,7 +1678,7 @@ export default function WeatherDashboard() {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Dew Point</span>
-                  <span className="font-semibold">{Math.round(currentWeather.dewPoint)}°F</span>
+                  <span className="font-semibold">{Math.round(currentWeather.dewPoint)}°{tempUnit === "fahrenheit" ? "F" : "C"}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between">
@@ -1555,7 +1691,9 @@ export default function WeatherDashboard() {
                 <Separator />
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Precipitation (24h)</span>
-                  <span className="font-semibold">{currentWeather.precipitation.toFixed(2)} in</span>
+                  <span className="font-semibold">
+                    {currentWeather.precipitation.toFixed(2)} {tempUnit === "fahrenheit" ? "in" : "mm"}
+                  </span>
                 </div>
                 <Separator />
                 <div className="flex justify-between">

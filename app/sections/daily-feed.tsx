@@ -21,6 +21,7 @@ import {
   EyeOff,
   Trash2,
   Star,
+  ArrowDownWideNarrow,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -34,12 +35,20 @@ import {
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
 type FeedSource = "hackernews" | "github" | "reddit" | "lobsters" | "devto"
+type SortOption = "trending" | "newest" | "top"
 
 interface FeedItem {
   id: string
@@ -446,6 +455,7 @@ export default function DailyFeedSection() {
     "hackernews", "github", "reddit", "lobsters", "devto"
   ])
   const [subreddits, setSubreddits] = React.useState<string[]>(DEFAULT_SUBREDDITS)
+  const [sortBy, setSortBy] = React.useState<SortOption>("trending")
 
   // Saved/Hidden state
   const [savedItems, setSavedItems] = React.useState<Set<string>>(new Set())
@@ -463,6 +473,7 @@ export default function DailyFeedSection() {
         if (prefs.savedItems) setSavedItems(new Set(prefs.savedItems))
         if (prefs.hiddenItems) setHiddenItems(new Set(prefs.hiddenItems))
         if (prefs.savedItemsData) setSavedItemsData(new Map(Object.entries(prefs.savedItemsData)))
+        if (prefs.sortBy) setSortBy(prefs.sortBy)
       }
     } catch (e) {
       console.error("Failed to load preferences:", e)
@@ -478,11 +489,12 @@ export default function DailyFeedSection() {
         savedItems: Array.from(savedItems),
         hiddenItems: Array.from(hiddenItems),
         savedItemsData: Object.fromEntries(savedItemsData),
+        sortBy,
       }))
     } catch (e) {
       console.error("Failed to save preferences:", e)
     }
-  }, [enabledSources, subreddits, savedItems, hiddenItems, savedItemsData])
+  }, [enabledSources, subreddits, savedItems, hiddenItems, savedItemsData, sortBy])
 
   // Save/Hide handlers
   const toggleSave = (item: FeedItem) => {
@@ -609,11 +621,40 @@ export default function DailyFeedSection() {
     })
   }
 
+  // Sort function
+  const sortItems = React.useCallback((itemsToSort: FeedItem[]) => {
+    const sorted = [...itemsToSort]
+    switch (sortBy) {
+      case "top":
+        // Sort by score (highest first)
+        return sorted.sort((a, b) => b.score - a.score)
+      case "newest":
+        // Sort by date (newest first)
+        return sorted.sort((a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
+      case "trending":
+      default:
+        // Trending: score weighted by recency (higher score + more recent = better)
+        // Using a decay factor based on hours since posted
+        return sorted.sort((a, b) => {
+          const now = Date.now()
+          const hoursA = (now - new Date(a.createdAt).getTime()) / (1000 * 60 * 60)
+          const hoursB = (now - new Date(b.createdAt).getTime()) / (1000 * 60 * 60)
+          // Gravity/decay factor (similar to HN algorithm)
+          const gravity = 1.8
+          const trendingA = a.score / Math.pow(hoursA + 2, gravity)
+          const trendingB = b.score / Math.pow(hoursB + 2, gravity)
+          return trendingB - trendingA
+        })
+    }
+  }, [sortBy])
+
   // Filter items
   const filteredItems = React.useMemo(() => {
     // For saved view, show saved items from storage
     if (viewMode === "saved") {
-      return Array.from(savedItemsData.values())
+      return sortItems(Array.from(savedItemsData.values()))
     }
 
     // Filter out hidden items
@@ -621,12 +662,12 @@ export default function DailyFeedSection() {
 
     // If "all" mode or no sources selected, show all visible items
     if (viewMode === "all" || selectedSources.size === 0) {
-      return visibleItems
+      return sortItems(visibleItems)
     }
 
     // Filter by selected sources (multi-select)
-    return visibleItems.filter((item) => selectedSources.has(item.source))
-  }, [items, viewMode, selectedSources, hiddenItems, savedItemsData])
+    return sortItems(visibleItems.filter((item) => selectedSources.has(item.source)))
+  }, [items, viewMode, selectedSources, hiddenItems, savedItemsData, sortItems])
 
   // Get counts per source
   const sourceCounts = React.useMemo(() => {
@@ -654,6 +695,33 @@ export default function DailyFeedSection() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Sort Dropdown */}
+          <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
+            <SelectTrigger className="w-[130px] h-9">
+              <ArrowDownWideNarrow className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="trending">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-3.5 w-3.5" />
+                  Trending
+                </div>
+              </SelectItem>
+              <SelectItem value="newest">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-3.5 w-3.5" />
+                  Newest
+                </div>
+              </SelectItem>
+              <SelectItem value="top">
+                <div className="flex items-center gap-2">
+                  <Star className="h-3.5 w-3.5" />
+                  Top Rated
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
           <SourceToggle enabledSources={enabledSources} onToggle={toggleSource} />
           <SubredditSettings subreddits={subreddits} onUpdate={setSubreddits} />
           <Button
@@ -674,10 +742,10 @@ export default function DailyFeedSection() {
         <div className="flex-1 flex flex-wrap items-center gap-2">
           {/* All Button */}
           <Button
-            variant={viewMode === "all" ? "default" : "outline"}
+            variant={viewMode === "all" ? "default" : "ghost"}
             size="sm"
             onClick={showAll}
-            className="gap-1.5"
+            className={`gap-1.5 ${viewMode === "all" ? "" : "opacity-70 hover:opacity-100"}`}
           >
             All
             <Badge variant="secondary" className="ml-1 text-xs bg-white/10">{sourceCounts.all || 0}</Badge>
@@ -685,12 +753,12 @@ export default function DailyFeedSection() {
 
           {/* Saved Button */}
           <Button
-            variant={viewMode === "saved" ? "default" : "outline"}
+            variant={viewMode === "saved" ? "default" : "ghost"}
             size="sm"
             onClick={showSaved}
-            className="gap-1.5"
+            className={`gap-1.5 ${viewMode === "saved" ? "" : "opacity-70 hover:opacity-100"}`}
           >
-            <Bookmark className={`h-3.5 w-3.5 ${viewMode === "saved" ? "" : "text-primary"}`} />
+            <Bookmark className={`h-3.5 w-3.5 ${viewMode === "saved" ? "" : "text-muted-foreground"}`} />
             <span className="hidden sm:inline">Saved</span>
             <Badge variant="secondary" className="ml-1 text-xs bg-white/10">{sourceCounts.saved || 0}</Badge>
           </Button>
@@ -709,13 +777,13 @@ export default function DailyFeedSection() {
             return (
               <Button
                 key={source}
-                variant={isSelected ? "default" : "outline"}
+                variant={isSelected ? "default" : "ghost"}
                 size="sm"
                 onClick={() => toggleSourceFilter(source)}
-                className={`gap-1.5 ${isSelected ? "" : "hover:bg-white/10"}`}
-                title="Click to toggle, hold Shift for single-select"
+                className={`gap-1.5 ${isSelected ? "" : "opacity-70 hover:opacity-100"}`}
+                title="Click to toggle filter"
               >
-                <Icon className={`h-3.5 w-3.5 ${isSelected ? "" : config.color}`} />
+                <Icon className={`h-3.5 w-3.5 ${isSelected ? "" : "text-muted-foreground"}`} />
                 <span className="hidden sm:inline">{config.name}</span>
                 <Badge variant="secondary" className="ml-1 text-xs bg-white/10">{count}</Badge>
               </Button>

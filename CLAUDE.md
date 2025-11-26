@@ -8,8 +8,8 @@ A personal dashboard/homepage designed to be used as a browser start page. Featu
 
 | Section | Status | Description |
 |---------|--------|-------------|
-| **Home** | Placeholder | Dashboard overview with quick stats |
-| **Weather** | Complete | Live weather from Open-Meteo + RainViewer radar |
+| **Home** | Complete | Dashboard overview with live weather/feed stats, clickable cards |
+| **Weather** | Complete | Live weather from Open-Meteo + RainViewer radar + NWS alerts |
 | **Daily Feed** | Complete | Aggregated content from HN, GitHub, Reddit, Lobsters, Dev.to |
 | **Settings** | Partial | Theme customizer (needs full options) |
 
@@ -18,7 +18,7 @@ A personal dashboard/homepage designed to be used as a browser start page. Featu
 - **Framework**: Next.js 15 (App Router)
 - **Styling**: Tailwind CSS + shadcn/ui components
 - **Theming**: 4 themes (Terminal, Amber, Carbon, Light) + background options
-- **APIs**: Open-Meteo (weather), RainViewer (radar), Nominatim (geocoding), plus feed APIs
+- **APIs**: Open-Meteo (weather), RainViewer (radar), NWS (alerts), Nominatim (geocoding), plus feed APIs
 
 ## Related Project
 
@@ -92,6 +92,44 @@ Uses the same design system as portfolio-style-guides:
 - `minimal` - Minimal/clean
 - `none` - No background effect
 
+## Home Section
+
+The home page is the default landing page featuring:
+- **Live weather card**: Shows current temperature, condition, and location (fetched from Open-Meteo)
+- **Daily feed card**: Shows item count from feed API
+- **Settings card**: Quick access to settings
+- **Clickable navigation**: All cards navigate to their respective sections
+
+## Weather Section
+
+### Features
+- **Geolocation**: Auto-detects user location (falls back to San Francisco)
+- **Temperature unit toggle**: °F/°C switch in header (persisted in localStorage)
+- **Live weather data**: Temperature, feels like, humidity, wind, pressure, visibility, UV, cloud cover
+- **Weather alerts**: Real alerts from NWS API (US locations only)
+- **Hourly forecast**: 24-hour forecast with temperature chart
+- **7-day forecast**: Extended daily forecast
+- **Air quality**: AQI with pollutant breakdown (PM2.5, PM10, O3, CO)
+- **Weather radar**: Live precipitation radar from RainViewer (animated)
+- **Historical comparison**: Current vs normal vs record values
+
+### APIs Used
+| API | Purpose | Notes |
+|-----|---------|-------|
+| Open-Meteo | Weather data | Free, no API key |
+| Open-Meteo Air Quality | AQI data | Free, no API key |
+| NWS (api.weather.gov) | Weather alerts | Free, US only |
+| RainViewer | Precipitation radar | Free, global |
+| Nominatim | Reverse geocoding | Free, requires User-Agent |
+
+### Weather Icon Animations
+- **Sunny/Clear**: Smooth 360° rotation (20s)
+- **Other conditions**: Balatro-style floating effect (gentle bob + rotation wobble)
+
+### Unit Preferences (localStorage)
+- `weather-temp-unit`: "fahrenheit" | "celsius"
+- Affects: temperature, wind speed (mph/km/h), visibility (mi/km), pressure (inHg/hPa), precipitation (in/mm)
+
 ## Daily Feed
 
 ### API Endpoints
@@ -120,6 +158,7 @@ GET /api/feed?subreddits=rust,golang    # Custom subreddits
 - r/tui
 
 ### Features
+- **Sort options**: Trending (HN-style algorithm), Newest, Top Rated
 - **Multi-select filtering**: Click source buttons to filter by multiple sources
 - **Save items**: Bookmark items for later (persists in localStorage)
 - **Hide items**: Remove items from feed (can be cleared)
@@ -144,6 +183,21 @@ interface FeedItem {
   description?: string    // GitHub repos
 }
 ```
+
+### Sort Algorithm (Trending)
+Uses HN-style gravity decay:
+```typescript
+trendingScore = score / Math.pow(hoursAgo + 2, 1.8)
+```
+
+### Preferences (localStorage)
+Key: `daily-feed-preferences`
+- `enabledSources`: Which sources to fetch
+- `subreddits`: Custom subreddit list
+- `savedItems`: Bookmarked item IDs
+- `hiddenItems`: Hidden item IDs
+- `savedItemsData`: Full data for saved items
+- `sortBy`: "trending" | "newest" | "top"
 
 ## Future Enhancements
 

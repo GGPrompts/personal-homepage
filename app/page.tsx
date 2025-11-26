@@ -88,22 +88,6 @@ function SidebarContent({
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className={`border-b border-border/20 transition-all duration-300 overflow-hidden ${
-        collapsed && !mobile ? 'h-0 p-0 opacity-0' : 'h-auto p-4 opacity-100'
-      }`}>
-        <div className="grid grid-cols-2 gap-2 text-center">
-          <div className="glass rounded p-2">
-            <p className="text-xl font-bold text-primary">72°</p>
-            <p className="text-xs text-muted-foreground">Weather</p>
-          </div>
-          <div className="glass rounded p-2">
-            <p className="text-xl font-bold text-secondary">18</p>
-            <p className="text-xs text-muted-foreground">Feed Items</p>
-          </div>
-        </div>
-      </div>
-
       {/* Navigation */}
       <nav className="flex-1 p-4 overflow-hidden">
         <ul className="space-y-2">
@@ -116,8 +100,8 @@ function SidebarContent({
                     <button
                       onClick={() => handleClick(item.id)}
                       className={`
-                        w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200
-                        ${collapsed && !mobile ? 'justify-center' : ''}
+                        w-full flex items-center rounded-lg transition-colors duration-200
+                        ${collapsed && !mobile ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'}
                         ${activeSection === item.id
                           ? 'glass text-primary border-glow'
                           : 'hover:bg-primary/10 text-muted-foreground hover:text-foreground'
@@ -125,7 +109,7 @@ function SidebarContent({
                       `}
                     >
                       <Icon className="h-5 w-5 flex-shrink-0" />
-                      <span className={`transition-all duration-300 overflow-hidden ${
+                      <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap ${
                         collapsed && !mobile ? 'w-0 opacity-0' : 'w-auto opacity-100'
                       }`}>{item.label}</span>
                     </button>
@@ -158,33 +142,158 @@ function SidebarContent({
 }
 
 // ============================================================================
-// HOME SECTION (Placeholder)
+// HOME SECTION
 // ============================================================================
 
-function HomeSection() {
+function HomeSection({ onNavigate }: { onNavigate: (section: Section) => void }) {
+  const [weatherTemp, setWeatherTemp] = React.useState<number | null>(null)
+  const [feedCount, setFeedCount] = React.useState<number | null>(null)
+  const [weatherCondition, setWeatherCondition] = React.useState<string>("Loading...")
+  const [weatherLocation, setWeatherLocation] = React.useState<string>("")
+
+  // Fetch weather summary
+  React.useEffect(() => {
+    const fetchWeather = async () => {
+      try {
+        // Try to get user location
+        if ("geolocation" in navigator) {
+          navigator.geolocation.getCurrentPosition(
+            async (position) => {
+              const { latitude, longitude } = position.coords
+              const params = new URLSearchParams({
+                latitude: latitude.toString(),
+                longitude: longitude.toString(),
+                current: "temperature_2m,weather_code",
+                temperature_unit: "fahrenheit",
+              })
+              const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)
+              if (res.ok) {
+                const data = await res.json()
+                setWeatherTemp(Math.round(data.current.temperature_2m))
+                // Simple weather code mapping
+                const code = data.current.weather_code
+                if (code === 0) setWeatherCondition("Clear")
+                else if (code <= 3) setWeatherCondition("Partly Cloudy")
+                else if (code <= 48) setWeatherCondition("Foggy")
+                else if (code <= 67) setWeatherCondition("Rainy")
+                else if (code <= 77) setWeatherCondition("Snowy")
+                else if (code <= 82) setWeatherCondition("Showers")
+                else setWeatherCondition("Stormy")
+              }
+              // Reverse geocode for location name
+              const geoRes = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
+                { headers: { "User-Agent": "PersonalHomepage/1.0" } }
+              )
+              if (geoRes.ok) {
+                const geoData = await geoRes.json()
+                const city = geoData.address?.city || geoData.address?.town || geoData.address?.village
+                const state = geoData.address?.state
+                if (city && state) setWeatherLocation(`${city}, ${state}`)
+                else if (city) setWeatherLocation(city)
+              }
+            },
+            async () => {
+              // Fallback to default location (San Francisco)
+              const params = new URLSearchParams({
+                latitude: "37.7749",
+                longitude: "-122.4194",
+                current: "temperature_2m,weather_code",
+                temperature_unit: "fahrenheit",
+              })
+              const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)
+              if (res.ok) {
+                const data = await res.json()
+                setWeatherTemp(Math.round(data.current.temperature_2m))
+                setWeatherCondition("Clear")
+                setWeatherLocation("San Francisco, CA")
+              }
+            }
+          )
+        }
+      } catch (e) {
+        console.error("Failed to fetch weather:", e)
+      }
+    }
+    fetchWeather()
+  }, [])
+
+  // Fetch feed count
+  React.useEffect(() => {
+    const fetchFeedCount = async () => {
+      try {
+        const res = await fetch("/api/feed")
+        if (res.ok) {
+          const data = await res.json()
+          setFeedCount(data.items?.length || 0)
+        }
+      } catch (e) {
+        console.error("Failed to fetch feed:", e)
+      }
+    }
+    fetchFeedCount()
+  }, [])
+
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold terminal-glow mb-2">Welcome Home</h1>
       <p className="text-muted-foreground mb-8">Your personal dashboard overview</p>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <div className="glass rounded-lg p-6">
-          <Cloud className="h-8 w-8 text-primary mb-4" />
-          <h3 className="font-semibold mb-2">Weather</h3>
-          <p className="text-sm text-muted-foreground">Live weather monitoring with Open-Meteo</p>
-        </div>
+        {/* Weather Card */}
+        <button
+          onClick={() => onNavigate("weather")}
+          className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+        >
+          <div className="flex items-start justify-between mb-4">
+            <Cloud className="h-8 w-8 text-primary" />
+            {weatherTemp !== null && (
+              <span className="text-3xl font-bold text-primary">{weatherTemp}°</span>
+            )}
+          </div>
+          <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Weather</h3>
+          {weatherTemp !== null ? (
+            <div className="text-sm text-muted-foreground">
+              <p>{weatherCondition}</p>
+              {weatherLocation && <p className="text-xs mt-1">{weatherLocation}</p>}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Loading weather data...</p>
+          )}
+        </button>
 
-        <div className="glass rounded-lg p-6">
-          <Newspaper className="h-8 w-8 text-primary mb-4" />
-          <h3 className="font-semibold mb-2">Daily Feed</h3>
-          <p className="text-sm text-muted-foreground">AI-curated content from HN, GitHub, Reddit</p>
-        </div>
+        {/* Daily Feed Card */}
+        <button
+          onClick={() => onNavigate("feed")}
+          className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+        >
+          <div className="flex items-start justify-between mb-4">
+            <Newspaper className="h-8 w-8 text-primary" />
+            {feedCount !== null && (
+              <span className="text-3xl font-bold text-primary">{feedCount}</span>
+            )}
+          </div>
+          <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Daily Feed</h3>
+          {feedCount !== null ? (
+            <p className="text-sm text-muted-foreground">
+              {feedCount} items from HN, GitHub, Reddit & more
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">Loading feed...</p>
+          )}
+        </button>
 
-        <div className="glass rounded-lg p-6">
-          <Settings className="h-8 w-8 text-primary mb-4" />
-          <h3 className="font-semibold mb-2">Settings</h3>
+        {/* Settings Card */}
+        <button
+          onClick={() => onNavigate("settings")}
+          className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+        >
+          <div className="flex items-start justify-between mb-4">
+            <Settings className="h-8 w-8 text-primary" />
+          </div>
+          <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Settings</h3>
           <p className="text-sm text-muted-foreground">Customize themes and preferences</p>
-        </div>
+        </button>
       </div>
     </div>
   )
@@ -224,13 +333,13 @@ function SettingsSection() {
 export default function PersonalHomepage() {
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
-  const [activeSection, setActiveSection] = React.useState<Section>("weather")
+  const [activeSection, setActiveSection] = React.useState<Section>("home")
 
   // Render the active section content
   const renderContent = () => {
     switch (activeSection) {
       case "home":
-        return <HomeSection />
+        return <HomeSection onNavigate={setActiveSection} />
       case "weather":
         return <WeatherDashboard />
       case "feed":
@@ -238,7 +347,7 @@ export default function PersonalHomepage() {
       case "settings":
         return <SettingsSection />
       default:
-        return <HomeSection />
+        return <HomeSection onNavigate={setActiveSection} />
     }
   }
 
