@@ -122,8 +122,13 @@ function renderMarkdown(markdown: string): string {
     .replace(/`([^`]+)`/g, '<code class="md-code">$1</code>')
     // Images
     .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="md-img" />')
-    // Links
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>')
+    // Links (anchor links stay in page, external links open new tab)
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, href) => {
+      if (href.startsWith('#')) {
+        return `<a href="${href}" class="md-link">${text}</a>`
+      }
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="md-link">${text}</a>`
+    })
     // Blockquotes (can be multi-line)
     .replace(/^> (.+)$/gm, '<blockquote class="md-blockquote">$1</blockquote>')
     // Task lists
