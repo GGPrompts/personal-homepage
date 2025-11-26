@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useState, useEffect, useMemo } from "react"
+import React, { useState, useEffect, useMemo, useCallback } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Cloud,
@@ -229,6 +230,16 @@ interface RainViewerData {
     nowcast: Array<{ time: number; path: string }>
   }
   host: string
+}
+
+// Combined weather data returned by the query
+interface WeatherQueryData {
+  currentWeather: CurrentWeather
+  hourlyForecast: HourlyForecast[]
+  dailyForecast: DailyForecast[]
+  airQuality: AirQuality
+  weatherAlerts: WeatherAlert[]
+  isDaytime: boolean
 }
 
 // ============================================================================
@@ -506,6 +517,134 @@ function getAqiRecommendation(category: AirQuality["category"]): string {
   }
 }
 
+// Combined fetch function for useQuery
+async function fetchAllWeatherData(
+  lat: number,
+  lon: number,
+  unit: "fahrenheit" | "celsius"
+): Promise<WeatherQueryData> {
+  // Fetch weather, air quality, and NWS alerts in parallel
+  const [weatherData, aqData, alertsData] = await Promise.all([
+    fetchWeatherData(lat, lon, unit),
+    fetchAirQuality(lat, lon).catch(() => null),
+    fetchNWSAlerts(lat, lon).catch(() => []),
+  ])
+
+  // Parse current weather
+  const current = weatherData.current
+  const weatherInfo = getWeatherFromCode(current.weather_code)
+
+  // Find current hour index for UV and visibility
+  const now = new Date()
+  const currentHourIndex = weatherData.hourly.time.findIndex((t) => {
+    const hourDate = new Date(t)
+    return hourDate.getHours() === now.getHours() && hourDate.getDate() === now.getDate()
+  })
+
+  const currentWeather: CurrentWeather = {
+    temperature: current.temperature_2m,
+    feelsLike: current.apparent_temperature,
+    condition: weatherInfo.condition,
+    description: weatherInfo.description,
+    humidity: current.relative_humidity_2m,
+    pressure: unit === "fahrenheit"
+      ? current.pressure_msl * 0.02953
+      : current.pressure_msl,
+    windSpeed: current.wind_speed_10m,
+    windDirection: current.wind_direction_10m,
+    visibility: currentHourIndex >= 0
+      ? unit === "fahrenheit"
+        ? weatherData.hourly.visibility[currentHourIndex] / 1609.34
+        : weatherData.hourly.visibility[currentHourIndex] / 1000
+      : 10,
+    cloudCover: current.cloud_cover,
+    uvIndex: currentHourIndex >= 0 ? weatherData.hourly.uv_index[currentHourIndex] : 0,
+    dewPoint: currentHourIndex >= 0 ? weatherData.hourly.dew_point_2m[currentHourIndex] : 50,
+    precipitation: current.precipitation,
+  }
+
+  // Parse hourly forecast (next 24 hours)
+  const hourlyForecast: HourlyForecast[] = []
+  const startIndex = currentHourIndex >= 0 ? currentHourIndex : 0
+  for (let i = startIndex; i < Math.min(startIndex + 24, weatherData.hourly.time.length); i++) {
+    const hourDate = new Date(weatherData.hourly.time[i])
+    const hourWeather = getWeatherFromCode(weatherData.hourly.weather_code[i])
+
+    hourlyForecast.push({
+      hour: hourDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+      temp: Math.round(weatherData.hourly.temperature_2m[i]),
+      condition: hourWeather.condition,
+      precipChance: weatherData.hourly.precipitation_probability[i] || 0,
+      windSpeed: Math.round(weatherData.hourly.wind_speed_10m[i]),
+      humidity: weatherData.hourly.relative_humidity_2m[i],
+    })
+  }
+
+  // Parse daily forecast
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+  const dailyForecast: DailyForecast[] = weatherData.daily.time.map((date, i) => {
+    const dayDate = new Date(date)
+    const dayWeather = getWeatherFromCode(weatherData.daily.weather_code[i])
+    const isToday = dayDate.toDateString() === now.toDateString()
+    const isTomorrow = dayDate.toDateString() === new Date(now.getTime() + 86400000).toDateString()
+
+    return {
+      day: isToday ? "Today" : isTomorrow ? "Tomorrow" : days[dayDate.getDay()],
+      highTemp: Math.round(weatherData.daily.temperature_2m_max[i]),
+      lowTemp: Math.round(weatherData.daily.temperature_2m_min[i]),
+      condition: dayWeather.condition,
+      precipChance: weatherData.daily.precipitation_probability_max[i] || 0,
+      sunrise: new Date(weatherData.daily.sunrise[i]).toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+      }),
+      sunset: new Date(weatherData.daily.sunset[i]).toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+      }),
+      uvIndex: Math.round(weatherData.daily.uv_index_max[i]),
+    }
+  })
+
+  // Parse air quality
+  let airQuality: AirQuality = {
+    aqi: 0,
+    category: "good",
+    pm25: 0,
+    pm10: 0,
+    o3: 0,
+    co: 0,
+    no2: 0,
+    so2: 0,
+    healthRecommendation: "Air quality data unavailable",
+  }
+
+  if (aqData) {
+    const aq = aqData.current
+    const category = getAqiCategory(aq.us_aqi)
+    airQuality = {
+      aqi: aq.us_aqi,
+      category,
+      pm25: aq.pm2_5,
+      pm10: aq.pm10,
+      o3: aq.ozone,
+      co: aq.carbon_monoxide / 1000,
+      no2: aq.nitrogen_dioxide,
+      so2: aq.sulphur_dioxide,
+      healthRecommendation: getAqiRecommendation(category),
+    }
+  }
+
+  return {
+    currentWeather,
+    hourlyForecast,
+    dailyForecast,
+    airQuality,
+    weatherAlerts: alertsData,
+    isDaytime: current.is_day === 1,
+  }
+}
+
 // ============================================================================
 // MOCK DATA & GENERATORS
 // ============================================================================
@@ -617,33 +756,36 @@ const HISTORICAL_DATA: HistoricalComparison[] = [
 // ============================================================================
 
 export default function WeatherDashboard() {
+  // UI state
   const [isLive, setIsLive] = useState(true)
-  const [currentWeather, setCurrentWeather] = useState<CurrentWeather>(INITIAL_WEATHER)
-  const [hourlyForecast, setHourlyForecast] = useState<HourlyForecast[]>([])
-  const [dailyForecast, setDailyForecast] = useState<DailyForecast[]>([])
-  const [airQuality, setAirQuality] = useState<AirQuality>(AIR_QUALITY)
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
-  const [geoLocation, setGeoLocation] = useState<GeoLocation>(DEFAULT_LOCATION)
   const [selectedMapLayer, setSelectedMapLayer] = useState<"radar" | "temperature" | "wind" | "clouds">("radar")
-  const [isDaytime, setIsDaytime] = useState(true)
-  const [radarAnimation, setRadarAnimation] = useState(0)
 
-  // New state for API integration
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Location state (persisted in localStorage)
+  const [geoLocation, setGeoLocation] = useState<GeoLocation>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("weather-location")
+      if (saved) {
+        try {
+          return JSON.parse(saved)
+        } catch {
+          // Invalid JSON, use default
+        }
+      }
+    }
+    return DEFAULT_LOCATION
+  })
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false)
+
+  // Search state
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<GeoLocation[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [showSearchResults, setShowSearchResults] = useState(false)
-  const [locationResolved, setLocationResolved] = useState(false)
 
   // Radar map state
   const [radarData, setRadarData] = useState<RainViewerData | null>(null)
   const [radarFrameIndex, setRadarFrameIndex] = useState(0)
   const [isRadarPlaying, setIsRadarPlaying] = useState(true)
-
-  // Weather alerts state (from NWS API)
-  const [weatherAlerts, setWeatherAlerts] = useState<WeatherAlert[]>([])
 
   // Temperature unit preference (persisted in localStorage)
   const [tempUnit, setTempUnit] = useState<"fahrenheit" | "celsius">(() => {
@@ -659,131 +801,53 @@ export default function WeatherDashboard() {
     localStorage.setItem("weather-temp-unit", tempUnit)
   }, [tempUnit])
 
-  // Fetch weather data from Open-Meteo API
-  const fetchAllWeatherData = async (lat: number, lon: number, unit: "fahrenheit" | "celsius") => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      // Fetch weather, air quality, and NWS alerts in parallel
-      const [weatherData, aqData, alertsData] = await Promise.all([
-        fetchWeatherData(lat, lon, unit),
-        fetchAirQuality(lat, lon).catch(() => null), // Air quality is optional
-        fetchNWSAlerts(lat, lon).catch(() => []), // Alerts are optional (US only)
-      ])
-
-      // Update weather alerts
-      setWeatherAlerts(alertsData)
-
-      // Parse current weather
-      const current = weatherData.current
-      const weatherInfo = getWeatherFromCode(current.weather_code)
-
-      // Find current hour index for UV and visibility
-      const now = new Date()
-      const currentHourIndex = weatherData.hourly.time.findIndex((t) => {
-        const hourDate = new Date(t)
-        return hourDate.getHours() === now.getHours() && hourDate.getDate() === now.getDate()
-      })
-
-      setCurrentWeather({
-        temperature: current.temperature_2m,
-        feelsLike: current.apparent_temperature,
-        condition: weatherInfo.condition,
-        description: weatherInfo.description,
-        humidity: current.relative_humidity_2m,
-        pressure: unit === "fahrenheit"
-          ? current.pressure_msl * 0.02953 // Convert hPa to inHg
-          : current.pressure_msl, // Keep as hPa for metric
-        windSpeed: current.wind_speed_10m,
-        windDirection: current.wind_direction_10m,
-        visibility: currentHourIndex >= 0
-          ? unit === "fahrenheit"
-            ? weatherData.hourly.visibility[currentHourIndex] / 1609.34 // Convert m to miles
-            : weatherData.hourly.visibility[currentHourIndex] / 1000 // Convert m to km
-          : 10,
-        cloudCover: current.cloud_cover,
-        uvIndex: currentHourIndex >= 0 ? weatherData.hourly.uv_index[currentHourIndex] : 0,
-        dewPoint: currentHourIndex >= 0 ? weatherData.hourly.dew_point_2m[currentHourIndex] : 50,
-        precipitation: current.precipitation,
-      })
-
-      setIsDaytime(current.is_day === 1)
-
-      // Parse hourly forecast (next 24 hours)
-      const hourlyData: HourlyForecast[] = []
-      const startIndex = currentHourIndex >= 0 ? currentHourIndex : 0
-      for (let i = startIndex; i < Math.min(startIndex + 24, weatherData.hourly.time.length); i++) {
-        const hourDate = new Date(weatherData.hourly.time[i])
-        const hourWeather = getWeatherFromCode(weatherData.hourly.weather_code[i])
-
-        hourlyData.push({
-          hour: hourDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-          temp: Math.round(weatherData.hourly.temperature_2m[i]),
-          condition: hourWeather.condition,
-          precipChance: weatherData.hourly.precipitation_probability[i] || 0,
-          windSpeed: Math.round(weatherData.hourly.wind_speed_10m[i]),
-          humidity: weatherData.hourly.relative_humidity_2m[i],
-        })
-      }
-      setHourlyForecast(hourlyData)
-
-      // Parse daily forecast
-      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-      const dailyData: DailyForecast[] = weatherData.daily.time.map((date, i) => {
-        const dayDate = new Date(date)
-        const dayWeather = getWeatherFromCode(weatherData.daily.weather_code[i])
-        const isToday = dayDate.toDateString() === now.toDateString()
-        const isTomorrow = dayDate.toDateString() === new Date(now.getTime() + 86400000).toDateString()
-
-        return {
-          day: isToday ? "Today" : isTomorrow ? "Tomorrow" : days[dayDate.getDay()],
-          highTemp: Math.round(weatherData.daily.temperature_2m_max[i]),
-          lowTemp: Math.round(weatherData.daily.temperature_2m_min[i]),
-          condition: dayWeather.condition,
-          precipChance: weatherData.daily.precipitation_probability_max[i] || 0,
-          sunrise: new Date(weatherData.daily.sunrise[i]).toLocaleTimeString("en-US", {
-            hour: "numeric",
-            minute: "2-digit",
-          }),
-          sunset: new Date(weatherData.daily.sunset[i]).toLocaleTimeString("en-US", {
-            hour: "numeric",
-            minute: "2-digit",
-          }),
-          uvIndex: Math.round(weatherData.daily.uv_index_max[i]),
-        }
-      })
-      setDailyForecast(dailyData)
-
-      // Parse air quality if available
-      if (aqData) {
-        const aq = aqData.current
-        const category = getAqiCategory(aq.us_aqi)
-        setAirQuality({
-          aqi: aq.us_aqi,
-          category,
-          pm25: aq.pm2_5,
-          pm10: aq.pm10,
-          o3: aq.ozone,
-          co: aq.carbon_monoxide / 1000, // Convert µg/m³ to ppm (approximate)
-          no2: aq.nitrogen_dioxide,
-          so2: aq.sulphur_dioxide,
-          healthRecommendation: getAqiRecommendation(category),
-        })
-      }
-
-      setLastUpdate(new Date())
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch weather data")
-      console.error("Weather fetch error:", err)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Get user's geolocation on mount
+  // Persist location preference
   useEffect(() => {
+    localStorage.setItem("weather-location", JSON.stringify(geoLocation))
+  }, [geoLocation])
+
+  // Weather data query with TanStack Query
+  const {
+    data: weatherData,
+    isLoading,
+    error,
+    dataUpdatedAt,
+    refetch,
+  } = useQuery({
+    queryKey: ["weather", geoLocation.latitude, geoLocation.longitude, tempUnit],
+    queryFn: () => fetchAllWeatherData(geoLocation.latitude, geoLocation.longitude, tempUnit),
+    staleTime: 5 * 60 * 1000, // Data fresh for 5 minutes
+    gcTime: 30 * 60 * 1000, // Cache for 30 minutes
+    refetchInterval: isLive ? 5 * 60 * 1000 : false, // Auto-refetch every 5 min if live
+  })
+
+  // Extract data from query result (with fallbacks)
+  const currentWeather = weatherData?.currentWeather ?? INITIAL_WEATHER
+  const hourlyForecast = weatherData?.hourlyForecast ?? []
+  const dailyForecast = weatherData?.dailyForecast ?? []
+  const airQuality = weatherData?.airQuality ?? AIR_QUALITY
+  const weatherAlerts = weatherData?.weatherAlerts ?? []
+  const isDaytime = weatherData?.isDaytime ?? true
+
+  // Get user's geolocation on first visit (only if using default location)
+  useEffect(() => {
+    // Skip if we already have a saved location that's not the default
+    const savedLocation = localStorage.getItem("weather-location")
+    if (savedLocation) {
+      try {
+        const parsed = JSON.parse(savedLocation)
+        // If it's not the default location, don't auto-detect
+        if (parsed.latitude !== DEFAULT_LOCATION.latitude ||
+            parsed.longitude !== DEFAULT_LOCATION.longitude) {
+          return
+        }
+      } catch {
+        // Continue with detection
+      }
+    }
+
     if ("geolocation" in navigator) {
+      setIsDetectingLocation(true)
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const { latitude, longitude } = position.coords
@@ -794,36 +858,16 @@ export default function WeatherDashboard() {
             longitude,
             name: locationName,
           })
-          setLocationResolved(true)
+          setIsDetectingLocation(false)
         },
         () => {
-          // Geolocation denied or failed, use default location
-          console.log("Geolocation not available, using default location")
-          setLocationResolved(true)
+          // Geolocation denied or failed, keep current location
+          console.log("Geolocation not available, using saved/default location")
+          setIsDetectingLocation(false)
         }
       )
-    } else {
-      // Geolocation not supported, use default
-      setLocationResolved(true)
     }
   }, [])
-
-  // Fetch weather data when location or temperature unit changes
-  useEffect(() => {
-    fetchAllWeatherData(geoLocation.latitude, geoLocation.longitude, tempUnit)
-  }, [geoLocation, tempUnit])
-
-  // Auto-refresh weather data when live mode is enabled
-  useEffect(() => {
-    if (!isLive) return
-
-    const interval = setInterval(() => {
-      fetchAllWeatherData(geoLocation.latitude, geoLocation.longitude, tempUnit)
-      setRadarAnimation((prev) => (prev + 1) % 100)
-    }, 300000) // Refresh every 5 minutes (300000ms)
-
-    return () => clearInterval(interval)
-  }, [isLive, geoLocation, tempUnit])
 
   // Fetch RainViewer radar data
   useEffect(() => {
@@ -938,7 +982,7 @@ export default function WeatherDashboard() {
           <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground terminal-glow">Live Weather Monitoring</h1>
           <div className="mt-1 flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
             <MapPin className="h-3 w-3 sm:h-4 sm:w-4" />
-            {locationResolved ? geoLocation.name : "Detecting location..."}
+            {geoLocation.name}{isDetectingLocation && " (updating...)"}
             <Separator orientation="vertical" className="h-3 sm:h-4" />
             <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
             <span suppressHydrationWarning>{currentTime}</span>
@@ -1037,7 +1081,7 @@ export default function WeatherDashboard() {
           </div>
           <Badge variant="outline" className="gap-1 text-xs">
             <Activity className="h-3 w-3" />
-            Updated {timeAgo(lastUpdate)}
+            Updated {dataUpdatedAt ? timeAgo(new Date(dataUpdatedAt)) : "..."}
           </Badge>
           <Button
             variant={isLive ? "default" : "outline"}
@@ -1083,12 +1127,12 @@ export default function WeatherDashboard() {
             <CardContent className="pt-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <AlertTriangle className="h-5 w-5 text-red-500" />
-                <p className="text-sm text-red-500">{error}</p>
+                <p className="text-sm text-red-500">{error instanceof Error ? error.message : "Failed to fetch weather data"}</p>
               </div>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => fetchAllWeatherData(geoLocation.latitude, geoLocation.longitude, tempUnit)}
+                onClick={() => refetch()}
               >
                 Retry
               </Button>

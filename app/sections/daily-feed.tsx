@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useQuery } from "@tanstack/react-query"
 import {
   RefreshCw,
   ExternalLink,
@@ -95,6 +96,29 @@ const SOURCE_CONFIG: Record<FeedSource, {
 const DEFAULT_SUBREDDITS = ["commandline", "ClaudeAI", "ClaudeCode", "cli", "tui"]
 
 const STORAGE_KEY = "daily-feed-preferences"
+
+// Fetch function for useQuery
+async function fetchFeedData(
+  enabledSources: FeedSource[],
+  subreddits: string[]
+): Promise<FeedResponse> {
+  const params = new URLSearchParams()
+  if (enabledSources.length < 5) {
+    params.set("sources", enabledSources.join(","))
+  }
+  if (subreddits.length > 0 && enabledSources.includes("reddit")) {
+    params.set("subreddits", subreddits.join(","))
+  }
+
+  const url = `/api/feed${params.toString() ? `?${params}` : ""}`
+  const res = await fetch(url)
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch feed: ${res.status}`)
+  }
+
+  return res.json()
+}
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -441,13 +465,6 @@ function SourceToggle({
 // ============================================================================
 
 export default function DailyFeedSection() {
-  // State
-  const [items, setItems] = React.useState<FeedItem[]>([])
-  const [loading, setLoading] = React.useState(true)
-  const [error, setError] = React.useState<string | null>(null)
-  const [fetchedAt, setFetchedAt] = React.useState<string | null>(null)
-  const [sourceStats, setSourceStats] = React.useState<FeedResponse["sources"]>([])
-
   // Filter state
   const [viewMode, setViewMode] = React.useState<"all" | "saved" | "filtered">("all")
   const [selectedSources, setSelectedSources] = React.useState<Set<FeedSource>>(new Set())
@@ -456,6 +473,7 @@ export default function DailyFeedSection() {
   ])
   const [subreddits, setSubreddits] = React.useState<string[]>(DEFAULT_SUBREDDITS)
   const [sortBy, setSortBy] = React.useState<SortOption>("trending")
+  const [prefsLoaded, setPrefsLoaded] = React.useState(false)
 
   // Saved/Hidden state
   const [savedItems, setSavedItems] = React.useState<Set<string>>(new Set())
@@ -478,7 +496,27 @@ export default function DailyFeedSection() {
     } catch (e) {
       console.error("Failed to load preferences:", e)
     }
+    setPrefsLoaded(true)
   }, [])
+
+  // Feed data query with TanStack Query
+  const {
+    data: feedData,
+    isLoading: loading,
+    error,
+    refetch: fetchFeed,
+  } = useQuery({
+    queryKey: ["feed", enabledSources, subreddits],
+    queryFn: () => fetchFeedData(enabledSources, subreddits),
+    staleTime: 15 * 60 * 1000, // Data fresh for 15 minutes (matches server cache)
+    gcTime: 30 * 60 * 1000, // Cache for 30 minutes
+    enabled: prefsLoaded, // Only fetch after preferences are loaded
+  })
+
+  // Extract data from query result
+  const items = feedData?.items ?? []
+  const fetchedAt = feedData?.fetchedAt ?? null
+  const sourceStats = feedData?.sources ?? []
 
   // Save preferences to localStorage
   React.useEffect(() => {
@@ -572,42 +610,6 @@ export default function DailyFeedSection() {
     setViewMode("saved")
   }
 
-  // Fetch feed data
-  const fetchFeed = React.useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const params = new URLSearchParams()
-      if (enabledSources.length < 5) {
-        params.set("sources", enabledSources.join(","))
-      }
-      if (subreddits.length > 0 && enabledSources.includes("reddit")) {
-        params.set("subreddits", subreddits.join(","))
-      }
-
-      const url = `/api/feed${params.toString() ? `?${params}` : ""}`
-      const res = await fetch(url)
-
-      if (!res.ok) {
-        throw new Error(`Failed to fetch feed: ${res.status}`)
-      }
-
-      const data: FeedResponse = await res.json()
-      setItems(data.items)
-      setFetchedAt(data.fetchedAt)
-      setSourceStats(data.sources)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to fetch feed")
-    } finally {
-      setLoading(false)
-    }
-  }, [enabledSources, subreddits])
-
-  // Initial fetch
-  React.useEffect(() => {
-    fetchFeed()
-  }, [fetchFeed])
 
   // Toggle source
   const toggleSource = (source: FeedSource) => {
@@ -727,7 +729,7 @@ export default function DailyFeedSection() {
           <Button
             variant="outline"
             size="sm"
-            onClick={fetchFeed}
+            onClick={() => fetchFeed()}
             disabled={loading}
             className="gap-2"
           >
@@ -811,9 +813,9 @@ export default function DailyFeedSection() {
           <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
           <div>
             <p className="font-medium text-red-400">Failed to load feed</p>
-            <p className="text-sm text-muted-foreground">{error}</p>
+            <p className="text-sm text-muted-foreground">{error instanceof Error ? error.message : "Unknown error"}</p>
           </div>
-          <Button variant="outline" size="sm" onClick={fetchFeed} className="ml-auto">
+          <Button variant="outline" size="sm" onClick={() => fetchFeed()} className="ml-auto">
             Retry
           </Button>
         </div>
@@ -838,7 +840,7 @@ export default function DailyFeedSection() {
             <p className="text-sm text-muted-foreground mb-4">
               Try enabling more sources or adjusting your subreddits
             </p>
-            <Button variant="outline" onClick={fetchFeed}>
+            <Button variant="outline" onClick={() => fetchFeed()}>
               Refresh Feed
             </Button>
           </div>

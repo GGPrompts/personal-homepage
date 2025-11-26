@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useQuery } from "@tanstack/react-query"
 import {
   Cloud,
   Newspaper,
@@ -12,6 +13,9 @@ import {
   Calendar,
   Bookmark,
   RefreshCw,
+  MapPin,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
@@ -45,7 +49,6 @@ interface NavigationItem {
 // ============================================================================
 
 const navigationItems: NavigationItem[] = [
-  { id: "home", label: "Home", icon: Home, description: "Dashboard overview" },
   { id: "weather", label: "Weather", icon: Cloud, description: "Live weather monitoring" },
   { id: "feed", label: "Daily Feed", icon: Newspaper, description: "AI-curated content" },
   { id: "settings", label: "Settings", icon: Settings, description: "Theme & preferences" },
@@ -75,18 +78,30 @@ function SidebarContent({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className={`p-4 border-b border-border/20 transition-all duration-300 ${collapsed && !mobile ? 'px-3' : ''}`}>
-        <div className={`flex items-center gap-3 transition-all duration-300 ${collapsed && !mobile ? 'justify-center' : ''}`}>
-          <div className="h-10 w-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
-            <Home className="h-5 w-5 text-primary" />
-          </div>
-          <div className={`transition-all duration-300 overflow-hidden ${collapsed && !mobile ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>
-            <p className="font-semibold text-foreground">Personal Home</p>
-            <p className="text-xs text-muted-foreground">Dashboard</p>
-          </div>
-        </div>
-      </div>
+      {/* Header - clickable to return home */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={() => handleClick("home")}
+            className={`p-4 border-b border-border/20 transition-all duration-300 w-full text-left hover:bg-primary/5 ${collapsed && !mobile ? 'px-3' : ''}`}
+          >
+            <div className={`flex items-center gap-3 transition-all duration-300 ${collapsed && !mobile ? 'justify-center' : ''}`}>
+              <div className="h-10 w-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+                <Home className="h-5 w-5 text-primary" />
+              </div>
+              <div className={`transition-all duration-300 overflow-hidden ${collapsed && !mobile ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>
+                <p className="font-semibold text-foreground">Personal Home</p>
+                <p className="text-xs text-muted-foreground">Dashboard</p>
+              </div>
+            </div>
+          </button>
+        </TooltipTrigger>
+        {(collapsed && !mobile) && (
+          <TooltipContent side="right">
+            <p>Home</p>
+          </TooltipContent>
+        )}
+      </Tooltip>
 
       {/* Navigation */}
       <nav className="flex-1 p-4 overflow-hidden">
@@ -145,94 +160,105 @@ function SidebarContent({
 // HOME SECTION
 // ============================================================================
 
+// Default location (San Francisco)
+const DEFAULT_LOCATION = {
+  latitude: 37.7749,
+  longitude: -122.4194,
+  name: "San Francisco, CA",
+}
+
+// Weather code to condition mapping
+function getConditionFromCode(code: number): string {
+  if (code === 0) return "Clear"
+  if (code <= 3) return "Partly Cloudy"
+  if (code <= 48) return "Foggy"
+  if (code <= 67) return "Rainy"
+  if (code <= 77) return "Snowy"
+  if (code <= 82) return "Showers"
+  return "Stormy"
+}
+
+// Fetch weather summary for home card
+async function fetchHomeWeather(lat: number, lon: number, unit: "fahrenheit" | "celsius") {
+  const params = new URLSearchParams({
+    latitude: lat.toString(),
+    longitude: lon.toString(),
+    current: "temperature_2m,weather_code",
+    daily: "temperature_2m_max,temperature_2m_min",
+    temperature_unit: unit,
+    forecast_days: "1",
+    timezone: "auto",
+  })
+  const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)
+  if (!res.ok) throw new Error("Failed to fetch weather")
+  const data = await res.json()
+  return {
+    temp: Math.round(data.current.temperature_2m),
+    condition: getConditionFromCode(data.current.weather_code),
+    high: Math.round(data.daily.temperature_2m_max[0]),
+    low: Math.round(data.daily.temperature_2m_min[0]),
+  }
+}
+
 function HomeSection({ onNavigate }: { onNavigate: (section: Section) => void }) {
-  const [weatherTemp, setWeatherTemp] = React.useState<number | null>(null)
-  const [feedCount, setFeedCount] = React.useState<number | null>(null)
-  const [weatherCondition, setWeatherCondition] = React.useState<string>("Loading...")
-  const [weatherLocation, setWeatherLocation] = React.useState<string>("")
-
-  // Fetch weather summary
-  React.useEffect(() => {
-    const fetchWeather = async () => {
-      try {
-        // Try to get user location
-        if ("geolocation" in navigator) {
-          navigator.geolocation.getCurrentPosition(
-            async (position) => {
-              const { latitude, longitude } = position.coords
-              const params = new URLSearchParams({
-                latitude: latitude.toString(),
-                longitude: longitude.toString(),
-                current: "temperature_2m,weather_code",
-                temperature_unit: "fahrenheit",
-              })
-              const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)
-              if (res.ok) {
-                const data = await res.json()
-                setWeatherTemp(Math.round(data.current.temperature_2m))
-                // Simple weather code mapping
-                const code = data.current.weather_code
-                if (code === 0) setWeatherCondition("Clear")
-                else if (code <= 3) setWeatherCondition("Partly Cloudy")
-                else if (code <= 48) setWeatherCondition("Foggy")
-                else if (code <= 67) setWeatherCondition("Rainy")
-                else if (code <= 77) setWeatherCondition("Snowy")
-                else if (code <= 82) setWeatherCondition("Showers")
-                else setWeatherCondition("Stormy")
-              }
-              // Reverse geocode for location name
-              const geoRes = await fetch(
-                `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-                { headers: { "User-Agent": "PersonalHomepage/1.0" } }
-              )
-              if (geoRes.ok) {
-                const geoData = await geoRes.json()
-                const city = geoData.address?.city || geoData.address?.town || geoData.address?.village
-                const state = geoData.address?.state
-                if (city && state) setWeatherLocation(`${city}, ${state}`)
-                else if (city) setWeatherLocation(city)
-              }
-            },
-            async () => {
-              // Fallback to default location (San Francisco)
-              const params = new URLSearchParams({
-                latitude: "37.7749",
-                longitude: "-122.4194",
-                current: "temperature_2m,weather_code",
-                temperature_unit: "fahrenheit",
-              })
-              const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)
-              if (res.ok) {
-                const data = await res.json()
-                setWeatherTemp(Math.round(data.current.temperature_2m))
-                setWeatherCondition("Clear")
-                setWeatherLocation("San Francisco, CA")
-              }
-            }
-          )
+  // Get saved location and temp unit from localStorage (same as Weather section)
+  const [location, setLocation] = React.useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("weather-location")
+      if (saved) {
+        try {
+          return JSON.parse(saved)
+        } catch {
+          // Invalid JSON
         }
-      } catch (e) {
-        console.error("Failed to fetch weather:", e)
       }
     }
-    fetchWeather()
-  }, [])
+    return DEFAULT_LOCATION
+  })
 
-  // Fetch feed count
+  const [tempUnit] = React.useState<"fahrenheit" | "celsius">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("weather-temp-unit")
+      if (saved === "celsius" || saved === "fahrenheit") return saved
+    }
+    return "fahrenheit"
+  })
+
+  // Use same query key pattern as Weather section for cache sharing
+  const { data: weather, isLoading: weatherLoading } = useQuery({
+    queryKey: ["home-weather", location.latitude, location.longitude, tempUnit],
+    queryFn: () => fetchHomeWeather(location.latitude, location.longitude, tempUnit),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  })
+
+  // Listen for location changes from Weather section
   React.useEffect(() => {
-    const fetchFeedCount = async () => {
-      try {
-        const res = await fetch("/api/feed")
-        if (res.ok) {
-          const data = await res.json()
-          setFeedCount(data.items?.length || 0)
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "weather-location" && e.newValue) {
+        try {
+          setLocation(JSON.parse(e.newValue))
+        } catch {
+          // Invalid JSON
         }
-      } catch (e) {
-        console.error("Failed to fetch feed:", e)
       }
     }
-    fetchFeedCount()
+    window.addEventListener("storage", handleStorage)
+    return () => window.removeEventListener("storage", handleStorage)
   }, [])
+
+  // Fetch feed count using same query as Daily Feed section
+  const { data: feedData } = useQuery({
+    queryKey: ["feed", ["hackernews", "github", "reddit", "lobsters", "devto"], ["commandline", "ClaudeAI", "ClaudeCode", "cli", "tui"]],
+    queryFn: async () => {
+      const res = await fetch("/api/feed")
+      if (!res.ok) throw new Error("Failed to fetch feed")
+      return res.json()
+    },
+    staleTime: 15 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  })
+  const feedCount = feedData?.items?.length ?? null
 
   return (
     <div className="p-6">
@@ -247,18 +273,33 @@ function HomeSection({ onNavigate }: { onNavigate: (section: Section) => void })
         >
           <div className="flex items-start justify-between mb-4">
             <Cloud className="h-8 w-8 text-primary" />
-            {weatherTemp !== null && (
-              <span className="text-3xl font-bold text-primary">{weatherTemp}°</span>
+            {weather && (
+              <span className="text-3xl font-bold text-primary">{weather.temp}°</span>
             )}
           </div>
           <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Weather</h3>
-          {weatherTemp !== null ? (
-            <div className="text-sm text-muted-foreground">
-              <p>{weatherCondition}</p>
-              {weatherLocation && <p className="text-xs mt-1">{weatherLocation}</p>}
+          {weather ? (
+            <div className="text-sm text-muted-foreground space-y-1">
+              <p>{weather.condition}</p>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="flex items-center gap-0.5">
+                  <ArrowUp className="h-3 w-3 text-red-400" />
+                  {weather.high}°
+                </span>
+                <span className="flex items-center gap-0.5">
+                  <ArrowDown className="h-3 w-3 text-blue-400" />
+                  {weather.low}°
+                </span>
+              </div>
+              <p className="flex items-center gap-1 text-xs">
+                <MapPin className="h-3 w-3" />
+                {location.name}
+              </p>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">Loading weather data...</p>
+            <p className="text-sm text-muted-foreground">
+              {weatherLoading ? "Loading weather data..." : "Unable to load weather"}
+            </p>
           )}
         </button>
 
