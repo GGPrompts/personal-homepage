@@ -552,22 +552,13 @@ export default function QuickNotesSection({
 
   // Create new file mutation
   const createFileMutation = useMutation({
-    mutationFn: async (fileName: string) => {
+    mutationFn: async (filePath: string) => {
       if (!token || !repo) throw new Error("Not configured")
 
-      // Get current directory path
-      let dirPath = ""
-      if (selectedFile) {
-        dirPath =
-          selectedFile.type === "dir"
-            ? selectedFile.path
-            : selectedFile.path.substring(
-                0,
-                selectedFile.path.lastIndexOf("/")
-              )
-      }
-
-      const filePath = dirPath ? `${dirPath}/${fileName}` : fileName
+      // Use the path as-is (user can type folder/note.md)
+      const fileName = filePath.includes("/")
+        ? filePath.substring(filePath.lastIndexOf("/") + 1)
+        : filePath
 
       return saveFile(
         token,
@@ -662,7 +653,7 @@ export default function QuickNotesSection({
                   <DialogHeader>
                     <DialogTitle>New Note</DialogTitle>
                     <DialogDescription>
-                      Create a new markdown file
+                      Create a new markdown file (use folder/name.md for subfolders)
                     </DialogDescription>
                   </DialogHeader>
                   <div className="py-4">
@@ -670,7 +661,7 @@ export default function QuickNotesSection({
                       type="text"
                       value={newFileName}
                       onChange={(e) => setNewFileName(e.target.value)}
-                      placeholder="note-name.md"
+                      placeholder="folder/note.md"
                       className="w-full h-10 px-3 rounded-md border border-border bg-background text-sm"
                       autoFocus
                     />
