@@ -4,6 +4,9 @@ Future enhancements and planned features.
 
 ## Recently Completed
 
+- **Quick Notes** - GitHub-synced markdown editor with file browser, theme-aware preview, auto-save
+- **GitHub Integration** - Settings panel for token/repo, auto-injection into API Playground
+- **Markdown Preview Styles** - Theme-aware rendering with `.md-*` CSS classes
 - **API Playground** - HTTP request builder with collections, history, JSON viewer
 - **Accordion Sidebar** - Expandable sections with contextual sub-items
 - **10 Themes** - Terminal, Amber, Carbon, Light, Ocean, Sunset, Forest, Midnight, Neon, Slate
@@ -12,19 +15,12 @@ Future enhancements and planned features.
 ## In Progress
 
 ### Settings Section Expansion
-Current: Theme/appearance customizer
+Current: Theme/appearance customizer + GitHub integration
 Needed:
 - Feed Configuration (sources, subreddits, refresh interval)
 - API Keys management (for authenticated APIs)
 
 ## Planned Sections
-
-### Quick Notes / Scratchpad
-A persistent notepad for quick capture:
-- Markdown support
-- localStorage persistence
-- Code snippets with syntax highlighting
-- **Complexity**: Low-Medium
 
 ### Bookmarks / Quick Links
 Curated link manager for browser start page:

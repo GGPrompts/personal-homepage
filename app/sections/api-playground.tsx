@@ -332,6 +332,125 @@ const SAMPLE_COLLECTIONS: Collection[] = [
       },
     ],
   },
+  {
+    id: "github-content",
+    name: "GitHub Content API",
+    expanded: false,
+    requests: [
+      {
+        id: "gh1",
+        name: "Get Repository Info",
+        method: "GET",
+        url: "https://api.github.com/repos/OWNER/REPO",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "https://api.github.com/repos/OWNER/REPO",
+          headers: [
+            { id: "1", key: "Accept", value: "application/vnd.github.v3+json", enabled: true },
+            { id: "2", key: "User-Agent", value: "PersonalHomepage/1.0", enabled: true },
+          ],
+          auth: {
+            ...DEFAULT_CONFIG.auth,
+            type: "bearer",
+            token: "",
+          },
+        },
+      },
+      {
+        id: "gh2",
+        name: "List Directory Contents",
+        method: "GET",
+        url: "https://api.github.com/repos/OWNER/REPO/contents/PATH",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "https://api.github.com/repos/OWNER/REPO/contents/PATH",
+          headers: [
+            { id: "1", key: "Accept", value: "application/vnd.github.v3+json", enabled: true },
+            { id: "2", key: "User-Agent", value: "PersonalHomepage/1.0", enabled: true },
+          ],
+          auth: {
+            ...DEFAULT_CONFIG.auth,
+            type: "bearer",
+            token: "",
+          },
+        },
+      },
+      {
+        id: "gh3",
+        name: "Get File Content",
+        method: "GET",
+        url: "https://api.github.com/repos/OWNER/REPO/contents/README.md",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "https://api.github.com/repos/OWNER/REPO/contents/README.md",
+          headers: [
+            { id: "1", key: "Accept", value: "application/vnd.github.v3+json", enabled: true },
+            { id: "2", key: "User-Agent", value: "PersonalHomepage/1.0", enabled: true },
+          ],
+          auth: {
+            ...DEFAULT_CONFIG.auth,
+            type: "bearer",
+            token: "",
+          },
+        },
+      },
+      {
+        id: "gh4",
+        name: "Create/Update File",
+        method: "PUT",
+        url: "https://api.github.com/repos/OWNER/REPO/contents/PATH",
+        config: {
+          ...DEFAULT_CONFIG,
+          method: "PUT",
+          url: "https://api.github.com/repos/OWNER/REPO/contents/PATH",
+          headers: [
+            { id: "1", key: "Accept", value: "application/vnd.github.v3+json", enabled: true },
+            { id: "2", key: "User-Agent", value: "PersonalHomepage/1.0", enabled: true },
+          ],
+          body: {
+            type: "json",
+            content: `{
+  "message": "Update file via API",
+  "content": "BASE64_ENCODED_CONTENT",
+  "sha": "FILE_SHA_FOR_UPDATES"
+}`,
+          },
+          auth: {
+            ...DEFAULT_CONFIG.auth,
+            type: "bearer",
+            token: "",
+          },
+        },
+      },
+      {
+        id: "gh5",
+        name: "Delete File",
+        method: "DELETE",
+        url: "https://api.github.com/repos/OWNER/REPO/contents/PATH",
+        config: {
+          ...DEFAULT_CONFIG,
+          method: "DELETE",
+          url: "https://api.github.com/repos/OWNER/REPO/contents/PATH",
+          headers: [
+            { id: "1", key: "Accept", value: "application/vnd.github.v3+json", enabled: true },
+            { id: "2", key: "User-Agent", value: "PersonalHomepage/1.0", enabled: true },
+          ],
+          body: {
+            type: "json",
+            content: `{
+  "message": "Delete file via API",
+  "sha": "FILE_SHA_REQUIRED"
+}`,
+          },
+          auth: {
+            ...DEFAULT_CONFIG.auth,
+            type: "bearer",
+            token: "",
+          },
+        },
+      },
+    ],
+  },
 ]
 
 // ============================================================================
@@ -404,6 +523,42 @@ export default function ApiPlaygroundSection() {
       } catch (e) {
         console.error("Failed to load history", e)
       }
+    }
+  }, [])
+
+  // Inject GitHub settings from localStorage into collections
+  React.useEffect(() => {
+    const githubToken = localStorage.getItem("github-token") || ""
+    const githubRepo = localStorage.getItem("github-repo") || ""
+
+    if (githubToken || githubRepo) {
+      setCollections(prev => prev.map(collection => {
+        if (collection.id !== "github-content") return collection
+
+        return {
+          ...collection,
+          requests: collection.requests.map(request => {
+            // Replace OWNER/REPO in URL with actual repo
+            let newUrl = request.url
+            if (githubRepo) {
+              newUrl = newUrl.replace("OWNER/REPO", githubRepo)
+            }
+
+            return {
+              ...request,
+              url: newUrl,
+              config: {
+                ...request.config,
+                url: newUrl,
+                auth: {
+                  ...request.config.auth,
+                  token: githubToken,
+                },
+              },
+            }
+          }),
+        }
+      }))
     }
   }, [])
 

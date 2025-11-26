@@ -89,6 +89,22 @@ Pre-configured API collections for quick access:
 | Feed Aggregator | /api/feed | Combined feed from all sources |
 | Filtered Feed | /api/feed?sources=... | Filtered by specific sources |
 
+### GitHub Content API
+
+Used by Quick Notes for repository file management. If you have GitHub settings configured in Settings, the token and repo are automatically injected.
+
+| Request | Method | Description |
+|---------|--------|-------------|
+| Get Repository Info | GET | Test connection, get repo metadata |
+| List Directory Contents | GET | Browse folder contents |
+| Get File Content | GET | Read file (base64 encoded) |
+| Create/Update File | PUT | Create or update with JSON body |
+| Delete File | DELETE | Delete with SHA in body |
+
+**Auto-injection:** When `github-token` and `github-repo` are set in localStorage (via Settings), the collection automatically:
+- Replaces `OWNER/REPO` placeholder with your actual repo
+- Pre-fills the bearer token in Auth tab
+
 ## Code Generation
 
 Generate code snippets in multiple languages:

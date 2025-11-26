@@ -14,6 +14,7 @@ import {
   Calendar,
   Bookmark,
   RefreshCw,
+  RotateCw,
   MapPin,
   ArrowUp,
   ArrowDown,
@@ -48,12 +49,13 @@ import { ThemeSettingsPanel } from "@/components/ThemeSettingsPanel"
 import WeatherDashboard from "./sections/weather"
 import DailyFeedSection from "./sections/daily-feed"
 import ApiPlaygroundSection from "./sections/api-playground"
+import QuickNotesSection from "./sections/quick-notes"
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type Section = "home" | "weather" | "feed" | "api-playground" | "settings"
+type Section = "home" | "weather" | "feed" | "api-playground" | "notes" | "settings"
 
 interface SubItem {
   id: string
@@ -104,6 +106,16 @@ const navigationItems: NavigationItem[] = [
     subItems: [
       { id: "collections", label: "Collections", icon: FolderOpen },
       { id: "history", label: "History", icon: History },
+    ]
+  },
+  {
+    id: "notes",
+    label: "Quick Notes",
+    icon: FileText,
+    description: "GitHub-synced notes",
+    subItems: [
+      { id: "files", label: "Browse Files", icon: FolderOpen },
+      { id: "recent", label: "Recent", icon: Clock },
     ]
   },
   {
@@ -458,6 +470,18 @@ function HomeSection({ onNavigate }: { onNavigate: (section: Section) => void })
           <p className="text-sm text-muted-foreground">Test and debug API requests</p>
         </button>
 
+        {/* Quick Notes Card */}
+        <button
+          onClick={() => onNavigate("notes")}
+          className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+        >
+          <div className="flex items-start justify-between mb-4">
+            <FileText className="h-8 w-8 text-primary" />
+          </div>
+          <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Quick Notes</h3>
+          <p className="text-sm text-muted-foreground">GitHub-synced markdown notes</p>
+        </button>
+
         {/* Settings Card */}
         <button
           onClick={() => onNavigate("settings")}
@@ -661,6 +685,8 @@ export default function PersonalHomepage() {
         return <DailyFeedSection />
       case "api-playground":
         return <ApiPlaygroundSection />
+      case "notes":
+        return <QuickNotesSection onNavigateToSettings={() => setActiveSection("settings")} />
       case "settings":
         return <SettingsSection />
       default:

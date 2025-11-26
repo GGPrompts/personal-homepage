@@ -1,0 +1,868 @@
+"use client"
+
+import * as React from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import {
+  FileText,
+  Folder,
+  FolderOpen,
+  ChevronRight,
+  ChevronDown,
+  Save,
+  RotateCw,
+  Plus,
+  Trash2,
+  Eye,
+  EyeOff,
+  Settings,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  File,
+  ExternalLink,
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
+  getContents,
+  getFile,
+  saveFile,
+  deleteFile,
+  cacheFile,
+  getCachedFile,
+  getCachedFilePaths,
+  type GitHubFile,
+  type GitHubError,
+} from "@/lib/github"
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+interface FileTreeNode extends GitHubFile {
+  children?: FileTreeNode[]
+  isExpanded?: boolean
+  isLoading?: boolean
+}
+
+interface EditorState {
+  path: string
+  name: string
+  content: string
+  originalContent: string
+  sha: string
+  isDirty: boolean
+  isSaving: boolean
+  lastSaved: Date | null
+}
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const AUTO_SAVE_DELAY = 2000 // 2 seconds
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+function isMarkdownFile(name: string): boolean {
+  return name.toLowerCase().endsWith(".md")
+}
+
+function getFileIcon(file: GitHubFile) {
+  if (file.type === "dir") {
+    return Folder
+  }
+  if (isMarkdownFile(file.name)) {
+    return FileText
+  }
+  return File
+}
+
+// Simple markdown to HTML converter (basic implementation)
+function renderMarkdown(markdown: string): string {
+  let html = markdown
+    // Escape HTML
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    // Headers
+    .replace(/^#### (.+)$/gm, '<h4 class="md-h4">$1</h4>')
+    .replace(/^### (.+)$/gm, '<h3 class="md-h3">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 class="md-h2">$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1 class="md-h1">$1</h1>')
+    // Bold and italic (order matters - do bold first)
+    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="md-strong">$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em class="md-em">$1</em>')
+    .replace(/___(.+?)___/g, '<strong><em>$1</em></strong>')
+    .replace(/__(.+?)__/g, '<strong class="md-strong">$1</strong>')
+    .replace(/_(.+?)_/g, '<em class="md-em">$1</em>')
+    // Strikethrough
+    .replace(/~~(.+?)~~/g, '<del class="md-del">$1</del>')
+    // Code blocks
+    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="md-pre"><code class="md-code-block">$2</code></pre>')
+    // Inline code
+    .replace(/`([^`]+)`/g, '<code class="md-code">$1</code>')
+    // Images
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="md-img" />')
+    // Links
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>')
+    // Blockquotes (can be multi-line)
+    .replace(/^> (.+)$/gm, '<blockquote class="md-blockquote">$1</blockquote>')
+    // Task lists
+    .replace(/^- \[x\] (.+)$/gm, '<li class="md-task md-task-done"><span class="md-checkbox">✓</span>$1</li>')
+    .replace(/^- \[ \] (.+)$/gm, '<li class="md-task"><span class="md-checkbox">○</span>$1</li>')
+    // Unordered lists
+    .replace(/^\* (.+)$/gm, '<li class="md-li">$1</li>')
+    .replace(/^- (.+)$/gm, '<li class="md-li">$1</li>')
+    // Ordered lists
+    .replace(/^\d+\. (.+)$/gm, '<li class="md-li md-li-ordered">$1</li>')
+    // Horizontal rules
+    .replace(/^---$/gm, '<hr class="md-hr" />')
+    .replace(/^\*\*\*$/gm, '<hr class="md-hr" />')
+    // Paragraphs (lines with content that aren't already wrapped)
+    .replace(/^(?!<[hblupid]|<li|<hr|<pre|<code)(.+)$/gm, '<p class="md-p">$1</p>')
+
+  return html
+}
+
+// ============================================================================
+// FILE TREE COMPONENT
+// ============================================================================
+
+function FileTreeItem({
+  node,
+  depth,
+  selectedPath,
+  onSelect,
+  onToggleExpand,
+  expandedPaths,
+}: {
+  node: FileTreeNode
+  depth: number
+  selectedPath: string | null
+  onSelect: (file: FileTreeNode) => void
+  onToggleExpand: (path: string) => void
+  expandedPaths: Set<string>
+}) {
+  const Icon = getFileIcon(node)
+  const isDir = node.type === "dir"
+  const isExpanded = expandedPaths.has(node.path)
+  const isSelected = selectedPath === node.path
+  const isMarkdown = isMarkdownFile(node.name)
+
+  const handleClick = () => {
+    if (isDir) {
+      onToggleExpand(node.path)
+    } else if (isMarkdown) {
+      onSelect(node)
+    }
+  }
+
+  return (
+    <div>
+      <button
+        onClick={handleClick}
+        className={`
+          w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors
+          ${isSelected ? "bg-primary/20 text-primary" : "hover:bg-primary/10 text-foreground"}
+          ${!isMarkdown && !isDir ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+        `}
+        style={{ paddingLeft: `${depth * 16 + 8}px` }}
+        disabled={!isMarkdown && !isDir}
+      >
+        {isDir && (
+          <span className="flex-shrink-0">
+            {node.isLoading ? (
+              <RotateCw className="h-3.5 w-3.5 animate-spin" />
+            ) : isExpanded ? (
+              <ChevronDown className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5" />
+            )}
+          </span>
+        )}
+        {!isDir && <span className="w-3.5" />}
+        {isDir && isExpanded ? (
+          <FolderOpen className="h-4 w-4 text-primary flex-shrink-0" />
+        ) : (
+          <Icon className={`h-4 w-4 flex-shrink-0 ${isMarkdown ? "text-primary" : "text-muted-foreground"}`} />
+        )}
+        <span className="truncate">{node.name}</span>
+      </button>
+
+      {isDir && isExpanded && node.children && (
+        <div>
+          {node.children.map((child) => (
+            <FileTreeItem
+              key={child.path}
+              node={child}
+              depth={depth + 1}
+              selectedPath={selectedPath}
+              onSelect={onSelect}
+              onToggleExpand={onToggleExpand}
+              expandedPaths={expandedPaths}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
+// NO CONFIG MESSAGE
+// ============================================================================
+
+function NoConfigMessage({ onNavigateToSettings }: { onNavigateToSettings: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+      <div className="glass rounded-lg p-8 max-w-md">
+        <AlertCircle className="h-12 w-12 text-primary mx-auto mb-4" />
+        <h2 className="text-xl font-semibold mb-2">GitHub Not Configured</h2>
+        <p className="text-muted-foreground mb-6">
+          Connect to a GitHub repository to sync your notes. You'll need a Personal Access Token with repo access.
+        </p>
+        <Button onClick={onNavigateToSettings}>
+          <Settings className="h-4 w-4 mr-2" />
+          Configure in Settings
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
+export default function QuickNotesSection({
+  onNavigateToSettings,
+}: {
+  onNavigateToSettings?: () => void
+}) {
+  const queryClient = useQueryClient()
+
+  // GitHub config from localStorage
+  const [token, setToken] = React.useState<string | null>(null)
+  const [repo, setRepo] = React.useState<string | null>(null)
+
+  // UI state
+  const [expandedPaths, setExpandedPaths] = React.useState<Set<string>>(new Set([""])) // Root expanded
+  const [directoryContents, setDirectoryContents] = React.useState<Map<string, GitHubFile[]>>(new Map())
+  const [loadingPaths, setLoadingPaths] = React.useState<Set<string>>(new Set())
+  const [selectedFile, setSelectedFile] = React.useState<FileTreeNode | null>(null)
+  const [showPreview, setShowPreview] = React.useState(false)
+  const [newFileName, setNewFileName] = React.useState("")
+  const [newFileDialogOpen, setNewFileDialogOpen] = React.useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
+
+  // Editor state
+  const [editor, setEditor] = React.useState<EditorState | null>(null)
+  const autoSaveTimerRef = React.useRef<NodeJS.Timeout | null>(null)
+
+  // Load config from localStorage
+  React.useEffect(() => {
+    const savedToken = localStorage.getItem("github-token")
+    const savedRepo = localStorage.getItem("github-repo")
+    setToken(savedToken)
+    setRepo(savedRepo)
+  }, [])
+
+  // Fetch root directory
+  const {
+    data: rootFiles,
+    isLoading: isLoadingRoot,
+    error: rootError,
+    refetch: refetchRoot,
+  } = useQuery({
+    queryKey: ["github-contents", repo, ""],
+    queryFn: () => getContents(token!, repo!, ""),
+    enabled: !!token && !!repo,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: false,
+  })
+
+  // Handle directory expansion
+  const handleToggleExpand = async (path: string) => {
+    const newExpanded = new Set(expandedPaths)
+
+    if (newExpanded.has(path)) {
+      // Collapse
+      newExpanded.delete(path)
+      setExpandedPaths(newExpanded)
+    } else {
+      // Expand
+      newExpanded.add(path)
+      setExpandedPaths(newExpanded)
+
+      // Fetch directory contents if not already loaded
+      if (!directoryContents.has(path) && token && repo) {
+        setLoadingPaths(prev => new Set(prev).add(path))
+        try {
+          const contents = await getContents(token, repo, path)
+          setDirectoryContents(prev => new Map(prev).set(path, contents))
+        } catch (error) {
+          console.error("Failed to load directory:", error)
+        } finally {
+          setLoadingPaths(prev => {
+            const next = new Set(prev)
+            next.delete(path)
+            return next
+          })
+        }
+      }
+    }
+  }
+
+  // Build tree structure from flat file list
+  const buildTreeFromPath = (
+    files: GitHubFile[],
+    parentPath: string
+  ): FileTreeNode[] => {
+    return files.map((file) => {
+      const node: FileTreeNode = {
+        ...file,
+        isExpanded: expandedPaths.has(file.path),
+        isLoading: loadingPaths.has(file.path),
+      }
+
+      if (file.type === "dir" && expandedPaths.has(file.path)) {
+        const contents = directoryContents.get(file.path)
+        if (contents) {
+          node.children = buildTreeFromPath(contents, file.path)
+        }
+      }
+
+      return node
+    })
+  }
+
+  // Load file content
+  const handleSelectFile = async (file: FileTreeNode) => {
+    if (!token || !repo) return
+
+    // Check for unsaved changes
+    if (editor?.isDirty) {
+      const confirm = window.confirm(
+        "You have unsaved changes. Do you want to discard them?"
+      )
+      if (!confirm) return
+    }
+
+    setSelectedFile(file)
+
+    // Clear auto-save timer
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current)
+    }
+
+    try {
+      // Try to get from cache first for instant display
+      const cached = getCachedFile(file.path)
+      if (cached) {
+        setEditor({
+          path: file.path,
+          name: file.name,
+          content: cached.content,
+          originalContent: cached.content,
+          sha: cached.sha,
+          isDirty: false,
+          isSaving: false,
+          lastSaved: null,
+        })
+      }
+
+      // Then fetch fresh from GitHub
+      const result = await getFile(token, repo, file.path)
+
+      // Update cache
+      cacheFile({
+        path: file.path,
+        name: file.name,
+        content: result.content,
+        sha: result.sha,
+        cachedAt: Date.now(),
+      })
+
+      setEditor({
+        path: file.path,
+        name: result.name,
+        content: result.content,
+        originalContent: result.content,
+        sha: result.sha,
+        isDirty: false,
+        isSaving: false,
+        lastSaved: null,
+      })
+    } catch (error) {
+      const githubError = error as GitHubError
+      console.error("Failed to load file:", githubError)
+
+      // Try to use cached version if available
+      const cached = getCachedFile(file.path)
+      if (cached) {
+        setEditor({
+          path: file.path,
+          name: file.name,
+          content: cached.content,
+          originalContent: cached.content,
+          sha: cached.sha,
+          isDirty: false,
+          isSaving: false,
+          lastSaved: null,
+        })
+      }
+    }
+  }
+
+  // Handle content change with auto-save
+  const handleContentChange = (newContent: string) => {
+    if (!editor) return
+
+    setEditor({
+      ...editor,
+      content: newContent,
+      isDirty: newContent !== editor.originalContent,
+    })
+
+    // Clear existing timer
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current)
+    }
+
+    // Set new auto-save timer
+    if (newContent !== editor.originalContent) {
+      autoSaveTimerRef.current = setTimeout(() => {
+        handleSave(newContent)
+      }, AUTO_SAVE_DELAY)
+    }
+  }
+
+  // Save file mutation
+  const saveMutation = useMutation({
+    mutationFn: async ({
+      content,
+      sha,
+    }: {
+      content: string
+      sha: string
+    }) => {
+      if (!token || !repo || !editor) throw new Error("Not configured")
+      return saveFile(
+        token,
+        repo,
+        editor.path,
+        content,
+        sha,
+        `Update ${editor.name} from homepage`
+      )
+    },
+    onSuccess: (result, variables) => {
+      if (!editor) return
+
+      // Update cache
+      cacheFile({
+        path: editor.path,
+        name: editor.name,
+        content: variables.content,
+        sha: result.sha,
+        cachedAt: Date.now(),
+      })
+
+      setEditor({
+        ...editor,
+        sha: result.sha,
+        originalContent: variables.content,
+        isDirty: false,
+        isSaving: false,
+        lastSaved: new Date(),
+      })
+    },
+    onError: (error) => {
+      console.error("Save failed:", error)
+      if (editor) {
+        setEditor({
+          ...editor,
+          isSaving: false,
+        })
+      }
+    },
+  })
+
+  // Handle save
+  const handleSave = (content?: string) => {
+    if (!editor) return
+
+    const contentToSave = content ?? editor.content
+
+    setEditor({
+      ...editor,
+      isSaving: true,
+    })
+
+    saveMutation.mutate({
+      content: contentToSave,
+      sha: editor.sha,
+    })
+  }
+
+  // Create new file mutation
+  const createFileMutation = useMutation({
+    mutationFn: async (fileName: string) => {
+      if (!token || !repo) throw new Error("Not configured")
+
+      // Get current directory path
+      let dirPath = ""
+      if (selectedFile) {
+        dirPath =
+          selectedFile.type === "dir"
+            ? selectedFile.path
+            : selectedFile.path.substring(
+                0,
+                selectedFile.path.lastIndexOf("/")
+              )
+      }
+
+      const filePath = dirPath ? `${dirPath}/${fileName}` : fileName
+
+      return saveFile(
+        token,
+        repo,
+        filePath,
+        `# ${fileName.replace(".md", "")}\n\n`,
+        null,
+        `Create ${fileName} from homepage`
+      )
+    },
+    onSuccess: () => {
+      setNewFileDialogOpen(false)
+      setNewFileName("")
+      // Refetch the current directory
+      refetchRoot()
+    },
+  })
+
+  // Delete file mutation
+  const deleteFileMutation = useMutation({
+    mutationFn: async () => {
+      if (!token || !repo || !editor) throw new Error("Not configured")
+      return deleteFile(
+        token,
+        repo,
+        editor.path,
+        editor.sha,
+        `Delete ${editor.name} from homepage`
+      )
+    },
+    onSuccess: () => {
+      setDeleteDialogOpen(false)
+      setEditor(null)
+      setSelectedFile(null)
+      refetchRoot()
+    },
+  })
+
+  // Cleanup on unmount
+  React.useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current)
+      }
+    }
+  }, [])
+
+  // If not configured, show message
+  if (!token || !repo) {
+    return (
+      <NoConfigMessage
+        onNavigateToSettings={onNavigateToSettings || (() => {})}
+      />
+    )
+  }
+
+  // Build file tree
+  const fileTree = rootFiles ? buildTreeFromPath(rootFiles, "") : []
+
+  return (
+    <div className="h-full flex flex-col lg:flex-row gap-4 p-4 lg:p-6">
+      {/* File Browser Panel */}
+      <div className="lg:w-72 flex-shrink-0">
+        <div className="glass rounded-lg p-4 h-full flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <FolderOpen className="h-4 w-4" />
+              Files
+            </h3>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => {
+                  setDirectoryContents(new Map())
+                  refetchRoot()
+                }}
+                disabled={isLoadingRoot}
+              >
+                <RotateCw
+                  className={`h-3.5 w-3.5 ${isLoadingRoot ? "animate-spin" : ""}`}
+                />
+              </Button>
+              <Dialog open={newFileDialogOpen} onOpenChange={setNewFileDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7">
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="glass">
+                  <DialogHeader>
+                    <DialogTitle>New Note</DialogTitle>
+                    <DialogDescription>
+                      Create a new markdown file
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4">
+                    <input
+                      type="text"
+                      value={newFileName}
+                      onChange={(e) => setNewFileName(e.target.value)}
+                      placeholder="note-name.md"
+                      className="w-full h-10 px-3 rounded-md border border-border bg-background text-sm"
+                      autoFocus
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setNewFileDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        const name = newFileName.endsWith(".md")
+                          ? newFileName
+                          : `${newFileName}.md`
+                        createFileMutation.mutate(name)
+                      }}
+                      disabled={!newFileName || createFileMutation.isPending}
+                    >
+                      {createFileMutation.isPending ? (
+                        <RotateCw className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Plus className="h-4 w-4 mr-2" />
+                      )}
+                      Create
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+
+          {/* File Tree */}
+          <div className="flex-1 overflow-y-auto">
+            {isLoadingRoot ? (
+              <div className="flex items-center justify-center py-8">
+                <RotateCw className="h-6 w-6 animate-spin text-primary/50" />
+              </div>
+            ) : rootError ? (
+              <div className="text-center py-8 text-sm text-red-400">
+                <AlertCircle className="h-6 w-6 mx-auto mb-2" />
+                Failed to load files
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                {fileTree.map((node) => (
+                  <FileTreeItem
+                    key={node.path}
+                    node={node}
+                    depth={0}
+                    selectedPath={selectedFile?.path || null}
+                    onSelect={handleSelectFile}
+                    onToggleExpand={handleToggleExpand}
+                    expandedPaths={expandedPaths}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Repo info */}
+          <div className="pt-3 mt-3 border-t border-border/20">
+            <a
+              href={`https://github.com/${repo}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+              </svg>
+              <span className="truncate">{repo}</span>
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* Editor Panel */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {editor ? (
+          <div className="glass rounded-lg flex flex-col h-full overflow-hidden">
+            {/* Editor Header */}
+            <div className="flex items-center justify-between p-3 border-b border-border/20">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText className="h-4 w-4 text-primary flex-shrink-0" />
+                <span className="font-medium text-sm truncate">{editor.name}</span>
+                {editor.isDirty && (
+                  <Badge variant="outline" className="text-[10px] px-1.5">
+                    Unsaved
+                  </Badge>
+                )}
+                {editor.isSaving && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 text-amber-400">
+                    <RotateCw className="h-3 w-3 animate-spin mr-1" />
+                    Saving...
+                  </Badge>
+                )}
+                {editor.lastSaved && !editor.isDirty && !editor.isSaving && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 text-emerald-400">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Saved
+                  </Badge>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowPreview(!showPreview)}
+                  className="h-8"
+                >
+                  {showPreview ? (
+                    <>
+                      <EyeOff className="h-3.5 w-3.5 mr-1.5" />
+                      Edit
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="h-3.5 w-3.5 mr-1.5" />
+                      Preview
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleSave()}
+                  disabled={!editor.isDirty || editor.isSaving}
+                  className="h-8"
+                >
+                  <Save className="h-3.5 w-3.5 mr-1.5" />
+                  Save
+                </Button>
+                <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-400 hover:text-red-300">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="glass">
+                    <DialogHeader>
+                      <DialogTitle>Delete Note</DialogTitle>
+                      <DialogDescription>
+                        Are you sure you want to delete "{editor.name}"? This action cannot be undone.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setDeleteDialogOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={() => deleteFileMutation.mutate()}
+                        disabled={deleteFileMutation.isPending}
+                      >
+                        {deleteFileMutation.isPending ? (
+                          <RotateCw className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Trash2 className="h-4 w-4 mr-2" />
+                        )}
+                        Delete
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </div>
+
+            {/* Editor Content */}
+            <div className="flex-1 overflow-hidden">
+              {showPreview ? (
+                <div
+                  className="md-preview h-full overflow-y-auto p-4"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(editor.content) }}
+                />
+              ) : (
+                <textarea
+                  value={editor.content}
+                  onChange={(e) => handleContentChange(e.target.value)}
+                  className="w-full h-full p-4 bg-transparent resize-none focus:outline-none font-mono text-sm"
+                  placeholder="Start writing..."
+                  spellCheck={false}
+                />
+              )}
+            </div>
+
+            {/* Editor Footer */}
+            <div className="flex items-center justify-between px-3 py-2 border-t border-border/20 text-xs text-muted-foreground">
+              <span>{editor.content.length} characters</span>
+              <div className="flex items-center gap-3">
+                {editor.lastSaved && (
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Last saved{" "}
+                    {editor.lastSaved.toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                )}
+                <span className="text-[10px]">Auto-save enabled</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="glass rounded-lg flex-1 flex flex-col items-center justify-center text-muted-foreground">
+            <FileText className="h-12 w-12 mb-4 opacity-20" />
+            <p>Select a file to edit</p>
+            <p className="text-sm">or create a new note</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

@@ -77,6 +77,36 @@ The `JsonViewer` component uses theme-aware colors:
 
 Each theme has custom color overrides in `globals.css` (search for "JSON VIEWER").
 
+## Markdown Preview Styles
+
+The Quick Notes preview uses theme-aware markdown rendering with `.md-*` CSS classes.
+
+| Class | Element | Description |
+|-------|---------|-------------|
+| `.md-preview` | Container | Line height and font size |
+| `.md-h1` - `.md-h4` | Headers | Sized headers with h1 border |
+| `.md-p` | Paragraphs | Standard spacing |
+| `.md-strong` | Bold | Full weight |
+| `.md-em` | Italic | Uses theme primary color |
+| `.md-del` | Strikethrough | Muted color |
+| `.md-link` | Links | Primary color with hover glow |
+| `.md-code` | Inline code | Monospace with background |
+| `.md-pre` | Code blocks | Rounded with border |
+| `.md-blockquote` | Blockquotes | Left border accent |
+| `.md-li` | List items | Bullet in primary color |
+| `.md-task` | Task items | Checkbox styling |
+| `.md-hr` | Horizontal rules | Gradient fade |
+| `.md-img` | Images | Rounded with border |
+
+**Theme-specific behaviors:**
+- Dark themes: Headers and links have subtle glow effects
+- Light theme: No glows, softer backgrounds
+- Carbon theme: Grayscale only, no accent colors
+- Neon theme: Enhanced glow effects
+- Each theme: Custom italic color matching palette
+
+Search for "MARKDOWN PREVIEW" in `globals.css` for full implementation.
+
 ## Gradient Text
 
 Use `.gradient-text-theme` for theme-aware gradient text:

@@ -10,6 +10,7 @@ A personal dashboard/homepage designed as a browser start page. Features an acco
 | [docs/weather.md](docs/weather.md) | Weather section APIs, features, localStorage |
 | [docs/daily-feed.md](docs/daily-feed.md) | Feed API, sources, schema, preferences |
 | [docs/api-playground.md](docs/api-playground.md) | HTTP client, collections, JSON viewer |
+| [docs/quick-notes.md](docs/quick-notes.md) | GitHub-synced notes, markdown editor |
 | [docs/design-system.md](docs/design-system.md) | 10 themes, CSS utilities, backgrounds |
 | [docs/state-management.md](docs/state-management.md) | TanStack Query, caching, localStorage |
 | [docs/roadmap.md](docs/roadmap.md) | Planned features and ideas |
@@ -23,7 +24,8 @@ A personal dashboard/homepage designed as a browser start page. Features an acco
 | **Weather** | Complete | Live weather + radar + alerts + air quality |
 | **Daily Feed** | Complete | Aggregated content from HN, GitHub, Reddit, Lobsters, Dev.to |
 | **API Playground** | Complete | HTTP request builder with collections, history, JSON viewer |
-| **Settings** | Partial | Theme/appearance (Feed Config and API Keys coming soon) |
+| **Quick Notes** | Complete | GitHub-synced markdown editor with file browser |
+| **Settings** | Partial | Theme/appearance + GitHub integration (Feed Config coming soon) |
 
 ## Tech Stack
 
@@ -31,7 +33,7 @@ A personal dashboard/homepage designed as a browser start page. Features an acco
 - **Styling**: Tailwind CSS + shadcn/ui components
 - **State**: TanStack Query (server state) + localStorage (preferences)
 - **Theming**: 10 themes + background styles + glassmorphism
-- **APIs**: Open-Meteo, RainViewer, NWS, Nominatim, HN, GitHub, Reddit, Lobsters, Dev.to
+- **APIs**: Open-Meteo, RainViewer, NWS, Nominatim, HN, GitHub (trending + Contents API), Reddit, Lobsters, Dev.to
 
 ## Project Structure
 
@@ -44,7 +46,8 @@ personal-homepage/
 │   ├── sections/               # Section components
 │   │   ├── weather.tsx
 │   │   ├── daily-feed.tsx
-│   │   └── api-playground.tsx
+│   │   ├── api-playground.tsx
+│   │   └── quick-notes.tsx
 │   └── api/feed/               # Feed API endpoint + fetchers
 ├── components/
 │   ├── ui/                     # shadcn/ui components
@@ -55,8 +58,10 @@ personal-homepage/
 │   ├── ThemeSettingsPanel.tsx  # Full theme settings
 │   ├── BackgroundProvider.tsx  # Background style context
 │   └── MasterBackground.tsx    # Animated backgrounds
+├── lib/
+│   ├── utils.ts                # cn() helper
+│   └── github.ts               # GitHub API helper
 ├── docs/                       # Detailed documentation
-└── lib/utils.ts                # cn() helper
 ```
 
 ## Development
@@ -113,6 +118,7 @@ The sidebar uses an accordion pattern:
 ### Components
 
 - `JsonViewer`: Use for displaying API responses with syntax highlighting
+- Markdown preview: Uses `.md-*` classes in `globals.css` for Quick Notes
 - Theme classes automatically adapt to all 10 themes
 
 ### Hydration Warnings

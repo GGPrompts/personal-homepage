@@ -14,6 +14,7 @@ The sidebar uses an accordion-style navigation pattern with expandable sections 
 │   • Saved Items      │                                 │
 │   • Refresh          │                                 │
 │ ▸ API Playground     │                                 │
+│ ▸ Quick Notes        │                                 │
 │ ▸ Settings           │                                 │
 └──────────────────────┴─────────────────────────────────┘
 ```
@@ -39,7 +40,7 @@ The sidebar uses an accordion-style navigation pattern with expandable sections 
 Defined in `app/page.tsx`:
 
 ```typescript
-type Section = "home" | "weather" | "feed" | "api-playground" | "settings"
+type Section = "home" | "weather" | "feed" | "api-playground" | "notes" | "settings"
 
 interface SubItem {
   id: string
@@ -63,6 +64,7 @@ interface NavigationItem {
 | **Weather** | Cloud | Forecast, Radar, Alerts |
 | **Daily Feed** | Newspaper | Sources, Saved Items, Refresh |
 | **API Playground** | Zap | Collections, History |
+| **Quick Notes** | FileText | Browse Files, Recent |
 | **Settings** | Settings | Appearance, Feed Config, API Keys |
 
 ## Adding a New Section
