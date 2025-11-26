@@ -248,8 +248,12 @@ function NoConfigMessage({ onNavigateToSettings }: { onNavigateToSettings: () =>
 // ============================================================================
 
 export default function QuickNotesSection({
+  activeSubItem,
+  onSubItemHandled,
   onNavigateToSettings,
 }: {
+  activeSubItem?: string | null
+  onSubItemHandled?: () => void
   onNavigateToSettings?: () => void
 }) {
   const queryClient = useQueryClient()
@@ -263,7 +267,7 @@ export default function QuickNotesSection({
   const [directoryContents, setDirectoryContents] = React.useState<Map<string, GitHubFile[]>>(new Map())
   const [loadingPaths, setLoadingPaths] = React.useState<Set<string>>(new Set())
   const [selectedFile, setSelectedFile] = React.useState<FileTreeNode | null>(null)
-  const [showPreview, setShowPreview] = React.useState(false)
+  const [showPreview, setShowPreview] = React.useState(true)
   const [newFileName, setNewFileName] = React.useState("")
   const [newFileDialogOpen, setNewFileDialogOpen] = React.useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
@@ -279,6 +283,23 @@ export default function QuickNotesSection({
     setToken(savedToken)
     setRepo(savedRepo)
   }, [])
+
+  // Handle sub-item navigation from sidebar
+  React.useEffect(() => {
+    if (activeSubItem) {
+      const timer = setTimeout(() => {
+        if (activeSubItem === "files") {
+          const element = document.getElementById("notes-files")
+          if (element) {
+            element.scrollIntoView({ behavior: "smooth", block: "start" })
+          }
+        }
+        // "recent" is not implemented yet - just clear it
+        onSubItemHandled?.()
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [activeSubItem, onSubItemHandled])
 
   // Fetch root directory
   const {
@@ -598,7 +619,7 @@ export default function QuickNotesSection({
   return (
     <div className="h-full flex flex-col lg:flex-row gap-4 p-4 lg:p-6">
       {/* File Browser Panel */}
-      <div className="lg:w-72 flex-shrink-0">
+      <div id="notes-files" className="lg:w-72 flex-shrink-0 scroll-mt-6">
         <div className="glass rounded-lg p-4 h-full flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-sm flex items-center gap-2">

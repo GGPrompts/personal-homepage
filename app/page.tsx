@@ -140,6 +140,8 @@ function SidebarContent({
   setActiveSection,
   expandedSection,
   setExpandedSection,
+  setActiveSubItem,
+  weatherAlertCount = 0,
   collapsed = false,
   mobile = false,
   onNavigate,
@@ -148,6 +150,8 @@ function SidebarContent({
   setActiveSection: (section: Section) => void
   expandedSection: Section | null
   setExpandedSection: (section: Section | null) => void
+  setActiveSubItem?: (subItem: string | null) => void
+  weatherAlertCount?: number
   collapsed?: boolean
   mobile?: boolean
   onNavigate?: () => void
@@ -155,6 +159,8 @@ function SidebarContent({
   const handleSectionClick = (id: Section) => {
     // Navigate to section
     setActiveSection(id)
+    // Clear any active sub-item when clicking section header
+    setActiveSubItem?.(null)
     // Toggle expand (collapse if already expanded, expand otherwise)
     setExpandedSection(expandedSection === id ? null : id)
     // Don't close mobile menu on section click - let user explore sub-items
@@ -162,7 +168,8 @@ function SidebarContent({
 
   const handleSubItemClick = (sectionId: Section, subItemId: string) => {
     setActiveSection(sectionId)
-    // In the future, subItemId can be used to scroll to or highlight specific features
+    // Trigger scroll to the sub-item's anchor
+    setActiveSubItem?.(subItemId)
     onNavigate?.() // Close mobile menu when sub-item is clicked
   }
 
@@ -254,6 +261,8 @@ function SidebarContent({
                     <ul className="ml-4 mt-1 space-y-0.5 border-l border-border/20 pl-3">
                       {item.subItems!.map((subItem) => {
                         const SubIcon = subItem.icon
+                        // Show alert count badge for weather alerts
+                        const showAlertBadge = item.id === "weather" && subItem.id === "alerts"
                         return (
                           <li key={subItem.id}>
                             <button
@@ -261,7 +270,16 @@ function SidebarContent({
                               className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-primary/5 rounded transition-colors"
                             >
                               <SubIcon className="h-3.5 w-3.5" />
-                              <span>{subItem.label}</span>
+                              <span className="flex-1 text-left">{subItem.label}</span>
+                              {showAlertBadge && (
+                                <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                                  weatherAlertCount > 0
+                                    ? 'bg-red-500/20 text-red-400'
+                                    : 'bg-emerald-500/20 text-emerald-400'
+                                }`}>
+                                  ({weatherAlertCount})
+                                </span>
+                              )}
                             </button>
                           </li>
                         )
@@ -627,14 +645,29 @@ function GitHubSettings() {
   )
 }
 
-function SettingsSection() {
+function SettingsSection({ activeSubItem, onSubItemHandled }: { activeSubItem?: string | null; onSubItemHandled?: () => void }) {
+  // Scroll to sub-item when activeSubItem changes
+  React.useEffect(() => {
+    if (activeSubItem) {
+      // Small delay to ensure DOM is ready after section switch
+      const timer = setTimeout(() => {
+        const element = document.getElementById(`settings-${activeSubItem}`)
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" })
+        }
+        onSubItemHandled?.()
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [activeSubItem, onSubItemHandled])
+
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold terminal-glow mb-2">Settings</h1>
       <p className="text-muted-foreground mb-8">Customize your dashboard</p>
 
       <div className="max-w-3xl">
-        <div className="glass rounded-lg p-6 mb-6">
+        <div id="settings-appearance" className="glass rounded-lg p-6 mb-6 scroll-mt-6">
           <h3 className="font-semibold mb-6">Theme & Appearance</h3>
           <ThemeSettingsPanel />
         </div>
@@ -648,13 +681,13 @@ function SettingsSection() {
           <GitHubSettings />
         </div>
 
-        <div className="glass rounded-lg p-6 mb-6">
+        <div id="settings-feed-config" className="glass rounded-lg p-6 mb-6 scroll-mt-6">
           <h3 className="font-semibold mb-4">Feed Configuration</h3>
           <p className="text-sm text-muted-foreground mb-4">Configure your content sources</p>
           <Button variant="outline" disabled>Coming Soon</Button>
         </div>
 
-        <div className="glass rounded-lg p-6">
+        <div id="settings-api-keys" className="glass rounded-lg p-6 scroll-mt-6">
           <h3 className="font-semibold mb-4">API Keys</h3>
           <p className="text-sm text-muted-foreground mb-4">Manage API keys and environments</p>
           <Button variant="outline" disabled>Coming Soon</Button>
@@ -673,6 +706,13 @@ export default function PersonalHomepage() {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
   const [activeSection, setActiveSection] = React.useState<Section>("home")
   const [expandedSection, setExpandedSection] = React.useState<Section | null>(null)
+  const [activeSubItem, setActiveSubItem] = React.useState<string | null>(null)
+  const [weatherAlertCount, setWeatherAlertCount] = React.useState<number>(0)
+
+  // Clear sub-item after scroll completes
+  const clearSubItem = React.useCallback(() => {
+    setActiveSubItem(null)
+  }, [])
 
   // Render the active section content
   const renderContent = () => {
@@ -680,15 +720,15 @@ export default function PersonalHomepage() {
       case "home":
         return <HomeSection onNavigate={setActiveSection} />
       case "weather":
-        return <WeatherDashboard />
+        return <WeatherDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onAlertCountChange={setWeatherAlertCount} />
       case "feed":
-        return <DailyFeedSection />
+        return <DailyFeedSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "api-playground":
-        return <ApiPlaygroundSection />
+        return <ApiPlaygroundSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "notes":
-        return <QuickNotesSection onNavigateToSettings={() => setActiveSection("settings")} />
+        return <QuickNotesSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("settings")} />
       case "settings":
-        return <SettingsSection />
+        return <SettingsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       default:
         return <HomeSection onNavigate={setActiveSection} />
     }
@@ -718,6 +758,8 @@ export default function PersonalHomepage() {
               setActiveSection={setActiveSection}
               expandedSection={expandedSection}
               setExpandedSection={setExpandedSection}
+              setActiveSubItem={setActiveSubItem}
+              weatherAlertCount={weatherAlertCount}
               mobile
               onNavigate={() => setMobileMenuOpen(false)}
             />
@@ -737,6 +779,8 @@ export default function PersonalHomepage() {
                 setActiveSection={setActiveSection}
                 expandedSection={expandedSection}
                 setExpandedSection={setExpandedSection}
+                setActiveSubItem={setActiveSubItem}
+                weatherAlertCount={weatherAlertCount}
                 collapsed={sidebarCollapsed}
               />
             </aside>

@@ -493,7 +493,13 @@ function formatJSON(str: string): string {
 // MAIN COMPONENT
 // ============================================================================
 
-export default function ApiPlaygroundSection() {
+export default function ApiPlaygroundSection({
+  activeSubItem,
+  onSubItemHandled
+}: {
+  activeSubItem?: string | null
+  onSubItemHandled?: () => void
+}) {
   // Request config state
   const [config, setConfig] = React.useState<RequestConfig>(DEFAULT_CONFIG)
   const [response, setResponse] = React.useState<ResponseData | null>(null)
@@ -506,6 +512,14 @@ export default function ApiPlaygroundSection() {
   const [history, setHistory] = React.useState<HistoryItem[]>([])
   const [collections, setCollections] = React.useState<Collection[]>(SAMPLE_COLLECTIONS)
   const [sidebarTab, setSidebarTab] = React.useState<"collections" | "history">("collections")
+
+  // Handle sub-item navigation (switch to collections or history tab)
+  React.useEffect(() => {
+    if (activeSubItem === "collections" || activeSubItem === "history") {
+      setSidebarTab(activeSubItem)
+      onSubItemHandled?.()
+    }
+  }, [activeSubItem, onSubItemHandled])
 
   // Code generation
   const [codeLanguage, setCodeLanguage] = React.useState("curl")

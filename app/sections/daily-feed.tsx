@@ -464,7 +464,13 @@ function SourceToggle({
 // MAIN COMPONENT
 // ============================================================================
 
-export default function DailyFeedSection() {
+export default function DailyFeedSection({
+  activeSubItem,
+  onSubItemHandled
+}: {
+  activeSubItem?: string | null
+  onSubItemHandled?: () => void
+}) {
   // Filter state
   const [viewMode, setViewMode] = React.useState<"all" | "saved" | "filtered">("all")
   const [selectedSources, setSelectedSources] = React.useState<Set<FeedSource>>(new Set())
@@ -610,6 +616,27 @@ export default function DailyFeedSection() {
     setViewMode("saved")
   }
 
+  // Handle sub-item navigation from sidebar
+  React.useEffect(() => {
+    if (activeSubItem) {
+      const timer = setTimeout(() => {
+        if (activeSubItem === "saved") {
+          showSaved()
+        } else if (activeSubItem === "refresh") {
+          fetchFeed()
+        } else if (activeSubItem === "sources") {
+          // Switch back to All view and scroll to toolbar
+          showAll()
+          const element = document.getElementById("feed-toolbar")
+          if (element) {
+            element.scrollIntoView({ behavior: "smooth", block: "start" })
+          }
+        }
+        onSubItemHandled?.()
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [activeSubItem, onSubItemHandled, fetchFeed])
 
   // Toggle source
   const toggleSource = (source: FeedSource) => {
@@ -696,7 +723,7 @@ export default function DailyFeedSection() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div id="feed-toolbar" className="flex items-center gap-2 scroll-mt-6">
           {/* Sort Dropdown */}
           <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
             <SelectTrigger className="w-[130px] h-9">

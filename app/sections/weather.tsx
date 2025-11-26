@@ -755,10 +755,32 @@ const HISTORICAL_DATA: HistoricalComparison[] = [
 // MAIN COMPONENT
 // ============================================================================
 
-export default function WeatherDashboard() {
+export default function WeatherDashboard({
+  activeSubItem,
+  onSubItemHandled,
+  onAlertCountChange
+}: {
+  activeSubItem?: string | null
+  onSubItemHandled?: () => void
+  onAlertCountChange?: (count: number) => void
+}) {
   // UI state
   const [isLive, setIsLive] = useState(true)
   const [selectedMapLayer, setSelectedMapLayer] = useState<"radar" | "temperature" | "wind" | "clouds">("radar")
+
+  // Handle sub-item navigation (scroll to section)
+  useEffect(() => {
+    if (activeSubItem) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById(`weather-${activeSubItem}`)
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" })
+        }
+        onSubItemHandled?.()
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [activeSubItem, onSubItemHandled])
 
   // Location state (persisted in localStorage)
   const [geoLocation, setGeoLocation] = useState<GeoLocation>(() => {
@@ -828,6 +850,11 @@ export default function WeatherDashboard() {
   const airQuality = weatherData?.airQuality ?? AIR_QUALITY
   const weatherAlerts = weatherData?.weatherAlerts ?? []
   const isDaytime = weatherData?.isDaytime ?? true
+
+  // Report alert count to parent for sidebar badge
+  useEffect(() => {
+    onAlertCountChange?.(weatherAlerts.length)
+  }, [weatherAlerts.length, onAlertCountChange])
 
   // Get user's geolocation on first visit (only if using default location)
   useEffect(() => {
@@ -1144,9 +1171,10 @@ export default function WeatherDashboard() {
       {/* Severe Weather Alerts (from NWS API) */}
       {weatherAlerts.length > 0 && (
         <motion.div
+          id="weather-alerts"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
+          className="mb-6 scroll-mt-6"
         >
           <Card className="border-amber-500/50 bg-amber-500/10">
             <CardContent className="pt-4 space-y-4">
@@ -1361,7 +1389,7 @@ export default function WeatherDashboard() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 sm:gap-6 lg:grid-cols-3 w-full max-w-full">
+      <div id="weather-forecast" className="grid gap-4 sm:gap-6 lg:grid-cols-3 w-full max-w-full scroll-mt-6">
         {/* Hourly Forecast */}
         <div className="lg:col-span-2 min-w-0">
           <Card className="glass border-border">
@@ -1553,7 +1581,7 @@ export default function WeatherDashboard() {
           </Card>
 
           {/* Weather Map */}
-          <Card className="glass border-border">
+          <Card id="weather-radar" className="glass border-border scroll-mt-6">
             <CardHeader>
               <CardTitle className="text-lg">Weather Radar</CardTitle>
               <p className="text-xs text-muted-foreground mt-1">
