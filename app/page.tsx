@@ -32,6 +32,8 @@ import {
   FileText,
   Clock,
   CheckCircle2,
+  Grid,
+  Search,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -50,12 +52,13 @@ import WeatherDashboard from "./sections/weather"
 import DailyFeedSection from "./sections/daily-feed"
 import ApiPlaygroundSection from "./sections/api-playground"
 import QuickNotesSection from "./sections/quick-notes"
+import BookmarksSection from "./sections/bookmarks"
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type Section = "home" | "weather" | "feed" | "api-playground" | "notes" | "settings"
+type Section = "home" | "weather" | "feed" | "api-playground" | "notes" | "bookmarks" | "settings"
 
 interface SubItem {
   id: string
@@ -116,6 +119,16 @@ const navigationItems: NavigationItem[] = [
     subItems: [
       { id: "files", label: "Browse Files", icon: FolderOpen },
       { id: "recent", label: "Recent", icon: Clock },
+    ]
+  },
+  {
+    id: "bookmarks",
+    label: "Bookmarks",
+    icon: Bookmark,
+    description: "Quick links",
+    subItems: [
+      { id: "all", label: "All Links", icon: Grid },
+      { id: "search", label: "Search", icon: Search },
     ]
   },
   {
@@ -500,6 +513,18 @@ function HomeSection({ onNavigate }: { onNavigate: (section: Section) => void })
           <p className="text-sm text-muted-foreground">GitHub-synced markdown notes</p>
         </button>
 
+        {/* Bookmarks Card */}
+        <button
+          onClick={() => onNavigate("bookmarks")}
+          className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+        >
+          <div className="flex items-start justify-between mb-4">
+            <Bookmark className="h-8 w-8 text-primary" />
+          </div>
+          <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Bookmarks</h3>
+          <p className="text-sm text-muted-foreground">Organized quick links</p>
+        </button>
+
         {/* Settings Card */}
         <button
           onClick={() => onNavigate("settings")}
@@ -727,6 +752,8 @@ export default function PersonalHomepage() {
         return <ApiPlaygroundSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "notes":
         return <QuickNotesSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("settings")} />
+      case "bookmarks":
+        return <BookmarksSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("settings")} />
       case "settings":
         return <SettingsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       default:
