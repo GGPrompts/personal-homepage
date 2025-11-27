@@ -11,7 +11,6 @@ import {
   CloudFog,
   CloudLightning,
   Sun,
-  Moon,
   Wind,
   Droplets,
   Gauge,
@@ -289,6 +288,117 @@ const WMO_CODE_MAP: Record<number, { condition: WeatherCondition; description: s
 
 const getWeatherFromCode = (code: number): { condition: WeatherCondition; description: string } => {
   return WMO_CODE_MAP[code] || { condition: "partly-cloudy", description: "Unknown" }
+}
+
+// ============================================================================
+// MOON PHASE CALCULATION
+// ============================================================================
+
+type MoonPhase =
+  | "new-moon"
+  | "waxing-crescent"
+  | "first-quarter"
+  | "waxing-gibbous"
+  | "full-moon"
+  | "waning-gibbous"
+  | "last-quarter"
+  | "waning-crescent"
+
+const MOON_PHASE_NAMES: Record<MoonPhase, string> = {
+  "new-moon": "New Moon",
+  "waxing-crescent": "Waxing Crescent",
+  "first-quarter": "First Quarter",
+  "waxing-gibbous": "Waxing Gibbous",
+  "full-moon": "Full Moon",
+  "waning-gibbous": "Waning Gibbous",
+  "last-quarter": "Last Quarter",
+  "waning-crescent": "Waning Crescent",
+}
+
+// Calculate moon phase based on date
+// Uses the synodic month (~29.53 days) from a known new moon
+function getMoonPhase(date: Date = new Date()): { phase: MoonPhase; illumination: number } {
+  // Known new moon: January 6, 2000 at 18:14 UTC
+  const knownNewMoon = new Date("2000-01-06T18:14:00Z")
+  const synodicMonth = 29.53058867 // Average length of synodic month in days
+
+  const daysSinceNewMoon = (date.getTime() - knownNewMoon.getTime()) / (1000 * 60 * 60 * 24)
+  const lunarAge = daysSinceNewMoon % synodicMonth
+  const normalizedPhase = lunarAge / synodicMonth // 0 to 1
+
+  // Calculate approximate illumination (0 at new moon, 1 at full moon)
+  const illumination = Math.abs(Math.cos(normalizedPhase * Math.PI * 2 - Math.PI))
+
+  // Determine phase name (8 phases, each ~3.69 days)
+  let phase: MoonPhase
+  if (normalizedPhase < 0.0625) phase = "new-moon"
+  else if (normalizedPhase < 0.1875) phase = "waxing-crescent"
+  else if (normalizedPhase < 0.3125) phase = "first-quarter"
+  else if (normalizedPhase < 0.4375) phase = "waxing-gibbous"
+  else if (normalizedPhase < 0.5625) phase = "full-moon"
+  else if (normalizedPhase < 0.6875) phase = "waning-gibbous"
+  else if (normalizedPhase < 0.8125) phase = "last-quarter"
+  else if (normalizedPhase < 0.9375) phase = "waning-crescent"
+  else phase = "new-moon"
+
+  return { phase, illumination }
+}
+
+// Moon phase icon components
+const MoonPhaseIcon = ({ phase, className }: { phase: MoonPhase; className?: string }) => {
+  // SVG moon icons for each phase
+  const iconProps = { className, viewBox: "0 0 24 24", fill: "currentColor" }
+
+  switch (phase) {
+    case "new-moon":
+      return (
+        <svg {...iconProps}>
+          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      )
+    case "waxing-crescent":
+      return (
+        <svg {...iconProps}>
+          <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 0 1 0-16c-3 2-5 5-5 8s2 6 5 8z" />
+        </svg>
+      )
+    case "first-quarter":
+      return (
+        <svg {...iconProps}>
+          <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18V4a8 8 0 0 1 0 16z" />
+        </svg>
+      )
+    case "waxing-gibbous":
+      return (
+        <svg {...iconProps}>
+          <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 0 1 0-16c2 2 3 5 3 8s-1 6-3 8z" />
+        </svg>
+      )
+    case "full-moon":
+      return (
+        <svg {...iconProps}>
+          <circle cx="12" cy="12" r="10" />
+        </svg>
+      )
+    case "waning-gibbous":
+      return (
+        <svg {...iconProps}>
+          <path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 18a8 8 0 0 0 0-16c-2 2-3 5-3 8s1 6 3 8z" />
+        </svg>
+      )
+    case "last-quarter":
+      return (
+        <svg {...iconProps}>
+          <path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 18V4a8 8 0 0 0 0 16z" />
+        </svg>
+      )
+    case "waning-crescent":
+      return (
+        <svg {...iconProps}>
+          <path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 18a8 8 0 0 0 0-16c3 2 5 5 5 8s-2 6-5 8z" />
+        </svg>
+      )
+  }
 }
 
 // ============================================================================
@@ -1000,8 +1110,9 @@ export default function WeatherDashboard({
     return directions[index]
   }
 
-  // Weather icon component
+  // Weather icon component - use moon phase icon at night for clear conditions
   const WeatherIcon = WEATHER_ICONS[currentWeather.condition]
+  const moonPhaseData = getMoonPhase()
 
   // Current time
   const currentTime = new Date().toLocaleTimeString("en-US", {
@@ -1324,21 +1435,21 @@ export default function WeatherDashboard({
               <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 lg:justify-start">
                 <motion.div
                   animate={
-                    currentWeather.condition === "clear"
+                    currentWeather.condition === "clear" && isDaytime
                       ? {
                           // Sunny: smooth rotation
                           rotate: [0, 360],
                           scale: [1, 1.05, 1],
                         }
                       : {
-                          // Balatro-style floating effect for other conditions
+                          // Balatro-style floating effect for moon/other conditions
                           y: [0, -8, 0, -4, 0],
                           rotate: [-2, 2, -1, 1, -2],
                           scale: [1, 1.02, 1, 1.01, 1],
                         }
                   }
                   transition={
-                    currentWeather.condition === "clear"
+                    currentWeather.condition === "clear" && isDaytime
                       ? {
                           rotate: { duration: 20, repeat: Infinity, ease: "linear" },
                           scale: { duration: 3, repeat: Infinity, ease: "easeInOut" },
@@ -1350,7 +1461,15 @@ export default function WeatherDashboard({
                         }
                   }
                 >
-                  <WeatherIcon className="h-20 w-20 sm:h-24 sm:w-24 lg:h-32 lg:w-32 text-cyan-500" />
+                  {/* Show moon phase icon at night for clear conditions, otherwise weather icon */}
+                  {!isDaytime && currentWeather.condition === "clear" ? (
+                    <MoonPhaseIcon
+                      phase={moonPhaseData.phase}
+                      className="h-20 w-20 sm:h-24 sm:w-24 lg:h-32 lg:w-32 text-cyan-500"
+                    />
+                  ) : (
+                    <WeatherIcon className="h-20 w-20 sm:h-24 sm:w-24 lg:h-32 lg:w-32 text-cyan-500" />
+                  )}
                 </motion.div>
                 <div>
                   <motion.p
@@ -1854,8 +1973,8 @@ export default function WeatherDashboard({
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Moon Phase</span>
                   <div className="flex items-center gap-2">
-                    <Moon className="h-4 w-4" />
-                    <span className="font-semibold">Waning Crescent</span>
+                    <MoonPhaseIcon phase={moonPhaseData.phase} className="h-4 w-4" />
+                    <span className="font-semibold">{MOON_PHASE_NAMES[moonPhaseData.phase]}</span>
                   </div>
                 </div>
                 <Separator />

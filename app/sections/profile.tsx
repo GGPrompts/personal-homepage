@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import {
   Github,
@@ -17,12 +17,11 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/components/AuthProvider"
 import { AuthModal } from "@/components/AuthModal"
+import { RepoSelector } from "@/components/RepoSelector"
 
 interface SyncStatus {
   lastSync: string | null
@@ -37,7 +36,18 @@ export default function ProfileSection() {
   const [notesRepo, setNotesRepo] = useState(
     () => typeof window !== "undefined" ? localStorage.getItem("github-repo") || "" : ""
   )
-  const [savedRepo, setSavedRepo] = useState(notesRepo)
+  const [token, setToken] = useState<string | null>(null)
+
+  // Load token when user is available
+  useEffect(() => {
+    const loadToken = async () => {
+      const authToken = await getGitHubToken()
+      setToken(authToken)
+    }
+    if (user) {
+      loadToken()
+    }
+  }, [user, getGitHubToken])
 
   // Get sync status from localStorage
   const getNotesStatus = (): SyncStatus => {
@@ -106,9 +116,9 @@ export default function ProfileSection() {
     }
   }
 
-  const handleSaveRepo = () => {
-    localStorage.setItem("github-repo", notesRepo)
-    setSavedRepo(notesRepo)
+  const handleRepoChange = (repo: string) => {
+    setNotesRepo(repo)
+    localStorage.setItem("github-repo", repo)
   }
 
   const notesStatus = getNotesStatus()
@@ -320,23 +330,11 @@ export default function ProfileSection() {
             <Label htmlFor="repo" className="text-sm mb-2 block">
               GitHub Repository
             </Label>
-            <div className="flex gap-2">
-              <Input
-                id="repo"
-                value={notesRepo}
-                onChange={(e) => setNotesRepo(e.target.value)}
-                placeholder="username/repo"
-                className="glass-dark"
-              />
-              <Button
-                onClick={handleSaveRepo}
-                disabled={notesRepo === savedRepo}
-                variant="outline"
-                className="glass-dark"
-              >
-                Save
-              </Button>
-            </div>
+            <RepoSelector
+              value={notesRepo}
+              onValueChange={handleRepoChange}
+              token={token}
+            />
             <p className="text-xs text-muted-foreground mt-2">
               Repository used for syncing Quick Notes and Bookmarks
             </p>

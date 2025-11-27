@@ -68,6 +68,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setSession(session)
         setUser(session?.user ?? null)
         setLoading(false)
+
+        // Store provider_token when user signs in (it's only available right after OAuth)
+        if (event === "SIGNED_IN" && session?.provider_token) {
+          localStorage.setItem("github-provider-token", session.provider_token)
+        }
+
+        // Clear stored token on sign out
+        if (event === "SIGNED_OUT") {
+          localStorage.removeItem("github-provider-token")
+        }
       }
     )
 
@@ -121,8 +131,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (error || !data.session) {
         return null
       }
-      // The provider_token contains the GitHub access token
-      return data.session.provider_token ?? null
+
+      // Try to get provider_token from session first (available right after OAuth)
+      if (data.session.provider_token) {
+        // Store it for future use
+        localStorage.setItem("github-provider-token", data.session.provider_token)
+        return data.session.provider_token
+      }
+
+      // Fall back to stored token (Supabase doesn't persist provider_token)
+      const storedToken = localStorage.getItem("github-provider-token")
+      return storedToken
     } catch (error) {
       console.error("Error getting GitHub token:", error)
       return null
