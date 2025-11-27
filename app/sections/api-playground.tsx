@@ -883,10 +883,10 @@ print(response.json())`
   return (
     <div className="min-h-full lg:h-full flex flex-col lg:flex-row gap-4 p-4 lg:p-6">
       {/* Sidebar - Collections & History */}
-      <div className="lg:w-72 flex-shrink-0">
-        <div className="glass rounded-lg p-4 h-full">
-          <Tabs value={sidebarTab} onValueChange={(v) => setSidebarTab(v as "collections" | "history")}>
-            <TabsList className="grid w-full grid-cols-2 mb-4">
+      <div className="lg:w-72 flex-shrink-0 lg:h-full">
+        <div className="glass rounded-lg p-4 h-full flex flex-col">
+          <Tabs value={sidebarTab} onValueChange={(v) => setSidebarTab(v as "collections" | "history")} className="flex flex-col flex-1 min-h-0">
+            <TabsList className="grid w-full grid-cols-2 mb-4 flex-shrink-0">
               <TabsTrigger value="collections" className="text-xs">
                 <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
                 Collections
@@ -898,7 +898,7 @@ print(response.json())`
             </TabsList>
 
             {/* Collections Tab */}
-            <TabsContent value="collections" className="space-y-2 mt-0 max-h-[400px] overflow-y-auto">
+            <TabsContent value="collections" className="space-y-2 mt-0 flex-1 overflow-y-auto">
               {collections.map(collection => (
                 <div key={collection.id}>
                   <button
@@ -942,7 +942,7 @@ print(response.json())`
             </TabsContent>
 
             {/* History Tab */}
-            <TabsContent value="history" className="space-y-1 mt-0 max-h-[400px] overflow-y-auto">
+            <TabsContent value="history" className="space-y-1 mt-0 flex-1 overflow-y-auto">
               {history.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-8">
                   No request history yet
