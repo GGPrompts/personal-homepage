@@ -129,12 +129,13 @@ async function fetchRedditClient(
 ): Promise<FeedItem[]> {
   const fetchSubreddit = async (subreddit: string): Promise<FeedItem[]> => {
     try {
+      // Use raw_json=1 to get unescaped content, no www to avoid redirects
       const res = await fetch(
-        `https://www.reddit.com/r/${subreddit}/hot.json?limit=${limitPerSubreddit}`,
+        `https://reddit.com/r/${subreddit}/hot.json?limit=${limitPerSubreddit}&raw_json=1`,
         {
-          headers: {
-            "Accept": "application/json",
-          },
+          method: "GET",
+          mode: "cors",
+          credentials: "omit",
         }
       )
 
@@ -144,6 +145,12 @@ async function fetchRedditClient(
       }
 
       const data = await res.json()
+
+      // Validate response structure
+      if (!data?.data?.children) {
+        console.warn(`Reddit r/${subreddit}: unexpected response structure`)
+        return []
+      }
 
       return data.data.children
         .filter((post: { data: { title: string } }) => {
@@ -180,18 +187,26 @@ async function fetchRedditClient(
           }
         })
     } catch (error) {
-      console.error(`Failed to fetch r/${subreddit}:`, error)
+      console.error(`[Reddit] Failed to fetch r/${subreddit}:`, error)
       return []
     }
   }
 
+  if (!subreddits || subreddits.length === 0) {
+    console.warn("[Reddit] No subreddits to fetch")
+    return []
+  }
+
+  console.log("[Reddit] Starting fetch for:", subreddits)
   try {
     const results = await Promise.all(
       subreddits.map((sub) => fetchSubreddit(sub))
     )
-    return results.flat()
+    const flatResults = results.flat()
+    console.log("[Reddit] Total items fetched:", flatResults.length)
+    return flatResults
   } catch (error) {
-    console.error("Failed to fetch Reddit:", error)
+    console.error("[Reddit] Failed to fetch:", error)
     return []
   }
 }
@@ -596,17 +611,25 @@ export default function DailyFeedSection({
   })
 
   // Reddit query - fetched client-side to bypass Vercel IP blocking
+  // Use JSON.stringify for stable query key (arrays compared by reference otherwise)
+  const subredditsKey = JSON.stringify(subreddits)
   const {
     data: redditItems,
     isLoading: redditLoading,
     error: redditError,
     refetch: refetchReddit,
   } = useQuery({
-    queryKey: ["reddit", subreddits],
-    queryFn: () => fetchRedditClient(subreddits),
+    queryKey: ["reddit", subredditsKey],
+    queryFn: async () => {
+      console.log("[Reddit] Fetching subreddits:", subreddits)
+      const results = await fetchRedditClient(subreddits)
+      console.log("[Reddit] Fetched items:", results.length)
+      return results
+    },
     staleTime: 15 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
-    enabled: prefsLoaded && enabledSources.includes("reddit"),
+    enabled: prefsLoaded && enabledSources.includes("reddit") && subreddits.length > 0,
+    retry: 2,
   })
 
   // Combined loading and error states
