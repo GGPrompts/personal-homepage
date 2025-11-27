@@ -29,7 +29,8 @@ A personal dashboard/homepage designed as a browser start page. Features an acco
 | **Bookmarks** | Complete | Folder-based links with icon/list view, search, GitHub sync |
 | **Search Hub** | Complete | Search, AI chat, and image generation with keyboard shortcuts |
 | **Paper Trading** | Complete | Practice stock trading with real data and $100K virtual money |
-| **Settings** | Partial | Theme/appearance + GitHub integration (Feed Config coming soon) |
+| **Profile** | Complete | GitHub OAuth login, sync status, repository settings |
+| **Settings** | Partial | Theme/appearance (Feed Config coming soon) |
 
 ## Tech Stack
 
@@ -37,7 +38,8 @@ A personal dashboard/homepage designed as a browser start page. Features an acco
 - **Styling**: Tailwind CSS + shadcn/ui components
 - **State**: TanStack Query (server state) + localStorage (preferences)
 - **Theming**: 10 themes + background styles + glassmorphism
-- **APIs**: Open-Meteo, RainViewer, NWS, Nominatim, HN, GitHub (trending + Contents API), Reddit, Lobsters, Dev.to, Finnhub (stocks)
+- **Auth**: Supabase Auth (GitHub OAuth)
+- **APIs**: Open-Meteo, RainViewer, NWS, Nominatim, HN, GitHub (trending + Contents API), Reddit, Lobsters, Dev.to, Finnhub (stocks), Alpha Vantage (charts)
 
 ## Project Structure
 
@@ -54,11 +56,14 @@ personal-homepage/
 │   │   ├── quick-notes.tsx
 │   │   ├── bookmarks.tsx
 │   │   ├── search-hub.tsx
-│   │   └── stocks-dashboard.tsx
+│   │   ├── stocks-dashboard.tsx
+│   │   └── profile.tsx
 │   ├── api/feed/               # Feed API endpoint + fetchers
 │   └── api/stocks/             # Stock quotes, history, search
 ├── components/
 │   ├── ui/                     # shadcn/ui components
+│   ├── AuthProvider.tsx        # Supabase auth context
+│   ├── AuthModal.tsx           # GitHub OAuth login modal
 │   ├── JsonViewer.tsx          # Syntax-highlighted collapsible JSON
 │   ├── QueryProvider.tsx       # TanStack Query provider
 │   ├── ThemeProvider.tsx       # Theme context
@@ -68,7 +73,8 @@ personal-homepage/
 │   └── MasterBackground.tsx    # Animated backgrounds
 ├── lib/
 │   ├── utils.ts                # cn() helper
-│   └── github.ts               # GitHub API helper
+│   ├── github.ts               # GitHub API helper
+│   └── supabase.ts             # Supabase client
 ├── docs/                       # Detailed documentation
 ```
 

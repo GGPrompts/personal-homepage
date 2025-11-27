@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { BackgroundProvider } from "@/components/BackgroundProvider";
 import { MasterBackground } from "@/components/MasterBackground";
 import { QueryProvider } from "@/components/QueryProvider";
+import { AuthProvider } from "@/components/AuthProvider";
 import { Toaster } from "sonner";
 
 const inter = Inter({
@@ -31,11 +32,12 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
       <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans`}>
         <QueryProvider>
-          <BackgroundProvider>
-            <ThemeProvider>
-              <MasterBackground />
-              {children}
-              <Toaster
+          <AuthProvider>
+            <BackgroundProvider>
+              <ThemeProvider>
+                <MasterBackground />
+                {children}
+                <Toaster
               theme="dark"
               position="bottom-right"
               toastOptions={{
@@ -45,9 +47,10 @@ export default function RootLayout({
                   color: 'hsl(var(--popover-foreground))',
                 },
               }}
-              />
-            </ThemeProvider>
-          </BackgroundProvider>
+                />
+              </ThemeProvider>
+            </BackgroundProvider>
+          </AuthProvider>
         </QueryProvider>
       </body>
     </html>

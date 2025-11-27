@@ -43,6 +43,9 @@ import {
   type GitHubFile,
   type GitHubError,
 } from "@/lib/github"
+import { useAuth } from "@/components/AuthProvider"
+import { AuthModal } from "@/components/AuthModal"
+import { Github, User } from "lucide-react"
 
 // ============================================================================
 // TYPES
@@ -236,18 +239,44 @@ function FileTreeItem({
 // NO CONFIG MESSAGE
 // ============================================================================
 
-function NoConfigMessage({ onNavigateToSettings }: { onNavigateToSettings: () => void }) {
+function NoConfigMessage({
+  onNavigateToSettings,
+  isLoggedIn,
+  onShowAuth,
+}: {
+  onNavigateToSettings: () => void
+  isLoggedIn: boolean
+  onShowAuth: () => void
+}) {
+  if (!isLoggedIn) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+        <div className="glass rounded-lg p-8 max-w-md">
+          <User className="h-12 w-12 text-primary mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Sign In to Sync Notes</h2>
+          <p className="text-muted-foreground mb-6">
+            Sign in with GitHub to sync your notes across devices. Your notes are stored in a GitHub repository you control.
+          </p>
+          <Button onClick={onShowAuth} className="bg-[#24292e] hover:bg-[#24292e]/90 text-white">
+            <Github className="h-4 w-4 mr-2" />
+            Sign in with GitHub
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col items-center justify-center h-full p-8 text-center">
       <div className="glass rounded-lg p-8 max-w-md">
         <AlertCircle className="h-12 w-12 text-primary mx-auto mb-4" />
-        <h2 className="text-xl font-semibold mb-2">GitHub Not Configured</h2>
+        <h2 className="text-xl font-semibold mb-2">Repository Not Configured</h2>
         <p className="text-muted-foreground mb-6">
-          Connect to a GitHub repository to sync your notes. You'll need a Personal Access Token with repo access.
+          You're signed in! Now configure which GitHub repository to use for syncing your notes.
         </p>
         <Button onClick={onNavigateToSettings}>
           <Settings className="h-4 w-4 mr-2" />
-          Configure in Settings
+          Configure in Profile
         </Button>
       </div>
     </div>
@@ -268,10 +297,12 @@ export default function QuickNotesSection({
   onNavigateToSettings?: () => void
 }) {
   const queryClient = useQueryClient()
+  const { user, getGitHubToken } = useAuth()
 
-  // GitHub config from localStorage
+  // GitHub config
   const [token, setToken] = React.useState<string | null>(null)
   const [repo, setRepo] = React.useState<string | null>(null)
+  const [showAuthModal, setShowAuthModal] = React.useState(false)
 
   // UI state
   const [expandedPaths, setExpandedPaths] = React.useState<Set<string>>(new Set([""])) // Root expanded
@@ -287,13 +318,17 @@ export default function QuickNotesSection({
   const [editor, setEditor] = React.useState<EditorState | null>(null)
   const autoSaveTimerRef = React.useRef<NodeJS.Timeout | null>(null)
 
-  // Load config from localStorage
+  // Load token from auth, repo from localStorage
   React.useEffect(() => {
-    const savedToken = localStorage.getItem("github-token")
+    const loadToken = async () => {
+      const authToken = await getGitHubToken()
+      setToken(authToken)
+    }
+    loadToken()
+
     const savedRepo = localStorage.getItem("github-repo")
-    setToken(savedToken)
     setRepo(savedRepo)
-  }, [])
+  }, [user, getGitHubToken])
 
   // Handle sub-item navigation from sidebar
   React.useEffect(() => {
@@ -619,9 +654,14 @@ export default function QuickNotesSection({
   // If not configured, show message
   if (!token || !repo) {
     return (
-      <NoConfigMessage
-        onNavigateToSettings={onNavigateToSettings || (() => {})}
-      />
+      <>
+        <NoConfigMessage
+          onNavigateToSettings={onNavigateToSettings || (() => {})}
+          isLoggedIn={!!user}
+          onShowAuth={() => setShowAuthModal(true)}
+        />
+        <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+      </>
     )
   }
 

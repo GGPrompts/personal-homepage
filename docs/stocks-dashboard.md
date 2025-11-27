@@ -7,6 +7,7 @@ A trading practice dashboard with real market data and virtual money.
 ## Features
 
 - **Real-time quotes** (15-min delayed on free tier) via Finnhub API
+- **Historical charts** with real OHLCV data via Alpha Vantage API
 - **Paper trading** with $100,000 virtual starting balance
 - **Portfolio tracking** with positions, P&L, and day's change
 - **Watchlist** with 8 default stocks, searchable and sortable
@@ -17,18 +18,28 @@ A trading practice dashboard with real market data and virtual money.
 
 ## Setup
 
-### 1. Get a Finnhub API Key (Free)
+### 1. Get API Keys (Free)
 
+**Finnhub** (real-time quotes):
 1. Go to [finnhub.io/register](https://finnhub.io/register)
 2. Create a free account
 3. Copy your API key from the dashboard
+
+**Alpha Vantage** (historical charts):
+1. Go to [alphavantage.co/support/#api-key](https://www.alphavantage.co/support/#api-key)
+2. Request a free API key (instant)
+3. Copy your API key
 
 ### 2. Add to Environment
 
 Create or edit `.env.local`:
 
 ```bash
-FINNHUB_API_KEY=your_api_key_here
+# Required: Real-time quotes
+FINNHUB_API_KEY=your_finnhub_key_here
+
+# Optional: Historical chart data (falls back to simulated data without this)
+ALPHA_VANTAGE_API_KEY=your_alpha_vantage_key_here
 ```
 
 ### 3. Restart Dev Server
@@ -47,14 +58,14 @@ npm run dev
 
 ## Timeframes
 
-| Code | Resolution | Data Range |
-|------|------------|------------|
-| 1D | 5-minute candles | 1 day |
-| 5D | 15-minute candles | 5 days |
-| 1M | 1-hour candles | 30 days |
-| 6M | Daily candles | 180 days |
-| 1Y | Daily candles | 365 days |
-| 5Y | Weekly candles | 5 years |
+| Code | Resolution | Data Range | Alpha Vantage API |
+|------|------------|------------|-------------------|
+| 1D | 5-minute candles | 1 day | TIME_SERIES_INTRADAY |
+| 5D | Daily candles | 5 days | TIME_SERIES_DAILY |
+| 1M | Daily candles | 30 days | TIME_SERIES_DAILY |
+| 6M | Daily candles | 180 days | TIME_SERIES_DAILY (full) |
+| 1Y | Daily candles | 365 days | TIME_SERIES_DAILY (full) |
+| 5Y | Weekly candles | 5 years | TIME_SERIES_WEEKLY |
 
 ## Paper Trading
 
@@ -95,13 +106,18 @@ Click "Reset Portfolio" to restore to $100,000 and clear all positions/history.
 
 ## Rate Limits
 
-Finnhub free tier: **60 calls/minute**
+| API | Rate Limit | Used For |
+|-----|------------|----------|
+| Finnhub | 60 calls/minute | Real-time quotes, watchlist |
+| Alpha Vantage | 25 calls/day, 5/minute | Historical chart data |
 
 The dashboard uses aggressive caching to stay well under limits:
 - Quotes: 1-minute cache, refetch when "Live" mode enabled
 - Historical data: 1-5 minute cache based on timeframe
 - Company profiles: 24-hour cache
 - Metrics (P/E, 52-week): 1-hour cache
+
+**Note:** If Alpha Vantage API key is not configured or rate limits are exceeded, charts fall back to simulated data based on the current quote.
 
 ## Limitations
 
@@ -127,7 +143,7 @@ app/
 
 - [ ] Add more stocks to search/watchlist
 - [ ] WebSocket streaming for real-time updates (Finnhub supports this)
-- [ ] Technical indicators (RSI, MACD) from Alpha Vantage
+- [ ] Technical indicators (RSI, MACD) - Alpha Vantage has these endpoints
 - [ ] GitHub sync for portfolio (like Notes/Bookmarks)
 - [ ] Price alerts
 - [ ] Performance charts over time

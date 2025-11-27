@@ -46,6 +46,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { getFile, saveFile, type GitHubError } from "@/lib/github"
+import { useAuth } from "@/components/AuthProvider"
+import { AuthModal } from "@/components/AuthModal"
+import { Github, User } from "lucide-react"
 
 // ============================================================================
 // TYPES
@@ -139,10 +142,12 @@ export default function BookmarksSection({
   onNavigateToSettings?: () => void
 }) {
   const queryClient = useQueryClient()
+  const { user, getGitHubToken } = useAuth()
 
   // GitHub config
   const [token, setToken] = React.useState<string | null>(null)
   const [repo, setRepo] = React.useState<string | null>(null)
+  const [showAuthModal, setShowAuthModal] = React.useState(false)
 
   // UI state
   const [viewMode, setViewMode] = React.useState<"grid" | "list">(() => {
@@ -174,13 +179,17 @@ export default function BookmarksSection({
   const [formFolderId, setFormFolderId] = React.useState<string>("root")
   const [formIcon, setFormIcon] = React.useState("")
 
-  // Load GitHub config
+  // Load token from auth, repo from localStorage
   React.useEffect(() => {
-    const savedToken = localStorage.getItem("github-token")
+    const loadToken = async () => {
+      const authToken = await getGitHubToken()
+      setToken(authToken)
+    }
+    loadToken()
+
     const savedRepo = localStorage.getItem("github-repo")
-    setToken(savedToken)
     setRepo(savedRepo)
-  }, [])
+  }, [user, getGitHubToken])
 
   // Save view mode preference
   React.useEffect(() => {
@@ -417,17 +426,41 @@ export default function BookmarksSection({
 
   // Not configured state
   if (!token || !repo) {
+    if (!user) {
+      return (
+        <>
+          <div className="h-full flex items-center justify-center p-6">
+            <div className="text-center max-w-md">
+              <User className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Sign In to Sync Bookmarks</h2>
+              <p className="text-muted-foreground mb-4">
+                Sign in with GitHub to sync your bookmarks across devices.
+              </p>
+              <Button
+                onClick={() => setShowAuthModal(true)}
+                className="bg-[#24292e] hover:bg-[#24292e]/90 text-white"
+              >
+                <Github className="h-4 w-4 mr-2" />
+                Sign in with GitHub
+              </Button>
+            </div>
+          </div>
+          <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+        </>
+      )
+    }
+
     return (
       <div className="h-full flex items-center justify-center p-6">
         <div className="text-center max-w-md">
           <Bookmark className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Connect GitHub</h2>
+          <h2 className="text-xl font-semibold mb-2">Configure Repository</h2>
           <p className="text-muted-foreground mb-4">
-            Configure GitHub integration to sync your bookmarks across devices.
+            You're signed in! Now configure which GitHub repository to use for syncing your bookmarks.
           </p>
           <Button onClick={onNavigateToSettings}>
             <Settings className="h-4 w-4 mr-2" />
-            Go to Settings
+            Configure in Profile
           </Button>
         </div>
       </div>
