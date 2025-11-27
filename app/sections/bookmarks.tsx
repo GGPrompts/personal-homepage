@@ -187,7 +187,7 @@ export default function BookmarksSection({
     }
     loadToken()
 
-    const savedRepo = localStorage.getItem("github-repo")
+    const savedRepo = localStorage.getItem("github-bookmarks-repo")
     setRepo(savedRepo)
   }, [user, getGitHubToken])
 

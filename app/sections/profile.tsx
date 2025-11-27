@@ -34,7 +34,10 @@ export default function ProfileSection() {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const [notesRepo, setNotesRepo] = useState(
-    () => typeof window !== "undefined" ? localStorage.getItem("github-repo") || "" : ""
+    () => typeof window !== "undefined" ? localStorage.getItem("github-notes-repo") || "" : ""
+  )
+  const [bookmarksRepo, setBookmarksRepo] = useState(
+    () => typeof window !== "undefined" ? localStorage.getItem("github-bookmarks-repo") || "" : ""
   )
   const [token, setToken] = useState<string | null>(null)
 
@@ -52,41 +55,36 @@ export default function ProfileSection() {
   // Get sync status from localStorage
   const getNotesStatus = (): SyncStatus => {
     if (typeof window === "undefined") return { lastSync: null, itemCount: 0, repo: null }
-    const cache = localStorage.getItem("github-notes-cache")
-    const repo = localStorage.getItem("github-repo")
-    if (cache) {
-      try {
-        const data = JSON.parse(cache)
-        return {
-          lastSync: data.timestamp || null,
-          itemCount: data.files?.length || 0,
-          repo,
-        }
-      } catch {
-        return { lastSync: null, itemCount: 0, repo }
+    const repo = localStorage.getItem("github-notes-repo")
+
+    // Count cached files and find most recent cache time
+    let itemCount = 0
+    let mostRecentCache: number | null = null
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key?.startsWith("github-notes-cache-")) {
+        itemCount++
+        try {
+          const cached = JSON.parse(localStorage.getItem(key) || "{}")
+          if (cached.cachedAt && (!mostRecentCache || cached.cachedAt > mostRecentCache)) {
+            mostRecentCache = cached.cachedAt
+          }
+        } catch {}
       }
     }
-    return { lastSync: null, itemCount: 0, repo }
+
+    return {
+      lastSync: mostRecentCache ? new Date(mostRecentCache).toISOString() : null,
+      itemCount,
+      repo,
+    }
   }
 
   const getBookmarksStatus = (): SyncStatus => {
     if (typeof window === "undefined") return { lastSync: null, itemCount: 0, repo: null }
-    const cache = localStorage.getItem("bookmarks-github-cache")
-    const repo = localStorage.getItem("github-repo")
-    if (cache) {
-      try {
-        const data = JSON.parse(cache)
-        const bookmarkCount = data.bookmarks?.reduce((acc: number, folder: { links?: unknown[] }) =>
-          acc + (folder.links?.length || 0), 0) || 0
-        return {
-          lastSync: data.timestamp || null,
-          itemCount: bookmarkCount,
-          repo,
-        }
-      } catch {
-        return { lastSync: null, itemCount: 0, repo }
-      }
-    }
+    const repo = localStorage.getItem("github-bookmarks-repo")
+    // Bookmarks don't have persistent cache - just show if repo is configured
     return { lastSync: null, itemCount: 0, repo }
   }
 
@@ -116,9 +114,14 @@ export default function ProfileSection() {
     }
   }
 
-  const handleRepoChange = (repo: string) => {
+  const handleNotesRepoChange = (repo: string) => {
     setNotesRepo(repo)
-    localStorage.setItem("github-repo", repo)
+    localStorage.setItem("github-notes-repo", repo)
+  }
+
+  const handleBookmarksRepoChange = (repo: string) => {
+    setBookmarksRepo(repo)
+    localStorage.setItem("github-bookmarks-repo", repo)
   }
 
   const notesStatus = getNotesStatus()
@@ -273,8 +276,10 @@ export default function ProfileSection() {
                 <p className="font-medium">Quick Notes</p>
                 <p className="text-xs text-muted-foreground">
                   {notesStatus.itemCount > 0
-                    ? `${notesStatus.itemCount} files`
-                    : "No files synced"}
+                    ? `${notesStatus.itemCount} files cached`
+                    : notesRepo
+                    ? "Ready to browse"
+                    : "No repository selected"}
                 </p>
               </div>
             </div>
@@ -283,9 +288,13 @@ export default function ProfileSection() {
                 <Badge variant="outline" className="text-xs">
                   {formatLastSync(notesStatus.lastSync)}
                 </Badge>
+              ) : notesRepo ? (
+                <Badge variant="secondary" className="text-xs bg-emerald-500/20 text-emerald-400">
+                  Configured
+                </Badge>
               ) : (
                 <Badge variant="outline" className="text-xs text-muted-foreground">
-                  Not synced
+                  Not configured
                 </Badge>
               )}
             </div>
@@ -298,20 +307,20 @@ export default function ProfileSection() {
               <div>
                 <p className="font-medium">Bookmarks</p>
                 <p className="text-xs text-muted-foreground">
-                  {bookmarksStatus.itemCount > 0
-                    ? `${bookmarksStatus.itemCount} bookmarks`
-                    : "No bookmarks synced"}
+                  {bookmarksRepo
+                    ? `Syncing to ${bookmarksRepo.split('/')[1] || bookmarksRepo}`
+                    : "No repository selected"}
                 </p>
               </div>
             </div>
             <div className="text-right">
-              {bookmarksStatus.lastSync ? (
-                <Badge variant="outline" className="text-xs">
-                  {formatLastSync(bookmarksStatus.lastSync)}
+              {bookmarksRepo ? (
+                <Badge variant="secondary" className="text-xs bg-emerald-500/20 text-emerald-400">
+                  Configured
                 </Badge>
               ) : (
                 <Badge variant="outline" className="text-xs text-muted-foreground">
-                  Not synced
+                  Not configured
                 </Badge>
               )}
             </div>
@@ -325,18 +334,36 @@ export default function ProfileSection() {
           <Settings className="h-5 w-5 text-primary" />
           Repository Settings
         </h3>
-        <div className="space-y-4">
+        <div className="space-y-6">
+          {/* Quick Notes Repo */}
           <div>
-            <Label htmlFor="repo" className="text-sm mb-2 block">
-              GitHub Repository
+            <Label className="text-sm mb-2 flex items-center gap-2">
+              <FileText className="h-4 w-4 text-blue-400" />
+              Quick Notes Repository
             </Label>
             <RepoSelector
               value={notesRepo}
-              onValueChange={handleRepoChange}
+              onValueChange={handleNotesRepoChange}
               token={token}
             />
             <p className="text-xs text-muted-foreground mt-2">
-              Repository used for syncing Quick Notes and Bookmarks
+              Browse and edit files in any repository
+            </p>
+          </div>
+
+          {/* Bookmarks Repo */}
+          <div>
+            <Label className="text-sm mb-2 flex items-center gap-2">
+              <Bookmark className="h-4 w-4 text-amber-400" />
+              Bookmarks Repository
+            </Label>
+            <RepoSelector
+              value={bookmarksRepo}
+              onValueChange={handleBookmarksRepoChange}
+              token={token}
+            />
+            <p className="text-xs text-muted-foreground mt-2">
+              Where your bookmarks.json is stored
             </p>
           </div>
         </div>

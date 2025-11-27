@@ -45,7 +45,8 @@ import {
 } from "@/lib/github"
 import { useAuth } from "@/components/AuthProvider"
 import { AuthModal } from "@/components/AuthModal"
-import { Github, User } from "lucide-react"
+import { RepoSelector } from "@/components/RepoSelector"
+import { Github, User, GitBranch } from "lucide-react"
 
 // ============================================================================
 // TYPES
@@ -162,6 +163,7 @@ function FileTreeItem({
   onSelect,
   onToggleExpand,
   expandedPaths,
+  repo,
 }: {
   node: FileTreeNode
   depth: number
@@ -169,6 +171,7 @@ function FileTreeItem({
   onSelect: (file: FileTreeNode) => void
   onToggleExpand: (path: string) => void
   expandedPaths: Set<string>
+  repo: string | null
 }) {
   const Icon = getFileIcon(node)
   const isDir = node.type === "dir"
@@ -181,6 +184,9 @@ function FileTreeItem({
       onToggleExpand(node.path)
     } else if (isMarkdown) {
       onSelect(node)
+    } else if (repo) {
+      // Open non-markdown files on GitHub
+      window.open(`https://github.com/${repo}/blob/main/${node.path}`, "_blank")
     }
   }
 
@@ -189,12 +195,10 @@ function FileTreeItem({
       <button
         onClick={handleClick}
         className={`
-          w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors
+          group w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors cursor-pointer
           ${isSelected ? "bg-primary/20 text-primary" : "hover:bg-primary/10 text-foreground"}
-          ${!isMarkdown && !isDir ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
         `}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
-        disabled={!isMarkdown && !isDir}
       >
         {isDir && (
           <span className="flex-shrink-0">
@@ -211,9 +215,12 @@ function FileTreeItem({
         {isDir && isExpanded ? (
           <FolderOpen className="h-4 w-4 text-primary flex-shrink-0" />
         ) : (
-          <Icon className={`h-4 w-4 flex-shrink-0 ${isMarkdown ? "text-primary" : "text-muted-foreground"}`} />
+          <Icon className={`h-4 w-4 flex-shrink-0 ${isMarkdown ? "text-primary" : isDir ? "" : "text-muted-foreground"}`} />
         )}
-        <span className="truncate">{node.name}</span>
+        <span className="truncate flex-1">{node.name}</span>
+        {!isDir && !isMarkdown && (
+          <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 flex-shrink-0" />
+        )}
       </button>
 
       {isDir && isExpanded && node.children && (
@@ -227,6 +234,7 @@ function FileTreeItem({
               onSelect={onSelect}
               onToggleExpand={onToggleExpand}
               expandedPaths={expandedPaths}
+              repo={repo}
             />
           ))}
         </div>
@@ -326,9 +334,22 @@ export default function QuickNotesSection({
     }
     loadToken()
 
-    const savedRepo = localStorage.getItem("github-repo")
+    const savedRepo = localStorage.getItem("github-notes-repo")
     setRepo(savedRepo)
   }, [user, getGitHubToken])
+
+  // Handle repo change - clear state and save to localStorage
+  const handleRepoChange = React.useCallback((newRepo: string) => {
+    setRepo(newRepo)
+    localStorage.setItem("github-notes-repo", newRepo)
+    // Clear editor and file state when switching repos
+    setEditor(null)
+    setSelectedFile(null)
+    setDirectoryContents(new Map())
+    setExpandedPaths(new Set([""]))
+    // Invalidate queries to refetch for new repo
+    queryClient.invalidateQueries({ queryKey: ["github-contents"] })
+  }, [queryClient])
 
   // Handle sub-item navigation from sidebar
   React.useEffect(() => {
@@ -673,6 +694,19 @@ export default function QuickNotesSection({
       {/* File Browser Panel */}
       <div id="notes-files" className="lg:w-72 flex-shrink-0 scroll-mt-6">
         <div className="glass rounded-lg p-4 h-full flex flex-col">
+          {/* Repo Selector */}
+          <div className="mb-4">
+            <label className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
+              <GitBranch className="h-3 w-3" />
+              Repository
+            </label>
+            <RepoSelector
+              value={repo || ""}
+              onValueChange={handleRepoChange}
+              token={token}
+            />
+          </div>
+
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-sm flex items-center gap-2">
               <FolderOpen className="h-4 w-4" />
@@ -767,6 +801,7 @@ export default function QuickNotesSection({
                     onSelect={handleSelectFile}
                     onToggleExpand={handleToggleExpand}
                     expandedPaths={expandedPaths}
+                    repo={repo}
                   />
                 ))}
               </div>
