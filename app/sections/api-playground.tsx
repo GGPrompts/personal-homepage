@@ -451,6 +451,83 @@ const SAMPLE_COLLECTIONS: Collection[] = [
       },
     ],
   },
+  {
+    id: "stocks",
+    name: "Stocks APIs",
+    expanded: false,
+    requests: [
+      {
+        id: "s1",
+        name: "Get Quotes (Watchlist)",
+        method: "GET",
+        url: "/api/stocks?symbols=AAPL,MSFT,GOOGL,NVDA",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "/api/stocks?symbols=AAPL,MSFT,GOOGL,NVDA",
+        },
+      },
+      {
+        id: "s2",
+        name: "Get Single Quote",
+        method: "GET",
+        url: "/api/stocks?symbols=AAPL&metrics=true",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "/api/stocks?symbols=AAPL&metrics=true",
+        },
+      },
+      {
+        id: "s3",
+        name: "Historical Data (1D)",
+        method: "GET",
+        url: "/api/stocks/history?symbol=AAPL&timeframe=1D",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "/api/stocks/history?symbol=AAPL&timeframe=1D",
+        },
+      },
+      {
+        id: "s4",
+        name: "Historical Data (1M)",
+        method: "GET",
+        url: "/api/stocks/history?symbol=AAPL&timeframe=1M",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "/api/stocks/history?symbol=AAPL&timeframe=1M",
+        },
+      },
+      {
+        id: "s5",
+        name: "Historical Data (1Y)",
+        method: "GET",
+        url: "/api/stocks/history?symbol=AAPL&timeframe=1Y",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "/api/stocks/history?symbol=AAPL&timeframe=1Y",
+        },
+      },
+      {
+        id: "s6",
+        name: "Search Stocks",
+        method: "GET",
+        url: "/api/stocks/search?q=apple",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "/api/stocks/search?q=apple",
+        },
+      },
+      {
+        id: "s7",
+        name: "API Status",
+        method: "GET",
+        url: "/api/status",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "/api/status",
+        },
+      },
+    ],
+  },
 ]
 
 // ============================================================================

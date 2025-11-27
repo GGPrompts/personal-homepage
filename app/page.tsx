@@ -35,6 +35,9 @@ import {
   Grid,
   Search,
   Globe,
+  TrendingUp,
+  Wallet,
+  LineChart,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -55,12 +58,13 @@ import ApiPlaygroundSection from "./sections/api-playground"
 import QuickNotesSection from "./sections/quick-notes"
 import BookmarksSection from "./sections/bookmarks"
 import SearchHubSection from "./sections/search-hub"
+import StocksDashboard from "./sections/stocks-dashboard"
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type Section = "home" | "weather" | "feed" | "api-playground" | "notes" | "bookmarks" | "search" | "settings"
+type Section = "home" | "weather" | "feed" | "api-playground" | "notes" | "bookmarks" | "search" | "stocks" | "settings"
 
 interface SubItem {
   id: string
@@ -142,6 +146,17 @@ const navigationItems: NavigationItem[] = [
       { id: "search", label: "Search", icon: Globe },
       { id: "ai", label: "AI Chat", icon: Zap },
       { id: "image", label: "Image AI", icon: Palette },
+    ]
+  },
+  {
+    id: "stocks",
+    label: "Paper Trading",
+    icon: TrendingUp,
+    description: "Practice stock trading",
+    subItems: [
+      { id: "portfolio", label: "Portfolio", icon: Wallet },
+      { id: "watchlist", label: "Watchlist", icon: LineChart },
+      { id: "history", label: "History", icon: History },
     ]
   },
   {
@@ -695,6 +710,123 @@ function GitHubSettings() {
   )
 }
 
+function ApiKeysSettings() {
+  const [copied, setCopied] = React.useState<string | null>(null)
+  const { data: apiStatus, isLoading } = useQuery<{ apis: { finnhub: boolean; github: boolean } }>({
+    queryKey: ["api-status"],
+    queryFn: async () => {
+      const res = await fetch("/api/status")
+      if (!res.ok) throw new Error("Failed to fetch status")
+      return res.json()
+    },
+    staleTime: 30000,
+  })
+
+  const copyToClipboard = (text: string, key: string) => {
+    navigator.clipboard.writeText(text)
+    setCopied(key)
+    setTimeout(() => setCopied(null), 2000)
+  }
+
+  const apis = [
+    {
+      id: "finnhub",
+      name: "Finnhub",
+      description: "Stock market data for Paper Trading",
+      envVar: "FINNHUB_API_KEY",
+      docsUrl: "https://finnhub.io/register",
+      configured: apiStatus?.apis.finnhub ?? false,
+    },
+    {
+      id: "github",
+      name: "GitHub (Server)",
+      description: "Optional server-side GitHub access",
+      envVar: "GITHUB_TOKEN",
+      docsUrl: "https://github.com/settings/tokens/new",
+      configured: apiStatus?.apis.github ?? false,
+      note: "Client-side GitHub is configured separately above",
+    },
+  ]
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        These API keys are configured via environment variables in <code className="px-1 py-0.5 bg-muted rounded text-xs">.env.local</code>
+      </p>
+
+      <div className="space-y-3">
+        {apis.map((api) => (
+          <div
+            key={api.id}
+            className={`rounded-lg border p-4 ${
+              api.configured
+                ? "border-emerald-500/30 bg-emerald-500/5"
+                : "border-border"
+            }`}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-medium">{api.name}</h4>
+                  {isLoading ? (
+                    <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground" />
+                  ) : api.configured ? (
+                    <span className="text-xs bg-emerald-500/20 text-emerald-500 px-2 py-0.5 rounded-full">
+                      Configured
+                    </span>
+                  ) : (
+                    <span className="text-xs bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded-full">
+                      Not Set
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">{api.description}</p>
+                {api.note && (
+                  <p className="text-xs text-muted-foreground mt-1 italic">{api.note}</p>
+                )}
+              </div>
+            </div>
+
+            {!api.configured && (
+              <div className="mt-3 pt-3 border-t border-border space-y-2">
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-muted/50 px-3 py-1.5 rounded text-xs font-mono">
+                    {api.envVar}=your_key_here
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyToClipboard(`${api.envVar}=`, api.id)}
+                    className="h-8"
+                  >
+                    {copied === api.id ? (
+                      <CheckCircle2 className="h-3 w-3" />
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                    )}
+                  </Button>
+                </div>
+                <a
+                  href={api.docsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                >
+                  Get API key <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </a>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="pt-2 text-xs text-muted-foreground">
+        After adding keys to <code className="px-1 py-0.5 bg-muted rounded">.env.local</code>, restart your dev server with <code className="px-1 py-0.5 bg-muted rounded">npm run dev</code>
+      </div>
+    </div>
+  )
+}
+
 function SettingsSection({ activeSubItem, onSubItemHandled }: { activeSubItem?: string | null; onSubItemHandled?: () => void }) {
   // Scroll to sub-item when activeSubItem changes
   React.useEffect(() => {
@@ -739,8 +871,7 @@ function SettingsSection({ activeSubItem, onSubItemHandled }: { activeSubItem?: 
 
         <div id="settings-api-keys" className="glass rounded-lg p-6 scroll-mt-6">
           <h3 className="font-semibold mb-4">API Keys</h3>
-          <p className="text-sm text-muted-foreground mb-4">Manage API keys and environments</p>
-          <Button variant="outline" disabled>Coming Soon</Button>
+          <ApiKeysSettings />
         </div>
       </div>
     </div>
@@ -781,6 +912,8 @@ export default function PersonalHomepage() {
         return <BookmarksSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("settings")} />
       case "search":
         return <SearchHubSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "stocks":
+        return <StocksDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("settings")} />
       case "settings":
         return <SettingsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       default:

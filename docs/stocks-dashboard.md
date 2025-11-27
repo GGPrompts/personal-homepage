@@ -1,87 +1,133 @@
-# Stocks Dashboard (Planned)
+# Stocks Dashboard (Paper Trading)
 
-A trading practice dashboard with real market data and paper trading.
+A trading practice dashboard with real market data and virtual money.
 
-## Overview
-
-Based on the template from `~/projects/portfolio-style-guides/app/templates/` - a stocks dashboard that could be adapted for real data and simulated trading.
+## Status: Implemented
 
 ## Features
 
-- Real-time (15-min delayed) stock quotes
-- Portfolio tracking with fake money
-- Watchlists
-- Technical indicators (RSI, MACD, etc.)
-- Historical charts
-- Paper trading to practice without risk
+- **Real-time quotes** (15-min delayed on free tier) via Finnhub API
+- **Paper trading** with $100,000 virtual starting balance
+- **Portfolio tracking** with positions, P&L, and day's change
+- **Watchlist** with 8 default stocks, searchable and sortable
+- **Price charts** with multiple timeframes (1D, 5D, 1M, 6M, 1Y, 5Y)
+- **Market statistics** (P/E, 52-week high/low, market cap)
+- **Transaction history** with buy/sell records
+- **localStorage persistence** for portfolio state
 
-## Free Stock Market APIs
+## Setup
 
-| API | Free Tier | Best For |
-|-----|-----------|----------|
-| [Alpha Vantage](https://www.alphavantage.co/) | 25 requests/day | Historical data, 50+ technical indicators |
-| [Finnhub](https://finnhub.io/) | 60 calls/minute | Real-time quotes, company fundamentals |
-| [Twelve Data](https://twelvedata.com/) | 800 calls/day | WebSocket streaming (~170ms latency) |
-| [Marketstack](https://marketstack.com/) | 100 calls/month | Simple REST API, 30k+ tickers |
-| [EOD Historical Data](https://eodhd.com/) | 20 calls/day | 30+ years historical data |
+### 1. Get a Finnhub API Key (Free)
 
-## Recommended APIs
+1. Go to [finnhub.io/register](https://finnhub.io/register)
+2. Create a free account
+3. Copy your API key from the dashboard
 
-### Alpha Vantage
-- Most popular free option
-- 25 requests/day is enough for personal use with caching
-- Covers stocks, ETFs, forex, crypto
-- Built-in technical indicators (RSI, MACD, Bollinger Bands, etc.)
+### 2. Add to Environment
 
-### Finnhub
-- More generous rate limits (60/min)
-- Good for real-time quotes
-- WebSocket support for streaming
-- Company fundamentals and news
+Create or edit `.env.local`:
 
-### Twelve Data
-- Best WebSocket streaming for live updates
-- ~170ms latency
-- Good for real-time price tickers
+```bash
+FINNHUB_API_KEY=your_api_key_here
+```
 
-## Implementation Considerations
+### 3. Restart Dev Server
 
-### Data Caching
-- Cache responses in localStorage or TanStack Query
-- Avoid hitting rate limits on every page load
-- Refresh on user action or scheduled intervals
+```bash
+npm run dev
+```
 
-### Market Hours
-- Real-time data only during trading hours (9:30 AM - 4:00 PM ET)
-- Show "Market Closed" indicator outside hours
-- Pre/post market data if available
+## API Endpoints
 
-### Delayed Quotes
-- Most free tiers have 15-minute delayed quotes
-- Display delay notice to users
-- Sufficient for practice/learning
+| Endpoint | Description | Rate Limit |
+|----------|-------------|------------|
+| `/api/stocks?symbols=AAPL,MSFT` | Get quotes for symbols | Cached 1 min |
+| `/api/stocks/history?symbol=AAPL&timeframe=1D` | Historical candles | Cached 1-5 min |
+| `/api/stocks/search?q=apple` | Search stocks by name/symbol | Cached 1 hour |
 
-### US Focus
-- Free tiers typically focus on US markets
-- International markets may require paid plans
+## Timeframes
 
-## Paper Trading Features
+| Code | Resolution | Data Range |
+|------|------------|------------|
+| 1D | 5-minute candles | 1 day |
+| 5D | 15-minute candles | 5 days |
+| 1M | 1-hour candles | 30 days |
+| 6M | Daily candles | 180 days |
+| 1Y | Daily candles | 365 days |
+| 5Y | Weekly candles | 5 years |
 
-- Starting balance (e.g., $100,000 fake money)
-- Buy/sell at current market price
-- Track positions and P&L
-- Transaction history
-- Performance metrics over time
-- localStorage persistence (or GitHub sync like Bookmarks/Notes)
+## Paper Trading
 
-## Reference
+### Starting Balance
+- $100,000 virtual cash
 
-Template location: `~/projects/portfolio-style-guides/app/templates/`
+### Order Types
+- **Market**: Execute at current price
+- **Limit**: Execute at specified price (simulated - executes immediately at limit price)
 
-## Complexity
+### State Persistence
+Portfolio data is stored in `localStorage` under key `stocks-portfolio`:
 
-Medium-High
-- API integration with rate limiting
-- Real-time updates (polling or WebSocket)
-- Paper trading state management
-- Charts (Recharts or similar)
+```typescript
+{
+  cash: number,
+  positions: [{ symbol, shares, avgCost }],
+  transactions: [{ id, type, symbol, shares, price, total, timestamp }],
+  watchlist: string[],
+  createdAt: string,
+  updatedAt: string
+}
+```
+
+### Reset
+Click "Reset Portfolio" to restore to $100,000 and clear all positions/history.
+
+## Default Watchlist
+
+- AAPL (Apple)
+- MSFT (Microsoft)
+- GOOGL (Alphabet)
+- AMZN (Amazon)
+- NVDA (NVIDIA)
+- TSLA (Tesla)
+- META (Meta)
+- NFLX (Netflix)
+
+## Rate Limits
+
+Finnhub free tier: **60 calls/minute**
+
+The dashboard uses aggressive caching to stay well under limits:
+- Quotes: 1-minute cache, refetch when "Live" mode enabled
+- Historical data: 1-5 minute cache based on timeframe
+- Company profiles: 24-hour cache
+- Metrics (P/E, 52-week): 1-hour cache
+
+## Limitations
+
+1. **15-minute delayed quotes** - Free tier limitation
+2. **No real order book** - Simplified to current bid/ask
+3. **US stocks only** - Free tier focuses on US markets
+4. **Market hours** - Data only during trading hours (9:30 AM - 4 PM ET)
+
+## Files
+
+```
+app/
+├── api/stocks/
+│   ├── types.ts          # Types for API & paper trading
+│   ├── route.ts          # Quote endpoint
+│   ├── history/route.ts  # Historical candles
+│   └── search/route.ts   # Stock search
+└── sections/
+    └── stocks-dashboard.tsx  # Main dashboard component
+```
+
+## Future Enhancements
+
+- [ ] Add more stocks to search/watchlist
+- [ ] WebSocket streaming for real-time updates (Finnhub supports this)
+- [ ] Technical indicators (RSI, MACD) from Alpha Vantage
+- [ ] GitHub sync for portfolio (like Notes/Bookmarks)
+- [ ] Price alerts
+- [ ] Performance charts over time

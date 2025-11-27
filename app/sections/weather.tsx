@@ -1229,7 +1229,10 @@ export default function WeatherDashboard({
                         <AlertTriangle className="h-6 w-6 text-amber-500 flex-shrink-0" />
                         <div>
                           <DialogTitle className="text-amber-500">{alert.title}</DialogTitle>
-                          <DialogDescription className="flex items-center gap-2 mt-1">
+                          <DialogDescription className="sr-only">
+                            Weather alert: {alert.title} - Severity: {alert.severity}
+                          </DialogDescription>
+                          <div className="flex items-center gap-2 mt-1">
                             <Badge
                               variant={
                                 alert.severity === "extreme" || alert.severity === "severe"
@@ -1240,7 +1243,7 @@ export default function WeatherDashboard({
                             >
                               {alert.severity}
                             </Badge>
-                          </DialogDescription>
+                          </div>
                         </div>
                       </div>
                     </DialogHeader>

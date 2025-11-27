@@ -97,19 +97,20 @@ const DEFAULT_SUBREDDITS = ["commandline", "ClaudeAI", "ClaudeCode", "cli", "tui
 
 const STORAGE_KEY = "daily-feed-preferences"
 
-// Fetch function for useQuery (excludes Reddit - fetched client-side)
+// Fetch function for useQuery - routes through server API
 async function fetchFeedData(
   enabledSources: FeedSource[],
+  subreddits?: string[],
 ): Promise<FeedResponse> {
-  // Filter out Reddit - it will be fetched client-side due to Vercel IP blocking
-  const serverSources = enabledSources.filter(s => s !== "reddit")
-
   const params = new URLSearchParams()
-  if (serverSources.length > 0 && serverSources.length < 4) {
-    params.set("sources", serverSources.join(","))
-  } else if (serverSources.length > 0) {
-    // Explicitly set sources to exclude reddit
-    params.set("sources", serverSources.join(","))
+
+  if (enabledSources.length > 0) {
+    params.set("sources", enabledSources.join(","))
+  }
+
+  // Pass custom subreddits to server
+  if (subreddits && subreddits.length > 0 && enabledSources.includes("reddit")) {
+    params.set("subreddits", subreddits.join(","))
   }
 
   const url = `/api/feed${params.toString() ? `?${params}` : ""}`
@@ -120,91 +121,6 @@ async function fetchFeedData(
   }
 
   return res.json()
-}
-
-// Client-side Reddit fetcher (runs in user's browser, bypasses server IP issues)
-async function fetchRedditClient(
-  subreddits: string[],
-  limitPerSubreddit: number = 5
-): Promise<FeedItem[]> {
-  const fetchSubreddit = async (subreddit: string): Promise<FeedItem[]> => {
-    try {
-      // Use www.reddit.com with raw_json=1 for unescaped content
-      const res = await fetch(
-        `https://www.reddit.com/r/${subreddit}/hot.json?limit=${limitPerSubreddit}&raw_json=1`,
-        {
-          method: "GET",
-          mode: "cors",
-          credentials: "omit",
-        }
-      )
-
-      if (!res.ok) {
-        console.warn(`Reddit r/${subreddit} error: ${res.status}`)
-        return []
-      }
-
-      const data = await res.json()
-
-      // Validate response structure
-      if (!data?.data?.children) {
-        console.warn(`Reddit r/${subreddit}: unexpected response structure`)
-        return []
-      }
-
-      return data.data.children
-        .filter((post: { data: { title: string } }) => {
-          return post.data.title && !post.data.title.includes("[Megathread]")
-        })
-        .map((post: { data: {
-          id: string
-          title: string
-          url: string
-          permalink: string
-          author: string
-          score: number
-          num_comments: number
-          created_utc: number
-          subreddit: string
-          is_self: boolean
-          link_flair_text?: string
-        }}): FeedItem => {
-          const d = post.data
-          return {
-            id: `reddit-${d.id}`,
-            title: d.title,
-            url: d.is_self
-              ? `https://www.reddit.com${d.permalink}`
-              : d.url,
-            source: "reddit" as FeedSource,
-            author: d.author,
-            score: d.score,
-            commentCount: d.num_comments,
-            commentsUrl: `https://www.reddit.com${d.permalink}`,
-            createdAt: new Date(d.created_utc * 1000).toISOString(),
-            subreddit: d.subreddit,
-            tags: d.link_flair_text ? [d.link_flair_text.toLowerCase()] : [],
-          }
-        })
-    } catch (error) {
-      console.error(`Failed to fetch r/${subreddit}:`, error)
-      return []
-    }
-  }
-
-  if (!subreddits || subreddits.length === 0) {
-    return []
-  }
-
-  try {
-    const results = await Promise.all(
-      subreddits.map((sub) => fetchSubreddit(sub))
-    )
-    return results.flat()
-  } catch (error) {
-    console.error("Failed to fetch Reddit:", error)
-    return []
-  }
 }
 
 // ============================================================================
@@ -592,72 +508,24 @@ export default function DailyFeedSection({
     setPrefsLoaded(true)
   }, [])
 
-  // Feed data query with TanStack Query (server-side sources, excludes Reddit)
+  // Feed data query with TanStack Query - all sources via server API
+  const subredditsKey = JSON.stringify(subreddits)
   const {
     data: feedData,
-    isLoading: serverLoading,
-    error: serverError,
-    refetch: refetchServer,
+    isLoading: loading,
+    error,
+    refetch: fetchFeed,
   } = useQuery({
-    queryKey: ["feed", enabledSources],
-    queryFn: () => fetchFeedData(enabledSources),
+    queryKey: ["feed", enabledSources, subredditsKey],
+    queryFn: () => fetchFeedData(enabledSources, subreddits),
     staleTime: 15 * 60 * 1000, // Data fresh for 15 minutes (matches server cache)
     gcTime: 30 * 60 * 1000, // Cache for 30 minutes
     enabled: prefsLoaded, // Only fetch after preferences are loaded
   })
 
-  // Reddit query - fetched client-side from user's browser (bypasses any server IP issues)
-  const subredditsKey = JSON.stringify(subreddits)
-  const {
-    data: redditItems,
-    isLoading: redditLoading,
-    error: redditError,
-    refetch: refetchReddit,
-  } = useQuery({
-    queryKey: ["reddit", subredditsKey],
-    queryFn: () => fetchRedditClient(subreddits),
-    staleTime: 15 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-    enabled: prefsLoaded && enabledSources.includes("reddit") && subreddits.length > 0,
-    retry: 1,
-  })
-
-  // Combined loading and error states
-  const loading = serverLoading || (enabledSources.includes("reddit") && redditLoading)
-  const error = serverError || redditError
-
-  // Refetch both sources
-  const fetchFeed = React.useCallback(() => {
-    refetchServer()
-    if (enabledSources.includes("reddit")) {
-      refetchReddit()
-    }
-  }, [refetchServer, refetchReddit, enabledSources])
-
-  // Combine server items with client-side Reddit items
-  const items = React.useMemo(() => {
-    const serverItems = feedData?.items ?? []
-    const clientRedditItems = redditItems ?? []
-    return [...serverItems, ...clientRedditItems]
-  }, [feedData?.items, redditItems])
-
+  const items = feedData?.items ?? []
   const fetchedAt = feedData?.fetchedAt ?? null
-
-  // Combine source stats
-  const sourceStats = React.useMemo(() => {
-    const serverStats = feedData?.sources ?? []
-    // Add Reddit stats if enabled
-    if (enabledSources.includes("reddit")) {
-      const redditCount = redditItems?.length ?? 0
-      const redditStat = {
-        source: "reddit" as FeedSource,
-        count: redditCount,
-        error: redditError ? (redditError as Error).message : undefined,
-      }
-      return [...serverStats, redditStat]
-    }
-    return serverStats
-  }, [feedData?.sources, enabledSources, redditItems, redditError])
+  const sourceStats = feedData?.sources ?? []
 
   // Save preferences to localStorage
   React.useEffect(() => {

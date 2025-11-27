@@ -13,6 +13,7 @@ A personal dashboard/homepage designed as a browser start page. Features an acco
 | [docs/quick-notes.md](docs/quick-notes.md) | GitHub-synced notes, markdown editor |
 | [docs/design-system.md](docs/design-system.md) | 10 themes, CSS utilities, backgrounds |
 | [docs/state-management.md](docs/state-management.md) | TanStack Query, caching, localStorage |
+| [docs/stocks-dashboard.md](docs/stocks-dashboard.md) | Paper trading, Finnhub API, portfolio |
 | [docs/roadmap.md](docs/roadmap.md) | Planned features and ideas |
 | [CHANGELOG.md](CHANGELOG.md) | Completed features and changes |
 
@@ -27,6 +28,7 @@ A personal dashboard/homepage designed as a browser start page. Features an acco
 | **Quick Notes** | Complete | GitHub-synced markdown editor with file browser |
 | **Bookmarks** | Complete | Folder-based links with icon/list view, search, GitHub sync |
 | **Search Hub** | Complete | Search, AI chat, and image generation with keyboard shortcuts |
+| **Paper Trading** | Complete | Practice stock trading with real data and $100K virtual money |
 | **Settings** | Partial | Theme/appearance + GitHub integration (Feed Config coming soon) |
 
 ## Tech Stack
@@ -35,7 +37,7 @@ A personal dashboard/homepage designed as a browser start page. Features an acco
 - **Styling**: Tailwind CSS + shadcn/ui components
 - **State**: TanStack Query (server state) + localStorage (preferences)
 - **Theming**: 10 themes + background styles + glassmorphism
-- **APIs**: Open-Meteo, RainViewer, NWS, Nominatim, HN, GitHub (trending + Contents API), Reddit, Lobsters, Dev.to
+- **APIs**: Open-Meteo, RainViewer, NWS, Nominatim, HN, GitHub (trending + Contents API), Reddit, Lobsters, Dev.to, Finnhub (stocks)
 
 ## Project Structure
 
@@ -51,8 +53,10 @@ personal-homepage/
 │   │   ├── api-playground.tsx
 │   │   ├── quick-notes.tsx
 │   │   ├── bookmarks.tsx
-│   │   └── search-hub.tsx
-│   └── api/feed/               # Feed API endpoint + fetchers
+│   │   ├── search-hub.tsx
+│   │   └── stocks-dashboard.tsx
+│   ├── api/feed/               # Feed API endpoint + fetchers
+│   └── api/stocks/             # Stock quotes, history, search
 ├── components/
 │   ├── ui/                     # shadcn/ui components
 │   ├── JsonViewer.tsx          # Syntax-highlighted collapsible JSON
