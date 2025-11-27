@@ -29,9 +29,10 @@ Needed:
 
 | Feature | Description | Complexity |
 |---------|-------------|------------|
-| **Pomodoro Timer** | Focus timer with work/break sessions | Low |
+| **Section Visibility** | Toggle sections on/off in Settings, drag-drop reorder | Low |
 | **World Clocks** | Multiple timezone display | Low |
 | **Quote of the Day** | Motivational quotes API | Low |
+| **Dynamic Weather Theme** | Auto-switch theme/background based on local weather conditions | Low-Medium |
 
 ## Planned Sections
 
@@ -83,6 +84,14 @@ Practice trading with real market data:
 - See [docs/stocks-dashboard.md](stocks-dashboard.md) for API details
 - **Complexity**: Medium-High
 
+### Integrations Page
+Central hub for connecting services:
+- Show all available integrations (GitHub, Google Calendar, Todoist, etc.)
+- Connection status indicators
+- Connect/disconnect buttons
+- API key management for external services
+- **Complexity**: Low-Medium
+
 ## Ideas / Backlog
 
 - PWA support for mobile installation
@@ -90,7 +99,6 @@ Practice trading with real market data:
 - Custom widgets API (user-defined sections)
 - WebSocket connections for real-time data
 - Sync settings across devices
-- Dark/light mode auto-switch based on time
 - Bookmarks import/export (Chrome format)
 - Bookmarks keyboard shortcuts
 
