@@ -614,8 +614,8 @@ export default function BookmarksSection({
                 }}
                 className="group flex flex-col items-center p-3 rounded-lg hover:bg-primary/10 transition-colors"
               >
-                <div className="h-12 w-12 flex items-center justify-center text-2xl mb-1">
-                  {folder.icon || <Folder className="h-10 w-10 text-primary" />}
+                <div className="h-12 w-12 flex items-center justify-center text-2xl mb-1 rounded-lg bg-white/15">
+                  {folder.icon || <Folder className="h-8 w-8 text-primary" />}
                 </div>
                 <span className="text-xs text-center line-clamp-2">{folder.name}</span>
                 <span className="text-[10px] text-muted-foreground">
@@ -635,14 +635,14 @@ export default function BookmarksSection({
                 }}
                 className="group flex flex-col items-center p-3 rounded-lg hover:bg-primary/10 transition-colors"
               >
-                <div className="h-12 w-12 flex items-center justify-center mb-1">
+                <div className="h-12 w-12 flex items-center justify-center mb-1 rounded-lg bg-white/15">
                   {bookmark.icon ? (
                     <span className="text-2xl">{bookmark.icon}</span>
                   ) : (
                     <img
                       src={getFaviconUrl(bookmark.url)}
                       alt=""
-                      className="h-8 w-8"
+                      className="h-7 w-7"
                       onError={(e) => {
                         e.currentTarget.style.display = "none"
                       }}
@@ -665,8 +665,8 @@ export default function BookmarksSection({
                   onClick={() => setCurrentFolderId(folder.id)}
                   className="flex items-center gap-3 flex-1 min-w-0 text-left"
                 >
-                  <div className="h-8 w-8 flex items-center justify-center text-lg flex-shrink-0">
-                    {folder.icon || <Folder className="h-6 w-6 text-primary" />}
+                  <div className="h-8 w-8 flex items-center justify-center text-lg flex-shrink-0 rounded-md bg-white/15">
+                    {folder.icon || <Folder className="h-5 w-5 text-primary" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{folder.name}</p>
@@ -707,14 +707,14 @@ export default function BookmarksSection({
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 flex-1 min-w-0"
                 >
-                  <div className="h-8 w-8 flex items-center justify-center flex-shrink-0">
+                  <div className="h-8 w-8 flex items-center justify-center flex-shrink-0 rounded-md bg-white/15">
                     {bookmark.icon ? (
                       <span className="text-lg">{bookmark.icon}</span>
                     ) : (
                       <img
                         src={getFaviconUrl(bookmark.url)}
                         alt=""
-                        className="h-6 w-6"
+                        className="h-5 w-5"
                         onError={(e) => {
                           e.currentTarget.style.display = "none"
                         }}
