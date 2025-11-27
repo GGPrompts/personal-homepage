@@ -456,9 +456,9 @@ export default function SearchHubSection({
   }
 
   return (
-    <div className="p-6">
-      <h1 className="text-3xl font-bold terminal-glow mb-2">Search Hub</h1>
-      <p className="text-muted-foreground mb-8">Quick search across engines and AI assistants</p>
+    <div className="p-4 sm:p-6">
+      <h1 className="text-2xl sm:text-3xl font-bold terminal-glow mb-1 sm:mb-2">Search Hub</h1>
+      <p className="text-muted-foreground text-sm sm:text-base mb-6 sm:mb-8">Quick search across engines and AI assistants</p>
 
       {/* Search Form */}
       <div className="max-w-2xl mx-auto">
@@ -506,21 +506,23 @@ export default function SearchHubSection({
         </div>
 
         <form onSubmit={handleSearch} className="mb-6">
-          <div className="glass rounded-lg p-4">
-            <div className="flex items-center gap-3 mb-4">
-              <div className={`p-2 rounded-lg bg-primary/10 ${currentEngine.color}`}>
-                <Icon className="h-5 w-5" />
+          <div className="glass rounded-lg p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+              <div className="flex items-center gap-3 flex-1">
+                <div className={`p-2 rounded-lg bg-primary/10 ${currentEngine.color} flex-shrink-0`}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <Input
+                    ref={inputRef}
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder={currentEngine.placeholder}
+                    className="text-base sm:text-lg h-11 sm:h-12 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 px-0"
+                  />
+                </div>
               </div>
-              <div className="flex-1">
-                <Input
-                  ref={inputRef}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={currentEngine.placeholder}
-                  className="text-lg h-12 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 px-0"
-                />
-              </div>
-              <Button type="submit" disabled={!query.trim()} className="h-10">
+              <Button type="submit" disabled={!query.trim()} className="h-11 sm:h-10 w-full sm:w-auto">
                 {activeCategory === "ai" ? (
                   <>
                     <Sparkles className="h-4 w-4 mr-2" />
@@ -541,7 +543,7 @@ export default function SearchHubSection({
             </div>
 
             {/* Engine Selection */}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5 sm:gap-2">
               {currentEngines.map((engine, index) => {
                 const EngineIcon = engine.icon
                 const isSelected = selectedEngine === engine.id
@@ -551,20 +553,21 @@ export default function SearchHubSection({
                     type="button"
                     onClick={() => handleEngineSelect(engine.id)}
                     className={`
-                      flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-all
+                      flex items-center gap-1 sm:gap-1.5 px-2.5 py-2 sm:px-3 sm:py-1.5 rounded-md text-sm transition-all
                       ${isSelected
                         ? "bg-primary/20 text-primary border border-primary/30"
                         : "bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
                       }
                     `}
                   >
-                    <EngineIcon className={`h-3.5 w-3.5 ${isSelected ? engine.color : ""}`} />
-                    <span>{engine.name}</span>
+                    <EngineIcon className={`h-4 w-4 sm:h-3.5 sm:w-3.5 ${isSelected ? engine.color : ""}`} />
+                    <span className="hidden sm:inline">{engine.name}</span>
+                    <span className="sm:hidden text-xs">{engine.shortcut}</span>
                     {engine.copyPrompt && (
-                      <Clipboard className="h-3 w-3 opacity-50" />
+                      <Clipboard className="h-3 w-3 opacity-50 hidden sm:block" />
                     )}
-                    <kbd className="ml-1 text-[10px] opacity-50 font-mono">
-                      <Command className="h-2.5 w-2.5 inline" />
+                    <kbd className="ml-1 text-[10px] opacity-50 font-mono hidden sm:inline-flex items-center">
+                      <Command className="h-2.5 w-2.5" />
                       {index + 1}
                     </kbd>
                   </button>
@@ -582,8 +585,8 @@ export default function SearchHubSection({
           </div>
         </form>
 
-        {/* Quick Tips */}
-        <div className="glass rounded-lg p-4 mb-6">
+        {/* Quick Tips - hidden on mobile */}
+        <div className="hidden sm:block glass rounded-lg p-4 mb-6">
           <h3 className="text-sm font-medium mb-3">Quick Tips</h3>
           <ul className="text-sm text-muted-foreground space-y-1.5">
             <li className="flex items-center gap-2">
@@ -617,7 +620,7 @@ export default function SearchHubSection({
 
         {/* Recent Searches */}
         {prefs.recentSearches.length > 0 && (
-          <div className="glass rounded-lg p-4">
+          <div className="glass rounded-lg p-3 sm:p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-medium">Recent</h3>
               <Button
@@ -639,14 +642,14 @@ export default function SearchHubSection({
                   <li key={index}>
                     <button
                       onClick={() => handleRecentSearch(recent)}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-primary/5 text-sm text-left transition-colors"
+                      className="w-full flex items-center gap-2 px-2 py-2 sm:py-1.5 rounded hover:bg-primary/5 text-sm text-left transition-colors"
                     >
-                      <RecentIcon className={`h-3.5 w-3.5 ${engine?.color || ""}`} />
-                      <span className="flex-1 truncate">{recent.query}</span>
-                      <Badge variant="outline" className="text-[10px]">
+                      <RecentIcon className={`h-4 w-4 sm:h-3.5 sm:w-3.5 flex-shrink-0 ${engine?.color || ""}`} />
+                      <span className="flex-1 truncate min-w-0">{recent.query}</span>
+                      <Badge variant="outline" className="text-[10px] hidden sm:inline-flex">
                         {categoryLabel}
                       </Badge>
-                      <span className="text-xs text-muted-foreground">{engine?.name}</span>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">{engine?.shortcut}</span>
                     </button>
                   </li>
                 )
