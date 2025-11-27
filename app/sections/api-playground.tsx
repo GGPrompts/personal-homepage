@@ -18,6 +18,7 @@ import {
   XCircle,
   RotateCw,
   Save,
+  Activity,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -41,6 +42,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { JsonViewer } from "@/components/JsonViewer"
+import { useAuth } from "@/components/AuthProvider"
 
 // ============================================================================
 // TYPES
@@ -108,6 +110,12 @@ interface Collection {
   name: string
   requests: SavedRequest[]
   expanded: boolean
+}
+
+interface HealthStatus {
+  status: number | null // null = not checked, 0 = error
+  time: number
+  checkedAt: Date
 }
 
 // ============================================================================
@@ -577,6 +585,8 @@ export default function ApiPlaygroundSection({
   activeSubItem?: string | null
   onSubItemHandled?: () => void
 }) {
+  const { getGitHubToken } = useAuth()
+
   // Request config state
   const [config, setConfig] = React.useState<RequestConfig>(DEFAULT_CONFIG)
   const [response, setResponse] = React.useState<ResponseData | null>(null)
@@ -589,6 +599,10 @@ export default function ApiPlaygroundSection({
   const [history, setHistory] = React.useState<HistoryItem[]>([])
   const [collections, setCollections] = React.useState<Collection[]>(SAMPLE_COLLECTIONS)
   const [sidebarTab, setSidebarTab] = React.useState<"collections" | "history">("collections")
+
+  // Health check state
+  const [healthStatuses, setHealthStatuses] = React.useState<Map<string, HealthStatus>>(new Map())
+  const [checkingHealth, setCheckingHealth] = React.useState<Set<string>>(new Set())
 
   // Handle sub-item navigation (switch to collections or history tab)
   React.useEffect(() => {
@@ -869,6 +883,112 @@ print(response.json())`
     )
   }
 
+  // Run health check on a single request
+  const checkRequestHealth = async (request: SavedRequest): Promise<HealthStatus> => {
+    const startTime = Date.now()
+    try {
+      // Build URL - handle relative URLs
+      let url = request.config.url
+      if (url.startsWith("/")) {
+        url = window.location.origin + url
+      }
+
+      // Build headers
+      const headers: Record<string, string> = {}
+      request.config.headers
+        .filter(h => h.enabled && h.key)
+        .forEach(h => {
+          headers[h.key] = h.value
+        })
+
+      // Add auth headers - use OAuth token for GitHub API
+      const isGitHubApi = url.includes("api.github.com")
+      if (isGitHubApi) {
+        const oauthToken = await getGitHubToken()
+        if (oauthToken) {
+          headers["Authorization"] = `Bearer ${oauthToken}`
+        }
+      } else if (request.config.auth.type === "bearer" && request.config.auth.token) {
+        headers["Authorization"] = `Bearer ${request.config.auth.token}`
+      }
+
+      const res = await fetch(url, {
+        method: request.config.method,
+        headers,
+        signal: AbortSignal.timeout(10000), // 10s timeout
+      })
+
+      return {
+        status: res.status,
+        time: Date.now() - startTime,
+        checkedAt: new Date(),
+      }
+    } catch {
+      return {
+        status: 0, // 0 indicates network error
+        time: Date.now() - startTime,
+        checkedAt: new Date(),
+      }
+    }
+  }
+
+  // Run health check on all requests in a collection
+  const checkCollectionHealth = async (collectionId: string) => {
+    const collection = collections.find(c => c.id === collectionId)
+    if (!collection) return
+
+    // Mark all requests in this collection as checking
+    setCheckingHealth(prev => {
+      const next = new Set(prev)
+      collection.requests.forEach(r => next.add(r.id))
+      return next
+    })
+
+    // Run all checks in parallel
+    const results = await Promise.all(
+      collection.requests.map(async (request) => {
+        const status = await checkRequestHealth(request)
+        return { requestId: request.id, status }
+      })
+    )
+
+    // Update statuses
+    setHealthStatuses(prev => {
+      const next = new Map(prev)
+      results.forEach(({ requestId, status }) => {
+        next.set(requestId, status)
+      })
+      return next
+    })
+
+    // Clear checking state
+    setCheckingHealth(prev => {
+      const next = new Set(prev)
+      collection.requests.forEach(r => next.delete(r.id))
+      return next
+    })
+  }
+
+  // Get health summary for a collection
+  const getCollectionHealthSummary = (collection: Collection) => {
+    let passed = 0
+    let failed = 0
+    let unchecked = 0
+
+    collection.requests.forEach(r => {
+      const status = healthStatuses.get(r.id)
+      if (!status) {
+        unchecked++
+      } else if (status.status && status.status >= 200 && status.status < 400) {
+        passed++
+      } else {
+        failed++
+      }
+    })
+
+    return { passed, failed, unchecked, total: collection.requests.length }
+  }
+
   // Keyboard shortcut: Ctrl+Enter to send
   React.useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -899,41 +1019,103 @@ print(response.json())`
 
             {/* Collections Tab */}
             <TabsContent value="collections" className="space-y-2 mt-0 flex-1 overflow-y-auto">
-              {collections.map(collection => (
-                <div key={collection.id}>
-                  <button
-                    onClick={() => toggleCollection(collection.id)}
-                    className="w-full flex items-center gap-2 p-2 rounded hover:bg-primary/5 transition-colors text-sm"
-                  >
-                    {collection.expanded ? (
-                      <ChevronDown className="h-4 w-4" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4" />
-                    )}
-                    <span className="flex-1 text-left font-medium">{collection.name}</span>
-                    <Badge variant="outline" className="text-xs">
-                      {collection.requests.length}
-                    </Badge>
-                  </button>
+              {collections.map(collection => {
+                const summary = getCollectionHealthSummary(collection)
+                const isChecking = collection.requests.some(r => checkingHealth.has(r.id))
 
-                  {collection.expanded && (
-                    <div className="ml-4 mt-1 space-y-1 border-l border-border/20 pl-3">
-                      {collection.requests.map(request => (
-                        <button
-                          key={request.id}
-                          onClick={() => loadRequest(request)}
-                          className="w-full flex items-center gap-2 p-1.5 rounded hover:bg-primary/5 transition-colors text-xs"
-                        >
-                          <Badge variant="outline" className={`text-[10px] px-1 ${METHOD_COLORS[request.method]}`}>
-                            {request.method}
+                return (
+                  <div key={collection.id}>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => toggleCollection(collection.id)}
+                        className="flex-1 flex items-center gap-2 p-2 rounded hover:bg-primary/5 transition-colors text-sm"
+                      >
+                        {collection.expanded ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                        <span className="flex-1 text-left font-medium">{collection.name}</span>
+                        {/* Health summary badges */}
+                        {summary.failed > 0 && (
+                          <Badge variant="destructive" className="text-[10px] px-1.5">
+                            {summary.failed}
                           </Badge>
-                          <span className="truncate text-muted-foreground">{request.name}</span>
-                        </button>
-                      ))}
+                        )}
+                        {summary.passed > 0 && summary.failed === 0 && (
+                          <Badge className="text-[10px] px-1.5 bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+                            {summary.passed}/{summary.total}
+                          </Badge>
+                        )}
+                        {summary.unchecked === summary.total && (
+                          <Badge variant="outline" className="text-xs">
+                            {collection.requests.length}
+                          </Badge>
+                        )}
+                      </button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 flex-shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          checkCollectionHealth(collection.id)
+                        }}
+                        disabled={isChecking}
+                        title="Check all endpoints"
+                      >
+                        {isChecking ? (
+                          <RotateCw className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Activity className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
                     </div>
-                  )}
-                </div>
-              ))}
+
+                    {collection.expanded && (
+                      <div className="ml-4 mt-1 space-y-1 border-l border-border/20 pl-3">
+                        {collection.requests.map(request => {
+                          const status = healthStatuses.get(request.id)
+                          const isCheckingThis = checkingHealth.has(request.id)
+
+                          return (
+                            <button
+                              key={request.id}
+                              onClick={() => loadRequest(request)}
+                              className="w-full flex items-center gap-2 p-1.5 rounded hover:bg-primary/5 transition-colors text-xs group"
+                            >
+                              {/* Status indicator */}
+                              <span className="w-2 h-2 rounded-full flex-shrink-0">
+                                {isCheckingThis ? (
+                                  <span className="block w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                                ) : status ? (
+                                  status.status && status.status >= 200 && status.status < 400 ? (
+                                    <span className="block w-2 h-2 rounded-full bg-emerald-400" />
+                                  ) : (
+                                    <span className="block w-2 h-2 rounded-full bg-red-400" />
+                                  )
+                                ) : (
+                                  <span className="block w-2 h-2 rounded-full bg-muted-foreground/30" />
+                                )}
+                              </span>
+                              <Badge variant="outline" className={`text-[10px] px-1 ${METHOD_COLORS[request.method]}`}>
+                                {request.method}
+                              </Badge>
+                              <span className="truncate text-muted-foreground flex-1 text-left">{request.name}</span>
+                              {/* Show response time on hover if checked */}
+                              {status && (
+                                <span className="text-[10px] text-muted-foreground/60 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  {status.time}ms
+                                </span>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
 
               <Button variant="outline" size="sm" className="w-full mt-3" disabled>
                 <Plus className="h-3.5 w-3.5 mr-1.5" />
