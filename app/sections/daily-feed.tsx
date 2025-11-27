@@ -122,16 +122,16 @@ async function fetchFeedData(
   return res.json()
 }
 
-// Client-side Reddit fetcher (bypasses Vercel IP blocking)
+// Client-side Reddit fetcher (runs in user's browser, bypasses server IP issues)
 async function fetchRedditClient(
   subreddits: string[],
   limitPerSubreddit: number = 5
 ): Promise<FeedItem[]> {
   const fetchSubreddit = async (subreddit: string): Promise<FeedItem[]> => {
     try {
-      // Use raw_json=1 to get unescaped content, no www to avoid redirects
+      // Use www.reddit.com with raw_json=1 for unescaped content
       const res = await fetch(
-        `https://reddit.com/r/${subreddit}/hot.json?limit=${limitPerSubreddit}&raw_json=1`,
+        `https://www.reddit.com/r/${subreddit}/hot.json?limit=${limitPerSubreddit}&raw_json=1`,
         {
           method: "GET",
           mode: "cors",
@@ -174,13 +174,13 @@ async function fetchRedditClient(
             id: `reddit-${d.id}`,
             title: d.title,
             url: d.is_self
-              ? `https://reddit.com${d.permalink}`
+              ? `https://www.reddit.com${d.permalink}`
               : d.url,
             source: "reddit" as FeedSource,
             author: d.author,
             score: d.score,
             commentCount: d.num_comments,
-            commentsUrl: `https://reddit.com${d.permalink}`,
+            commentsUrl: `https://www.reddit.com${d.permalink}`,
             createdAt: new Date(d.created_utc * 1000).toISOString(),
             subreddit: d.subreddit,
             tags: d.link_flair_text ? [d.link_flair_text.toLowerCase()] : [],
@@ -606,12 +606,7 @@ export default function DailyFeedSection({
     enabled: prefsLoaded, // Only fetch after preferences are loaded
   })
 
-  // Reddit: disabled on production (Vercel) because Reddit blocks cloud provider IPs
-  // Works on localhost only. See: https://news.ycombinator.com/item?id=38705381
-  const isProduction = typeof window !== "undefined" && !window.location.hostname.includes("localhost")
-  const redditDisabledReason = isProduction ? "Unavailable on hosted version (Reddit blocks cloud IPs)" : null
-
-  // Reddit query - only runs on localhost
+  // Reddit query - fetched client-side from user's browser (bypasses any server IP issues)
   const subredditsKey = JSON.stringify(subreddits)
   const {
     data: redditItems,
@@ -623,8 +618,7 @@ export default function DailyFeedSection({
     queryFn: () => fetchRedditClient(subreddits),
     staleTime: 15 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
-    // Only fetch on localhost - Reddit blocks Vercel/cloud IPs
-    enabled: prefsLoaded && enabledSources.includes("reddit") && subreddits.length > 0 && !isProduction,
+    enabled: prefsLoaded && enabledSources.includes("reddit") && subreddits.length > 0,
     retry: 1,
   })
 
@@ -655,16 +649,15 @@ export default function DailyFeedSection({
     // Add Reddit stats if enabled
     if (enabledSources.includes("reddit")) {
       const redditCount = redditItems?.length ?? 0
-      // Show disabled reason on production, or error/count on localhost
       const redditStat = {
         source: "reddit" as FeedSource,
         count: redditCount,
-        error: redditDisabledReason || (redditError ? (redditError as Error).message : undefined),
+        error: redditError ? (redditError as Error).message : undefined,
       }
       return [...serverStats, redditStat]
     }
     return serverStats
-  }, [feedData?.sources, enabledSources, redditItems, redditError, redditDisabledReason])
+  }, [feedData?.sources, enabledSources, redditItems, redditError])
 
   // Save preferences to localStorage
   React.useEffect(() => {

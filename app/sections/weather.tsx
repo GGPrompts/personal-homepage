@@ -66,6 +66,14 @@ import {
   RadialBarChart,
   RadialBar,
 } from "recharts"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 
 // ============================================================================
 // TYPES
@@ -1179,38 +1187,125 @@ export default function WeatherDashboard({
           <Card className="border-amber-500/50 bg-amber-500/10">
             <CardContent className="pt-4 space-y-4">
               {weatherAlerts.map((alert) => (
-                <div key={alert.id} className="flex items-start gap-3">
-                  <AlertTriangle className="h-6 w-6 text-amber-500 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold text-amber-500">{alert.title}</p>
-                      <Badge
-                        variant={
-                          alert.severity === "extreme" || alert.severity === "severe"
-                            ? "destructive"
-                            : "default"
-                        }
-                        className="capitalize"
-                      >
-                        {alert.severity}
-                      </Badge>
-                    </div>
-                    <p className="mt-1 text-sm line-clamp-2">{alert.description}</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                      <span suppressHydrationWarning>
-                        Until: {alert.endTime.toLocaleString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit"
-                        })}
-                      </span>
+                <Dialog key={alert.id}>
+                  <DialogTrigger asChild>
+                    <button className="w-full text-left flex items-start gap-3 hover:bg-amber-500/10 rounded-lg p-2 -m-2 transition-colors cursor-pointer">
+                      <AlertTriangle className="h-6 w-6 text-amber-500 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-amber-500">{alert.title}</p>
+                          <Badge
+                            variant={
+                              alert.severity === "extreme" || alert.severity === "severe"
+                                ? "destructive"
+                                : "default"
+                            }
+                            className="capitalize"
+                          >
+                            {alert.severity}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-sm line-clamp-2">{alert.description}</p>
+                        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                          <span suppressHydrationWarning>
+                            Until: {alert.endTime.toLocaleString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit"
+                            })}
+                          </span>
+                          {alert.affectedAreas.length > 0 && (
+                            <span className="truncate max-w-[200px]">Areas: {alert.affectedAreas.join(", ")}</span>
+                          )}
+                          <span className="text-amber-500 font-medium">Click for details →</span>
+                        </div>
+                      </div>
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                      <div className="flex items-center gap-3">
+                        <AlertTriangle className="h-6 w-6 text-amber-500 flex-shrink-0" />
+                        <div>
+                          <DialogTitle className="text-amber-500">{alert.title}</DialogTitle>
+                          <DialogDescription className="flex items-center gap-2 mt-1">
+                            <Badge
+                              variant={
+                                alert.severity === "extreme" || alert.severity === "severe"
+                                  ? "destructive"
+                                  : "default"
+                              }
+                              className="capitalize"
+                            >
+                              {alert.severity}
+                            </Badge>
+                          </DialogDescription>
+                        </div>
+                      </div>
+                    </DialogHeader>
+                    <div className="space-y-4 mt-4">
+                      <div>
+                        <h4 className="text-sm font-semibold mb-2">Description</h4>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{alert.description}</p>
+                      </div>
+
+                      <Separator />
+
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">Effective</p>
+                          <p className="font-medium" suppressHydrationWarning>
+                            {alert.startTime.toLocaleString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit"
+                            })}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Expires</p>
+                          <p className="font-medium" suppressHydrationWarning>
+                            {alert.endTime.toLocaleString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit"
+                            })}
+                          </p>
+                        </div>
+                      </div>
+
                       {alert.affectedAreas.length > 0 && (
-                        <span className="truncate max-w-[200px]">Areas: {alert.affectedAreas.join(", ")}</span>
+                        <>
+                          <Separator />
+                          <div>
+                            <h4 className="text-sm font-semibold mb-2">Affected Areas</h4>
+                            <p className="text-sm text-muted-foreground">{alert.affectedAreas.join(", ")}</p>
+                          </div>
+                        </>
+                      )}
+
+                      {alert.safetyInstructions.length > 0 && (
+                        <>
+                          <Separator />
+                          <div>
+                            <h4 className="text-sm font-semibold mb-2">Safety Instructions</h4>
+                            <ul className="text-sm text-muted-foreground space-y-1">
+                              {alert.safetyInstructions.map((instruction, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                  <span className="text-amber-500">•</span>
+                                  <span>{instruction}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </>
                       )}
                     </div>
-                  </div>
-                </div>
+                  </DialogContent>
+                </Dialog>
               ))}
             </CardContent>
           </Card>

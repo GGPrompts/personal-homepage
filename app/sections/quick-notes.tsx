@@ -395,6 +395,16 @@ export default function QuickNotesSection({
 
     setSelectedFile(file)
 
+    // On mobile, scroll to the editor panel for feedback
+    if (window.innerWidth < 1024) {
+      setTimeout(() => {
+        const editorEl = document.getElementById("notes-editor")
+        if (editorEl) {
+          editorEl.scrollIntoView({ behavior: "smooth", block: "start" })
+        }
+      }, 100)
+    }
+
     // Clear auto-save timer
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current)
@@ -748,7 +758,7 @@ export default function QuickNotesSection({
       </div>
 
       {/* Editor Panel */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div id="notes-editor" className="flex-1 flex flex-col min-w-0 scroll-mt-4">
         {editor ? (
           <div className="glass rounded-lg flex flex-col h-full overflow-hidden">
             {/* Editor Header */}
