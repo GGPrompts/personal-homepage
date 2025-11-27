@@ -187,26 +187,22 @@ async function fetchRedditClient(
           }
         })
     } catch (error) {
-      console.error(`[Reddit] Failed to fetch r/${subreddit}:`, error)
+      console.error(`Failed to fetch r/${subreddit}:`, error)
       return []
     }
   }
 
   if (!subreddits || subreddits.length === 0) {
-    console.warn("[Reddit] No subreddits to fetch")
     return []
   }
 
-  console.log("[Reddit] Starting fetch for:", subreddits)
   try {
     const results = await Promise.all(
       subreddits.map((sub) => fetchSubreddit(sub))
     )
-    const flatResults = results.flat()
-    console.log("[Reddit] Total items fetched:", flatResults.length)
-    return flatResults
+    return results.flat()
   } catch (error) {
-    console.error("[Reddit] Failed to fetch:", error)
+    console.error("Failed to fetch Reddit:", error)
     return []
   }
 }
@@ -610,8 +606,12 @@ export default function DailyFeedSection({
     enabled: prefsLoaded, // Only fetch after preferences are loaded
   })
 
-  // Reddit query - fetched client-side to bypass Vercel IP blocking
-  // Use JSON.stringify for stable query key (arrays compared by reference otherwise)
+  // Reddit: disabled on production (Vercel) because Reddit blocks cloud provider IPs
+  // Works on localhost only. See: https://news.ycombinator.com/item?id=38705381
+  const isProduction = typeof window !== "undefined" && !window.location.hostname.includes("localhost")
+  const redditDisabledReason = isProduction ? "Unavailable on hosted version (Reddit blocks cloud IPs)" : null
+
+  // Reddit query - only runs on localhost
   const subredditsKey = JSON.stringify(subreddits)
   const {
     data: redditItems,
@@ -620,16 +620,12 @@ export default function DailyFeedSection({
     refetch: refetchReddit,
   } = useQuery({
     queryKey: ["reddit", subredditsKey],
-    queryFn: async () => {
-      console.log("[Reddit] Fetching subreddits:", subreddits)
-      const results = await fetchRedditClient(subreddits)
-      console.log("[Reddit] Fetched items:", results.length)
-      return results
-    },
+    queryFn: () => fetchRedditClient(subreddits),
     staleTime: 15 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
-    enabled: prefsLoaded && enabledSources.includes("reddit") && subreddits.length > 0,
-    retry: 2,
+    // Only fetch on localhost - Reddit blocks Vercel/cloud IPs
+    enabled: prefsLoaded && enabledSources.includes("reddit") && subreddits.length > 0 && !isProduction,
+    retry: 1,
   })
 
   // Combined loading and error states
@@ -659,17 +655,16 @@ export default function DailyFeedSection({
     // Add Reddit stats if enabled
     if (enabledSources.includes("reddit")) {
       const redditCount = redditItems?.length ?? 0
-      return [
-        ...serverStats,
-        {
-          source: "reddit" as FeedSource,
-          count: redditCount,
-          error: redditError ? (redditError as Error).message : undefined,
-        },
-      ]
+      // Show disabled reason on production, or error/count on localhost
+      const redditStat = {
+        source: "reddit" as FeedSource,
+        count: redditCount,
+        error: redditDisabledReason || (redditError ? (redditError as Error).message : undefined),
+      }
+      return [...serverStats, redditStat]
     }
     return serverStats
-  }, [feedData?.sources, enabledSources, redditItems, redditError])
+  }, [feedData?.sources, enabledSources, redditItems, redditError, redditDisabledReason])
 
   // Save preferences to localStorage
   React.useEffect(() => {
