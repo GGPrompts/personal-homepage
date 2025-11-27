@@ -898,7 +898,7 @@ print(response.json())`
             </TabsList>
 
             {/* Collections Tab */}
-            <TabsContent value="collections" className="space-y-2 mt-0">
+            <TabsContent value="collections" className="space-y-2 mt-0 max-h-[400px] overflow-y-auto">
               {collections.map(collection => (
                 <div key={collection.id}>
                   <button
