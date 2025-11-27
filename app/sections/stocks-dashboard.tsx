@@ -984,26 +984,41 @@ export default function StocksDashboard({ activeSubItem, onSubItemHandled, onNav
                 )}
               </div>
 
-              {/* Volume Chart */}
-              {chartData.length > 0 && (
-                <div className="mt-4 h-[80px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData}>
-                      <XAxis dataKey="time" hide />
-                      <YAxis stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 10 }} tickFormatter={formatLargeNumber} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--background))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                        }}
-                        formatter={(value: number) => [formatLargeNumber(value), "Volume"]}
-                      />
-                      <Bar dataKey="volume" fill="#10b981" opacity={0.6} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
+              {/* Volume Chart - using normalized scale for better visibility */}
+              {chartData.length > 0 && (() => {
+                // Normalize volume using square root to reduce impact of outliers
+                const volumes = chartData.map((d) => d.volume).filter((v) => v > 0)
+                const maxVolume = Math.max(...volumes, 1)
+                const normalizedData = chartData.map((d) => ({
+                  ...d,
+                  volumeNormalized: Math.sqrt(d.volume / maxVolume) * maxVolume,
+                }))
+
+                return (
+                  <div className="mt-4 h-[80px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={normalizedData}>
+                        <XAxis dataKey="time" hide />
+                        <YAxis hide />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "hsl(var(--background))",
+                            border: "1px solid hsl(var(--border))",
+                            borderRadius: "8px",
+                          }}
+                          formatter={(value: number, name: string) => {
+                            // Show original volume in tooltip
+                            const idx = normalizedData.findIndex((d) => d.volumeNormalized === value)
+                            const originalVolume = idx >= 0 ? normalizedData[idx].volume : value
+                            return [formatLargeNumber(originalVolume), "Volume"]
+                          }}
+                        />
+                        <Bar dataKey="volumeNormalized" fill="#10b981" opacity={0.6} radius={[2, 2, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )
+              })()}
             </CardContent>
           </Card>
 
