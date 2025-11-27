@@ -1,140 +1,84 @@
 # Personal Homepage
 
-A personal dashboard/homepage designed as a browser start page. Features an accordion-style sidebar navigation with expandable sections (collapsible on desktop, sheet drawer on mobile).
+A personal dashboard/homepage with accordion sidebar navigation. Features weather, feeds, notes, bookmarks, stock trading, and more.
+
+## Quick Reference
+
+| Task | Documentation |
+|------|---------------|
+| Add new section | [docs/navigation.md](docs/navigation.md) |
+| Styling/themes | [docs/design-system.md](docs/design-system.md) |
+| Authentication | [docs/auth.md](docs/auth.md) |
+| State management | [docs/state-management.md](docs/state-management.md) |
 
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
-| [docs/navigation.md](docs/navigation.md) | Accordion sidebar system, adding sections |
-| [docs/weather.md](docs/weather.md) | Weather section APIs, features, localStorage |
-| [docs/daily-feed.md](docs/daily-feed.md) | Feed API, sources, schema, preferences |
-| [docs/api-playground.md](docs/api-playground.md) | HTTP client, collections, JSON viewer |
-| [docs/quick-notes.md](docs/quick-notes.md) | GitHub-synced notes, markdown editor |
-| [docs/design-system.md](docs/design-system.md) | 10 themes, CSS utilities, backgrounds |
-| [docs/state-management.md](docs/state-management.md) | TanStack Query, caching, localStorage |
-| [docs/stocks-dashboard.md](docs/stocks-dashboard.md) | Paper trading, Finnhub API, portfolio |
-| [docs/roadmap.md](docs/roadmap.md) | Planned features and ideas |
-| [CHANGELOG.md](CHANGELOG.md) | Completed features and changes |
+| [docs/navigation.md](docs/navigation.md) | Sidebar system, adding sections |
+| [docs/auth.md](docs/auth.md) | GitHub OAuth via Supabase |
+| [docs/weather.md](docs/weather.md) | Weather APIs and features |
+| [docs/daily-feed.md](docs/daily-feed.md) | Feed sources and schema |
+| [docs/api-playground.md](docs/api-playground.md) | HTTP client features |
+| [docs/quick-notes.md](docs/quick-notes.md) | GitHub-synced markdown editor |
+| [docs/stocks-dashboard.md](docs/stocks-dashboard.md) | Paper trading, Finnhub/Alpha Vantage |
+| [docs/design-system.md](docs/design-system.md) | Themes, glassmorphism, backgrounds |
+| [docs/state-management.md](docs/state-management.md) | TanStack Query, caching |
+| [docs/roadmap.md](docs/roadmap.md) | Planned features |
 
-## Current Sections
+## Sections
 
-| Section | Status | Description |
-|---------|--------|-------------|
-| **Home** | Complete | Dashboard overview with weather/feed stats, quick navigation cards |
-| **Weather** | Complete | Live weather + radar + alerts + air quality |
-| **Daily Feed** | Complete | Aggregated content from HN, GitHub, Reddit, Lobsters, Dev.to |
-| **API Playground** | Complete | HTTP request builder with collections, history, JSON viewer |
-| **Quick Notes** | Complete | GitHub-synced markdown editor with file browser |
-| **Bookmarks** | Complete | Folder-based links with icon/list view, search, GitHub sync |
-| **Search Hub** | Complete | Search, AI chat, and image generation with keyboard shortcuts |
-| **Paper Trading** | Complete | Practice stock trading with real data and $100K virtual money |
-| **Profile** | Complete | GitHub OAuth login, sync status, repository settings |
-| **Settings** | Partial | Theme/appearance (Feed Config coming soon) |
+| Section | File | Description |
+|---------|------|-------------|
+| Home | `app/page.tsx` | Dashboard overview |
+| Weather | `app/sections/weather.tsx` | Weather + radar + alerts |
+| Daily Feed | `app/sections/daily-feed.tsx` | HN, GitHub, Reddit, etc. |
+| API Playground | `app/sections/api-playground.tsx` | HTTP request builder |
+| Quick Notes | `app/sections/quick-notes.tsx` | Markdown editor (GitHub sync) |
+| Bookmarks | `app/sections/bookmarks.tsx` | Links manager (GitHub sync) |
+| Search Hub | `app/sections/search-hub.tsx` | Search + AI chat |
+| Paper Trading | `app/sections/stocks-dashboard.tsx` | Stock trading practice |
+| Profile | `app/sections/profile.tsx` | Auth, sync status, settings |
+| Settings | `app/page.tsx` (SettingsSection) | Theme/appearance |
 
 ## Tech Stack
 
 - **Framework**: Next.js 15 (App Router)
-- **Styling**: Tailwind CSS + shadcn/ui components
-- **State**: TanStack Query (server state) + localStorage (preferences)
-- **Theming**: 10 themes + background styles + glassmorphism
-- **Auth**: Supabase Auth (GitHub OAuth)
-- **APIs**: Open-Meteo, RainViewer, NWS, Nominatim, HN, GitHub (trending + Contents API), Reddit, Lobsters, Dev.to, Finnhub (stocks), Alpha Vantage (charts)
-
-## Project Structure
-
-```
-personal-homepage/
-├── app/
-│   ├── layout.tsx              # Root layout with ThemeProvider
-│   ├── page.tsx                # Main page with accordion sidebar
-│   ├── globals.css             # Theme system + JSON viewer styles
-│   ├── sections/               # Section components
-│   │   ├── weather.tsx
-│   │   ├── daily-feed.tsx
-│   │   ├── api-playground.tsx
-│   │   ├── quick-notes.tsx
-│   │   ├── bookmarks.tsx
-│   │   ├── search-hub.tsx
-│   │   ├── stocks-dashboard.tsx
-│   │   └── profile.tsx
-│   ├── api/feed/               # Feed API endpoint + fetchers
-│   └── api/stocks/             # Stock quotes, history, search
-├── components/
-│   ├── ui/                     # shadcn/ui components
-│   ├── AuthProvider.tsx        # Supabase auth context
-│   ├── AuthModal.tsx           # GitHub OAuth login modal
-│   ├── JsonViewer.tsx          # Syntax-highlighted collapsible JSON
-│   ├── QueryProvider.tsx       # TanStack Query provider
-│   ├── ThemeProvider.tsx       # Theme context
-│   ├── ThemeCustomizer.tsx     # Quick theme switcher
-│   ├── ThemeSettingsPanel.tsx  # Full theme settings
-│   ├── BackgroundProvider.tsx  # Background style context
-│   └── MasterBackground.tsx    # Animated backgrounds
-├── lib/
-│   ├── utils.ts                # cn() helper
-│   ├── github.ts               # GitHub API helper
-│   └── supabase.ts             # Supabase client
-├── docs/                       # Detailed documentation
-```
+- **Styling**: Tailwind CSS + shadcn/ui
+- **State**: TanStack Query + localStorage
+- **Auth**: Supabase (GitHub OAuth)
+- **APIs**: Open-Meteo, Finnhub, Alpha Vantage, GitHub
 
 ## Development
 
 ```bash
-npm install
 npm run dev    # http://localhost:3001
 npm run build
 ```
 
-**Port 3001** to avoid conflict with portfolio-style-guides on 3000.
+## Key Patterns
 
-## Related Project
+### Adding a Section
 
-Reference templates from portfolio-style-guides:
-```
-~/projects/portfolio-style-guides/app/templates/
-```
-- `admin-dashboard` - Sidebar layout pattern
-- `live-weather-dashboard` - API integration pattern
-- `api-playground` - HTTP client pattern
-- `settings` - Full settings panel
+1. Add to `Section` type in `app/page.tsx`
+2. Add to `navigationItems` array
+3. Create `app/sections/[name].tsx`
+4. Add case to `renderContent()` switch
 
-## Notes for Claude
-
-### Adding New Sections
-
-1. Update `Section` type in `app/page.tsx`
-2. Add to `navigationItems` array with icon and sub-items
-3. Create component in `app/sections/[name].tsx`
-4. Import and add case to `renderContent()` switch
-5. (Optional) Add card to `HomeSection`
-6. Create `docs/[name].md` for detailed documentation
-
-See [docs/navigation.md](docs/navigation.md) for full details.
-
-### Sidebar Architecture
-
-The sidebar uses an accordion pattern:
-- Sections have expandable sub-items
-- Only one section expanded at a time
-- State: `activeSection`, `expandedSection`
-- Desktop: collapsible sidebar (280px → 80px)
-- Mobile: Sheet drawer with same accordion content
+See [docs/navigation.md](docs/navigation.md) for details.
 
 ### Styling
 
-- Use `glass` and `glass-dark` classes for cards/panels
+- Use `glass` / `glass-dark` for panels
 - Use `terminal-glow` for headings
-- Test mobile layout (Sheet drawer navigation)
-- 10 themes available - test appearance changes
-- See [docs/design-system.md](docs/design-system.md) for full details
+- See [docs/design-system.md](docs/design-system.md)
 
-### Components
+### Auth
 
-- `JsonViewer`: Use for displaying API responses with syntax highlighting
-- Markdown preview: Uses `.md-*` classes in `globals.css` for Quick Notes
-- Theme classes automatically adapt to all 10 themes
+- `useAuth()` hook from `components/AuthProvider.tsx`
+- `getGitHubToken()` for GitHub API calls
+- See [docs/auth.md](docs/auth.md)
 
-### Hydration Warnings
+### Hydration
 
-For time displays that change between server/client render, add `suppressHydrationWarning` to the element.
+Add `suppressHydrationWarning` for dynamic time displays.
