@@ -11,7 +11,7 @@ interface HNItem {
   type: string
 }
 
-export async function fetchHackerNews(limit: number = 30): Promise<FeedItem[]> {
+export async function fetchHackerNews(limit: number = 30, page: number = 1): Promise<{ items: FeedItem[]; hasMore: boolean }> {
   try {
     // Get top story IDs
     const topStoriesRes = await fetch(
@@ -24,7 +24,9 @@ export async function fetchHackerNews(limit: number = 30): Promise<FeedItem[]> {
     }
 
     const storyIds: number[] = await topStoriesRes.json()
-    const topIds = storyIds.slice(0, limit)
+    const offset = (page - 1) * limit
+    const topIds = storyIds.slice(offset, offset + limit)
+    const hasMore = offset + limit < storyIds.length
 
     // Fetch each story in parallel
     const stories = await Promise.all(
@@ -61,9 +63,12 @@ export async function fetchHackerNews(limit: number = 30): Promise<FeedItem[]> {
       })
     )
 
-    return stories.filter((s): s is FeedItem => s !== null)
+    return {
+      items: stories.filter((s): s is FeedItem => s !== null),
+      hasMore,
+    }
   } catch (error) {
     console.error("Failed to fetch Hacker News:", error)
-    return []
+    return { items: [], hasMore: false }
   }
 }

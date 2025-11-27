@@ -20,33 +20,33 @@ interface RedditPost {
 interface RedditResponse {
   data: {
     children: RedditPost[]
+    after: string | null
   }
 }
 
 async function fetchSubreddit(
   subreddit: string,
-  limit: number = 5
-): Promise<FeedItem[]> {
+  limit: number = 5,
+  after?: string
+): Promise<{ items: FeedItem[]; after: string | null }> {
   try {
-    const res = await fetch(
-      `https://www.reddit.com/r/${subreddit}/hot.json?limit=${limit}`,
-      {
-        headers: {
-          // Reddit requires a User-Agent
-          "User-Agent": "personal-homepage-feed/1.0",
-        },
-        next: { revalidate: 900 }, // 15 min cache
-      }
-    )
+    const url = `https://www.reddit.com/r/${subreddit}/hot.json?limit=${limit}${after ? `&after=${after}` : ""}`
+    const res = await fetch(url, {
+      headers: {
+        // Reddit requires a User-Agent
+        "User-Agent": "personal-homepage-feed/1.0",
+      },
+      next: { revalidate: 900 }, // 15 min cache
+    })
 
     if (!res.ok) {
       console.warn(`Reddit r/${subreddit} error: ${res.status}`)
-      return []
+      return { items: [], after: null }
     }
 
     const data: RedditResponse = await res.json()
 
-    return data.data.children
+    const items = data.data.children
       .filter((post) => {
         // Filter out stickied/pinned posts and ads
         const d = post.data
@@ -70,30 +70,57 @@ async function fetchSubreddit(
           tags: d.link_flair_text ? [d.link_flair_text.toLowerCase()] : [],
         }
       })
+
+    return { items, after: data.data.after }
   } catch (error) {
     console.error(`Failed to fetch r/${subreddit}:`, error)
-    return []
+    return { items: [], after: null }
   }
 }
 
+// Cursors format: "subreddit1:after1,subreddit2:after2,..."
 export async function fetchReddit(
   limitPerSubreddit: number = 5,
-  customSubreddits?: string[]
-): Promise<FeedItem[]> {
+  customSubreddits?: string[],
+  cursorsStr?: string
+): Promise<{ items: FeedItem[]; hasMore: boolean; cursors: string }> {
   try {
     const subreddits = customSubreddits && customSubreddits.length > 0
       ? customSubreddits
       : REDDIT_SUBREDDITS
 
+    // Parse cursors string into map
+    const cursorsMap: Record<string, string> = {}
+    if (cursorsStr) {
+      cursorsStr.split(",").forEach((pair) => {
+        const [sub, cursor] = pair.split(":")
+        if (sub && cursor) cursorsMap[sub] = cursor
+      })
+    }
+
     // Fetch all subreddits in parallel
     const results = await Promise.all(
-      subreddits.map((sub) => fetchSubreddit(sub, limitPerSubreddit))
+      subreddits.map((sub) =>
+        fetchSubreddit(sub, limitPerSubreddit, cursorsMap[sub])
+          .then((result) => ({ subreddit: sub, ...result }))
+      )
     )
 
-    // Flatten and return
-    return results.flat()
+    // Build new cursors string
+    const newCursors = results
+      .filter((r) => r.after)
+      .map((r) => `${r.subreddit}:${r.after}`)
+      .join(",")
+
+    // Check if any subreddit has more items
+    const hasMore = results.some((r) => r.after !== null)
+
+    // Flatten items
+    const items = results.flatMap((r) => r.items)
+
+    return { items, hasMore, cursors: newCursors }
   } catch (error) {
     console.error("Failed to fetch Reddit:", error)
-    return []
+    return { items: [], hasMore: false, cursors: "" }
   }
 }

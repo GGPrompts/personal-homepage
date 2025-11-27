@@ -612,6 +612,30 @@ async function reverseGeocode(lat: number, lon: number): Promise<string> {
   }
 }
 
+// Helper to check if a given hour is nighttime based on sunrise/sunset
+function isHourNighttime(hourStr: string, sunriseStr: string, sunsetStr: string): boolean {
+  // Parse hour string like "07:00 AM" or "11:00 PM"
+  const parseTime = (str: string): number => {
+    const match = str.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i)
+    if (!match) return 0
+    let hours = parseInt(match[1], 10)
+    const minutes = parseInt(match[2], 10)
+    const period = match[3]?.toUpperCase()
+
+    if (period === "PM" && hours !== 12) hours += 12
+    if (period === "AM" && hours === 12) hours = 0
+
+    return hours * 60 + minutes
+  }
+
+  const hourTime = parseTime(hourStr)
+  const sunriseTime = parseTime(sunriseStr)
+  const sunsetTime = parseTime(sunsetStr)
+
+  // Nighttime is before sunrise or after sunset
+  return hourTime < sunriseTime || hourTime >= sunsetTime
+}
+
 function getAqiCategory(aqi: number): AirQuality["category"] {
   if (aqi <= 50) return "good"
   if (aqi <= 100) return "moderate"
@@ -1618,13 +1642,22 @@ export default function WeatherDashboard({
                 <div className="flex gap-3 w-max">
                   {hourlyForecast.map((hour, index) => {
                     const HourIcon = WEATHER_ICONS[hour.condition]
+                    // Determine if this hour is nighttime based on sunrise/sunset
+                    const todaySunrise = dailyForecast[0]?.sunrise || "6:00 AM"
+                    const todaySunset = dailyForecast[0]?.sunset || "6:00 PM"
+                    const isNight = isHourNighttime(hour.hour, todaySunrise, todaySunset)
+                    const showMoon = isNight && hour.condition === "clear"
                     return (
                       <div
                         key={index}
                         className="flex w-[90px] flex-shrink-0 flex-col items-center rounded-lg border border-border bg-background/50 p-3"
                       >
                         <p className="text-xs font-semibold">{hour.hour}</p>
-                        <HourIcon className="my-2 h-6 w-6 text-cyan-500" />
+                        {showMoon ? (
+                          <MoonPhaseIcon phase={moonPhaseData.phase} className="my-2 h-6 w-6 text-cyan-500" />
+                        ) : (
+                          <HourIcon className="my-2 h-6 w-6 text-cyan-500" />
+                        )}
                         <p className="text-base font-bold">{Math.round(hour.temp)}°</p>
                         <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                           <Droplets className="h-3 w-3 text-blue-500" />

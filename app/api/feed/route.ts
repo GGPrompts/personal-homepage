@@ -13,6 +13,11 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const sourcesParam = searchParams.get("sources")
   const subredditsParam = searchParams.get("subreddits")
+  const pageParam = searchParams.get("page")
+  const redditCursorsParam = searchParams.get("redditCursors")
+
+  // Parse page number (default to 1)
+  const page = Math.max(1, parseInt(pageParam || "1", 10))
 
   // Parse requested sources, default to all
   const requestedSources: FeedSource[] = sourcesParam
@@ -37,45 +42,51 @@ export async function GET(request: NextRequest) {
   }
 
   // Fetch from all requested sources in parallel
-  const fetchPromises: Promise<{ source: FeedSource; items: FeedItem[]; error?: string }>[] = []
+  const fetchPromises: Promise<{
+    source: FeedSource
+    items: FeedItem[]
+    hasMore: boolean
+    cursor?: string
+    error?: string
+  }>[] = []
 
   if (validSources.includes("hackernews")) {
     fetchPromises.push(
-      fetchHackerNews(SOURCE_CONFIG.hackernews.limit)
-        .then((items) => ({ source: "hackernews" as FeedSource, items }))
-        .catch((e) => ({ source: "hackernews" as FeedSource, items: [], error: e.message }))
+      fetchHackerNews(SOURCE_CONFIG.hackernews.limit, page)
+        .then((result) => ({ source: "hackernews" as FeedSource, ...result }))
+        .catch((e) => ({ source: "hackernews" as FeedSource, items: [], hasMore: false, error: e.message }))
     )
   }
 
   if (validSources.includes("github")) {
     fetchPromises.push(
-      fetchGitHub(SOURCE_CONFIG.github.limit)
-        .then((items) => ({ source: "github" as FeedSource, items }))
-        .catch((e) => ({ source: "github" as FeedSource, items: [], error: e.message }))
+      fetchGitHub(SOURCE_CONFIG.github.limit, page)
+        .then((result) => ({ source: "github" as FeedSource, ...result }))
+        .catch((e) => ({ source: "github" as FeedSource, items: [], hasMore: false, error: e.message }))
     )
   }
 
   if (validSources.includes("reddit")) {
     fetchPromises.push(
-      fetchReddit(5, customSubreddits) // 5 per subreddit
-        .then((items) => ({ source: "reddit" as FeedSource, items }))
-        .catch((e) => ({ source: "reddit" as FeedSource, items: [], error: e.message }))
+      fetchReddit(5, customSubreddits, redditCursorsParam || undefined) // 5 per subreddit
+        .then((result) => ({ source: "reddit" as FeedSource, items: result.items, hasMore: result.hasMore, cursor: result.cursors }))
+        .catch((e) => ({ source: "reddit" as FeedSource, items: [], hasMore: false, error: e.message }))
     )
   }
 
   if (validSources.includes("lobsters")) {
     fetchPromises.push(
-      fetchLobsters(SOURCE_CONFIG.lobsters.limit)
-        .then((items) => ({ source: "lobsters" as FeedSource, items }))
-        .catch((e) => ({ source: "lobsters" as FeedSource, items: [], error: e.message }))
+      fetchLobsters(SOURCE_CONFIG.lobsters.limit, page)
+        .then((result) => ({ source: "lobsters" as FeedSource, ...result }))
+        .catch((e) => ({ source: "lobsters" as FeedSource, items: [], hasMore: false, error: e.message }))
     )
   }
 
   if (validSources.includes("devto")) {
     fetchPromises.push(
-      fetchDevTo(SOURCE_CONFIG.devto.limit)
-        .then((items) => ({ source: "devto" as FeedSource, items }))
-        .catch((e) => ({ source: "devto" as FeedSource, items: [], error: e.message }))
+      fetchDevTo(SOURCE_CONFIG.devto.limit, page)
+        .then((result) => ({ source: "devto" as FeedSource, ...result }))
+        .catch((e) => ({ source: "devto" as FeedSource, items: [], hasMore: false, error: e.message }))
     )
   }
 
@@ -97,6 +108,16 @@ export async function GET(request: NextRequest) {
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   })
 
+  // Check if any source has more items
+  const hasMore = results.some((r) => r.hasMore)
+
+  // Build cursors object for sources that need it (Reddit)
+  const cursors: Partial<Record<FeedSource, string>> = {}
+  const redditResult = results.find((r) => r.source === "reddit")
+  if (redditResult?.cursor) {
+    cursors.reddit = redditResult.cursor
+  }
+
   const response: FeedResponse = {
     items: allItems,
     fetchedAt: new Date().toISOString(),
@@ -105,6 +126,11 @@ export async function GET(request: NextRequest) {
       count: r.items.length,
       error: r.error,
     })),
+    pagination: {
+      page,
+      hasMore,
+      cursors: Object.keys(cursors).length > 0 ? cursors : undefined,
+    },
   }
 
   return NextResponse.json(response, {

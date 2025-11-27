@@ -74,6 +74,11 @@ interface FeedResponse {
     count: number
     error?: string
   }[]
+  pagination: {
+    page: number
+    hasMore: boolean
+    cursors?: Partial<Record<FeedSource, string>>
+  }
 }
 
 // ============================================================================
@@ -101,6 +106,8 @@ const STORAGE_KEY = "daily-feed-preferences"
 async function fetchFeedData(
   enabledSources: FeedSource[],
   subreddits?: string[],
+  page: number = 1,
+  redditCursors?: string,
 ): Promise<FeedResponse> {
   const params = new URLSearchParams()
 
@@ -111,6 +118,15 @@ async function fetchFeedData(
   // Pass custom subreddits to server
   if (subreddits && subreddits.length > 0 && enabledSources.includes("reddit")) {
     params.set("subreddits", subreddits.join(","))
+  }
+
+  // Pagination parameters
+  if (page > 1) {
+    params.set("page", page.toString())
+  }
+
+  if (redditCursors) {
+    params.set("redditCursors", redditCursors)
   }
 
   const url = `/api/feed${params.toString() ? `?${params}` : ""}`
@@ -489,6 +505,13 @@ export default function DailyFeedSection({
   const [hiddenItems, setHiddenItems] = React.useState<Set<string>>(new Set())
   const [savedItemsData, setSavedItemsData] = React.useState<Map<string, FeedItem>>(new Map())
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = React.useState(1)
+  const [accumulatedItems, setAccumulatedItems] = React.useState<FeedItem[]>([])
+  const [redditCursors, setRedditCursors] = React.useState<string | undefined>()
+  const [hasMore, setHasMore] = React.useState(true)
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false)
+
   // Load preferences from localStorage
   React.useEffect(() => {
     try {
@@ -523,7 +546,49 @@ export default function DailyFeedSection({
     enabled: prefsLoaded, // Only fetch after preferences are loaded
   })
 
-  const items = feedData?.items ?? []
+  // Update accumulated items when initial data loads
+  React.useEffect(() => {
+    if (feedData?.items) {
+      setAccumulatedItems(feedData.items)
+      setHasMore(feedData.pagination?.hasMore ?? false)
+      setRedditCursors(feedData.pagination?.cursors?.reddit)
+      setCurrentPage(1)
+    }
+  }, [feedData])
+
+  // Reset pagination when sources or subreddits change
+  React.useEffect(() => {
+    setCurrentPage(1)
+    setAccumulatedItems([])
+    setRedditCursors(undefined)
+    setHasMore(true)
+  }, [enabledSources, subredditsKey])
+
+  // Load more items
+  const loadMore = React.useCallback(async () => {
+    if (isLoadingMore || !hasMore) return
+
+    setIsLoadingMore(true)
+    try {
+      const nextPage = currentPage + 1
+      const moreData = await fetchFeedData(enabledSources, subreddits, nextPage, redditCursors)
+
+      // Dedupe items by id
+      const existingIds = new Set(accumulatedItems.map((item) => item.id))
+      const newItems = moreData.items.filter((item) => !existingIds.has(item.id))
+
+      setAccumulatedItems((prev) => [...prev, ...newItems])
+      setCurrentPage(nextPage)
+      setHasMore(moreData.pagination?.hasMore ?? false)
+      setRedditCursors(moreData.pagination?.cursors?.reddit)
+    } catch (err) {
+      console.error("Failed to load more items:", err)
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [isLoadingMore, hasMore, currentPage, enabledSources, subreddits, redditCursors, accumulatedItems])
+
+  const items = accumulatedItems.length > 0 ? accumulatedItems : (feedData?.items ?? [])
   const fetchedAt = feedData?.fetchedAt ?? null
   const sourceStats = feedData?.sources ?? []
 
@@ -719,7 +784,7 @@ export default function DailyFeedSection({
           <h1 className="text-3xl font-bold terminal-glow mb-1">Daily Feed</h1>
           <p className="text-muted-foreground text-sm">
             {fetchedAt ? (
-              <>Updated {timeAgo(fetchedAt)} &middot; {items.length} items</>
+              <>Updated {timeAgo(fetchedAt)} &middot; {items.length} items{currentPage > 1 && ` (page ${currentPage})`}</>
             ) : (
               "Aggregated content from across the web"
             )}
@@ -892,6 +957,30 @@ export default function DailyFeedSection({
                 showRemove={viewMode === "saved"}
               />
             ))}
+
+            {/* Load More Button */}
+            {viewMode !== "saved" && hasMore && (
+              <div className="flex justify-center pt-4">
+                <Button
+                  variant="outline"
+                  onClick={loadMore}
+                  disabled={isLoadingMore}
+                  className="gap-2"
+                >
+                  {isLoadingMore ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      Loading more...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4" />
+                      Load More
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
         </ScrollArea>
       )}

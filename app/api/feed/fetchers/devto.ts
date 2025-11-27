@@ -14,11 +14,11 @@ interface DevToArticle {
   description: string
 }
 
-export async function fetchDevTo(limit: number = 15): Promise<FeedItem[]> {
+export async function fetchDevTo(limit: number = 15, page: number = 1): Promise<{ items: FeedItem[]; hasMore: boolean }> {
   try {
     // Fetch top articles from the past day
     const res = await fetch(
-      `https://dev.to/api/articles?top=1&per_page=${limit}`,
+      `https://dev.to/api/articles?top=1&per_page=${limit}&page=${page}`,
       {
         headers: {
           Accept: "application/json",
@@ -32,22 +32,26 @@ export async function fetchDevTo(limit: number = 15): Promise<FeedItem[]> {
     }
 
     const articles: DevToArticle[] = await res.json()
+    const hasMore = articles.length >= limit
 
-    return articles.map((article): FeedItem => ({
-      id: `devto-${article.id}`,
-      title: article.title,
-      url: article.url,
-      source: "devto",
-      author: article.user.username,
-      score: article.public_reactions_count,
-      commentCount: article.comments_count,
-      commentsUrl: `${article.url}#comments`,
-      createdAt: article.published_at,
-      tags: article.tag_list.slice(0, 4),
-      description: article.description,
-    }))
+    return {
+      items: articles.map((article): FeedItem => ({
+        id: `devto-${article.id}`,
+        title: article.title,
+        url: article.url,
+        source: "devto",
+        author: article.user.username,
+        score: article.public_reactions_count,
+        commentCount: article.comments_count,
+        commentsUrl: `${article.url}#comments`,
+        createdAt: article.published_at,
+        tags: article.tag_list.slice(0, 4),
+        description: article.description,
+      })),
+      hasMore,
+    }
   } catch (error) {
     console.error("Failed to fetch Dev.to:", error)
-    return []
+    return { items: [], hasMore: false }
   }
 }

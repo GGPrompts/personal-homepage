@@ -17,9 +17,10 @@ interface GitHubRepo {
 
 interface GitHubSearchResponse {
   items: GitHubRepo[]
+  total_count: number
 }
 
-export async function fetchGitHub(limit: number = 10): Promise<FeedItem[]> {
+export async function fetchGitHub(limit: number = 10, page: number = 1): Promise<{ items: FeedItem[]; hasMore: boolean }> {
   try {
     // Get repos created in the last 7 days, sorted by stars
     const weekAgo = new Date()
@@ -27,7 +28,7 @@ export async function fetchGitHub(limit: number = 10): Promise<FeedItem[]> {
     const dateStr = weekAgo.toISOString().split("T")[0]
 
     const res = await fetch(
-      `https://api.github.com/search/repositories?q=created:>${dateStr}&sort=stars&order=desc&per_page=${limit}`,
+      `https://api.github.com/search/repositories?q=created:>${dateStr}&sort=stars&order=desc&per_page=${limit}&page=${page}`,
       {
         headers: {
           Accept: "application/vnd.github.v3+json",
@@ -42,29 +43,33 @@ export async function fetchGitHub(limit: number = 10): Promise<FeedItem[]> {
     if (!res.ok) {
       if (res.status === 403) {
         console.warn("GitHub API rate limited")
-        return []
+        return { items: [], hasMore: false }
       }
       throw new Error(`GitHub API error: ${res.status}`)
     }
 
     const data: GitHubSearchResponse = await res.json()
+    const hasMore = page * limit < data.total_count && page < 10 // GitHub limits to 1000 results (10 pages of 100)
 
-    return data.items.map((repo): FeedItem => ({
-      id: `gh-${repo.id}`,
-      title: repo.full_name,
-      url: repo.html_url,
-      source: "github",
-      author: repo.owner.login,
-      score: repo.stargazers_count,
-      description: repo.description || undefined,
-      tags: [
-        ...(repo.language ? [repo.language.toLowerCase()] : []),
-        ...repo.topics.slice(0, 3),
-      ],
-      createdAt: repo.created_at,
-    }))
+    return {
+      items: data.items.map((repo): FeedItem => ({
+        id: `gh-${repo.id}`,
+        title: repo.full_name,
+        url: repo.html_url,
+        source: "github",
+        author: repo.owner.login,
+        score: repo.stargazers_count,
+        description: repo.description || undefined,
+        tags: [
+          ...(repo.language ? [repo.language.toLowerCase()] : []),
+          ...repo.topics.slice(0, 3),
+        ],
+        createdAt: repo.created_at,
+      })),
+      hasMore,
+    }
   } catch (error) {
     console.error("Failed to fetch GitHub:", error)
-    return []
+    return { items: [], hasMore: false }
   }
 }

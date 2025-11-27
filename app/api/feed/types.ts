@@ -23,6 +23,11 @@ export interface FeedResponse {
     count: number
     error?: string
   }[]
+  pagination: {
+    page: number
+    hasMore: boolean
+    cursors?: Partial<Record<FeedSource, string>> // For cursor-based pagination (Reddit)
+  }
 }
 
 export const SOURCE_CONFIG: Record<FeedSource, { name: string; limit: number }> = {
