@@ -39,6 +39,7 @@ import {
   Wallet,
   LineChart,
   User,
+  Link2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -51,8 +52,11 @@ import {
 } from "@/components/ui/tooltip"
 import { ThemeCustomizer } from "@/components/ThemeCustomizer"
 import { ThemeSettingsPanel } from "@/components/ThemeSettingsPanel"
+import { SectionSettings } from "@/components/SectionSettings"
 import { useAuth } from "@/components/AuthProvider"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useSectionPreferences, ToggleableSection, DEFAULT_SECTION_ORDER, DEFAULT_VISIBILITY } from "@/hooks/useSectionPreferences"
+import { WorldClocks } from "@/components/WorldClocks"
 
 // Import page content components
 import WeatherDashboard from "./sections/weather"
@@ -63,12 +67,15 @@ import BookmarksSection from "./sections/bookmarks"
 import SearchHubSection from "./sections/search-hub"
 import StocksDashboard from "./sections/stocks-dashboard"
 import ProfileSection from "./sections/profile"
+import TasksSection from "./sections/tasks"
+import IntegrationsSection from "./sections/integrations"
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type Section = "home" | "weather" | "feed" | "api-playground" | "notes" | "bookmarks" | "search" | "stocks" | "profile" | "settings"
+// Re-export Section type from hook for consistency
+type Section = "home" | ToggleableSection | "settings"
 
 interface SubItem {
   id: string
@@ -164,6 +171,27 @@ const navigationItems: NavigationItem[] = [
     ]
   },
   {
+    id: "tasks",
+    label: "Tasks",
+    icon: CheckCircle2,
+    description: "Quick todo list",
+    subItems: [
+      { id: "pending", label: "To Do", icon: Clock },
+      { id: "completed", label: "Completed", icon: CheckCircle2 },
+    ]
+  },
+  {
+    id: "integrations",
+    label: "Integrations",
+    icon: Link2,
+    description: "Connected services",
+    subItems: [
+      { id: "auth", label: "Authentication", icon: Key },
+      { id: "apis", label: "API Services", icon: Zap },
+      { id: "data", label: "Data Sources", icon: Rss },
+    ]
+  },
+  {
     id: "profile",
     label: "Profile",
     icon: User,
@@ -180,6 +208,7 @@ const navigationItems: NavigationItem[] = [
     description: "Theme & preferences",
     subItems: [
       { id: "appearance", label: "Appearance", icon: Palette },
+      { id: "sections", label: "Sections", icon: Grid },
       { id: "feed-config", label: "Feed Config", icon: SlidersHorizontal },
       { id: "api-keys", label: "API Keys", icon: Key },
     ]
@@ -202,6 +231,9 @@ function SidebarContent({
   onNavigate,
   userAvatar,
   userName,
+  sectionOrder,
+  sectionVisibility,
+  prefsLoaded = false,
 }: {
   activeSection: Section
   setActiveSection: (section: Section) => void
@@ -214,6 +246,9 @@ function SidebarContent({
   onNavigate?: () => void
   userAvatar?: string | null
   userName?: string | null
+  sectionOrder: ToggleableSection[]
+  sectionVisibility: Record<ToggleableSection, boolean>
+  prefsLoaded?: boolean
 }) {
   const handleSectionClick = (id: Section) => {
     // Navigate to section
@@ -274,7 +309,25 @@ function SidebarContent({
       {/* Navigation */}
       <nav className="flex-1 p-4 overflow-y-auto">
         <ul className="space-y-1">
-          {navigationItems.map((item) => {
+          {/* Reorder and filter navigation items based on preferences */}
+          {(() => {
+            // Use defaults during SSR/before hydration to prevent mismatch
+            const effectiveOrder = prefsLoaded ? sectionOrder : DEFAULT_SECTION_ORDER
+            const effectiveVisibility = prefsLoaded ? sectionVisibility : DEFAULT_VISIBILITY
+
+            const orderedItems: NavigationItem[] = []
+            // First, add ordered toggleable sections that are visible
+            for (const id of effectiveOrder) {
+              if (effectiveVisibility[id]) {
+                const item = navigationItems.find((i) => i.id === id)
+                if (item) orderedItems.push(item)
+              }
+            }
+            // Then always add settings at the end
+            const settingsItem = navigationItems.find((i) => i.id === "settings")
+            if (settingsItem) orderedItems.push(settingsItem)
+            return orderedItems
+          })().map((item) => {
             const Icon = item.icon
             const isActive = activeSection === item.id
             const isExpanded = expandedSection === item.id
@@ -417,7 +470,9 @@ async function fetchHomeWeather(lat: number, lon: number, unit: "fahrenheit" | "
   }
 }
 
-function HomeSection({ onNavigate, userName }: { onNavigate: (section: Section) => void; userName?: string | null }) {
+function HomeSection({ onNavigate, userName, isVisible, prefsLoaded }: { onNavigate: (section: Section) => void; userName?: string | null; isVisible: (section: ToggleableSection) => boolean; prefsLoaded: boolean }) {
+  // Use default visibility (all visible) during SSR to prevent hydration mismatch
+  const checkVisible = (section: ToggleableSection) => prefsLoaded ? isVisible(section) : true
   // Get saved location and temp unit from localStorage (same as Weather section)
   const [location, setLocation] = React.useState(() => {
     if (typeof window !== "undefined") {
@@ -482,116 +537,175 @@ function HomeSection({ onNavigate, userName }: { onNavigate: (section: Section) 
       <h1 className="text-3xl font-bold terminal-glow mb-2">
         Welcome Home{userName ? `, ${userName.split(' ')[0]}` : ''}
       </h1>
-      <p className="text-muted-foreground mb-8">Your personal dashboard overview</p>
+      <p className="text-muted-foreground mb-6">Your personal dashboard overview</p>
+
+      {/* World Clocks Widget */}
+      <div className="mb-6">
+        <WorldClocks />
+      </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Weather Card */}
-        <button
-          onClick={() => onNavigate("weather")}
-          className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
-        >
-          <div className="flex items-start justify-between mb-4">
-            <Cloud className="h-8 w-8 text-primary" />
-            {weather && (
-              <span className="text-3xl font-bold text-primary">{weather.temp}°</span>
-            )}
-          </div>
-          <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Weather</h3>
-          {weather ? (
-            <div className="text-sm text-muted-foreground space-y-1">
-              <p>{weather.condition}</p>
-              <div className="flex items-center gap-3 text-xs">
-                <span className="flex items-center gap-0.5">
-                  <ArrowUp className="h-3 w-3 text-red-400" />
-                  {weather.high}°
-                </span>
-                <span className="flex items-center gap-0.5">
-                  <ArrowDown className="h-3 w-3 text-blue-400" />
-                  {weather.low}°
-                </span>
-              </div>
-              <p className="flex items-center gap-1 text-xs">
-                <MapPin className="h-3 w-3" />
-                {location.name}
-              </p>
+        {checkVisible("weather") && (
+          <button
+            onClick={() => onNavigate("weather")}
+            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <Cloud className="h-8 w-8 text-primary" />
+              {weather && (
+                <span className="text-3xl font-bold text-primary">{weather.temp}°</span>
+              )}
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              {weatherLoading ? "Loading weather data..." : "Unable to load weather"}
-            </p>
-          )}
-        </button>
+            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Weather</h3>
+            {weather ? (
+              <div className="text-sm text-muted-foreground space-y-1">
+                <p>{weather.condition}</p>
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="flex items-center gap-0.5">
+                    <ArrowUp className="h-3 w-3 text-red-400" />
+                    {weather.high}°
+                  </span>
+                  <span className="flex items-center gap-0.5">
+                    <ArrowDown className="h-3 w-3 text-blue-400" />
+                    {weather.low}°
+                  </span>
+                </div>
+                <p className="flex items-center gap-1 text-xs">
+                  <MapPin className="h-3 w-3" />
+                  {location.name}
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {weatherLoading ? "Loading weather data..." : "Unable to load weather"}
+              </p>
+            )}
+          </button>
+        )}
 
         {/* Daily Feed Card */}
-        <button
-          onClick={() => onNavigate("feed")}
-          className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
-        >
-          <div className="flex items-start justify-between mb-4">
-            <Newspaper className="h-8 w-8 text-primary" />
-            {feedCount !== null && (
-              <span className="text-3xl font-bold text-primary">{feedCount}</span>
+        {checkVisible("feed") && (
+          <button
+            onClick={() => onNavigate("feed")}
+            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <Newspaper className="h-8 w-8 text-primary" />
+              {feedCount !== null && (
+                <span className="text-3xl font-bold text-primary">{feedCount}</span>
+              )}
+            </div>
+            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Daily Feed</h3>
+            {feedCount !== null ? (
+              <p className="text-sm text-muted-foreground">
+                {feedCount} items from HN, GitHub, Reddit & more
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">Loading feed...</p>
             )}
-          </div>
-          <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Daily Feed</h3>
-          {feedCount !== null ? (
-            <p className="text-sm text-muted-foreground">
-              {feedCount} items from HN, GitHub, Reddit & more
-            </p>
-          ) : (
-            <p className="text-sm text-muted-foreground">Loading feed...</p>
-          )}
-        </button>
+          </button>
+        )}
 
         {/* API Playground Card */}
-        <button
-          onClick={() => onNavigate("api-playground")}
-          className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
-        >
-          <div className="flex items-start justify-between mb-4">
-            <Zap className="h-8 w-8 text-primary" />
-          </div>
-          <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">API Playground</h3>
-          <p className="text-sm text-muted-foreground">Test and debug API requests</p>
-        </button>
+        {checkVisible("api-playground") && (
+          <button
+            onClick={() => onNavigate("api-playground")}
+            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <Zap className="h-8 w-8 text-primary" />
+            </div>
+            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">API Playground</h3>
+            <p className="text-sm text-muted-foreground">Test and debug API requests</p>
+          </button>
+        )}
 
         {/* Quick Notes Card */}
-        <button
-          onClick={() => onNavigate("notes")}
-          className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
-        >
-          <div className="flex items-start justify-between mb-4">
-            <FileText className="h-8 w-8 text-primary" />
-          </div>
-          <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Quick Notes</h3>
-          <p className="text-sm text-muted-foreground">GitHub-synced markdown notes</p>
-        </button>
+        {checkVisible("notes") && (
+          <button
+            onClick={() => onNavigate("notes")}
+            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <FileText className="h-8 w-8 text-primary" />
+            </div>
+            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Quick Notes</h3>
+            <p className="text-sm text-muted-foreground">GitHub-synced markdown notes</p>
+          </button>
+        )}
 
         {/* Bookmarks Card */}
-        <button
-          onClick={() => onNavigate("bookmarks")}
-          className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
-        >
-          <div className="flex items-start justify-between mb-4">
-            <Bookmark className="h-8 w-8 text-primary" />
-          </div>
-          <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Bookmarks</h3>
-          <p className="text-sm text-muted-foreground">Organized quick links</p>
-        </button>
+        {checkVisible("bookmarks") && (
+          <button
+            onClick={() => onNavigate("bookmarks")}
+            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <Bookmark className="h-8 w-8 text-primary" />
+            </div>
+            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Bookmarks</h3>
+            <p className="text-sm text-muted-foreground">Organized quick links</p>
+          </button>
+        )}
 
         {/* Search Hub Card */}
-        <button
-          onClick={() => onNavigate("search")}
-          className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
-        >
-          <div className="flex items-start justify-between mb-4">
-            <Search className="h-8 w-8 text-primary" />
-          </div>
-          <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Search Hub</h3>
-          <p className="text-sm text-muted-foreground">Multi-engine web search</p>
-        </button>
+        {checkVisible("search") && (
+          <button
+            onClick={() => onNavigate("search")}
+            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <Search className="h-8 w-8 text-primary" />
+            </div>
+            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Search Hub</h3>
+            <p className="text-sm text-muted-foreground">Multi-engine web search</p>
+          </button>
+        )}
 
-        {/* Settings Card */}
+        {/* Paper Trading Card */}
+        {checkVisible("stocks") && (
+          <button
+            onClick={() => onNavigate("stocks")}
+            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <TrendingUp className="h-8 w-8 text-primary" />
+            </div>
+            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Paper Trading</h3>
+            <p className="text-sm text-muted-foreground">Practice stock trading</p>
+          </button>
+        )}
+
+        {/* Tasks Card */}
+        {checkVisible("tasks") && (
+          <button
+            onClick={() => onNavigate("tasks")}
+            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <CheckCircle2 className="h-8 w-8 text-primary" />
+            </div>
+            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Tasks</h3>
+            <p className="text-sm text-muted-foreground">Quick todo list</p>
+          </button>
+        )}
+
+        {/* Integrations Card */}
+        {checkVisible("integrations") && (
+          <button
+            onClick={() => onNavigate("integrations")}
+            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <Link2 className="h-8 w-8 text-primary" />
+            </div>
+            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Integrations</h3>
+            <p className="text-sm text-muted-foreground">Connected services</p>
+          </button>
+        )}
+
+        {/* Settings Card - always visible */}
         <button
           onClick={() => onNavigate("settings")}
           className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
@@ -766,6 +880,14 @@ function SettingsSection({ activeSubItem, onSubItemHandled }: { activeSubItem?: 
           <ThemeSettingsPanel />
         </div>
 
+        <div id="settings-sections" className="glass rounded-lg p-6 mb-6 scroll-mt-6">
+          <h3 className="font-semibold mb-4">Sections</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Toggle sections on or off and reorder them in the sidebar
+          </p>
+          <SectionSettings />
+        </div>
+
         <div className="glass rounded-lg p-6 mb-6">
           <div className="flex items-center gap-2 mb-4">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-primary"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
@@ -780,9 +902,16 @@ function SettingsSection({ activeSubItem, onSubItemHandled }: { activeSubItem?: 
         </div>
 
         <div id="settings-feed-config" className="glass rounded-lg p-6 mb-6 scroll-mt-6">
-          <h3 className="font-semibold mb-4">Feed Configuration</h3>
-          <p className="text-sm text-muted-foreground mb-4">Configure your content sources</p>
-          <Button variant="outline" disabled>Coming Soon</Button>
+          <div className="flex items-center gap-2 mb-4">
+            <Newspaper className="h-5 w-5 text-primary" />
+            <h3 className="font-semibold">Feed Configuration</h3>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            Feed sources and subreddits are configured directly in the Daily Feed section using the Sources and Subreddits buttons in the toolbar.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Go to <span className="text-primary">Daily Feed</span> in the sidebar to configure your content sources.
+          </p>
         </div>
 
         <div id="settings-api-keys" className="glass rounded-lg p-6 scroll-mt-6">
@@ -800,6 +929,7 @@ function SettingsSection({ activeSubItem, onSubItemHandled }: { activeSubItem?: 
 
 export default function PersonalHomepage() {
   const { user } = useAuth()
+  const { visibility, order, isVisible, isLoaded } = useSectionPreferences()
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
   const [activeSection, setActiveSection] = React.useState<Section>("home")
@@ -820,7 +950,7 @@ export default function PersonalHomepage() {
   const renderContent = () => {
     switch (activeSection) {
       case "home":
-        return <HomeSection onNavigate={setActiveSection} userName={userName} />
+        return <HomeSection onNavigate={setActiveSection} userName={userName} isVisible={isVisible} prefsLoaded={isLoaded} />
       case "weather":
         return <WeatherDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onAlertCountChange={setWeatherAlertCount} />
       case "feed":
@@ -835,12 +965,16 @@ export default function PersonalHomepage() {
         return <SearchHubSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "stocks":
         return <StocksDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("settings")} />
+      case "tasks":
+        return <TasksSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "integrations":
+        return <IntegrationsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSection={(section) => setActiveSection(section as Section)} />
       case "profile":
         return <ProfileSection />
       case "settings":
         return <SettingsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       default:
-        return <HomeSection onNavigate={setActiveSection} userName={userName} />
+        return <HomeSection onNavigate={setActiveSection} userName={userName} isVisible={isVisible} prefsLoaded={isLoaded} />
     }
   }
 
@@ -874,6 +1008,9 @@ export default function PersonalHomepage() {
               onNavigate={() => setMobileMenuOpen(false)}
               userAvatar={userAvatar}
               userName={userName}
+              sectionOrder={order}
+              sectionVisibility={visibility}
+              prefsLoaded={isLoaded}
             />
           </SheetContent>
         </Sheet>
@@ -896,6 +1033,9 @@ export default function PersonalHomepage() {
                 collapsed={sidebarCollapsed}
                 userAvatar={userAvatar}
                 userName={userName}
+                sectionOrder={order}
+                sectionVisibility={visibility}
+                prefsLoaded={isLoaded}
               />
             </aside>
 

@@ -4,6 +4,11 @@ Future enhancements and planned features.
 
 ## Recently Completed
 
+- **Integrations Page** - Central hub showing all connected services, API status, configuration links
+- **World Clocks** - Multiple timezone display on Home page, configurable with popular timezones
+- **Tasks / Quick Todo** - Simple task list with checkboxes, reordering, localStorage persistence, completion tracking
+- **Section Visibility** - Toggle sections on/off in Settings, reorder with up/down buttons, persisted to localStorage
+- **Paper Trading / Stocks Dashboard** - Real-time quotes, paper trading with $100k balance, portfolio tracking, watchlists
 - **Search Hub** - Multi-engine search + AI chat + Image AI (7 search engines, 6 AI assistants, 7 image generators including Sora) with keyboard shortcuts
 - **Bookmarks** - Folder-based organization, icon/list view toggle, search, GitHub sync, favicon auto-fetch
 - **Sidebar Jump Links** - Sub-items now navigate to specific sections (scroll/switch tabs)
@@ -19,30 +24,17 @@ Future enhancements and planned features.
 
 ## In Progress
 
-### Settings Section Expansion
-Current: Theme/appearance customizer + GitHub integration
-Needed:
-- Feed Configuration (sources, subreddits, refresh interval)
-- API Keys management (for authenticated APIs)
+(none currently)
 
 ## Up Next (Low Effort)
 
 | Feature | Description | Complexity |
 |---------|-------------|------------|
-| **Section Visibility** | Toggle sections on/off in Settings, drag-drop reorder | Low |
-| **World Clocks** | Multiple timezone display | Low |
 | **Quote of the Day** | Motivational quotes API | Low |
 | **Dynamic Weather Theme** | Auto-switch theme/background based on local weather conditions | Low-Medium |
+| **Keyboard Shortcuts** | Global hotkeys for navigation (g w → Weather, / → Search) | Medium |
 
 ## Planned Sections
-
-### Tasks / Quick Todo
-Lightweight task tracking:
-- Simple checkbox list for daily tasks
-- Drag-and-drop reordering (Framer Motion)
-- localStorage persistence
-- Optional: Todoist API sync
-- **Complexity**: Low-Medium
 
 ### System Status / Uptime Monitor
 Monitor personal services:
@@ -73,24 +65,6 @@ Show upcoming events:
 - Google Calendar API integration
 - Countdown to important dates
 - **Complexity**: Medium (OAuth)
-
-### Stocks Dashboard / Paper Trading
-Practice trading with real market data:
-- Real-time quotes (15-min delay) via Alpha Vantage, Finnhub, or Twelve Data
-- Paper trading with fake money ($100k starting balance)
-- Portfolio tracking, watchlists, P&L
-- Technical indicators (RSI, MACD, etc.)
-- Historical charts with Recharts
-- See [docs/stocks-dashboard.md](stocks-dashboard.md) for API details
-- **Complexity**: Medium-High
-
-### Integrations Page
-Central hub for connecting services:
-- Show all available integrations (GitHub, Google Calendar, Todoist, etc.)
-- Connection status indicators
-- Connect/disconnect buttons
-- API key management for external services
-- **Complexity**: Low-Medium
 
 ## Ideas / Backlog
 

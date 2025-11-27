@@ -37,16 +37,14 @@ The sidebar uses an accordion-style navigation pattern with expandable sections 
 
 ## Navigation Configuration
 
-Defined in `app/page.tsx`:
+Defined in `app/page.tsx` and `hooks/useSectionPreferences.ts`:
 
 ```typescript
-type Section = "home" | "weather" | "feed" | "api-playground" | "notes" | "settings"
+// Toggleable sections (can be hidden/reordered)
+type ToggleableSection = "weather" | "feed" | "api-playground" | "notes" | "bookmarks" | "search" | "stocks" | "tasks" | "integrations" | "profile"
 
-interface SubItem {
-  id: string
-  label: string
-  icon: React.ElementType
-}
+// All sections
+type Section = "home" | ToggleableSection | "settings"
 
 interface NavigationItem {
   id: Section
@@ -65,16 +63,32 @@ interface NavigationItem {
 | **Daily Feed** | Newspaper | Sources, Saved Items, Refresh |
 | **API Playground** | Zap | Collections, History |
 | **Quick Notes** | FileText | Browse Files, Recent |
-| **Settings** | Settings | Appearance, Feed Config, API Keys |
+| **Bookmarks** | Bookmark | All Links, Search |
+| **Search Hub** | Search | Search, AI Chat, Image AI |
+| **Paper Trading** | TrendingUp | Portfolio, Watchlist, History |
+| **Tasks** | CheckCircle2 | To Do, Completed |
+| **Integrations** | Link2 | Authentication, API Services, Data Sources |
+| **Profile** | User | Account, Sync Status |
+| **Settings** | Settings | Appearance, Sections, Feed Config, API Keys |
+
+## Section Visibility & Order
+
+Users can customize which sections appear and their order:
+
+- **Settings → Sections**: Toggle visibility, reorder with up/down buttons
+- **Hook**: `useSectionPreferences()` from `hooks/useSectionPreferences.ts`
+- **Storage**: localStorage key `section-preferences`
+- **Hydration**: Uses `DEFAULT_SECTION_ORDER` during SSR, switches to user prefs after load
 
 ## Adding a New Section
 
-1. **Update types** in `app/page.tsx`:
+1. **Update types** in `hooks/useSectionPreferences.ts`:
    ```typescript
-   type Section = "home" | "weather" | "feed" | "api-playground" | "settings" | "new-section"
+   type ToggleableSection = "weather" | ... | "new-section"
    ```
+   Also add to `DEFAULT_SECTION_ORDER` and `DEFAULT_VISIBILITY`.
 
-2. **Add to navigationItems array**:
+2. **Add to navigationItems array** in `app/page.tsx`:
    ```typescript
    {
      id: "new-section",
@@ -96,11 +110,18 @@ interface NavigationItem {
      return <NewSection />
    ```
 
-5. **Add card to HomeSection** (optional):
+5. **Add to SectionSettings** in `components/SectionSettings.tsx`:
    ```typescript
-   <button onClick={() => onNavigate("new-section")} className="glass ...">
-     ...
-   </button>
+   "new-section": { label: "New Section", icon: IconComponent, description: "..." }
+   ```
+
+6. **Add card to HomeSection** (optional):
+   ```typescript
+   {checkVisible("new-section") && (
+     <button onClick={() => onNavigate("new-section")} className="glass ...">
+       ...
+     </button>
+   )}
    ```
 
 ## State Management
@@ -118,7 +139,12 @@ interface NavigationItem {
 - Tooltips show labels when sidebar is collapsed
 - Keyboard navigation supported
 
-## File Location
+## File Locations
 
-- Main component: `app/page.tsx`
-- SidebarContent function: `app/page.tsx:121`
+| File | Purpose |
+|------|---------|
+| `app/page.tsx` | Main component, SidebarContent, HomeSection, SettingsSection |
+| `hooks/useSectionPreferences.ts` | Section visibility/order preferences hook |
+| `components/SectionSettings.tsx` | Settings UI for toggling/reordering sections |
+| `components/WorldClocks.tsx` | World clocks widget on Home page |
+| `app/sections/*.tsx` | Individual section components |

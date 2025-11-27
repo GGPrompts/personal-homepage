@@ -19,6 +19,8 @@ import {
   Settings,
   RotateCw,
   X,
+  Copy,
+  AppWindow,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -38,6 +40,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 import {
   Select,
   SelectContent,
@@ -624,33 +633,67 @@ export default function BookmarksSection({
               </button>
             ))}
             {visibleBookmarks.map((bookmark) => (
-              <a
-                key={bookmark.id}
-                href={bookmark.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                onContextMenu={(e) => {
-                  e.preventDefault()
-                  openEditBookmark(bookmark)
-                }}
-                className="group flex flex-col items-center p-3 rounded-lg hover:bg-primary/10 transition-colors"
-              >
-                <div className="h-12 w-12 flex items-center justify-center mb-1 rounded-lg bg-white/15">
-                  {bookmark.icon ? (
-                    <span className="text-2xl">{bookmark.icon}</span>
-                  ) : (
-                    <img
-                      src={getFaviconUrl(bookmark.url)}
-                      alt=""
-                      className="h-7 w-7"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none"
-                      }}
-                    />
-                  )}
-                </div>
-                <span className="text-xs text-center line-clamp-2">{bookmark.name}</span>
-              </a>
+              <ContextMenu key={bookmark.id}>
+                <ContextMenuTrigger asChild>
+                  <a
+                    href={bookmark.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex flex-col items-center p-3 rounded-lg hover:bg-primary/10 transition-colors"
+                  >
+                    <div className="h-12 w-12 flex items-center justify-center mb-1 rounded-lg bg-white/15">
+                      {bookmark.icon ? (
+                        <span className="text-2xl">{bookmark.icon}</span>
+                      ) : (
+                        <img
+                          src={getFaviconUrl(bookmark.url)}
+                          alt=""
+                          className="h-7 w-7"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none"
+                          }}
+                        />
+                      )}
+                    </div>
+                    <span className="text-xs text-center line-clamp-2">{bookmark.name}</span>
+                  </a>
+                </ContextMenuTrigger>
+                <ContextMenuContent className="w-48">
+                  <ContextMenuItem asChild>
+                    <a href={bookmark.url} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Open in New Tab
+                    </a>
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onClick={() => window.open(bookmark.url, '_blank', 'noopener,noreferrer')}
+                  >
+                    <AppWindow className="h-4 w-4 mr-2" />
+                    Open in New Window
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    onClick={() => {
+                      navigator.clipboard.writeText(bookmark.url)
+                    }}
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy Link
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem onClick={() => openEditBookmark(bookmark)}>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    className="text-destructive"
+                    onClick={() => setDeleteConfirm({ item: bookmark, type: "bookmark" })}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             ))}
           </div>
         ) : (
@@ -738,17 +781,30 @@ export default function BookmarksSection({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
+                    <DropdownMenuItem asChild>
+                      <a href={bookmark.url} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Open in New Tab
+                      </a>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => window.open(bookmark.url, '_blank', 'noopener,noreferrer')}
+                    >
+                      <AppWindow className="h-4 w-4 mr-2" />
+                      Open in New Window
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => navigator.clipboard.writeText(bookmark.url)}
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy Link
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => openEditBookmark(bookmark)}>
                       <Pencil className="h-4 w-4 mr-2" />
                       Edit
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <a href={bookmark.url} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Open
-                      </a>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-destructive"
                       onClick={() => setDeleteConfirm({ item: bookmark, type: "bookmark" })}

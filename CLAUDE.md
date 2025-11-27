@@ -1,6 +1,6 @@
 # Personal Homepage
 
-A personal dashboard/homepage with accordion sidebar navigation. Features weather, feeds, notes, bookmarks, stock trading, and more.
+A personal dashboard/homepage with accordion sidebar navigation. Features weather, feeds, notes, bookmarks, stock trading, tasks, world clocks, and more. Sections can be toggled on/off and reordered via Settings.
 
 ## Quick Reference
 
@@ -30,7 +30,7 @@ A personal dashboard/homepage with accordion sidebar navigation. Features weathe
 
 | Section | File | Description |
 |---------|------|-------------|
-| Home | `app/page.tsx` | Dashboard overview |
+| Home | `app/page.tsx` | Dashboard overview + World Clocks widget |
 | Weather | `app/sections/weather.tsx` | Weather + radar + alerts |
 | Daily Feed | `app/sections/daily-feed.tsx` | HN, GitHub, Reddit, etc. |
 | API Playground | `app/sections/api-playground.tsx` | HTTP request builder |
@@ -38,8 +38,10 @@ A personal dashboard/homepage with accordion sidebar navigation. Features weathe
 | Bookmarks | `app/sections/bookmarks.tsx` | Links manager (GitHub sync) |
 | Search Hub | `app/sections/search-hub.tsx` | Search + AI chat |
 | Paper Trading | `app/sections/stocks-dashboard.tsx` | Stock trading practice |
-| Profile | `app/sections/profile.tsx` | Auth, sync status, settings |
-| Settings | `app/page.tsx` (SettingsSection) | Theme/appearance |
+| Tasks | `app/sections/tasks.tsx` | Quick todo list (localStorage) |
+| Integrations | `app/sections/integrations.tsx` | Connected services status |
+| Profile | `app/sections/profile.tsx` | Auth, sync status |
+| Settings | `app/page.tsx` (SettingsSection) | Theme, sections, API keys |
 
 ## Tech Stack
 
@@ -82,3 +84,11 @@ See [docs/navigation.md](docs/navigation.md) for details.
 ### Hydration
 
 Add `suppressHydrationWarning` for dynamic time displays.
+
+### Section Preferences
+
+Sections can be hidden/shown and reordered via Settings → Sections:
+- `useSectionPreferences` hook in `hooks/useSectionPreferences.ts`
+- Preferences stored in localStorage (`section-preferences`)
+- Uses `DEFAULT_SECTION_ORDER` during SSR to prevent hydration mismatch
+- Pass `prefsLoaded` flag to components that need visibility checks
