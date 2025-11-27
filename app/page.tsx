@@ -51,6 +51,8 @@ import {
 } from "@/components/ui/tooltip"
 import { ThemeCustomizer } from "@/components/ThemeCustomizer"
 import { ThemeSettingsPanel } from "@/components/ThemeSettingsPanel"
+import { useAuth } from "@/components/AuthProvider"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 // Import page content components
 import WeatherDashboard from "./sections/weather"
@@ -198,6 +200,8 @@ function SidebarContent({
   collapsed = false,
   mobile = false,
   onNavigate,
+  userAvatar,
+  userName,
 }: {
   activeSection: Section
   setActiveSection: (section: Section) => void
@@ -208,6 +212,8 @@ function SidebarContent({
   collapsed?: boolean
   mobile?: boolean
   onNavigate?: () => void
+  userAvatar?: string | null
+  userName?: string | null
 }) {
   const handleSectionClick = (id: Section) => {
     // Navigate to section
@@ -245,10 +251,16 @@ function SidebarContent({
               <div className="h-10 w-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
                 <Home className="h-5 w-5 text-primary" />
               </div>
-              <div className={`transition-all duration-300 overflow-hidden ${collapsed && !mobile ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>
+              <div className={`flex-1 transition-all duration-300 overflow-hidden ${collapsed && !mobile ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>
                 <p className="font-semibold text-foreground">Personal Home</p>
                 <p className="text-xs text-muted-foreground">Dashboard</p>
               </div>
+              {userAvatar && !collapsed && (
+                <Avatar className="h-8 w-8 border border-primary/20 flex-shrink-0">
+                  <AvatarImage src={userAvatar} alt={userName || "User"} />
+                  <AvatarFallback>{userName?.charAt(0) || "U"}</AvatarFallback>
+                </Avatar>
+              )}
             </div>
           </button>
         </TooltipTrigger>
@@ -405,7 +417,7 @@ async function fetchHomeWeather(lat: number, lon: number, unit: "fahrenheit" | "
   }
 }
 
-function HomeSection({ onNavigate }: { onNavigate: (section: Section) => void }) {
+function HomeSection({ onNavigate, userName }: { onNavigate: (section: Section) => void; userName?: string | null }) {
   // Get saved location and temp unit from localStorage (same as Weather section)
   const [location, setLocation] = React.useState(() => {
     if (typeof window !== "undefined") {
@@ -467,7 +479,9 @@ function HomeSection({ onNavigate }: { onNavigate: (section: Section) => void })
 
   return (
     <div className="p-6">
-      <h1 className="text-3xl font-bold terminal-glow mb-2">Welcome Home</h1>
+      <h1 className="text-3xl font-bold terminal-glow mb-2">
+        Welcome Home{userName ? `, ${userName.split(' ')[0]}` : ''}
+      </h1>
       <p className="text-muted-foreground mb-8">Your personal dashboard overview</p>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -785,11 +799,16 @@ function SettingsSection({ activeSubItem, onSubItemHandled }: { activeSubItem?: 
 // ============================================================================
 
 export default function PersonalHomepage() {
+  const { user } = useAuth()
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
   const [activeSection, setActiveSection] = React.useState<Section>("home")
   const [expandedSection, setExpandedSection] = React.useState<Section | null>(null)
   const [activeSubItem, setActiveSubItem] = React.useState<string | null>(null)
+
+  // Get user info for personalization
+  const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.user_metadata?.user_name || null
+  const userAvatar = user?.user_metadata?.avatar_url || null
   const [weatherAlertCount, setWeatherAlertCount] = React.useState<number>(0)
 
   // Clear sub-item after scroll completes
@@ -801,7 +820,7 @@ export default function PersonalHomepage() {
   const renderContent = () => {
     switch (activeSection) {
       case "home":
-        return <HomeSection onNavigate={setActiveSection} />
+        return <HomeSection onNavigate={setActiveSection} userName={userName} />
       case "weather":
         return <WeatherDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onAlertCountChange={setWeatherAlertCount} />
       case "feed":
@@ -821,7 +840,7 @@ export default function PersonalHomepage() {
       case "settings":
         return <SettingsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       default:
-        return <HomeSection onNavigate={setActiveSection} />
+        return <HomeSection onNavigate={setActiveSection} userName={userName} />
     }
   }
 
@@ -853,6 +872,8 @@ export default function PersonalHomepage() {
               weatherAlertCount={weatherAlertCount}
               mobile
               onNavigate={() => setMobileMenuOpen(false)}
+              userAvatar={userAvatar}
+              userName={userName}
             />
           </SheetContent>
         </Sheet>
@@ -873,6 +894,8 @@ export default function PersonalHomepage() {
                 setActiveSubItem={setActiveSubItem}
                 weatherAlertCount={weatherAlertCount}
                 collapsed={sidebarCollapsed}
+                userAvatar={userAvatar}
+                userName={userName}
               />
             </aside>
 
