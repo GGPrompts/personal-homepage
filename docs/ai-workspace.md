@@ -14,6 +14,7 @@ This enables flexible workflows:
 - **Mobile (Termux)**: Web UI + Termux backend on same device (bypasses xterm.js/node-pty limitation)
 - **Remote**: Connect to home machine or phone via Tailscale
 - **Sensitive data**: Use local Docker models (never leaves your machine)
+- **Demo/Sharing**: Mock responses work without any backend configured
 
 ### Why Termux + Web UI?
 
@@ -384,19 +385,62 @@ hooks/
 - Suggested prompts for quick starts
 - Message actions (copy, regenerate, feedback)
 
-### Phase 2: Local Models
-- [ ] Docker Model Runner API integration
-- [ ] Model discovery and listing
-- [ ] Model selector UI
-- [ ] Unified streaming handler for both backends
+### Phase 2: Backend Integration ✅ COMPLETED
+- [x] Claude CLI integration (streaming via `--output-format stream-json`)
+- [x] Docker Model Runner API integration
+- [x] Model discovery and listing
+- [x] Model selector UI
+- [x] Unified streaming handler for all backends
+- [x] **Keep mock responses as fallback** - If no backend is configured, use mock responses so the UI remains functional for demos/sharing
 
-### Phase 3: Saved Prompts
+**Backend Infrastructure Completed:**
+- ✅ Backend detection system (`lib/ai/detect.ts`)
+- ✅ Claude CLI integration (`lib/ai/claude.ts`)
+- ✅ Docker Model Runner integration (`lib/ai/docker.ts`)
+- ✅ Mock backend always available (`lib/ai/mock.ts`)
+- ✅ Shared TypeScript types (`lib/ai/types.ts`)
+
+**API Routes Implemented:**
+- ✅ `/api/ai/models` - Lists available models from all backends
+- ✅ `/api/ai/chat` - Streaming chat endpoint with SSE
+
+**Frontend Features:**
+- ✅ Dynamic model selector with real-time detection
+- ✅ Backend status indicators (Available/Unavailable)
+- ✅ Streaming response parsing with Server-Sent Events
+- ✅ Automatic fallback to mock on errors
+- ✅ Error messages displayed in chat
+- ✅ Settings persistence (localStorage)
+
+**Fallback Chain:**
+1. Claude CLI (if available)
+2. Docker Model Runner (if localhost:12434 responds)
+3. Mock backend (always available)
+
+**Testing Status:**
+- ✅ Mock backend: Fully tested and working
+- ✅ Models API: Backend detection working
+- ⏸️ Claude CLI: Implementation complete, may need refinement for stream-json output
+- ⏸️ Docker: Ready but not tested (requires Docker Desktop + models)
+
+See `docs/ai-backend-integration-notes.md` for detailed implementation notes and troubleshooting.
+
+### Phase 3: Multi-Provider Support
+- [ ] Provider abstraction layer (unified interface for all backends)
+- [ ] GitHub Copilot integration
+- [ ] OpenAI / Codex integration
+- [ ] Google Gemini integration
+- [ ] Provider selector in UI (like OpenCode)
+- [ ] Per-provider settings (API keys, endpoints)
+- [ ] Remember last-used provider preference
+
+### Phase 4: Saved Prompts
 - [ ] Prompt CRUD operations
 - [ ] Prompt palette UI (⌘K)
 - [ ] Variable interpolation
 - [ ] GitHub sync for prompts
 
-### Phase 4: Polish
+### Phase 5: Polish
 - [ ] Conversation GitHub sync
 - [ ] Search/filter conversations
 - [ ] Export functionality

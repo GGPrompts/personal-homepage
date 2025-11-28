@@ -62,17 +62,24 @@ const SUGGESTED_PROMPTS = [
   { icon: CheckCheck, text: "Review my code for best practices", category: "Review" },
 ]
 
-const MODELS = [
-  { id: 'claude', name: 'Claude (Local)', description: 'Via CLI on this machine' },
-  { id: 'claude-termux', name: 'Claude (Termux)', description: 'Via phone' },
-  { id: 'docker-local', name: 'Docker Models', description: 'Local free models' },
-]
-
 const DEFAULT_SETTINGS: ChatSettings = {
-  model: 'claude',
+  model: 'mock', // Default to mock until we fetch real models
   temperature: 0.7,
   maxTokens: 2048,
   systemPrompt: 'You are a helpful AI coding assistant. Provide clear, concise answers with code examples when relevant.',
+}
+
+interface ModelInfo {
+  id: string
+  name: string
+  backend: 'claude' | 'docker' | 'mock'
+  description?: string
+}
+
+interface BackendStatus {
+  backend: string
+  available: boolean
+  error?: string
 }
 
 // Mock responses for demonstration
@@ -392,11 +399,51 @@ export default function AIWorkspaceSection({
   const [settings, setSettings] = React.useState<ChatSettings>(loadSettings)
   const [showSettings, setShowSettings] = React.useState(false)
   const [showSidebar, setShowSidebar] = React.useState(true)
+  const [availableModels, setAvailableModels] = React.useState<ModelInfo[]>([])
+  const [backends, setBackends] = React.useState<BackendStatus[]>([])
+  const [modelsLoading, setModelsLoading] = React.useState(true)
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
 
   const activeConv = conversations.find(c => c.id === activeConvId) || conversations[0]
+
+  // Fetch available models on mount
+  React.useEffect(() => {
+    async function fetchModels() {
+      try {
+        const response = await fetch('/api/ai/models')
+        const data = await response.json()
+
+        if (data.models) {
+          setAvailableModels(data.models)
+
+          // Set default model to first available (preferring non-mock)
+          const defaultModel = data.models.find((m: ModelInfo) => m.backend !== 'mock') || data.models[0]
+          if (defaultModel && !data.models.find((m: ModelInfo) => m.id === settings.model)) {
+            setSettings(prev => ({ ...prev, model: defaultModel.id }))
+          }
+        }
+
+        if (data.backends) {
+          setBackends(data.backends)
+        }
+      } catch (error) {
+        console.error('Failed to fetch models:', error)
+        // Fallback to mock
+        setAvailableModels([{
+          id: 'mock',
+          name: 'Mock AI (Demo)',
+          backend: 'mock',
+          description: 'Simulated responses'
+        }])
+      } finally {
+        setModelsLoading(false)
+      }
+    }
+
+    fetchModels()
+  }, [])
 
   // Save conversations to localStorage whenever they change
   React.useEffect(() => {
@@ -443,34 +490,6 @@ export default function AIWorkspaceSection({
     }
   }, [activeSubItem, onSubItemHandled])
 
-  // Simulate streaming response
-  const streamResponse = async (text: string, messageId: string) => {
-    setIsStreaming(true)
-    const words = text.split(' ')
-    let currentText = ''
-
-    for (let i = 0; i < words.length; i++) {
-      currentText += (i > 0 ? ' ' : '') + words[i]
-
-      setConversations(prev => prev.map(conv => {
-        if (conv.id !== activeConvId) return conv
-        return {
-          ...conv,
-          messages: conv.messages.map(msg =>
-            msg.id === messageId
-              ? { ...msg, content: currentText, isStreaming: i < words.length - 1 }
-              : msg
-          ),
-          updatedAt: new Date(),
-        }
-      }))
-
-      await new Promise(resolve => setTimeout(resolve, 30 + Math.random() * 70))
-    }
-
-    setIsStreaming(false)
-  }
-
   const sendMessage = async (content: string) => {
     if (!content.trim()) return
 
@@ -501,32 +520,160 @@ export default function AIWorkspaceSection({
     setInputValue('')
     setIsTyping(true)
 
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000))
+    // Prepare messages for API
+    const allMessages = activeConv.messages
+      .concat(userMessage)
+      .map(m => ({ role: m.role, content: m.content }))
 
-    setIsTyping(false)
-
-    // Add assistant message
-    const responseText = getResponseForPrompt(content)
-    const assistantMessage: Message = {
-      id: generateId(),
-      role: 'assistant',
-      content: '',
-      timestamp: new Date(),
-      isStreaming: true,
+    // Add system prompt if set
+    if (settings.systemPrompt) {
+      allMessages.unshift({
+        role: 'system',
+        content: settings.systemPrompt
+      })
     }
 
-    setConversations(prev => prev.map(conv => {
-      if (conv.id !== activeConvId) return conv
-      return {
-        ...conv,
-        messages: [...conv.messages, assistantMessage],
-        updatedAt: new Date(),
-      }
-    }))
+    // Determine backend from selected model
+    const selectedModel = availableModels.find(m => m.id === settings.model)
+    const backend = selectedModel?.backend || 'mock'
 
-    // Stream the response
-    await streamResponse(responseText, assistantMessage.id)
+    try {
+      // Call API with streaming
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: allMessages,
+          backend,
+          model: settings.model,
+          settings: {
+            temperature: settings.temperature,
+            maxTokens: settings.maxTokens,
+            systemPrompt: settings.systemPrompt
+          }
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`)
+      }
+
+      setIsTyping(false)
+
+      // Create assistant message
+      const assistantMessage: Message = {
+        id: generateId(),
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        isStreaming: true,
+      }
+
+      setConversations(prev => prev.map(conv => {
+        if (conv.id !== activeConvId) return conv
+        return {
+          ...conv,
+          messages: [...conv.messages, assistantMessage],
+          updatedAt: new Date(),
+        }
+      }))
+
+      setIsStreaming(true)
+
+      // Parse SSE stream
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+
+      if (!reader) {
+        throw new Error('No response body')
+      }
+
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+
+        // Process complete SSE events
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.trim() || !line.startsWith('data: ')) continue
+
+          const data = line.slice(6)
+
+          if (data === '[DONE]') {
+            setIsStreaming(false)
+            setConversations(prev => prev.map(conv => {
+              if (conv.id !== activeConvId) return conv
+              return {
+                ...conv,
+                messages: conv.messages.map(msg =>
+                  msg.id === assistantMessage.id
+                    ? { ...msg, isStreaming: false }
+                    : msg
+                ),
+              }
+            }))
+            break
+          }
+
+          try {
+            const chunk = JSON.parse(data)
+
+            if (chunk.error) {
+              console.error('Stream error:', chunk.error)
+              setIsStreaming(false)
+              break
+            }
+
+            if (chunk.content) {
+              setConversations(prev => prev.map(conv => {
+                if (conv.id !== activeConvId) return conv
+                return {
+                  ...conv,
+                  messages: conv.messages.map(msg =>
+                    msg.id === assistantMessage.id
+                      ? { ...msg, content: msg.content + chunk.content }
+                      : msg
+                  ),
+                  updatedAt: new Date(),
+                }
+              }))
+            }
+          } catch (error) {
+            console.error('Failed to parse SSE chunk:', data, error)
+          }
+        }
+      }
+
+      setIsStreaming(false)
+    } catch (error) {
+      console.error('Chat error:', error)
+      setIsTyping(false)
+      setIsStreaming(false)
+
+      // Show error message
+      const errorMessage: Message = {
+        id: generateId(),
+        role: 'assistant',
+        content: `❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}. Falling back to mock responses.`,
+        timestamp: new Date(),
+      }
+
+      setConversations(prev => prev.map(conv => {
+        if (conv.id !== activeConvId) return conv
+        return {
+          ...conv,
+          messages: [...conv.messages, errorMessage],
+          updatedAt: new Date(),
+        }
+      }))
+    }
   }
 
   const handleSend = () => {
@@ -721,7 +868,9 @@ export default function AIWorkspaceSection({
                 <h2 className="font-semibold terminal-glow truncate">{activeConv.title}</h2>
                 <p className="text-xs text-muted-foreground flex items-center gap-2">
                   <Cpu className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{MODELS.find(m => m.id === settings.model)?.name}</span>
+                  <span className="truncate">
+                    {availableModels.find(m => m.id === settings.model)?.name || 'Loading...'}
+                  </span>
                   <span className="opacity-50 hidden sm:inline">•</span>
                   <span className="hidden sm:inline">{totalTokens} / {settings.maxTokens} tokens</span>
                 </p>
@@ -906,24 +1055,45 @@ export default function AIWorkspaceSection({
               {/* Model Selection */}
               <div className="space-y-3">
                 <Label>Model</Label>
-                <Select
-                  value={settings.model}
-                  onValueChange={(value) => setSettings({ ...settings, model: value })}
-                >
-                  <SelectTrigger className="glass">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MODELS.map(model => (
-                      <SelectItem key={model.id} value={model.id}>
-                        <div className="flex flex-col items-start">
-                          <span className="font-medium">{model.name}</span>
-                          <span className="text-xs text-muted-foreground">{model.description}</span>
-                        </div>
-                      </SelectItem>
+                {modelsLoading ? (
+                  <div className="glass px-3 py-2 text-sm text-muted-foreground">
+                    Loading models...
+                  </div>
+                ) : (
+                  <Select
+                    value={settings.model}
+                    onValueChange={(value) => setSettings({ ...settings, model: value })}
+                  >
+                    <SelectTrigger className="glass">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableModels.map(model => (
+                        <SelectItem key={model.id} value={model.id}>
+                          <div className="flex flex-col items-start">
+                            <span className="font-medium">{model.name}</span>
+                            <span className="text-xs text-muted-foreground">{model.description}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {/* Backend Status */}
+                {backends.length > 0 && (
+                  <div className="space-y-2 pt-2">
+                    <p className="text-xs font-medium text-muted-foreground">Backend Status:</p>
+                    {backends.map(backend => (
+                      <div key={backend.backend} className="flex items-center justify-between text-xs">
+                        <span className="capitalize">{backend.backend}</span>
+                        <Badge variant={backend.available ? 'default' : 'secondary'} className="text-xs">
+                          {backend.available ? '✓ Available' : '✗ Unavailable'}
+                        </Badge>
+                      </div>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </div>
+                )}
               </div>
 
               {/* Temperature */}
