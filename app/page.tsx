@@ -40,6 +40,9 @@ import {
   LineChart,
   User,
   Link2,
+  FolderGit2,
+  Github,
+  Terminal,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -68,6 +71,7 @@ import SearchHubSection from "./sections/search-hub"
 import StocksDashboard from "./sections/stocks-dashboard"
 import ProfileSection from "./sections/profile"
 import TasksSection from "./sections/tasks"
+import ProjectsDashboard from "./sections/projects-dashboard"
 import IntegrationsSection from "./sections/integrations"
 
 // ============================================================================
@@ -178,6 +182,17 @@ const navigationItems: NavigationItem[] = [
     subItems: [
       { id: "pending", label: "To Do", icon: Clock },
       { id: "completed", label: "Completed", icon: CheckCircle2 },
+    ]
+  },
+  {
+    id: "projects",
+    label: "Projects",
+    icon: FolderGit2,
+    description: "GitHub & local repos",
+    subItems: [
+      { id: "all", label: "All Projects", icon: Grid },
+      { id: "github", label: "GitHub Repos", icon: Github },
+      { id: "local", label: "Local Projects", icon: Terminal },
     ]
   },
   {
@@ -691,6 +706,20 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded }: { onNavig
           </button>
         )}
 
+        {/* Projects Card */}
+        {checkVisible("projects") && (
+          <button
+            onClick={() => onNavigate("projects")}
+            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <FolderGit2 className="h-8 w-8 text-primary" />
+            </div>
+            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Projects</h3>
+            <p className="text-sm text-muted-foreground">GitHub & local repos</p>
+          </button>
+        )}
+
         {/* Integrations Card */}
         {checkVisible("integrations") && (
           <button
@@ -967,6 +996,8 @@ export default function PersonalHomepage() {
         return <StocksDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("settings")} />
       case "tasks":
         return <TasksSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "projects":
+        return <ProjectsDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "integrations":
         return <IntegrationsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSection={(section) => setActiveSection(section as Section)} />
       case "profile":

@@ -17,6 +17,7 @@ import {
   RotateCcw,
   Eye,
   EyeOff,
+  FolderGit2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -36,6 +37,7 @@ const sectionMeta: Record<ToggleableSection, { label: string; icon: React.Elemen
   search: { label: "Search Hub", icon: Search, description: "Search, AI & Image" },
   stocks: { label: "Paper Trading", icon: TrendingUp, description: "Practice stock trading" },
   tasks: { label: "Tasks", icon: CheckCircle2, description: "Quick todo list" },
+  projects: { label: "Projects", icon: FolderGit2, description: "GitHub & local repos" },
   integrations: { label: "Integrations", icon: Link2, description: "Connected services" },
   profile: { label: "Profile", icon: User, description: "Account & sync" },
 }
