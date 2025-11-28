@@ -830,10 +830,15 @@ export default function BookmarksSection({
                         <Terminal className="h-5 w-5 text-emerald-400" />
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="min-w-0 w-48 lg:w-64 flex-shrink-0">
                       <p className="font-medium truncate">{bookmark.name}</p>
                       <p className="text-xs text-muted-foreground truncate font-mono">{bookmark.command}</p>
                     </div>
+                    {bookmark.workingDir && (
+                      <p className="text-xs text-muted-foreground hidden lg:block flex-1 truncate font-mono">
+                        {bookmark.workingDir}
+                      </p>
+                    )}
                     {terminalAvailable && (
                       <Play className="h-4 w-4 text-emerald-400 flex-shrink-0" />
                     )}
@@ -859,12 +864,12 @@ export default function BookmarksSection({
                         />
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="min-w-0 w-48 lg:w-64 flex-shrink-0">
                       <p className="font-medium truncate">{bookmark.name}</p>
                       <p className="text-xs text-muted-foreground truncate">{getDomain(bookmark.url)}</p>
                     </div>
                     {bookmark.description && (
-                      <p className="text-xs text-muted-foreground hidden lg:block max-w-[200px] truncate">
+                      <p className="text-xs text-muted-foreground hidden lg:block flex-1 truncate">
                         {bookmark.description}
                       </p>
                     )}
