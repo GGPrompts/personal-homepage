@@ -29,6 +29,7 @@ interface TimezoneInfo {
 }
 
 const POPULAR_TIMEZONES: TimezoneInfo[] = [
+  { id: "UTC", label: "UTC", city: "UTC", offset: "UTC+0" },
   { id: "America/New_York", label: "Eastern", city: "New York", offset: "EST/EDT" },
   { id: "America/Chicago", label: "Central", city: "Chicago", offset: "CST/CDT" },
   { id: "America/Denver", label: "Mountain", city: "Denver", offset: "MST/MDT" },
