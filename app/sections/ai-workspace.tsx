@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useAuth } from "@/components/AuthProvider"
 import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -257,9 +258,10 @@ interface MessageBubbleProps {
   onCopy: () => void
   onRegenerate: () => void
   onFeedback: (type: 'up' | 'down') => void
+  userAvatarUrl?: string | null
 }
 
-function MessageBubble({ message, onCopy, onRegenerate, onFeedback }: MessageBubbleProps) {
+function MessageBubble({ message, onCopy, onRegenerate, onFeedback, userAvatarUrl }: MessageBubbleProps) {
   const [showActions, setShowActions] = React.useState(false)
   const [copied, setCopied] = React.useState(false)
 
@@ -342,6 +344,7 @@ function MessageBubble({ message, onCopy, onRegenerate, onFeedback }: MessageBub
     >
       {/* Hide avatars on mobile */}
       <Avatar className="h-8 w-8 border-2 border-primary/20 hidden sm:flex">
+        {isUser && userAvatarUrl && <AvatarImage src={userAvatarUrl} alt="You" />}
         <AvatarFallback className={isUser ? 'bg-primary/20' : 'bg-secondary/20'}>
           {isUser ? <User className="h-4 w-4 text-primary" /> : <Bot className="h-4 w-4 text-secondary" />}
         </AvatarFallback>
@@ -453,6 +456,10 @@ export default function AIWorkspaceSection({
   activeSubItem?: string | null
   onSubItemHandled?: () => void
 }) {
+  // Auth for user avatar
+  const { user } = useAuth()
+  const userAvatarUrl = user?.user_metadata?.avatar_url || null
+
   // State management
   const [conversations, setConversations] = React.useState<Conversation[]>(loadConversations)
   const [activeConvId, setActiveConvId] = React.useState(() => {
@@ -1095,6 +1102,7 @@ export default function AIWorkspaceSection({
                       onCopy={() => {}}
                       onRegenerate={handleRegenerate}
                       onFeedback={(type) => handleFeedback(message.id, type)}
+                      userAvatarUrl={userAvatarUrl}
                     />
                   ))}
 
