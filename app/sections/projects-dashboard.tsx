@@ -32,6 +32,8 @@ import {
   FolderOpen,
   X,
   Info,
+  Pin,
+  PinOff,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -60,6 +62,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { useAuth } from "@/components/AuthProvider"
 import { AuthModal } from "@/components/AuthModal"
 import { useTerminalExtension } from "@/hooks/useTerminalExtension"
@@ -71,6 +79,7 @@ import {
   type GitHubRepo,
   type LocalProject,
 } from "@/lib/projects"
+import { useAllProjectsMeta } from "@/hooks/useProjectMeta"
 
 // ============================================================================
 // HELPER COMPONENTS
@@ -116,6 +125,7 @@ export default function ProjectsDashboard({
 }) {
   const { user, getGitHubToken } = useAuth()
   const { available: terminalAvailable, runCommand } = useTerminalExtension()
+  const { isPinned, togglePinned, isConfigured: metaConfigured, isSyncing: metaSyncing } = useAllProjectsMeta()
   const [showAuthModal, setShowAuthModal] = React.useState(false)
 
   // Table state
@@ -192,7 +202,7 @@ export default function ProjectsDashboard({
     return Array.from(techs).sort()
   }, [projects])
 
-  // Filter projects
+  // Filter and sort projects (pinned first)
   const filteredProjects = React.useMemo(() => {
     let filtered = projects
 
@@ -204,6 +214,7 @@ export default function ProjectsDashboard({
         if (statusFilter === "local") return p.source === "local"
         if (statusFilter === "dirty") return p.local?.git?.status === "dirty"
         if (statusFilter === "archived") return p.github?.archived
+        if (statusFilter === "pinned") return isPinned(p.slug)
         return true
       })
     }
@@ -215,8 +226,15 @@ export default function ProjectsDashboard({
       )
     }
 
-    return filtered
-  }, [projects, statusFilter, techFilter])
+    // Sort pinned projects to top (stable sort)
+    return [...filtered].sort((a, b) => {
+      const aPinned = isPinned(a.slug)
+      const bPinned = isPinned(b.slug)
+      if (aPinned && !bPinned) return -1
+      if (!aPinned && bPinned) return 1
+      return 0
+    })
+  }, [projects, statusFilter, techFilter, isPinned])
 
   // Table columns
   const columns = React.useMemo<ColumnDef<Project>[]>(
@@ -227,9 +245,14 @@ export default function ProjectsDashboard({
         cell: ({ row }) => {
           const project = row.original
           const badge = getStatusBadge(project)
+          const pinned = isPinned(project.slug)
           return (
             <div className="flex items-center gap-2">
-              <FolderGit2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              {pinned ? (
+                <Pin className="h-4 w-4 text-amber-500 flex-shrink-0" />
+              ) : (
+                <FolderGit2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              )}
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <Link
@@ -375,8 +398,34 @@ export default function ProjectsDashboard({
         header: "Actions",
         cell: ({ row }) => {
           const project = row.original
+          const pinned = isPinned(project.slug)
           return (
             <div className="flex items-center gap-1">
+              {/* Pin/Unpin - only if meta is configured */}
+              {metaConfigured && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => togglePinned(project.slug)}
+                        disabled={metaSyncing}
+                      >
+                        {pinned ? (
+                          <PinOff className="h-4 w-4 text-amber-500" />
+                        ) : (
+                          <Pin className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {pinned ? "Unpin project" : "Pin to top"}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
               {/* Terminal - only if local */}
               {project.local && terminalAvailable && (
                 <Button
@@ -457,7 +506,7 @@ export default function ProjectsDashboard({
         },
       },
     ],
-    [terminalAvailable, runCommand]
+    [terminalAvailable, runCommand, isPinned, togglePinned, metaConfigured, metaSyncing]
   )
 
   // TanStack Table instance
@@ -565,6 +614,7 @@ export default function ProjectsDashboard({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="pinned">Pinned</SelectItem>
             <SelectItem value="cloned">Cloned</SelectItem>
             <SelectItem value="remote">Remote Only</SelectItem>
             <SelectItem value="local">Local Only</SelectItem>

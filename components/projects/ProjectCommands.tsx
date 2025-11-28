@@ -9,7 +9,10 @@ import {
   Trash2,
   Pencil,
   Check,
-  X,
+  Cloud,
+  CloudOff,
+  Loader2,
+  AlertCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,16 +33,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { useTerminalExtension } from "@/hooks/useTerminalExtension"
-import { type Project } from "@/lib/projects"
-
-interface ProjectCommand {
-  id: string
-  name: string
-  command: string
-  description?: string
-  category: "dev" | "build" | "test" | "deploy" | "custom"
-}
+import { type Project, type ProjectCommand } from "@/lib/projects"
+import { useProjectMeta } from "@/hooks/useProjectMeta"
 
 interface ProjectCommandsProps {
   project: Project
@@ -53,11 +55,8 @@ const CATEGORY_COLORS: Record<string, string> = {
   custom: "bg-gray-500/20 text-gray-400 border-gray-500/30",
 }
 
-function getStorageKey(slug: string): string {
-  return `project-commands-${slug}`
-}
-
-function getDefaultCommands(scripts: string[] | undefined): ProjectCommand[] {
+// Generate npm script commands from package.json scripts
+function getNpmCommands(scripts: string[] | undefined): ProjectCommand[] {
   if (!scripts) return []
 
   const categoryMap: Record<string, ProjectCommand["category"]> = {
@@ -84,7 +83,17 @@ function getDefaultCommands(scripts: string[] | undefined): ProjectCommand[] {
 
 export default function ProjectCommands({ project }: ProjectCommandsProps) {
   const { available: terminalAvailable, runCommand } = useTerminalExtension()
-  const [customCommands, setCustomCommands] = React.useState<ProjectCommand[]>([])
+  const {
+    meta,
+    isLoading,
+    isSyncing,
+    syncStatus,
+    addCommand,
+    updateCommand,
+    deleteCommand,
+  } = useProjectMeta(project.slug)
+
+  const customCommands = meta.commands
   const [addDialogOpen, setAddDialogOpen] = React.useState(false)
   const [editingCommand, setEditingCommand] = React.useState<ProjectCommand | null>(null)
   const [copiedId, setCopiedId] = React.useState<string | null>(null)
@@ -95,26 +104,8 @@ export default function ProjectCommands({ project }: ProjectCommandsProps) {
   const [formDescription, setFormDescription] = React.useState("")
   const [formCategory, setFormCategory] = React.useState<ProjectCommand["category"]>("custom")
 
-  // Load custom commands from localStorage
-  React.useEffect(() => {
-    const stored = localStorage.getItem(getStorageKey(project.slug))
-    if (stored) {
-      try {
-        setCustomCommands(JSON.parse(stored))
-      } catch {
-        setCustomCommands([])
-      }
-    }
-  }, [project.slug])
-
-  // Save custom commands to localStorage
-  const saveCommands = (commands: ProjectCommand[]) => {
-    setCustomCommands(commands)
-    localStorage.setItem(getStorageKey(project.slug), JSON.stringify(commands))
-  }
-
   // Get all commands (npm scripts + custom)
-  const npmCommands = getDefaultCommands(project.local?.scripts)
+  const npmCommands = getNpmCommands(project.local?.scripts)
   const allCommands = [...npmCommands, ...customCommands]
 
   // Group commands by category
@@ -141,38 +132,30 @@ export default function ProjectCommands({ project }: ProjectCommandsProps) {
   }
 
   const handleAddCommand = () => {
-    const newCommand: ProjectCommand = {
-      id: `custom-${Date.now()}`,
+    addCommand({
       name: formName,
       command: formCommand,
       description: formDescription || undefined,
       category: formCategory,
-    }
-    saveCommands([...customCommands, newCommand])
+    })
     resetForm()
     setAddDialogOpen(false)
   }
 
   const handleUpdateCommand = () => {
     if (!editingCommand) return
-    const updated = customCommands.map((cmd) =>
-      cmd.id === editingCommand.id
-        ? {
-            ...cmd,
-            name: formName,
-            command: formCommand,
-            description: formDescription || undefined,
-            category: formCategory,
-          }
-        : cmd
-    )
-    saveCommands(updated)
+    updateCommand(editingCommand.id, {
+      name: formName,
+      command: formCommand,
+      description: formDescription || undefined,
+      category: formCategory,
+    })
     resetForm()
     setAddDialogOpen(false)
   }
 
   const handleDeleteCommand = (id: string) => {
-    saveCommands(customCommands.filter((cmd) => cmd.id !== id))
+    deleteCommand(id)
   }
 
   const openEditDialog = (command: ProjectCommand) => {
@@ -200,6 +183,64 @@ export default function ProjectCommands({ project }: ProjectCommandsProps) {
 
   const canRun = terminalAvailable && project.local?.path
 
+  // Sync status icon
+  const SyncStatusIcon = () => {
+    switch (syncStatus) {
+      case "synced":
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Cloud className="h-4 w-4 text-emerald-500" />
+              </TooltipTrigger>
+              <TooltipContent>Custom commands synced to GitHub</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )
+      case "syncing":
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+              </TooltipTrigger>
+              <TooltipContent>Syncing...</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )
+      case "error":
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <AlertCircle className="h-4 w-4 text-destructive" />
+              </TooltipTrigger>
+              <TooltipContent>Sync error</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )
+      case "offline":
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <CloudOff className="h-4 w-4 text-muted-foreground" />
+              </TooltipTrigger>
+              <TooltipContent>Offline (stored locally)</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[200px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -210,10 +251,13 @@ export default function ProjectCommands({ project }: ProjectCommandsProps) {
             Run terminal commands for this project
           </p>
         </div>
-        <Button size="sm" onClick={() => { resetForm(); setAddDialogOpen(true) }}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Command
-        </Button>
+        <div className="flex items-center gap-2">
+          <SyncStatusIcon />
+          <Button size="sm" onClick={() => { resetForm(); setAddDialogOpen(true) }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Command
+          </Button>
+        </div>
       </div>
 
       {/* No local path warning */}
@@ -309,6 +353,7 @@ export default function ProjectCommands({ project }: ProjectCommandsProps) {
                             className="h-8 w-8 opacity-0 group-hover:opacity-100 text-destructive"
                             onClick={() => handleDeleteCommand(cmd.id)}
                             title="Delete command"
+                            disabled={isSyncing}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -397,9 +442,18 @@ export default function ProjectCommands({ project }: ProjectCommandsProps) {
             </Button>
             <Button
               onClick={editingCommand ? handleUpdateCommand : handleAddCommand}
-              disabled={!formName || !formCommand}
+              disabled={!formName || !formCommand || isSyncing}
             >
-              {editingCommand ? "Save Changes" : "Add Command"}
+              {isSyncing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : editingCommand ? (
+                "Save Changes"
+              ) : (
+                "Add Command"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

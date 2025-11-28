@@ -12,6 +12,10 @@ import {
   Palette,
   Server,
   MoreHorizontal,
+  Cloud,
+  CloudOff,
+  Loader2,
+  AlertCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -38,15 +42,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { type Project } from "@/lib/projects"
-
-interface ProjectLink {
-  id: string
-  name: string
-  url: string
-  type: "docs" | "deploy" | "design" | "api" | "other"
-  icon?: string
-}
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { type Project, type ProjectLink } from "@/lib/projects"
+import { useProjectMeta } from "@/hooks/useProjectMeta"
 
 interface ProjectLinksProps {
   project: Project
@@ -59,10 +62,6 @@ const LINK_TYPES: { id: ProjectLink["type"]; label: string; icon: React.ReactNod
   { id: "api", label: "API", icon: <Server className="h-4 w-4" />, color: "text-amber-400" },
   { id: "other", label: "Other", icon: <LinkIcon className="h-4 w-4" />, color: "text-gray-400" },
 ]
-
-function getStorageKey(slug: string): string {
-  return `project-links-${slug}`
-}
 
 function getFaviconUrl(url: string): string {
   try {
@@ -82,7 +81,17 @@ function getDomain(url: string): string {
 }
 
 export default function ProjectLinks({ project }: ProjectLinksProps) {
-  const [links, setLinks] = React.useState<ProjectLink[]>([])
+  const {
+    meta,
+    isLoading,
+    isSyncing,
+    syncStatus,
+    addLink,
+    updateLink,
+    deleteLink,
+  } = useProjectMeta(project.slug)
+
+  const links = meta.links
   const [addDialogOpen, setAddDialogOpen] = React.useState(false)
   const [editingLink, setEditingLink] = React.useState<ProjectLink | null>(null)
   const [deleteConfirm, setDeleteConfirm] = React.useState<ProjectLink | null>(null)
@@ -93,24 +102,6 @@ export default function ProjectLinks({ project }: ProjectLinksProps) {
   const [formType, setFormType] = React.useState<ProjectLink["type"]>("other")
   const [formIcon, setFormIcon] = React.useState("")
 
-  // Load links from localStorage
-  React.useEffect(() => {
-    const stored = localStorage.getItem(getStorageKey(project.slug))
-    if (stored) {
-      try {
-        setLinks(JSON.parse(stored))
-      } catch {
-        setLinks([])
-      }
-    }
-  }, [project.slug])
-
-  // Save links to localStorage
-  const saveLinks = (newLinks: ProjectLink[]) => {
-    setLinks(newLinks)
-    localStorage.setItem(getStorageKey(project.slug), JSON.stringify(newLinks))
-  }
-
   const resetForm = () => {
     setFormName("")
     setFormUrl("")
@@ -120,38 +111,30 @@ export default function ProjectLinks({ project }: ProjectLinksProps) {
   }
 
   const handleAddLink = () => {
-    const newLink: ProjectLink = {
-      id: `link-${Date.now()}`,
+    addLink({
       name: formName,
       url: formUrl.startsWith("http") ? formUrl : `https://${formUrl}`,
       type: formType,
       icon: formIcon || undefined,
-    }
-    saveLinks([...links, newLink])
+    })
     resetForm()
     setAddDialogOpen(false)
   }
 
   const handleUpdateLink = () => {
     if (!editingLink) return
-    const updated = links.map((link) =>
-      link.id === editingLink.id
-        ? {
-            ...link,
-            name: formName,
-            url: formUrl.startsWith("http") ? formUrl : `https://${formUrl}`,
-            type: formType,
-            icon: formIcon || undefined,
-          }
-        : link
-    )
-    saveLinks(updated)
+    updateLink(editingLink.id, {
+      name: formName,
+      url: formUrl.startsWith("http") ? formUrl : `https://${formUrl}`,
+      type: formType,
+      icon: formIcon || undefined,
+    })
     resetForm()
     setAddDialogOpen(false)
   }
 
   const handleDeleteLink = (linkId: string) => {
-    saveLinks(links.filter((l) => l.id !== linkId))
+    deleteLink(linkId)
     setDeleteConfirm(null)
   }
 
@@ -164,17 +147,70 @@ export default function ProjectLinks({ project }: ProjectLinksProps) {
     setAddDialogOpen(true)
   }
 
-  // Group links by type
-  const groupedLinks = React.useMemo(() => {
-    const groups: Record<string, ProjectLink[]> = {}
-    LINK_TYPES.forEach((type) => {
-      groups[type.id] = links.filter((l) => l.type === type.id)
-    })
-    return groups
-  }, [links])
-
   const getLinkTypeInfo = (type: ProjectLink["type"]) => {
     return LINK_TYPES.find((t) => t.id === type) || LINK_TYPES[4]
+  }
+
+  const handleQuickAdd = (name: string, url: string, type: ProjectLink["type"]) => {
+    addLink({ name, url, type })
+  }
+
+  // Sync status icon
+  const SyncStatusIcon = () => {
+    switch (syncStatus) {
+      case "synced":
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Cloud className="h-4 w-4 text-emerald-500" />
+              </TooltipTrigger>
+              <TooltipContent>Links synced to GitHub</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )
+      case "syncing":
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+              </TooltipTrigger>
+              <TooltipContent>Syncing...</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )
+      case "error":
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <AlertCircle className="h-4 w-4 text-destructive" />
+              </TooltipTrigger>
+              <TooltipContent>Sync error</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )
+      case "offline":
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <CloudOff className="h-4 w-4 text-muted-foreground" />
+              </TooltipTrigger>
+              <TooltipContent>Offline (stored locally)</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[200px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (
@@ -187,10 +223,13 @@ export default function ProjectLinks({ project }: ProjectLinksProps) {
             Project-related bookmarks and resources
           </p>
         </div>
-        <Button size="sm" onClick={() => { resetForm(); setAddDialogOpen(true) }}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Link
-        </Button>
+        <div className="flex items-center gap-2">
+          <SyncStatusIcon />
+          <Button size="sm" onClick={() => { resetForm(); setAddDialogOpen(true) }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Link
+          </Button>
+        </div>
       </div>
 
       {/* Links Grid */}
@@ -308,45 +347,24 @@ export default function ProjectLinks({ project }: ProjectLinksProps) {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  const newLink: ProjectLink = {
-                    id: `link-${Date.now()}`,
-                    name: "GitHub Issues",
-                    url: `${project.github!.html_url}/issues`,
-                    type: "other",
-                  }
-                  saveLinks([...links, newLink])
-                }}
+                onClick={() => handleQuickAdd("GitHub Issues", `${project.github!.html_url}/issues`, "other")}
+                disabled={isSyncing}
               >
                 GitHub Issues
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  const newLink: ProjectLink = {
-                    id: `link-${Date.now()}`,
-                    name: "Pull Requests",
-                    url: `${project.github!.html_url}/pulls`,
-                    type: "other",
-                  }
-                  saveLinks([...links, newLink])
-                }}
+                onClick={() => handleQuickAdd("Pull Requests", `${project.github!.html_url}/pulls`, "other")}
+                disabled={isSyncing}
               >
                 Pull Requests
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  const newLink: ProjectLink = {
-                    id: `link-${Date.now()}`,
-                    name: "Actions",
-                    url: `${project.github!.html_url}/actions`,
-                    type: "deploy",
-                  }
-                  saveLinks([...links, newLink])
-                }}
+                onClick={() => handleQuickAdd("Actions", `${project.github!.html_url}/actions`, "deploy")}
+                disabled={isSyncing}
               >
                 Actions
               </Button>
@@ -421,9 +439,18 @@ export default function ProjectLinks({ project }: ProjectLinksProps) {
             </Button>
             <Button
               onClick={editingLink ? handleUpdateLink : handleAddLink}
-              disabled={!formName || !formUrl}
+              disabled={!formName || !formUrl || isSyncing}
             >
-              {editingLink ? "Save Changes" : "Add Link"}
+              {isSyncing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : editingLink ? (
+                "Save Changes"
+              ) : (
+                "Add Link"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -445,8 +472,9 @@ export default function ProjectLinks({ project }: ProjectLinksProps) {
             <Button
               variant="destructive"
               onClick={() => deleteConfirm && handleDeleteLink(deleteConfirm.id)}
+              disabled={isSyncing}
             >
-              Delete
+              {isSyncing ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

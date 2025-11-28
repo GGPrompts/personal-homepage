@@ -8,6 +8,11 @@ import {
   CheckCircle2,
   Circle,
   Clock,
+  Cloud,
+  CloudOff,
+  Loader2,
+  AlertCircle,
+  Upload,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,16 +26,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { type Project } from "@/lib/projects"
-
-interface ProjectTask {
-  id: string
-  title: string
-  description?: string
-  status: "todo" | "in-progress" | "done"
-  createdAt: string
-  updatedAt: string
-}
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { type Project, type ProjectTask } from "@/lib/projects"
+import { useProjectMeta } from "@/hooks/useProjectMeta"
 
 interface ProjectKanbanProps {
   project: Project
@@ -42,40 +45,41 @@ const COLUMNS: { id: ProjectTask["status"]; title: string; icon: React.ReactNode
   { id: "done", title: "Done", icon: <CheckCircle2 className="h-4 w-4" />, color: "border-t-emerald-500" },
 ]
 
-function getStorageKey(slug: string): string {
-  return `project-tasks-${slug}`
-}
-
 export default function ProjectKanban({ project }: ProjectKanbanProps) {
-  const [tasks, setTasks] = React.useState<ProjectTask[]>([])
+  const {
+    meta,
+    isLoading,
+    isSyncing,
+    syncStatus,
+    isConfigured,
+    addTask,
+    updateTask,
+    deleteTask,
+    moveTask,
+    migrateFromLocalStorage,
+    hasLocalStorageData,
+  } = useProjectMeta(project.slug)
+
+  const tasks = meta.tasks
+
   const [addDialogOpen, setAddDialogOpen] = React.useState(false)
   const [addToColumn, setAddToColumn] = React.useState<ProjectTask["status"]>("todo")
   const [editingTask, setEditingTask] = React.useState<ProjectTask | null>(null)
   const [deleteConfirm, setDeleteConfirm] = React.useState<ProjectTask | null>(null)
   const [draggedTask, setDraggedTask] = React.useState<ProjectTask | null>(null)
   const [dragOverColumn, setDragOverColumn] = React.useState<ProjectTask["status"] | null>(null)
+  const [showMigrationDialog, setShowMigrationDialog] = React.useState(false)
 
   // Form state
   const [formTitle, setFormTitle] = React.useState("")
   const [formDescription, setFormDescription] = React.useState("")
 
-  // Load tasks from localStorage
+  // Check for migration on mount
   React.useEffect(() => {
-    const stored = localStorage.getItem(getStorageKey(project.slug))
-    if (stored) {
-      try {
-        setTasks(JSON.parse(stored))
-      } catch {
-        setTasks([])
-      }
+    if (isConfigured && hasLocalStorageData && !isLoading) {
+      setShowMigrationDialog(true)
     }
-  }, [project.slug])
-
-  // Save tasks to localStorage
-  const saveTasks = (newTasks: ProjectTask[]) => {
-    setTasks(newTasks)
-    localStorage.setItem(getStorageKey(project.slug), JSON.stringify(newTasks))
-  }
+  }, [isConfigured, hasLocalStorageData, isLoading])
 
   const resetForm = () => {
     setFormTitle("")
@@ -84,48 +88,28 @@ export default function ProjectKanban({ project }: ProjectKanbanProps) {
   }
 
   const handleAddTask = () => {
-    const newTask: ProjectTask = {
-      id: `task-${Date.now()}`,
+    addTask({
       title: formTitle,
       description: formDescription || undefined,
       status: addToColumn,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-    saveTasks([...tasks, newTask])
+    })
     resetForm()
     setAddDialogOpen(false)
   }
 
   const handleUpdateTask = () => {
     if (!editingTask) return
-    const updated = tasks.map((task) =>
-      task.id === editingTask.id
-        ? {
-            ...task,
-            title: formTitle,
-            description: formDescription || undefined,
-            updatedAt: new Date().toISOString(),
-          }
-        : task
-    )
-    saveTasks(updated)
+    updateTask(editingTask.id, {
+      title: formTitle,
+      description: formDescription || undefined,
+    })
     resetForm()
     setAddDialogOpen(false)
   }
 
   const handleDeleteTask = (taskId: string) => {
-    saveTasks(tasks.filter((t) => t.id !== taskId))
+    deleteTask(taskId)
     setDeleteConfirm(null)
-  }
-
-  const moveTask = (taskId: string, newStatus: ProjectTask["status"]) => {
-    const updated = tasks.map((task) =>
-      task.id === taskId
-        ? { ...task, status: newStatus, updatedAt: new Date().toISOString() }
-        : task
-    )
-    saveTasks(updated)
   }
 
   const openAddDialog = (column: ProjectTask["status"]) => {
@@ -147,7 +131,6 @@ export default function ProjectKanban({ project }: ProjectKanbanProps) {
     setDraggedTask(task)
     e.dataTransfer.effectAllowed = "move"
     e.dataTransfer.setData("text/plain", task.id)
-    // Add a slight delay to allow the drag image to be created
     setTimeout(() => {
       const element = document.getElementById(`task-${task.id}`)
       if (element) {
@@ -156,7 +139,7 @@ export default function ProjectKanban({ project }: ProjectKanbanProps) {
     }, 0)
   }
 
-  const handleDragEnd = (e: React.DragEvent) => {
+  const handleDragEnd = () => {
     if (draggedTask) {
       const element = document.getElementById(`task-${draggedTask.id}`)
       if (element) {
@@ -174,7 +157,6 @@ export default function ProjectKanban({ project }: ProjectKanbanProps) {
   }
 
   const handleDragLeave = (e: React.DragEvent) => {
-    // Only clear if we're actually leaving the column
     const relatedTarget = e.relatedTarget as HTMLElement
     if (!relatedTarget?.closest("[data-column]")) {
       setDragOverColumn(null)
@@ -190,9 +172,71 @@ export default function ProjectKanban({ project }: ProjectKanbanProps) {
     setDragOverColumn(null)
   }
 
-  // Get tasks for each column
   const getColumnTasks = (status: ProjectTask["status"]) => {
     return tasks.filter((t) => t.status === status)
+  }
+
+  const handleMigrate = async () => {
+    await migrateFromLocalStorage()
+    setShowMigrationDialog(false)
+  }
+
+  // Sync status icon
+  const SyncStatusIcon = () => {
+    switch (syncStatus) {
+      case "synced":
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Cloud className="h-4 w-4 text-emerald-500" />
+              </TooltipTrigger>
+              <TooltipContent>Synced to GitHub</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )
+      case "syncing":
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+              </TooltipTrigger>
+              <TooltipContent>Syncing...</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )
+      case "error":
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <AlertCircle className="h-4 w-4 text-destructive" />
+              </TooltipTrigger>
+              <TooltipContent>Sync error</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )
+      case "offline":
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <CloudOff className="h-4 w-4 text-muted-foreground" />
+              </TooltipTrigger>
+              <TooltipContent>Offline (stored locally)</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[200px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (
@@ -205,8 +249,11 @@ export default function ProjectKanban({ project }: ProjectKanbanProps) {
             Track tasks for this project
           </p>
         </div>
-        <div className="text-sm text-muted-foreground">
-          {tasks.length} task{tasks.length !== 1 ? "s" : ""}
+        <div className="flex items-center gap-2">
+          <SyncStatusIcon />
+          <span className="text-sm text-muted-foreground">
+            {tasks.length} task{tasks.length !== 1 ? "s" : ""}
+          </span>
         </div>
       </div>
 
@@ -345,9 +392,18 @@ export default function ProjectKanban({ project }: ProjectKanbanProps) {
             </Button>
             <Button
               onClick={editingTask ? handleUpdateTask : handleAddTask}
-              disabled={!formTitle.trim()}
+              disabled={!formTitle.trim() || isSyncing}
             >
-              {editingTask ? "Save Changes" : "Add Task"}
+              {isSyncing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : editingTask ? (
+                "Save Changes"
+              ) : (
+                "Add Task"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -369,8 +425,39 @@ export default function ProjectKanban({ project }: ProjectKanbanProps) {
             <Button
               variant="destructive"
               onClick={() => deleteConfirm && handleDeleteTask(deleteConfirm.id)}
+              disabled={isSyncing}
             >
-              Delete
+              {isSyncing ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Migration Dialog */}
+      <Dialog open={showMigrationDialog} onOpenChange={setShowMigrationDialog}>
+        <DialogContent className="glass">
+          <DialogHeader>
+            <DialogTitle>Migrate Local Data</DialogTitle>
+            <DialogDescription>
+              You have tasks stored locally for this project. Would you like to sync them to GitHub for cross-device access?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMigrationDialog(false)}>
+              Keep Local
+            </Button>
+            <Button onClick={handleMigrate} disabled={isSyncing}>
+              {isSyncing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Migrating...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Sync to GitHub
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

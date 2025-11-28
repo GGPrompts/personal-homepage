@@ -4,6 +4,64 @@
 // TYPES
 // ============================================================================
 
+// Task type for Kanban board
+export interface ProjectTask {
+  id: string
+  title: string
+  description?: string
+  status: "todo" | "in-progress" | "done"
+  createdAt: string
+  updatedAt: string
+}
+
+// Link type for project bookmarks
+export interface ProjectLink {
+  id: string
+  name: string
+  url: string
+  type: "docs" | "deploy" | "design" | "api" | "other"
+  icon?: string
+}
+
+// Command type for terminal shortcuts
+export interface ProjectCommand {
+  id: string
+  name: string
+  command: string
+  description?: string
+  category: "dev" | "build" | "test" | "deploy" | "custom"
+}
+
+// Metadata for a single project (stored in sync repo)
+export interface ProjectMeta {
+  pinned: boolean
+  tasks: ProjectTask[]
+  links: ProjectLink[]
+  commands: ProjectCommand[]
+}
+
+// Full metadata file structure
+export interface ProjectsMetaFile {
+  version: 1
+  projects: Record<string, ProjectMeta>  // keyed by project slug
+  updatedAt: string
+}
+
+// Default empty metadata for a project
+export const DEFAULT_PROJECT_META: ProjectMeta = {
+  pinned: false,
+  tasks: [],
+  links: [],
+  commands: [],
+}
+
+// Default empty metadata file
+export const DEFAULT_PROJECTS_META: ProjectsMetaFile = {
+  version: 1,
+  projects: {},
+  updatedAt: new Date().toISOString(),
+}
+
 export interface GitHubRepo {
   id: number
   name: string

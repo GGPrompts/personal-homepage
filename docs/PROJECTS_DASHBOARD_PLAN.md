@@ -7,7 +7,7 @@
 | Phase 1: Core Infrastructure | ✅ Complete | API routes, types, basic table |
 | Phase 2: Main Dashboard View | ✅ Complete | TanStack Table, filters, actions |
 | Phase 3: Project Detail View | ✅ Complete | Route, tabs, overview, commands, kanban, links |
-| Phase 4: Data Persistence | ⏳ Pending | Sync repo integration |
+| Phase 4: Data Persistence | ✅ Complete | Sync repo, pinned projects, migration |
 
 ### What's Been Built (Phase 1 & 2)
 
@@ -61,6 +61,35 @@
 - Project name in table links to detail page
 - Info icon button in actions column
 - Back button returns to dashboard
+
+### What's Been Built (Phase 4)
+
+**API Route:**
+- `GET/PUT /api/projects/meta` - Read/write projects-meta.json to sync repo
+
+**Types (`lib/projects.ts`):**
+- `ProjectTask`, `ProjectLink`, `ProjectCommand` - Shared types
+- `ProjectMeta` - Per-project metadata (pinned, tasks, links, commands)
+- `ProjectsMetaFile` - Full metadata file structure
+
+**Hook (`hooks/useProjectMeta.ts`):**
+- `useProjectMeta(slug)` - Project-specific metadata with CRUD operations
+- `useAllProjectsMeta()` - Dashboard-level metadata for pinned status
+- Optimistic updates for snappy UX
+- localStorage fallback when not authenticated
+- Migration from localStorage to sync repo
+
+**Updated Components:**
+- `ProjectKanban.tsx` - Uses sync hook, shows sync status, migration dialog
+- `ProjectCommands.tsx` - Syncs custom commands (npm scripts still local)
+- `ProjectLinks.tsx` - Syncs project links
+- `projects-dashboard.tsx` - Pin/unpin button, pinned filter, pinned projects sorted to top
+
+**Features:**
+- Sync status indicator (cloud icon) on each tab
+- Pin/unpin projects in dashboard (appear at top)
+- "Pinned" status filter option
+- Migration dialog prompts user to sync localStorage data
 
 ---
 
@@ -412,7 +441,7 @@ app/
 │       ├── local/
 │       │   └── route.ts          # ✅ Scan local projects
 │       └── meta/
-│           └── route.ts          # ⏳ Read/write projects-meta.json
+│           └── route.ts          # ✅ Read/write projects-meta.json
 ├── projects/
 │   ├── layout.tsx                # ✅ Back navigation layout
 │   └── [slug]/
@@ -421,10 +450,12 @@ app/
 │   └── projects-dashboard.tsx    # ✅ Main dashboard section (table view)
 components/
 ├── projects/
-│   ├── ProjectKanban.tsx         # ✅ Kanban board component
-│   ├── ProjectLinks.tsx          # ✅ Links management
-│   ├── ProjectCommands.tsx       # ✅ Commands management
+│   ├── ProjectKanban.tsx         # ✅ Kanban board component (synced)
+│   ├── ProjectLinks.tsx          # ✅ Links management (synced)
+│   ├── ProjectCommands.tsx       # ✅ Commands management (synced)
 │   └── ProjectOverview.tsx       # ✅ Overview tab content
+hooks/
+└── useProjectMeta.ts             # ✅ Project metadata sync hook
 lib/
 └── projects.ts                   # ✅ Types, helpers, merge logic
 ```
@@ -455,16 +486,18 @@ lib/
 17. [x] Implement Kanban tab with drag-drop
 18. [x] Implement Links tab
 
-### Phase 4: Data Persistence (Pending)
-19. [ ] Create `/api/projects/meta/route.ts` for sync repo
-20. [ ] localStorage persistence for tasks/links
-21. [ ] Pinned projects functionality
-22. [ ] Cross-device sync via GitHub repo
+### Phase 4: Data Persistence ✅
+19. [x] Create `/api/projects/meta/route.ts` for sync repo
+20. [x] localStorage fallback for tasks/links
+21. [x] Pinned projects functionality
+22. [x] Cross-device sync via GitHub repo
+23. [x] Migration from localStorage to sync repo
+24. [x] Sync status indicators
 
 ### Polish (Pending)
-23. [ ] Mobile responsive design improvements
-24. [ ] Column visibility toggle
-25. [ ] Documentation
+25. [ ] Mobile responsive design improvements
+26. [ ] Column visibility toggle
+27. [ ] Documentation
 
 ---
 
