@@ -21,6 +21,8 @@ import {
   X,
   Copy,
   AppWindow,
+  Terminal,
+  Play,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -57,6 +59,7 @@ import {
 import { getFile, saveFile, type GitHubError } from "@/lib/github"
 import { useAuth } from "@/components/AuthProvider"
 import { AuthModal } from "@/components/AuthModal"
+import { useTerminalExtension } from "@/hooks/useTerminalExtension"
 import { Github, User } from "lucide-react"
 
 // ============================================================================
@@ -71,6 +74,10 @@ interface BookmarkItem {
   icon?: string
   description?: string
   createdAt: string
+  // Terminal integration
+  type?: "link" | "terminal"
+  command?: string
+  workingDir?: string
 }
 
 interface FolderItem {
@@ -152,6 +159,7 @@ export default function BookmarksSection({
 }) {
   const queryClient = useQueryClient()
   const { user, getGitHubToken } = useAuth()
+  const { available: terminalAvailable, runCommand } = useTerminalExtension()
 
   // GitHub config
   const [token, setToken] = React.useState<string | null>(null)
@@ -187,6 +195,9 @@ export default function BookmarksSection({
   const [formDescription, setFormDescription] = React.useState("")
   const [formFolderId, setFormFolderId] = React.useState<string>("root")
   const [formIcon, setFormIcon] = React.useState("")
+  const [formType, setFormType] = React.useState<"link" | "terminal">("link")
+  const [formCommand, setFormCommand] = React.useState("")
+  const [formWorkingDir, setFormWorkingDir] = React.useState("")
 
   // Load token from auth, repo from localStorage
   React.useEffect(() => {
@@ -321,11 +332,14 @@ export default function BookmarksSection({
     const newBookmark: BookmarkItem = {
       id: generateId(),
       name: formName,
-      url: formUrl.startsWith("http") ? formUrl : `https://${formUrl}`,
+      url: formType === "terminal" ? `terminal://${formCommand}` : (formUrl.startsWith("http") ? formUrl : `https://${formUrl}`),
       folderId: formFolderId === "root" ? null : formFolderId,
       description: formDescription || undefined,
       icon: formIcon || undefined,
       createdAt: new Date().toISOString(),
+      type: formType,
+      command: formType === "terminal" ? formCommand : undefined,
+      workingDir: formType === "terminal" && formWorkingDir ? formWorkingDir : undefined,
     }
     const newData = { ...data, bookmarks: [...data.bookmarks, newBookmark] }
     saveMutation.mutate(newData)
@@ -353,10 +367,13 @@ export default function BookmarksSection({
         ? {
             ...b,
             name: formName,
-            url: formUrl.startsWith("http") ? formUrl : `https://${formUrl}`,
+            url: formType === "terminal" ? `terminal://${formCommand}` : (formUrl.startsWith("http") ? formUrl : `https://${formUrl}`),
             folderId: formFolderId === "root" ? null : formFolderId,
             description: formDescription || undefined,
             icon: formIcon || undefined,
+            type: formType,
+            command: formType === "terminal" ? formCommand : undefined,
+            workingDir: formType === "terminal" && formWorkingDir ? formWorkingDir : undefined,
           }
         : b
     )
@@ -413,16 +430,22 @@ export default function BookmarksSection({
     setFormDescription("")
     setFormFolderId(currentFolderId || "root")
     setFormIcon("")
+    setFormType("link")
+    setFormCommand("")
+    setFormWorkingDir("")
   }
 
   const openEditBookmark = (bookmark: BookmarkItem) => {
     setEditItem(bookmark)
     setEditType("bookmark")
     setFormName(bookmark.name)
-    setFormUrl(bookmark.url)
+    setFormUrl(bookmark.type === "terminal" ? "" : bookmark.url)
     setFormDescription(bookmark.description || "")
     setFormFolderId(bookmark.folderId || "root")
     setFormIcon(bookmark.icon || "")
+    setFormType(bookmark.type || "link")
+    setFormCommand(bookmark.command || "")
+    setFormWorkingDir(bookmark.workingDir || "")
   }
 
   const openEditFolder = (folder: FolderItem) => {
@@ -635,51 +658,98 @@ export default function BookmarksSection({
             {visibleBookmarks.map((bookmark) => (
               <ContextMenu key={bookmark.id}>
                 <ContextMenuTrigger asChild>
-                  <a
-                    href={bookmark.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group flex flex-col items-center p-3 rounded-lg hover:bg-primary/10 transition-colors"
-                  >
-                    <div className="h-12 w-12 flex items-center justify-center mb-1 rounded-lg bg-white/15">
-                      {bookmark.icon ? (
-                        <span className="text-2xl">{bookmark.icon}</span>
-                      ) : (
-                        <img
-                          src={getFaviconUrl(bookmark.url)}
-                          alt=""
-                          className="h-7 w-7"
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none"
-                          }}
-                        />
+                  {bookmark.type === "terminal" ? (
+                    <button
+                      onClick={() => {
+                        if (terminalAvailable && bookmark.command) {
+                          runCommand(bookmark.command, { workingDir: bookmark.workingDir, name: bookmark.name })
+                        }
+                      }}
+                      className="group flex flex-col items-center p-3 rounded-lg hover:bg-primary/10 transition-colors"
+                    >
+                      <div className="h-12 w-12 flex items-center justify-center mb-1 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
+                        {bookmark.icon ? (
+                          <span className="text-2xl">{bookmark.icon}</span>
+                        ) : (
+                          <Terminal className="h-6 w-6 text-emerald-400" />
+                        )}
+                      </div>
+                      <span className="text-xs text-center line-clamp-2">{bookmark.name}</span>
+                      {terminalAvailable && (
+                        <Play className="h-3 w-3 text-emerald-400 mt-0.5" />
                       )}
-                    </div>
-                    <span className="text-xs text-center line-clamp-2">{bookmark.name}</span>
-                  </a>
+                    </button>
+                  ) : (
+                    <a
+                      href={bookmark.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex flex-col items-center p-3 rounded-lg hover:bg-primary/10 transition-colors"
+                    >
+                      <div className="h-12 w-12 flex items-center justify-center mb-1 rounded-lg bg-white/15">
+                        {bookmark.icon ? (
+                          <span className="text-2xl">{bookmark.icon}</span>
+                        ) : (
+                          <img
+                            src={getFaviconUrl(bookmark.url)}
+                            alt=""
+                            className="h-7 w-7"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none"
+                            }}
+                          />
+                        )}
+                      </div>
+                      <span className="text-xs text-center line-clamp-2">{bookmark.name}</span>
+                    </a>
+                  )}
                 </ContextMenuTrigger>
                 <ContextMenuContent className="w-48">
-                  <ContextMenuItem asChild>
-                    <a href={bookmark.url} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      Open in New Tab
-                    </a>
-                  </ContextMenuItem>
-                  <ContextMenuItem
-                    onClick={() => window.open(bookmark.url, '_blank', 'noopener,noreferrer')}
-                  >
-                    <AppWindow className="h-4 w-4 mr-2" />
-                    Open in New Window
-                  </ContextMenuItem>
-                  <ContextMenuSeparator />
-                  <ContextMenuItem
-                    onClick={() => {
-                      navigator.clipboard.writeText(bookmark.url)
-                    }}
-                  >
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copy Link
-                  </ContextMenuItem>
+                  {bookmark.type === "terminal" ? (
+                    <>
+                      {terminalAvailable && bookmark.command && (
+                        <ContextMenuItem
+                          onClick={() => runCommand(bookmark.command!, { workingDir: bookmark.workingDir, name: bookmark.name })}
+                        >
+                          <Play className="h-4 w-4 mr-2" />
+                          Run in Terminal
+                        </ContextMenuItem>
+                      )}
+                      <ContextMenuItem
+                        onClick={() => navigator.clipboard.writeText(bookmark.command || "")}
+                      >
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy Command
+                      </ContextMenuItem>
+                      {!terminalAvailable && (
+                        <ContextMenuItem disabled className="text-muted-foreground text-xs">
+                          Terminal extension not detected
+                        </ContextMenuItem>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <ContextMenuItem asChild>
+                        <a href={bookmark.url} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Open in New Tab
+                        </a>
+                      </ContextMenuItem>
+                      <ContextMenuItem
+                        onClick={() => window.open(bookmark.url, '_blank', 'noopener,noreferrer')}
+                      >
+                        <AppWindow className="h-4 w-4 mr-2" />
+                        Open in New Window
+                      </ContextMenuItem>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem
+                        onClick={() => navigator.clipboard.writeText(bookmark.url)}
+                      >
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy Link
+                      </ContextMenuItem>
+                    </>
+                  )}
                   <ContextMenuSeparator />
                   <ContextMenuItem onClick={() => openEditBookmark(bookmark)}>
                     <Pencil className="h-4 w-4 mr-2" />
@@ -744,36 +814,62 @@ export default function BookmarksSection({
                 key={bookmark.id}
                 className="flex items-center gap-3 p-2 rounded-lg hover:bg-primary/10 transition-colors group"
               >
-                <a
-                  href={bookmark.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 flex-1 min-w-0"
-                >
-                  <div className="h-8 w-8 flex items-center justify-center flex-shrink-0 rounded-md bg-white/15">
-                    {bookmark.icon ? (
-                      <span className="text-lg">{bookmark.icon}</span>
-                    ) : (
-                      <img
-                        src={getFaviconUrl(bookmark.url)}
-                        alt=""
-                        className="h-5 w-5"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none"
-                        }}
-                      />
+                {bookmark.type === "terminal" ? (
+                  <button
+                    onClick={() => {
+                      if (terminalAvailable && bookmark.command) {
+                        runCommand(bookmark.command, { workingDir: bookmark.workingDir, name: bookmark.name })
+                      }
+                    }}
+                    className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                  >
+                    <div className="h-8 w-8 flex items-center justify-center flex-shrink-0 rounded-md bg-emerald-500/20 border border-emerald-500/30">
+                      {bookmark.icon ? (
+                        <span className="text-lg">{bookmark.icon}</span>
+                      ) : (
+                        <Terminal className="h-5 w-5 text-emerald-400" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{bookmark.name}</p>
+                      <p className="text-xs text-muted-foreground truncate font-mono">{bookmark.command}</p>
+                    </div>
+                    {terminalAvailable && (
+                      <Play className="h-4 w-4 text-emerald-400 flex-shrink-0" />
                     )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{bookmark.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{getDomain(bookmark.url)}</p>
-                  </div>
-                  {bookmark.description && (
-                    <p className="text-xs text-muted-foreground hidden lg:block max-w-[200px] truncate">
-                      {bookmark.description}
-                    </p>
-                  )}
-                </a>
+                  </button>
+                ) : (
+                  <a
+                    href={bookmark.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 flex-1 min-w-0"
+                  >
+                    <div className="h-8 w-8 flex items-center justify-center flex-shrink-0 rounded-md bg-white/15">
+                      {bookmark.icon ? (
+                        <span className="text-lg">{bookmark.icon}</span>
+                      ) : (
+                        <img
+                          src={getFaviconUrl(bookmark.url)}
+                          alt=""
+                          className="h-5 w-5"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none"
+                          }}
+                        />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{bookmark.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{getDomain(bookmark.url)}</p>
+                    </div>
+                    {bookmark.description && (
+                      <p className="text-xs text-muted-foreground hidden lg:block max-w-[200px] truncate">
+                        {bookmark.description}
+                      </p>
+                    )}
+                  </a>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100">
@@ -781,25 +877,46 @@ export default function BookmarksSection({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
-                    <DropdownMenuItem asChild>
-                      <a href={bookmark.url} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Open in New Tab
-                      </a>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => window.open(bookmark.url, '_blank', 'noopener,noreferrer')}
-                    >
-                      <AppWindow className="h-4 w-4 mr-2" />
-                      Open in New Window
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => navigator.clipboard.writeText(bookmark.url)}
-                    >
-                      <Copy className="h-4 w-4 mr-2" />
-                      Copy Link
-                    </DropdownMenuItem>
+                    {bookmark.type === "terminal" ? (
+                      <>
+                        {terminalAvailable && bookmark.command && (
+                          <DropdownMenuItem
+                            onClick={() => runCommand(bookmark.command!, { workingDir: bookmark.workingDir, name: bookmark.name })}
+                          >
+                            <Play className="h-4 w-4 mr-2" />
+                            Run in Terminal
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem
+                          onClick={() => navigator.clipboard.writeText(bookmark.command || "")}
+                        >
+                          <Copy className="h-4 w-4 mr-2" />
+                          Copy Command
+                        </DropdownMenuItem>
+                      </>
+                    ) : (
+                      <>
+                        <DropdownMenuItem asChild>
+                          <a href={bookmark.url} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            Open in New Tab
+                          </a>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => window.open(bookmark.url, '_blank', 'noopener,noreferrer')}
+                        >
+                          <AppWindow className="h-4 w-4 mr-2" />
+                          Open in New Window
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => navigator.clipboard.writeText(bookmark.url)}
+                        >
+                          <Copy className="h-4 w-4 mr-2" />
+                          Copy Link
+                        </DropdownMenuItem>
+                      </>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => openEditBookmark(bookmark)}>
                       <Pencil className="h-4 w-4 mr-2" />
@@ -825,25 +942,74 @@ export default function BookmarksSection({
         <DialogContent className="glass">
           <DialogHeader>
             <DialogTitle>Add Bookmark</DialogTitle>
-            <DialogDescription>Add a new bookmark to your collection</DialogDescription>
+            <DialogDescription>Add a new bookmark or terminal command</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Type selector */}
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Type</label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={formType === "link" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFormType("link")}
+                  className="flex-1"
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Link
+                </Button>
+                <Button
+                  type="button"
+                  variant={formType === "terminal" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFormType("terminal")}
+                  className="flex-1"
+                >
+                  <Terminal className="h-4 w-4 mr-2" />
+                  Terminal
+                </Button>
+              </div>
+            </div>
             <div>
               <label className="text-sm font-medium mb-1.5 block">Name</label>
               <Input
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
-                placeholder="My Website"
+                placeholder={formType === "terminal" ? "LazyGit" : "My Website"}
               />
             </div>
-            <div>
-              <label className="text-sm font-medium mb-1.5 block">URL</label>
-              <Input
-                value={formUrl}
-                onChange={(e) => setFormUrl(e.target.value)}
-                placeholder="https://example.com"
-              />
-            </div>
+            {formType === "link" ? (
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">URL</label>
+                <Input
+                  value={formUrl}
+                  onChange={(e) => setFormUrl(e.target.value)}
+                  placeholder="https://example.com"
+                />
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Command</label>
+                  <Input
+                    value={formCommand}
+                    onChange={(e) => setFormCommand(e.target.value)}
+                    placeholder="lazygit"
+                    className="font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Working Directory (optional)</label>
+                  <Input
+                    value={formWorkingDir}
+                    onChange={(e) => setFormWorkingDir(e.target.value)}
+                    placeholder="~/projects/my-project"
+                    className="font-mono"
+                  />
+                </div>
+              </>
+            )}
             <div>
               <label className="text-sm font-medium mb-1.5 block">Folder</label>
               <Select value={formFolderId} onValueChange={setFormFolderId}>
@@ -873,15 +1039,18 @@ export default function BookmarksSection({
               <Input
                 value={formIcon}
                 onChange={(e) => setFormIcon(e.target.value)}
-                placeholder="🌐"
+                placeholder={formType === "terminal" ? "🖥️" : "🌐"}
                 className="w-20"
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddBookmarkOpen(false)}>Cancel</Button>
-            <Button onClick={addBookmark} disabled={!formName || !formUrl || saveMutation.isPending}>
-              {saveMutation.isPending ? "Saving..." : "Add Bookmark"}
+            <Button
+              onClick={addBookmark}
+              disabled={!formName || (formType === "link" ? !formUrl : !formCommand) || saveMutation.isPending}
+            >
+              {saveMutation.isPending ? "Saving..." : formType === "terminal" ? "Add Command" : "Add Bookmark"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -954,13 +1123,60 @@ export default function BookmarksSection({
             </div>
             {editType === "bookmark" && (
               <>
+                {/* Type selector */}
                 <div>
-                  <label className="text-sm font-medium mb-1.5 block">URL</label>
-                  <Input
-                    value={formUrl}
-                    onChange={(e) => setFormUrl(e.target.value)}
-                  />
+                  <label className="text-sm font-medium mb-1.5 block">Type</label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={formType === "link" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setFormType("link")}
+                      className="flex-1"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Link
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={formType === "terminal" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setFormType("terminal")}
+                      className="flex-1"
+                    >
+                      <Terminal className="h-4 w-4 mr-2" />
+                      Terminal
+                    </Button>
+                  </div>
                 </div>
+                {formType === "link" ? (
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">URL</label>
+                    <Input
+                      value={formUrl}
+                      onChange={(e) => setFormUrl(e.target.value)}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">Command</label>
+                      <Input
+                        value={formCommand}
+                        onChange={(e) => setFormCommand(e.target.value)}
+                        className="font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">Working Directory (optional)</label>
+                      <Input
+                        value={formWorkingDir}
+                        onChange={(e) => setFormWorkingDir(e.target.value)}
+                        className="font-mono"
+                      />
+                    </div>
+                  </>
+                )}
                 <div>
                   <label className="text-sm font-medium mb-1.5 block">Description</label>
                   <Input
