@@ -11,7 +11,6 @@ import {
   Youtube,
   MessageSquare,
   ArrowRight,
-  Command,
   Sparkles,
   Bot,
   Zap,
@@ -361,8 +360,8 @@ export default function SearchHubSection({
       // Only handle when input is focused
       if (document.activeElement !== inputRef.current) return
 
-      // Cmd/Ctrl + number to select engine
-      if ((e.metaKey || e.ctrlKey) && e.key >= "1" && e.key <= "9") {
+      // Alt + number to select engine (avoids Win key and Ctrl+num browser conflicts)
+      if (e.altKey && !e.ctrlKey && !e.metaKey && e.key >= "1" && e.key <= "9") {
         e.preventDefault()
         const index = parseInt(e.key) - 1
         if (currentEngines[index]) {
@@ -566,9 +565,8 @@ export default function SearchHubSection({
                     {engine.copyPrompt && (
                       <Clipboard className="h-3 w-3 opacity-50 hidden sm:block" />
                     )}
-                    <kbd className="ml-1 text-[10px] opacity-50 font-mono hidden sm:inline-flex items-center">
-                      <Command className="h-2.5 w-2.5" />
-                      {index + 1}
+                    <kbd className="ml-1 text-[10px] opacity-50 font-mono hidden sm:inline-flex items-center gap-0.5">
+                      Alt+{index + 1}
                     </kbd>
                   </button>
                 )
@@ -591,7 +589,7 @@ export default function SearchHubSection({
           <ul className="text-sm text-muted-foreground space-y-1.5">
             <li className="flex items-center gap-2">
               <Badge variant="outline" className="text-[10px] font-mono">
-                <Command className="h-2.5 w-2.5 mr-0.5" />1-{currentEngines.length}
+                Alt+1-{currentEngines.length}
               </Badge>
               <span>Switch between {
                 activeCategory === "ai" ? "AI assistants" :

@@ -10,6 +10,7 @@ A personal dashboard/homepage with accordion sidebar navigation. Features weathe
 | Styling/themes | [docs/design-system.md](docs/design-system.md) |
 | Authentication | [docs/auth.md](docs/auth.md) |
 | State management | [docs/state-management.md](docs/state-management.md) |
+| Terminal bookmarks | [docs/terminal-integration.md](docs/terminal-integration.md) |
 
 ## Documentation
 
@@ -22,6 +23,7 @@ A personal dashboard/homepage with accordion sidebar navigation. Features weathe
 | [docs/api-playground.md](docs/api-playground.md) | HTTP client features |
 | [docs/quick-notes.md](docs/quick-notes.md) | GitHub-synced markdown editor |
 | [docs/stocks-dashboard.md](docs/stocks-dashboard.md) | Paper trading, Finnhub/Alpha Vantage |
+| [docs/terminal-integration.md](docs/terminal-integration.md) | Chrome extension terminal bookmarks |
 | [docs/design-system.md](docs/design-system.md) | Themes, glassmorphism, backgrounds |
 | [docs/state-management.md](docs/state-management.md) | TanStack Query, caching |
 | [docs/roadmap.md](docs/roadmap.md) | Planned features |
@@ -35,7 +37,7 @@ A personal dashboard/homepage with accordion sidebar navigation. Features weathe
 | Daily Feed | `app/sections/daily-feed.tsx` | HN, GitHub, Reddit, etc. |
 | API Playground | `app/sections/api-playground.tsx` | HTTP request builder |
 | Quick Notes | `app/sections/quick-notes.tsx` | Markdown editor (GitHub sync) |
-| Bookmarks | `app/sections/bookmarks.tsx` | Links manager (GitHub sync) |
+| Bookmarks | `app/sections/bookmarks.tsx` | Links + terminal commands (GitHub sync) |
 | Search Hub | `app/sections/search-hub.tsx` | Search + AI chat |
 | Paper Trading | `app/sections/stocks-dashboard.tsx` | Stock trading practice |
 | Tasks | `app/sections/tasks.tsx` | Quick todo list (localStorage) |

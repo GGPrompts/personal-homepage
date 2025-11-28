@@ -14,14 +14,18 @@ import {
   User,
   ExternalLink,
   Loader2,
+  Terminal,
+  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { useAuth } from "@/components/AuthProvider"
 import { AuthModal } from "@/components/AuthModal"
 import { RepoSelector } from "@/components/RepoSelector"
+import { useTerminalExtension } from "@/hooks/useTerminalExtension"
 
 interface SyncStatus {
   lastSync: string | null
@@ -31,6 +35,7 @@ interface SyncStatus {
 
 export default function ProfileSection() {
   const { user, loading, signOut, getGitHubToken, isConfigured } = useAuth()
+  const { available: terminalAvailable, version: terminalVersion, extensionId, setExtensionId, clearExtensionId } = useTerminalExtension()
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const [notesRepo, setNotesRepo] = useState(
@@ -40,6 +45,8 @@ export default function ProfileSection() {
     () => typeof window !== "undefined" ? localStorage.getItem("github-bookmarks-repo") || "" : ""
   )
   const [token, setToken] = useState<string | null>(null)
+  const [terminalIdInput, setTerminalIdInput] = useState("")
+  const [terminalIdError, setTerminalIdError] = useState<string | null>(null)
 
   // Load token when user is available
   useEffect(() => {
@@ -122,6 +129,17 @@ export default function ProfileSection() {
   const handleBookmarksRepoChange = (repo: string) => {
     setBookmarksRepo(repo)
     localStorage.setItem("github-bookmarks-repo", repo)
+  }
+
+  const handleTerminalIdSubmit = async () => {
+    if (!terminalIdInput.trim()) return
+    setTerminalIdError(null)
+    const success = await setExtensionId(terminalIdInput.trim())
+    if (success) {
+      setTerminalIdInput("")
+    } else {
+      setTerminalIdError("Extension not found or not responding. Check the ID and ensure the extension is installed.")
+    }
   }
 
   const notesStatus = getNotesStatus()
@@ -366,6 +384,68 @@ export default function ProfileSection() {
               Where your bookmarks.json is stored
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Terminal Extension */}
+      <div className="glass rounded-xl p-6">
+        <h3 className="font-semibold mb-4 flex items-center gap-2">
+          <Terminal className="h-5 w-5 text-emerald-400" />
+          Terminal Extension
+        </h3>
+        <div className="space-y-4">
+          {terminalAvailable ? (
+            <div className="flex items-center justify-between p-3 glass-dark rounded-lg">
+              <div className="flex items-center gap-3">
+                <Terminal className="h-5 w-5 text-emerald-400" />
+                <div>
+                  <p className="font-medium">TabzChrome Extension</p>
+                  <p className="text-xs text-muted-foreground font-mono">
+                    {extensionId?.slice(0, 8)}...{extensionId?.slice(-8)}
+                    {terminalVersion && ` • v${terminalVersion}`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="bg-emerald-500/20 text-emerald-400">
+                  Connected
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  onClick={clearExtensionId}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <Label className="text-sm mb-2 block">Extension ID</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={terminalIdInput}
+                  onChange={(e) => {
+                    setTerminalIdInput(e.target.value)
+                    setTerminalIdError(null)
+                  }}
+                  placeholder="e.g., abcdefghijklmnopqrstuvwxyz123456"
+                  className="font-mono text-sm"
+                />
+                <Button onClick={handleTerminalIdSubmit} disabled={!terminalIdInput.trim()}>
+                  Connect
+                </Button>
+              </div>
+              {terminalIdError && (
+                <p className="text-xs text-destructive mt-2">{terminalIdError}</p>
+              )}
+              <p className="text-xs text-muted-foreground mt-2">
+                Find your extension ID at <code className="bg-muted px-1 rounded">chrome://extensions</code> with Developer mode enabled.
+                Required for terminal bookmarks.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
