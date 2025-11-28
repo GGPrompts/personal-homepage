@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 
 // Section IDs that can be toggled (excluding home and settings which are always visible)
-export type ToggleableSection = "weather" | "feed" | "api-playground" | "notes" | "bookmarks" | "search" | "stocks" | "tasks" | "projects" | "integrations" | "profile"
+export type ToggleableSection = "weather" | "feed" | "api-playground" | "notes" | "bookmarks" | "search" | "stocks" | "tasks" | "projects" | "integrations" | "profile" | "ai-workspace"
 
 // All sections including non-toggleable ones
 export type Section = "home" | ToggleableSection | "settings"
@@ -16,6 +16,7 @@ export const DEFAULT_SECTION_ORDER: ToggleableSection[] = [
   "notes",
   "bookmarks",
   "search",
+  "ai-workspace",
   "stocks",
   "tasks",
   "projects",
@@ -31,6 +32,7 @@ export const DEFAULT_VISIBILITY: Record<ToggleableSection, boolean> = {
   notes: true,
   bookmarks: true,
   search: true,
+  "ai-workspace": true,
   stocks: true,
   tasks: true,
   projects: true,
@@ -54,11 +56,26 @@ function loadPreferences(): SectionPreferences {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
       const parsed = JSON.parse(saved)
-      // Merge with defaults in case new sections are added
-      return {
-        visibility: { ...DEFAULT_VISIBILITY, ...parsed.visibility },
-        order: parsed.order?.length ? parsed.order : DEFAULT_SECTION_ORDER,
+
+      // Merge visibility with defaults (new sections get default visibility)
+      const visibility = { ...DEFAULT_VISIBILITY, ...parsed.visibility }
+
+      // Merge order: keep saved order but append any new sections at the end
+      let order: ToggleableSection[] = []
+      if (parsed.order?.length) {
+        // Start with saved order
+        order = [...parsed.order]
+        // Add any new sections that aren't in saved order
+        for (const section of DEFAULT_SECTION_ORDER) {
+          if (!order.includes(section)) {
+            order.push(section)
+          }
+        }
+      } else {
+        order = DEFAULT_SECTION_ORDER
       }
+
+      return { visibility, order }
     }
   } catch {
     // Invalid JSON, use defaults

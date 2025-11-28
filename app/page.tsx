@@ -43,6 +43,7 @@ import {
   FolderGit2,
   Github,
   Terminal,
+  MessageSquare,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -68,6 +69,7 @@ import ApiPlaygroundSection from "./sections/api-playground"
 import QuickNotesSection from "./sections/quick-notes"
 import BookmarksSection from "./sections/bookmarks"
 import SearchHubSection from "./sections/search-hub"
+import AIWorkspaceSection from "./sections/ai-workspace"
 import StocksDashboard from "./sections/stocks-dashboard"
 import ProfileSection from "./sections/profile"
 import TasksSection from "./sections/tasks"
@@ -161,6 +163,16 @@ const navigationItems: NavigationItem[] = [
       { id: "search", label: "Search", icon: Globe },
       { id: "ai", label: "AI Chat", icon: Zap },
       { id: "image", label: "Image AI", icon: Palette },
+    ]
+  },
+  {
+    id: "ai-workspace",
+    label: "AI Workspace",
+    icon: MessageSquare,
+    description: "Chat with AI models",
+    subItems: [
+      { id: "chat", label: "Chat", icon: MessageSquare },
+      { id: "history", label: "History", icon: History },
     ]
   },
   {
@@ -678,6 +690,20 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded }: { onNavig
           </button>
         )}
 
+        {/* AI Workspace Card */}
+        {checkVisible("ai-workspace") && (
+          <button
+            onClick={() => onNavigate("ai-workspace")}
+            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <MessageSquare className="h-8 w-8 text-primary" />
+            </div>
+            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">AI Workspace</h3>
+            <p className="text-sm text-muted-foreground">Chat with Claude & local models</p>
+          </button>
+        )}
+
         {/* Paper Trading Card */}
         {checkVisible("stocks") && (
           <button
@@ -992,6 +1018,8 @@ export default function PersonalHomepage() {
         return <BookmarksSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("profile")} />
       case "search":
         return <SearchHubSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "ai-workspace":
+        return <AIWorkspaceSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "stocks":
         return <StocksDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("settings")} />
       case "tasks":
