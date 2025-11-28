@@ -6,7 +6,7 @@
 |-------|--------|-------|
 | Phase 1: Core Infrastructure | ✅ Complete | API routes, types, basic table |
 | Phase 2: Main Dashboard View | ✅ Complete | TanStack Table, filters, actions |
-| Phase 3: Project Detail View | ⏳ Pending | Route-based detail pages |
+| Phase 3: Project Detail View | ✅ Complete | Route, tabs, overview, commands, kanban, links |
 | Phase 4: Data Persistence | ⏳ Pending | Sync repo integration |
 
 ### What's Been Built (Phase 1 & 2)
@@ -34,6 +34,33 @@
 - Added to sidebar navigation with FolderGit2 icon
 - Added to SectionSettings for visibility toggle
 - Added Projects card to Home dashboard
+
+### What's Been Built (Phase 3)
+
+**Project Detail Route (`app/projects/[slug]/page.tsx`):**
+- Dynamic route for individual project pages
+- Fetches and merges GitHub + local data
+- Tabbed interface with 4 tabs
+
+**Layout (`app/projects/layout.tsx`):**
+- Back navigation to dashboard
+- Consistent header styling
+
+**Components:**
+- `ProjectOverview.tsx` - Project info, stats, status badges, quick actions
+- `ProjectCommands.tsx` - npm scripts + custom commands, run/copy functionality
+- `ProjectKanban.tsx` - 3-column drag-drop task board (todo/in-progress/done)
+- `ProjectLinks.tsx` - Project bookmarks with type categories
+
+**Storage:**
+- Commands: `localStorage` key `project-commands-{slug}`
+- Tasks: `localStorage` key `project-tasks-{slug}`
+- Links: `localStorage` key `project-links-{slug}`
+
+**Navigation:**
+- Project name in table links to detail page
+- Info icon button in actions column
+- Back button returns to dashboard
 
 ---
 
@@ -387,17 +414,17 @@ app/
 │       └── meta/
 │           └── route.ts          # ⏳ Read/write projects-meta.json
 ├── projects/
+│   ├── layout.tsx                # ✅ Back navigation layout
 │   └── [slug]/
-│       └── page.tsx              # ⏳ Project detail page (route-based)
+│       └── page.tsx              # ✅ Project detail page (route-based)
 ├── sections/
 │   └── projects-dashboard.tsx    # ✅ Main dashboard section (table view)
 components/
 ├── projects/
-│   ├── ProjectsTable.tsx         # (integrated into projects-dashboard.tsx)
-│   ├── ProjectKanban.tsx         # ⏳ Kanban board component
-│   ├── ProjectLinks.tsx          # ⏳ Links management
-│   ├── ProjectCommands.tsx       # ⏳ Commands management
-│   └── ProjectOverview.tsx       # ⏳ Overview tab content
+│   ├── ProjectKanban.tsx         # ✅ Kanban board component
+│   ├── ProjectLinks.tsx          # ✅ Links management
+│   ├── ProjectCommands.tsx       # ✅ Commands management
+│   └── ProjectOverview.tsx       # ✅ Overview tab content
 lib/
 └── projects.ts                   # ✅ Types, helpers, merge logic
 ```
@@ -421,12 +448,12 @@ lib/
 12. [x] Loading states and skeletons
 13. [x] Error handling
 
-### Phase 3: Detail View (Pending)
-14. [ ] Create `/app/projects/[slug]/page.tsx` route
-15. [ ] Implement Overview tab
-16. [ ] Implement Commands tab (pre-populate from package.json)
-17. [ ] Implement Kanban tab with drag-drop
-18. [ ] Implement Links tab
+### Phase 3: Detail View ✅
+14. [x] Create `/app/projects/[slug]/page.tsx` route
+15. [x] Implement Overview tab
+16. [x] Implement Commands tab (pre-populate from package.json)
+17. [x] Implement Kanban tab with drag-drop
+18. [x] Implement Links tab
 
 ### Phase 4: Data Persistence (Pending)
 19. [ ] Create `/api/projects/meta/route.ts` for sync repo

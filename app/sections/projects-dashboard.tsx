@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import {
   useReactTable,
@@ -30,6 +31,7 @@ import {
   CircleAlert,
   FolderOpen,
   X,
+  Info,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -230,7 +232,12 @@ export default function ProjectsDashboard({
               <FolderGit2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium truncate">{project.name}</span>
+                  <Link
+                    href={`/projects/${project.slug}`}
+                    className="font-medium truncate hover:text-primary hover:underline"
+                  >
+                    {project.name}
+                  </Link>
                   <Badge variant={badge.variant} className="text-[10px] px-1.5 py-0">
                     {badge.label}
                   </Badge>
@@ -434,6 +441,17 @@ export default function ProjectsDashboard({
                   </a>
                 </Button>
               )}
+              {/* Details */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                asChild
+              >
+                <Link href={`/projects/${project.slug}`} title="View Details">
+                  <Info className="h-4 w-4" />
+                </Link>
+              </Button>
             </div>
           )
         },
