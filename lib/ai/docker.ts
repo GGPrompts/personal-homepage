@@ -1,11 +1,16 @@
 /**
  * Docker Model Runner Integration
- * Uses the OpenAI-compatible API at http://localhost:12434
+ * Uses the OpenAI-compatible API at http://localhost:12434/engines/v1
+ *
+ * For WSL2: Set DOCKER_MODEL_API env var to Windows Tailscale IP
+ * e.g., DOCKER_MODEL_API=http://100.95.196.24:12434
  */
 
 import type { ChatMessage, ChatSettings, Model } from './types'
 
-const DOCKER_API_BASE = 'http://localhost:12434/v1'
+const DOCKER_API_BASE = process.env.DOCKER_MODEL_API
+  ? `${process.env.DOCKER_MODEL_API}/engines/v1`
+  : 'http://localhost:12434/engines/v1'
 
 interface DockerModel {
   id: string

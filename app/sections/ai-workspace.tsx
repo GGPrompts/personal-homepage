@@ -99,6 +99,62 @@ function generateId() {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 }
 
+// Helper to render text with clickable links
+function renderTextWithLinks(text: string, keyPrefix: string): React.ReactNode[] {
+  // Combined regex: matches markdown links OR plain URLs
+  // Markdown links: [text](url) - captured in groups 1 and 2
+  // Plain URLs: https?://... - captured in group 3
+  const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)|(https?:\/\/[^\s<>\[\]]+)/g
+
+  const parts: React.ReactNode[] = []
+  let lastIndex = 0
+  let match
+
+  while ((match = linkRegex.exec(text)) !== null) {
+    // Add text before the link
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index))
+    }
+
+    if (match[1] && match[2]) {
+      // Markdown-style link: [text](url)
+      parts.push(
+        <a
+          key={`${keyPrefix}-link-${match.index}`}
+          href={match[2]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
+        >
+          {match[1]}
+        </a>
+      )
+    } else if (match[3]) {
+      // Plain URL
+      parts.push(
+        <a
+          key={`${keyPrefix}-link-${match.index}`}
+          href={match[3]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
+        >
+          {match[3]}
+        </a>
+      )
+    }
+
+    lastIndex = match.index + match[0].length
+  }
+
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex))
+  }
+
+  return parts.length > 0 ? parts : [text]
+}
+
 function getResponseForPrompt(prompt: string): string {
   const lowerPrompt = prompt.toLowerCase()
 
@@ -213,7 +269,7 @@ function MessageBubble({ message, onCopy, onRegenerate, onFeedback }: MessageBub
     setTimeout(() => setCopied(false), 2000)
   }
 
-  // Simple markdown rendering for code blocks
+  // Simple markdown rendering for code blocks and links
   const renderContent = (content: string) => {
     const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g
     const parts: React.ReactNode[] = []
@@ -221,11 +277,12 @@ function MessageBubble({ message, onCopy, onRegenerate, onFeedback }: MessageBub
     let match
 
     while ((match = codeBlockRegex.exec(content)) !== null) {
-      // Add text before code block
+      // Add text before code block (with link rendering)
       if (match.index > lastIndex) {
+        const textBefore = content.slice(lastIndex, match.index)
         parts.push(
           <p key={`text-${lastIndex}`} className="whitespace-pre-wrap">
-            {content.slice(lastIndex, match.index)}
+            {renderTextWithLinks(textBefore, `msg-${lastIndex}`)}
           </p>
         )
       }
@@ -255,16 +312,21 @@ function MessageBubble({ message, onCopy, onRegenerate, onFeedback }: MessageBub
       lastIndex = match.index + match[0].length
     }
 
-    // Add remaining text
+    // Add remaining text (with link rendering)
     if (lastIndex < content.length) {
+      const remainingText = content.slice(lastIndex)
       parts.push(
         <p key={`text-${lastIndex}`} className="whitespace-pre-wrap">
-          {content.slice(lastIndex)}
+          {renderTextWithLinks(remainingText, `msg-${lastIndex}`)}
         </p>
       )
     }
 
-    return parts.length > 0 ? parts : <p className="whitespace-pre-wrap">{content}</p>
+    return parts.length > 0 ? parts : (
+      <p className="whitespace-pre-wrap">
+        {renderTextWithLinks(content, 'msg-full')}
+      </p>
+    )
   }
 
   return (

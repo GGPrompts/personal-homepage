@@ -8,6 +8,10 @@ import { promisify } from 'util'
 
 const execAsync = promisify(exec)
 
+const DOCKER_API_BASE = process.env.DOCKER_MODEL_API
+  ? `${process.env.DOCKER_MODEL_API}/engines/v1`
+  : 'http://localhost:12434/engines/v1'
+
 export type AIBackend = 'claude' | 'docker' | 'mock'
 
 export interface BackendStatus {
@@ -40,7 +44,7 @@ export async function checkDockerModels(): Promise<BackendStatus> {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 2000)
 
-    const response = await fetch('http://localhost:12434/v1/models', {
+    const response = await fetch(`${DOCKER_API_BASE}/models`, {
       signal: controller.signal
     })
 
@@ -59,7 +63,7 @@ export async function checkDockerModels(): Promise<BackendStatus> {
     return {
       backend: 'docker',
       available: false,
-      error: 'Docker Model Runner not running at localhost:12434'
+      error: `Docker Model Runner not available at ${DOCKER_API_BASE}`
     }
   }
 }

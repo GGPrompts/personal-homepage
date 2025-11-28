@@ -254,14 +254,15 @@ export async function streamTermux(
 
 ### Docker Model Runner Integration
 
-Docker Model Runner exposes an OpenAI-compatible API at `http://localhost:12434`:
+Docker Model Runner exposes an OpenAI-compatible API at `http://localhost:12434` (or via `DOCKER_MODEL_API` env var for WSL2):
 
 ```typescript
 // lib/ai/docker-models.ts
-const DOCKER_MODEL_API = 'http://localhost:12434/v1'
+const DOCKER_MODEL_API = process.env.DOCKER_MODEL_API || 'http://localhost:12434'
+const API_BASE = `${DOCKER_MODEL_API}/engines/v1`  // Note: /engines/v1, not /v1
 
 export async function listLocalModels() {
-  const res = await fetch(`${DOCKER_MODEL_API}/models`)
+  const res = await fetch(`${API_BASE}/models`)
   return res.json()
 }
 
@@ -270,7 +271,7 @@ export async function streamLocalModel(
   messages: Message[],
   options: ModelOptions
 ) {
-  const res = await fetch(`${DOCKER_MODEL_API}/chat/completions`, {
+  const res = await fetch(`${API_BASE}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -284,6 +285,80 @@ export async function streamLocalModel(
 
   return res.body // ReadableStream
 }
+```
+
+### Docker Model Runner Setup (WSL2)
+
+When running the homepage in WSL2 and Docker Desktop on Windows, extra configuration is needed because:
+
+1. **Docker Model Runner binds to `127.0.0.1` on Windows** - Not accessible from WSL2
+2. **WSL2 can't reach Windows localhost directly** - Different network namespace
+3. **Solution: Use `netsh portproxy` + Tailscale IP**
+
+**Step 1: Enable Docker Model Runner with TCP**
+
+```bash
+# In Windows terminal
+docker desktop enable model-runner --tcp=12434
+
+# Check status
+docker model status --json
+
+# List available models
+docker model list
+
+# Pull a model (example)
+docker model pull ai/phi4
+```
+
+**Step 2: Configure Windows Port Forwarding**
+
+```powershell
+# Windows Admin PowerShell - enable port proxy from all interfaces to localhost
+netsh interface portproxy add v4tov4 listenport=12434 listenaddress=0.0.0.0 connectport=12434 connectaddress=127.0.0.1
+
+# Add Windows Firewall rule
+New-NetFirewallRule -DisplayName 'Docker Model Runner' -Direction Inbound -LocalPort 12434 -Protocol TCP -Action Allow
+```
+
+**Step 3: Configure Environment Variable**
+
+Set `DOCKER_MODEL_API` in `.env.local` to your Windows machine's Tailscale IP:
+
+```bash
+# .env.local
+DOCKER_MODEL_API=http://<windows-tailscale-ip>:12434
+```
+
+**Step 4: Verify Connection**
+
+```bash
+# Test from Windows
+curl http://localhost:12434/engines/v1/models
+
+# Test from WSL2 (using Tailscale IP)
+curl http://<windows-tailscale-ip>:12434/engines/v1/models
+```
+
+**Important:** The API endpoint is `/engines/v1` (not `/v1`). The models endpoint is `/engines/v1/models` and chat completions is `/engines/v1/chat/completions`.
+
+**Useful Docker Model Commands:**
+
+```bash
+# Enable model runner with TCP
+docker desktop enable model-runner --tcp=12434
+
+# Check status
+docker model status --json
+
+# List models
+docker model list
+
+# Pull a model
+docker model pull ai/phi4
+
+# Remove port proxy (if needed)
+netsh interface portproxy delete v4tov4 listenport=12434 listenaddress=0.0.0.0
 ```
 
 ## Data Models
