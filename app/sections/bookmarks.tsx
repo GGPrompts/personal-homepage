@@ -945,32 +945,34 @@ export default function BookmarksSection({
             <DialogDescription>Add a new bookmark or terminal command</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            {/* Type selector */}
-            <div>
-              <label className="text-sm font-medium mb-1.5 block">Type</label>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant={formType === "link" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setFormType("link")}
-                  className="flex-1"
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Link
-                </Button>
-                <Button
-                  type="button"
-                  variant={formType === "terminal" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setFormType("terminal")}
-                  className="flex-1"
-                >
-                  <Terminal className="h-4 w-4 mr-2" />
-                  Terminal
-                </Button>
+            {/* Type selector - only show Terminal option if extension available */}
+            {terminalAvailable && (
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Type</label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={formType === "link" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setFormType("link")}
+                    className="flex-1"
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Link
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={formType === "terminal" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setFormType("terminal")}
+                    className="flex-1"
+                  >
+                    <Terminal className="h-4 w-4 mr-2" />
+                    Terminal
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
             <div>
               <label className="text-sm font-medium mb-1.5 block">Name</label>
               <Input
@@ -1123,32 +1125,34 @@ export default function BookmarksSection({
             </div>
             {editType === "bookmark" && (
               <>
-                {/* Type selector */}
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">Type</label>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant={formType === "link" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setFormType("link")}
-                      className="flex-1"
-                    >
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      Link
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={formType === "terminal" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setFormType("terminal")}
-                      className="flex-1"
-                    >
-                      <Terminal className="h-4 w-4 mr-2" />
-                      Terminal
-                    </Button>
+                {/* Type selector - only show if extension available */}
+                {terminalAvailable && (
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Type</label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant={formType === "link" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setFormType("link")}
+                        className="flex-1"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Link
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={formType === "terminal" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setFormType("terminal")}
+                        className="flex-1"
+                      >
+                        <Terminal className="h-4 w-4 mr-2" />
+                        Terminal
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                )}
                 {formType === "link" ? (
                   <div>
                     <label className="text-sm font-medium mb-1.5 block">URL</label>
