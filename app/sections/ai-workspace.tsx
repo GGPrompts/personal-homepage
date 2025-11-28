@@ -168,24 +168,25 @@ function TypingIndicator() {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="flex items-center gap-2 px-4 py-3 glass rounded-lg w-fit"
+      className="flex items-center gap-3 px-4 py-3 glass rounded-lg w-fit border border-primary/20"
     >
-      <Bot className="h-4 w-4 text-primary" />
+      <Bot className="h-4 w-4 text-primary terminal-glow" />
+      <span className="text-sm text-muted-foreground">Thinking</span>
       <div className="flex gap-1">
         <motion.div
           animate={{ y: [0, -8, 0] }}
           transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
-          className="w-2 h-2 bg-primary rounded-full"
+          className="w-2 h-2 bg-primary rounded-full terminal-glow"
         />
         <motion.div
           animate={{ y: [0, -8, 0] }}
           transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }}
-          className="w-2 h-2 bg-primary rounded-full"
+          className="w-2 h-2 bg-primary rounded-full terminal-glow"
         />
         <motion.div
           animate={{ y: [0, -8, 0] }}
           transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }}
-          className="w-2 h-2 bg-primary rounded-full"
+          className="w-2 h-2 bg-primary rounded-full terminal-glow"
         />
       </div>
     </motion.div>
@@ -407,6 +408,7 @@ export default function AIWorkspaceSection({
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
 
   const activeConv = conversations.find(c => c.id === activeConvId) || conversations[0]
+  const selectedModel = availableModels.find(m => m.id === settings.model)
 
   // Fetch available models on mount
   React.useEffect(() => {
@@ -871,6 +873,15 @@ export default function AIWorkspaceSection({
                   <span className="truncate">
                     {availableModels.find(m => m.id === settings.model)?.name || 'Loading...'}
                   </span>
+                  {(isTyping || isStreaming) && (
+                    <motion.span
+                      animate={{ opacity: [0.5, 1, 0.5] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                      className="text-primary text-xs"
+                    >
+                      • Generating
+                    </motion.span>
+                  )}
                   <span className="opacity-50 hidden sm:inline">•</span>
                   <span className="hidden sm:inline">{totalTokens} / {settings.maxTokens} tokens</span>
                 </p>
@@ -999,20 +1010,25 @@ export default function AIWorkspaceSection({
               </div>
 
               {isStreaming ? (
-                <Button
-                  size="icon"
-                  variant="destructive"
-                  className="h-[48px] w-[48px] sm:h-[52px] sm:w-[52px] shrink-0"
-                  onClick={() => setIsStreaming(false)}
+                <motion.div
+                  animate={{ scale: [1, 1.05, 1] }}
+                  transition={{ duration: 1, repeat: Infinity }}
                 >
-                  <StopCircle className="h-5 w-5" />
-                </Button>
+                  <Button
+                    size="icon"
+                    variant="destructive"
+                    className="h-[48px] w-[48px] sm:h-[52px] sm:w-[52px] shrink-0"
+                    onClick={() => setIsStreaming(false)}
+                  >
+                    <StopCircle className="h-5 w-5" />
+                  </Button>
+                </motion.div>
               ) : (
                 <Button
                   size="icon"
                   className="h-[48px] w-[48px] sm:h-[52px] sm:w-[52px] border-glow shrink-0"
                   onClick={handleSend}
-                  disabled={!inputValue.trim() || isStreaming}
+                  disabled={!inputValue.trim() || isStreaming || isTyping}
                 >
                   <Send className="h-5 w-5" />
                 </Button>
@@ -1109,9 +1125,12 @@ export default function AIWorkspaceSection({
                   max={1}
                   step={0.1}
                   className="glass"
+                  disabled={selectedModel?.backend === 'claude' || selectedModel?.backend === 'mock'}
                 />
                 <p className="text-xs text-muted-foreground">
                   Higher values make output more random
+                  {(selectedModel?.backend === 'claude' || selectedModel?.backend === 'mock') &&
+                    ' (only applies to Docker models)'}
                 </p>
               </div>
 
@@ -1126,9 +1145,12 @@ export default function AIWorkspaceSection({
                   max={8192}
                   step={256}
                   className="glass"
+                  disabled={selectedModel?.backend === 'claude' || selectedModel?.backend === 'mock'}
                 />
                 <p className="text-xs text-muted-foreground">
                   Maximum length of the response
+                  {(selectedModel?.backend === 'claude' || selectedModel?.backend === 'mock') &&
+                    ' (only applies to Docker models)'}
                 </p>
               </div>
 
@@ -1144,9 +1166,12 @@ export default function AIWorkspaceSection({
                     onChange={(e) => setSettings({ ...settings, systemPrompt: e.target.value })}
                     className="glass min-h-[120px]"
                     placeholder="Customize the AI's behavior..."
+                    disabled={selectedModel?.backend === 'mock'}
                   />
                   <p className="text-xs text-muted-foreground mt-2">
-                    Define how the AI should respond
+                    {selectedModel?.backend === 'claude' && 'Appends to Claude\'s default system prompt'}
+                    {selectedModel?.backend === 'docker' && 'Define how the AI should respond'}
+                    {selectedModel?.backend === 'mock' && 'Not used for mock responses'}
                   </p>
                 </CollapsibleContent>
               </Collapsible>

@@ -46,7 +46,7 @@ export async function streamClaude(
   ]
 
   if (systemPrompt) {
-    args.push('--system-prompt', systemPrompt)
+    args.push('--append-system-prompt', systemPrompt)
   }
 
   // Add the prompt as the last argument
