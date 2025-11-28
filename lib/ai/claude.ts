@@ -26,7 +26,8 @@ interface ClaudeStreamEvent {
  */
 export async function streamClaude(
   messages: ChatMessage[],
-  settings?: ChatSettings
+  settings?: ChatSettings,
+  cwd?: string
 ): Promise<ReadableStream<string>> {
   // Build the conversation context
   const systemPrompt = settings?.systemPrompt || ''
@@ -62,6 +63,7 @@ export async function streamClaude(
       // Remove ANTHROPIC_API_KEY to force subscription auth
       ANTHROPIC_API_KEY: undefined
     },
+    cwd: cwd || process.cwd(), // Use project path if provided
     stdio: ['ignore', 'pipe', 'pipe'], // Don't inherit stdin, pipe stdout/stderr
     detached: false
   })

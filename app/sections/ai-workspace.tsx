@@ -18,8 +18,11 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import {
   MessageSquare, Send, Bot, User, Copy, RotateCw, ThumbsUp, ThumbsDown,
   Settings, ChevronDown, Plus, X, Trash2, Code, CheckCheck,
-  Sparkles, StopCircle, Clock, Cpu, FileJson, FileText,
+  Sparkles, StopCircle, Clock, Cpu, FileJson, FileText, FolderOpen,
 } from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
+import { useAllProjectsMeta } from "@/hooks/useProjectMeta"
+import type { Project, LocalProject } from "@/lib/projects"
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -465,12 +468,38 @@ export default function AIWorkspaceSection({
   const [availableModels, setAvailableModels] = React.useState<ModelInfo[]>([])
   const [backends, setBackends] = React.useState<BackendStatus[]>([])
   const [modelsLoading, setModelsLoading] = React.useState(true)
+  const [selectedProjectPath, setSelectedProjectPath] = React.useState<string | null>(null)
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
 
   const activeConv = conversations.find(c => c.id === activeConvId) || conversations[0]
   const selectedModel = availableModels.find(m => m.id === settings.model)
+
+  // Fetch local projects and pinned status
+  const { getPinnedSlugs, isConfigured: projectsConfigured } = useAllProjectsMeta()
+  const { data: localProjects } = useQuery({
+    queryKey: ['local-projects'],
+    queryFn: async () => {
+      const res = await fetch('/api/projects/local')
+      if (!res.ok) return []
+      const data = await res.json()
+      return (data.projects || []) as LocalProject[]
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+
+  // Get pinned projects with their paths
+  const pinnedProjects = React.useMemo(() => {
+    if (!localProjects || !projectsConfigured) return []
+    const pinnedSlugs = getPinnedSlugs()
+    return localProjects.filter(p => {
+      const slug = `local-${p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
+      return pinnedSlugs.includes(slug)
+    })
+  }, [localProjects, getPinnedSlugs, projectsConfigured])
+
+  const selectedProject = pinnedProjects.find(p => p.path === selectedProjectPath)
 
   // Fetch available models on mount
   React.useEffect(() => {
@@ -614,7 +643,8 @@ export default function AIWorkspaceSection({
             temperature: settings.temperature,
             maxTokens: settings.maxTokens,
             systemPrompt: settings.systemPrompt
-          }
+          },
+          cwd: selectedProjectPath || undefined
         })
       })
 
@@ -952,6 +982,29 @@ export default function AIWorkspaceSection({
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            {/* Project Selector */}
+            {pinnedProjects.length > 0 && (
+              <Select
+                value={selectedProjectPath || "none"}
+                onValueChange={(value) => setSelectedProjectPath(value === "none" ? null : value)}
+              >
+                <SelectTrigger className="w-[140px] sm:w-[180px] h-9 glass text-xs">
+                  <FolderOpen className="h-3 w-3 mr-1 shrink-0" />
+                  <SelectValue placeholder="No project" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">
+                    <span className="text-muted-foreground">No project context</span>
+                  </SelectItem>
+                  {pinnedProjects.map(project => (
+                    <SelectItem key={project.path} value={project.path}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>

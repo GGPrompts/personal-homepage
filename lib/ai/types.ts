@@ -21,6 +21,7 @@ export interface ChatRequest {
   model?: string
   settings?: ChatSettings
   stream?: boolean
+  cwd?: string  // Working directory for Claude CLI (project path)
 }
 
 export interface Model {

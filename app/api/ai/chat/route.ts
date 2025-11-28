@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   try {
     const body: ChatRequest = await request.json()
 
-    const { messages, backend, model, settings } = body
+    const { messages, backend, model, settings, cwd } = body
 
     if (!messages || messages.length === 0) {
       return new Response(
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     try {
       if (backend === 'claude') {
-        stream = await streamClaude(messages, settings)
+        stream = await streamClaude(messages, settings, cwd)
       } else if (backend === 'docker') {
         if (!model) {
           return new Response(
