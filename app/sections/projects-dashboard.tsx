@@ -34,6 +34,7 @@ import {
   Info,
   Pin,
   PinOff,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -560,10 +561,19 @@ export default function ProjectsDashboard({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <div>
           <h1 className="text-3xl font-bold terminal-glow mb-1">Projects</h1>
-          <p className="text-muted-foreground text-sm">
-            {filteredProjects.length} projects
-            {githubData?.count ? ` (${githubData.count} GitHub` : ""}
-            {localData?.count ? `, ${localData.count} local)` : githubData?.count ? ")" : ""}
+          <p className="text-muted-foreground text-sm flex items-center gap-2">
+            {isLoading ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span>Loading projects...</span>
+              </>
+            ) : (
+              <>
+                {filteredProjects.length} projects
+                {githubData?.count ? ` (${githubData.count} GitHub` : ""}
+                {localData?.count ? `, ${localData.count} local)` : githubData?.count ? ")" : ""}
+              </>
+            )}
           </p>
         </div>
 

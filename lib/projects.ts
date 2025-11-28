@@ -149,38 +149,37 @@ export function mergeProjects(
   localProjects: LocalProject[]
 ): Project[] {
   const projects: Project[] = []
-  const matchedLocalPaths = new Set<string>()
 
-  // Process GitHub repos first
+  // Build a map of normalized GitHub URLs to repos for quick lookup
+  const githubByUrl = new Map<string, GitHubRepo>()
+  const matchedGithubUrls = new Set<string>()
+
   for (const repo of githubRepos) {
-    const repoUrl = normalizeGitUrl(repo.html_url)
-
-    // Try to find matching local project
-    const matchingLocal = localProjects.find((local) => {
-      if (!local.git?.remoteUrl) return false
-      return normalizeGitUrl(local.git.remoteUrl) === repoUrl
-    })
-
-    if (matchingLocal) {
-      matchedLocalPaths.add(matchingLocal.path)
-    }
-
-    projects.push({
-      id: `gh-${repo.id}`,
-      name: repo.name,
-      slug: generateSlug(repo.name, "github", repo.full_name),
-      github: repo,
-      local: matchingLocal,
-      source: matchingLocal ? "both" : "github",
-      description: repo.description || matchingLocal?.description || "",
-      techStack: matchingLocal?.techStack || (repo.language ? [repo.language] : []),
-      pinned: false,
-    })
+    const normalizedUrl = normalizeGitUrl(repo.html_url)
+    githubByUrl.set(normalizedUrl, repo)
   }
 
-  // Add local-only projects
+  // Process local projects first - each local folder gets its own entry
   for (const local of localProjects) {
-    if (!matchedLocalPaths.has(local.path)) {
+    const localUrl = local.git?.remoteUrl ? normalizeGitUrl(local.git.remoteUrl) : null
+    const matchingGithub = localUrl ? githubByUrl.get(localUrl) : undefined
+
+    if (matchingGithub) {
+      // Local folder matches a GitHub repo - mark as "both"
+      matchedGithubUrls.add(localUrl!)
+      projects.push({
+        id: `local-${local.path}`,
+        name: local.name,
+        slug: generateSlug(local.name, "local"),
+        github: matchingGithub,
+        local,
+        source: "both",
+        description: local.description || matchingGithub.description || "",
+        techStack: local.techStack.length > 0 ? local.techStack : (matchingGithub.language ? [matchingGithub.language] : []),
+        pinned: false,
+      })
+    } else {
+      // Local-only project (no remote or no matching GitHub repo)
       projects.push({
         id: `local-${local.path}`,
         name: local.name,
@@ -189,6 +188,23 @@ export function mergeProjects(
         source: "local",
         description: local.description || "",
         techStack: local.techStack,
+        pinned: false,
+      })
+    }
+  }
+
+  // Add GitHub-only repos (not cloned locally)
+  for (const repo of githubRepos) {
+    const repoUrl = normalizeGitUrl(repo.html_url)
+    if (!matchedGithubUrls.has(repoUrl)) {
+      projects.push({
+        id: `gh-${repo.id}`,
+        name: repo.name,
+        slug: generateSlug(repo.name, "github", repo.full_name),
+        github: repo,
+        source: "github",
+        description: repo.description || "",
+        techStack: repo.language ? [repo.language] : [],
         pinned: false,
       })
     }
