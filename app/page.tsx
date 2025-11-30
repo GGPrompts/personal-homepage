@@ -44,6 +44,7 @@ import {
   Github,
   Terminal,
   MessageSquare,
+  Play,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -74,7 +75,11 @@ import StocksDashboard from "./sections/stocks-dashboard"
 import ProfileSection from "./sections/profile"
 import TasksSection from "./sections/tasks"
 import ProjectsDashboard from "./sections/projects-dashboard"
+import JobsSection from "./sections/jobs"
 import IntegrationsSection from "./sections/integrations"
+import { useLoginTrigger } from "@/hooks/useLoginTrigger"
+import { StartupJobsModal } from "@/components/StartupJobsModal"
+import { useJobResults } from "@/hooks/useJobResults"
 
 // ============================================================================
 // TYPES
@@ -208,6 +213,16 @@ const navigationItems: NavigationItem[] = [
     ]
   },
   {
+    id: "jobs",
+    label: "Jobs",
+    icon: Play,
+    description: "Claude batch prompts",
+    subItems: [
+      { id: "all", label: "All Jobs", icon: Grid },
+      { id: "history", label: "Run History", icon: History },
+    ]
+  },
+  {
     id: "integrations",
     label: "Integrations",
     icon: Link2,
@@ -253,6 +268,7 @@ function SidebarContent({
   setExpandedSection,
   setActiveSubItem,
   weatherAlertCount = 0,
+  jobsNeedsHumanCount = 0,
   collapsed = false,
   mobile = false,
   onNavigate,
@@ -268,6 +284,7 @@ function SidebarContent({
   setExpandedSection: (section: Section | null) => void
   setActiveSubItem?: (subItem: string | null) => void
   weatherAlertCount?: number
+  jobsNeedsHumanCount?: number
   collapsed?: boolean
   mobile?: boolean
   onNavigate?: () => void
@@ -375,7 +392,15 @@ function SidebarContent({
                         }
                       `}
                     >
-                      <Icon className="h-5 w-5 flex-shrink-0" />
+                      <div className="relative flex-shrink-0">
+                        <Icon className="h-5 w-5" />
+                        {/* Jobs needs-human badge */}
+                        {item.id === "jobs" && jobsNeedsHumanCount > 0 && (
+                          <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-amber-500 text-[9px] flex items-center justify-center text-white font-medium">
+                            {jobsNeedsHumanCount > 9 ? '!' : jobsNeedsHumanCount}
+                          </span>
+                        )}
+                      </div>
                       <span className={`flex-1 text-left transition-all duration-300 overflow-hidden whitespace-nowrap ${
                         collapsed && !mobile ? 'w-0 opacity-0' : 'w-auto opacity-100'
                       }`}>{item.label}</span>
@@ -996,6 +1021,20 @@ export default function PersonalHomepage() {
   const userAvatar = user?.user_metadata?.avatar_url || null
   const [weatherAlertCount, setWeatherAlertCount] = React.useState<number>(0)
 
+  // On-login trigger for startup jobs
+  const { pendingJobs, hasPendingJobs, clearPendingJobs } = useLoginTrigger()
+  const [showStartupModal, setShowStartupModal] = React.useState(false)
+
+  // Job results for needs-human badge
+  const { needsHumanCount } = useJobResults()
+
+  // Show startup modal when there are pending jobs
+  React.useEffect(() => {
+    if (hasPendingJobs) {
+      setShowStartupModal(true)
+    }
+  }, [hasPendingJobs])
+
   // Clear sub-item after scroll completes
   const clearSubItem = React.useCallback(() => {
     setActiveSubItem(null)
@@ -1026,6 +1065,8 @@ export default function PersonalHomepage() {
         return <TasksSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "projects":
         return <ProjectsDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "jobs":
+        return <JobsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "integrations":
         return <IntegrationsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSection={(section) => setActiveSection(section as Section)} />
       case "profile":
@@ -1063,6 +1104,7 @@ export default function PersonalHomepage() {
               setExpandedSection={setExpandedSection}
               setActiveSubItem={setActiveSubItem}
               weatherAlertCount={weatherAlertCount}
+              jobsNeedsHumanCount={needsHumanCount}
               mobile
               onNavigate={() => setMobileMenuOpen(false)}
               userAvatar={userAvatar}
@@ -1089,6 +1131,7 @@ export default function PersonalHomepage() {
                 setExpandedSection={setExpandedSection}
                 setActiveSubItem={setActiveSubItem}
                 weatherAlertCount={weatherAlertCount}
+                jobsNeedsHumanCount={needsHumanCount}
                 collapsed={sidebarCollapsed}
                 userAvatar={userAvatar}
                 userName={userName}
@@ -1117,6 +1160,20 @@ export default function PersonalHomepage() {
             {renderContent()}
           </main>
         </div>
+
+        {/* Startup Jobs Modal */}
+        <StartupJobsModal
+          open={showStartupModal}
+          jobs={pendingJobs}
+          onClose={() => {
+            setShowStartupModal(false)
+            clearPendingJobs()
+          }}
+          onSkipAll={() => {
+            setShowStartupModal(false)
+            clearPendingJobs()
+          }}
+        />
       </div>
     </TooltipProvider>
   )

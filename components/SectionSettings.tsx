@@ -19,6 +19,7 @@ import {
   EyeOff,
   FolderGit2,
   MessageSquare,
+  Play,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -40,6 +41,7 @@ const sectionMeta: Record<ToggleableSection, { label: string; icon: React.Elemen
   stocks: { label: "Paper Trading", icon: TrendingUp, description: "Practice stock trading" },
   tasks: { label: "Tasks", icon: CheckCircle2, description: "Quick todo list" },
   projects: { label: "Projects", icon: FolderGit2, description: "GitHub & local repos" },
+  jobs: { label: "Jobs", icon: Play, description: "Claude batch prompts" },
   integrations: { label: "Integrations", icon: Link2, description: "Connected services" },
   profile: { label: "Profile", icon: User, description: "Account & sync" },
 }

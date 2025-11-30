@@ -13,6 +13,12 @@ export interface ChatSettings {
   temperature?: number
   maxTokens?: number
   systemPrompt?: string
+  // Claude CLI specific options
+  additionalDirs?: string[]  // --add-dir
+  claudeModel?: string  // --model (sonnet, opus, haiku, or full model name)
+  allowedTools?: string[]  // --allowed-tools
+  disallowedTools?: string[]  // --disallowed-tools
+  permissionMode?: 'acceptEdits' | 'bypassPermissions' | 'default' | 'plan'  // --permission-mode
 }
 
 export interface ChatRequest {

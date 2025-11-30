@@ -46,6 +46,8 @@ interface Conversation {
   messages: Message[]
   createdAt: Date
   updatedAt: Date
+  model?: string
+  projectPath?: string | null
 }
 
 interface ChatSettings {
@@ -53,6 +55,12 @@ interface ChatSettings {
   temperature: number
   maxTokens: number
   systemPrompt: string
+  // Claude CLI specific options
+  additionalDirs?: string[]
+  claudeModel?: string
+  allowedTools?: string[]
+  disallowedTools?: string[]
+  permissionMode?: 'acceptEdits' | 'bypassPermissions' | 'default' | 'plan'
 }
 
 // ============================================================================
@@ -369,76 +377,71 @@ function MessageBubble({ message, onCopy, onRegenerate, onFeedback, userAvatarUr
         </div>
 
         {!isUser && (
-          <AnimatePresence>
-            {showActions && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="flex items-center gap-1 mt-2"
-              >
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleCopy}
-                        className="h-7 px-2"
-                      >
-                        {copied ? <CheckCheck className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Copy message</TooltipContent>
-                  </Tooltip>
+          <div
+            className={`flex items-center gap-1 mt-2 transition-opacity duration-200 ${
+              showActions ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            }`}
+          >
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCopy}
+                    className="h-7 px-2"
+                  >
+                    {copied ? <CheckCheck className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Copy message</TooltipContent>
+              </Tooltip>
 
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={onRegenerate}
-                        className="h-7 px-2"
-                      >
-                        <RotateCw className="h-3 w-3" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Regenerate response</TooltipContent>
-                  </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onRegenerate}
+                    className="h-7 px-2"
+                  >
+                    <RotateCw className="h-3 w-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Regenerate response</TooltipContent>
+              </Tooltip>
 
-                  <Separator orientation="vertical" className="h-4" />
+              <Separator orientation="vertical" className="h-4" />
 
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onFeedback('up')}
-                        className={`h-7 px-2 ${message.feedback === 'up' ? 'text-green-500' : ''}`}
-                      >
-                        <ThumbsUp className="h-3 w-3" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Good response</TooltipContent>
-                  </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onFeedback('up')}
+                    className={`h-7 px-2 ${message.feedback === 'up' ? 'text-green-500' : ''}`}
+                  >
+                    <ThumbsUp className="h-3 w-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Good response</TooltipContent>
+              </Tooltip>
 
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onFeedback('down')}
-                        className={`h-7 px-2 ${message.feedback === 'down' ? 'text-red-500' : ''}`}
-                      >
-                        <ThumbsDown className="h-3 w-3" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Poor response</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onFeedback('down')}
+                    className={`h-7 px-2 ${message.feedback === 'down' ? 'text-red-500' : ''}`}
+                  >
+                    <ThumbsDown className="h-3 w-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Poor response</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         )}
       </div>
     </motion.div>
@@ -555,6 +558,16 @@ export default function AIWorkspaceSection({
     localStorage.setItem("ai-workspace-settings", JSON.stringify(settings))
   }, [settings])
 
+  // Restore model and project context when switching conversations
+  React.useEffect(() => {
+    if (activeConv.model && activeConv.model !== settings.model) {
+      setSettings(prev => ({ ...prev, model: activeConv.model! }))
+    }
+    if (activeConv.projectPath !== undefined && activeConv.projectPath !== selectedProjectPath) {
+      setSelectedProjectPath(activeConv.projectPath)
+    }
+  }, [activeConvId])
+
   // Responsive sidebar - hide on mobile by default
   React.useEffect(() => {
     const handleResize = () => {
@@ -609,11 +622,18 @@ export default function AIWorkspaceSection({
         ? content.slice(0, 50) + (content.length > 50 ? '...' : '')
         : conv.title
 
+      // Save model and project context on first message
+      const shouldSaveContext = conv.messages.length === 0
+
       return {
         ...conv,
         title: newTitle,
         messages: newMessages,
         updatedAt: new Date(),
+        ...(shouldSaveContext && {
+          model: settings.model,
+          projectPath: selectedProjectPath,
+        }),
       }
     }))
 
@@ -649,7 +669,12 @@ export default function AIWorkspaceSection({
           settings: {
             temperature: settings.temperature,
             maxTokens: settings.maxTokens,
-            systemPrompt: settings.systemPrompt
+            systemPrompt: settings.systemPrompt,
+            additionalDirs: settings.additionalDirs,
+            claudeModel: settings.claudeModel,
+            allowedTools: settings.allowedTools,
+            disallowedTools: settings.disallowedTools,
+            permissionMode: settings.permissionMode,
           },
           cwd: selectedProjectPath || undefined
         })
@@ -833,6 +858,8 @@ export default function AIWorkspaceSection({
       messages: [],
       createdAt: new Date(),
       updatedAt: new Date(),
+      model: settings.model,
+      projectPath: selectedProjectPath,
     }
 
     setConversations(prev => [newConv, ...prev])
@@ -849,6 +876,8 @@ export default function AIWorkspaceSection({
           messages: [],
           createdAt: new Date(),
           updatedAt: new Date(),
+          model: settings.model,
+          projectPath: selectedProjectPath,
         }
         setActiveConvId(newConv.id)
         return [newConv]
@@ -918,12 +947,30 @@ export default function AIWorkspaceSection({
                           <h4 className="text-sm font-medium truncate terminal-glow">
                             {conv.title}
                           </h4>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {conv.messages.length} messages
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {conv.updatedAt.toLocaleDateString()}
-                          </p>
+                          <div className="mt-1 space-y-0.5">
+                            <p className="text-xs text-muted-foreground">
+                              {conv.messages.length} messages
+                            </p>
+                            {conv.model && (
+                              <div className="flex items-center gap-1">
+                                <Cpu className="h-3 w-3 text-muted-foreground" />
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {availableModels.find(m => m.id === conv.model)?.name || conv.model}
+                                </p>
+                              </div>
+                            )}
+                            {conv.projectPath && (
+                              <div className="flex items-center gap-1">
+                                <FolderOpen className="h-3 w-3 text-muted-foreground" />
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {conv.projectPath.split('/').pop()}
+                                </p>
+                              </div>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              {conv.updatedAt.toLocaleDateString()}
+                            </p>
+                          </div>
                         </div>
 
                         <Button
@@ -1298,6 +1345,107 @@ export default function AIWorkspaceSection({
                   </p>
                 </CollapsibleContent>
               </Collapsible>
+
+              {/* Claude-specific settings */}
+              {selectedModel?.backend === 'claude' && (
+                <>
+                  <Separator />
+
+                  {/* Claude Model */}
+                  <div className="space-y-3">
+                    <Label>Claude Model</Label>
+                    <Select
+                      value={settings.claudeModel || 'default'}
+                      onValueChange={(value) => setSettings({ ...settings, claudeModel: value === 'default' ? undefined : value })}
+                    >
+                      <SelectTrigger className="glass">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">Default (from config)</SelectItem>
+                        <SelectItem value="sonnet">Sonnet 4.5</SelectItem>
+                        <SelectItem value="opus">Opus 4</SelectItem>
+                        <SelectItem value="haiku">Haiku 3.5</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Override the default model for this conversation
+                    </p>
+                  </div>
+
+                  {/* Permission Mode */}
+                  <div className="space-y-3">
+                    <Label>Permission Mode</Label>
+                    <Select
+                      value={settings.permissionMode || 'default'}
+                      onValueChange={(value) => setSettings({ ...settings, permissionMode: value === 'default' ? undefined : value as any })}
+                    >
+                      <SelectTrigger className="glass">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">Default (ask)</SelectItem>
+                        <SelectItem value="acceptEdits">Accept Edits</SelectItem>
+                        <SelectItem value="bypassPermissions">Bypass All</SelectItem>
+                        <SelectItem value="plan">Plan Mode</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Control how Claude asks for permissions
+                    </p>
+                  </div>
+
+                  {/* Additional Directories */}
+                  <Collapsible className="space-y-3">
+                    <CollapsibleTrigger className="flex items-center justify-between w-full">
+                      <Label>Additional Directories</Label>
+                      <ChevronDown className="h-4 w-4" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-2 pt-2">
+                      {settings.additionalDirs?.map((dir, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <Input
+                            value={dir}
+                            onChange={(e) => {
+                              const newDirs = [...(settings.additionalDirs || [])]
+                              newDirs[idx] = e.target.value
+                              setSettings({ ...settings, additionalDirs: newDirs })
+                            }}
+                            className="glass flex-1 text-xs"
+                            placeholder="/path/to/directory"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => {
+                              const newDirs = settings.additionalDirs?.filter((_, i) => i !== idx)
+                              setSettings({ ...settings, additionalDirs: newDirs?.length ? newDirs : undefined })
+                            }}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full glass"
+                        onClick={() => {
+                          const newDirs = [...(settings.additionalDirs || []), '']
+                          setSettings({ ...settings, additionalDirs: newDirs })
+                        }}
+                      >
+                        <Plus className="h-3 w-3 mr-2" />
+                        Add Directory
+                      </Button>
+                      <p className="text-xs text-muted-foreground">
+                        Grant Claude access to additional project directories
+                      </p>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </>
+              )}
 
               <Separator />
 

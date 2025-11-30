@@ -43,11 +43,36 @@ export async function streamClaude(
   }
 
   const args = [
-    '--print'
+    '--print',
+    '--output-format', 'stream-json'
   ]
 
   if (systemPrompt) {
     args.push('--append-system-prompt', systemPrompt)
+  }
+
+  // Add Claude-specific model
+  if (settings?.claudeModel) {
+    args.push('--model', settings.claudeModel)
+  }
+
+  // Add additional directories
+  if (settings?.additionalDirs && settings.additionalDirs.length > 0) {
+    args.push('--add-dir', ...settings.additionalDirs)
+  }
+
+  // Add tool permissions
+  if (settings?.allowedTools && settings.allowedTools.length > 0) {
+    args.push('--allowed-tools', ...settings.allowedTools)
+  }
+
+  if (settings?.disallowedTools && settings.disallowedTools.length > 0) {
+    args.push('--disallowed-tools', ...settings.disallowedTools)
+  }
+
+  // Add permission mode
+  if (settings?.permissionMode) {
+    args.push('--permission-mode', settings.permissionMode)
   }
 
   // Add the prompt as the last argument
@@ -70,35 +95,50 @@ export async function streamClaude(
 
   return new ReadableStream<string>({
     start(controller) {
-      let fullResponse = ''
+      let buffer = ''
 
-      // In --print mode, Claude outputs plain text, not stream-json
-      // We'll accumulate the full response and stream it word by word
+      // Process stream-json format from Claude CLI
       claude.stdout.on('data', (chunk: Buffer) => {
-        fullResponse += chunk.toString()
+        buffer += chunk.toString()
+
+        // Process complete JSON lines
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.trim()) continue
+
+          try {
+            const event: ClaudeStreamEvent = JSON.parse(line)
+
+            if (event.type === 'content_block_delta' && event.delta?.text) {
+              controller.enqueue(event.delta.text)
+            } else if (event.type === 'message_stop') {
+              controller.close()
+            } else if (event.type === 'error') {
+              controller.error(new Error(event.error?.message || 'Claude CLI error'))
+            }
+          } catch (error) {
+            console.error('Failed to parse Claude stream-json:', line, error)
+          }
+        }
       })
 
       claude.stderr.on('data', (chunk: Buffer) => {
         console.error('Claude CLI stderr:', chunk.toString())
       })
 
-      claude.on('close', async (code) => {
+      claude.on('close', (code) => {
         if (code !== 0) {
           controller.error(new Error(`Claude CLI exited with code ${code}`))
           return
         }
-
-        // Stream the response word by word for better UX
-        const words = fullResponse.trim().split(/(\s+)/)
-        for (const word of words) {
-          if (word) {
-            controller.enqueue(word)
-            // Small delay to simulate streaming
-            await new Promise(resolve => setTimeout(resolve, 20))
-          }
+        // Controller might already be closed by message_stop event
+        try {
+          controller.close()
+        } catch {
+          // Already closed
         }
-
-        controller.close()
       })
 
       claude.on('error', (error) => {

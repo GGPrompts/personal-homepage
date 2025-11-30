@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   useReactTable,
   getCoreRowModel,
@@ -12,6 +12,7 @@ import {
   type ColumnDef,
   type SortingState,
   type ColumnFiltersState,
+  type RowSelectionState,
 } from "@tanstack/react-table"
 import {
   FolderGit2,
@@ -35,6 +36,12 @@ import {
   Pin,
   PinOff,
   Loader2,
+  Play,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  SkipForward,
+  Save,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -69,6 +76,19 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Card, CardContent } from "@/components/ui/card"
 import { useAuth } from "@/components/AuthProvider"
 import { AuthModal } from "@/components/AuthModal"
 import { useTerminalExtension } from "@/hooks/useTerminalExtension"
@@ -81,6 +101,7 @@ import {
   type LocalProject,
 } from "@/lib/projects"
 import { useAllProjectsMeta } from "@/hooks/useProjectMeta"
+import type { JobStreamEvent, CreateJobRequest } from "@/lib/jobs/types"
 
 // ============================================================================
 // HELPER COMPONENTS
@@ -129,6 +150,8 @@ export default function ProjectsDashboard({
   const { isPinned, togglePinned, isConfigured: metaConfigured, isSyncing: metaSyncing } = useAllProjectsMeta()
   const [showAuthModal, setShowAuthModal] = React.useState(false)
 
+  const queryClient = useQueryClient()
+
   // Table state
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "pushed_at", desc: true },
@@ -137,6 +160,22 @@ export default function ProjectsDashboard({
   const [globalFilter, setGlobalFilter] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState<string>("all")
   const [techFilter, setTechFilter] = React.useState<string[]>([])
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({})
+
+  // Batch prompt modal state
+  const [batchPromptOpen, setBatchPromptOpen] = React.useState(false)
+  const [batchPrompt, setBatchPrompt] = React.useState("")
+  const [saveAsJob, setSaveAsJob] = React.useState(false)
+  const [jobName, setJobName] = React.useState("")
+  const [isRunningBatch, setIsRunningBatch] = React.useState(false)
+  const [batchProgress, setBatchProgress] = React.useState<{
+    path: string
+    name: string
+    status: 'pending' | 'running' | 'skipped' | 'complete' | 'error'
+    output: string
+    error?: string
+    needsHuman?: boolean
+  }[]>([])
 
   // Handle sub-item navigation
   React.useEffect(() => {
@@ -240,6 +279,34 @@ export default function ProjectsDashboard({
   // Table columns
   const columns = React.useMemo<ColumnDef<Project>[]>(
     () => [
+      {
+        id: "select",
+        header: ({ table }) => (
+          <Checkbox
+            checked={
+              table.getIsAllPageRowsSelected() ||
+              (table.getIsSomePageRowsSelected() && "indeterminate")
+            }
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all"
+          />
+        ),
+        cell: ({ row }) => {
+          // Only allow selecting projects with local paths
+          const hasLocal = !!row.original.local
+          return (
+            <Checkbox
+              checked={row.getIsSelected()}
+              onCheckedChange={(value) => row.toggleSelected(!!value)}
+              disabled={!hasLocal}
+              aria-label="Select row"
+              className={!hasLocal ? "opacity-30" : ""}
+            />
+          )
+        },
+        enableSorting: false,
+        enableHiding: false,
+      },
       {
         accessorKey: "name",
         header: ({ column }) => <SortableHeader column={column}>Name</SortableHeader>,
@@ -518,14 +585,25 @@ export default function ProjectsDashboard({
       sorting,
       columnFilters,
       globalFilter,
+      rowSelection,
     },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
+    onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getRowId: (row) => row.slug,
+    enableRowSelection: (row) => !!row.original.local, // Only local projects can be selected
   })
+
+  // Get selected projects with local paths
+  const selectedProjects = React.useMemo(() => {
+    return Object.keys(rowSelection)
+      .map((slug) => filteredProjects.find((p) => p.slug === slug))
+      .filter((p): p is Project => !!p && !!p.local)
+  }, [rowSelection, filteredProjects])
 
   const isLoading = githubLoading || localLoading
   const hasError = githubError || localError
@@ -578,6 +656,21 @@ export default function ProjectsDashboard({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Batch Prompt - visible when items selected */}
+          {selectedProjects.length > 0 && (
+            <Button
+              onClick={() => {
+                setBatchPromptOpen(true)
+                setBatchPrompt("")
+                setSaveAsJob(false)
+                setJobName("")
+              }}
+            >
+              <Play className="h-4 w-4 mr-2" />
+              Batch Prompt ({selectedProjects.length})
+            </Button>
+          )}
+
           {/* Refresh */}
           <Button
             variant="outline"
@@ -767,6 +860,11 @@ export default function ProjectsDashboard({
       <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
         <div>
           Showing {table.getRowModel().rows.length} of {projects.length} projects
+          {selectedProjects.length > 0 && (
+            <span className="ml-2 text-primary">
+              • {selectedProjects.length} selected
+            </span>
+          )}
         </div>
         {!terminalAvailable && (
           <div className="flex items-center gap-1">
@@ -775,6 +873,396 @@ export default function ProjectsDashboard({
           </div>
         )}
       </div>
+
+      {/* Batch Prompt Modal */}
+      <BatchPromptModal
+        open={batchPromptOpen}
+        onClose={() => {
+          setBatchPromptOpen(false)
+          setIsRunningBatch(false)
+          setBatchProgress([])
+        }}
+        projects={selectedProjects}
+        prompt={batchPrompt}
+        setPrompt={setBatchPrompt}
+        saveAsJob={saveAsJob}
+        setSaveAsJob={setSaveAsJob}
+        jobName={jobName}
+        setJobName={setJobName}
+        isRunning={isRunningBatch}
+        setIsRunning={setIsRunningBatch}
+        progress={batchProgress}
+        setProgress={setBatchProgress}
+        onComplete={() => {
+          queryClient.invalidateQueries({ queryKey: ['jobs'] })
+          setRowSelection({})
+        }}
+      />
     </div>
+  )
+}
+
+// ============================================================================
+// BATCH PROMPT MODAL
+// ============================================================================
+
+interface BatchPromptModalProps {
+  open: boolean
+  onClose: () => void
+  projects: Project[]
+  prompt: string
+  setPrompt: (prompt: string) => void
+  saveAsJob: boolean
+  setSaveAsJob: (save: boolean) => void
+  jobName: string
+  setJobName: (name: string) => void
+  isRunning: boolean
+  setIsRunning: (running: boolean) => void
+  progress: {
+    path: string
+    name: string
+    status: 'pending' | 'running' | 'skipped' | 'complete' | 'error'
+    output: string
+    error?: string
+    needsHuman?: boolean
+  }[]
+  setProgress: React.Dispatch<React.SetStateAction<{
+    path: string
+    name: string
+    status: 'pending' | 'running' | 'skipped' | 'complete' | 'error'
+    output: string
+    error?: string
+    needsHuman?: boolean
+  }[]>>
+  onComplete: () => void
+}
+
+function BatchPromptModal({
+  open,
+  onClose,
+  projects,
+  prompt,
+  setPrompt,
+  saveAsJob,
+  setSaveAsJob,
+  jobName,
+  setJobName,
+  isRunning,
+  setIsRunning,
+  progress,
+  setProgress,
+  onComplete,
+}: BatchPromptModalProps) {
+  const queryClient = useQueryClient()
+  const [expandedProject, setExpandedProject] = React.useState<string | null>(null)
+  const abortControllerRef = React.useRef<AbortController | null>(null)
+
+  // Save job mutation
+  const saveJobMutation = useMutation({
+    mutationFn: async (data: CreateJobRequest) => {
+      const res = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      if (!res.ok) throw new Error('Failed to save job')
+      return res.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+    },
+  })
+
+  const projectPaths = projects.map((p) => p.local!.path)
+
+  const handleRun = async () => {
+    if (!prompt.trim() || projectPaths.length === 0) return
+
+    // Save as job first if requested
+    if (saveAsJob && jobName.trim()) {
+      await saveJobMutation.mutateAsync({
+        name: jobName.trim(),
+        prompt: prompt.trim(),
+        projectPaths,
+        trigger: 'manual',
+      })
+    }
+
+    // Initialize progress
+    setProgress(
+      projects.map((p) => ({
+        path: p.local!.path,
+        name: p.name,
+        status: 'pending',
+        output: '',
+      }))
+    )
+    setIsRunning(true)
+
+    abortControllerRef.current = new AbortController()
+
+    try {
+      const response = await fetch('/api/jobs/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: prompt.trim(),
+          projectPaths,
+        }),
+        signal: abortControllerRef.current.signal,
+      })
+
+      if (!response.ok) throw new Error('Failed to start job')
+
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('No response body')
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.trim() || !line.startsWith('data: ')) continue
+          const data = line.slice(6)
+
+          try {
+            const event: JobStreamEvent = JSON.parse(data)
+            handleEvent(event)
+          } catch {
+            // Ignore parse errors
+          }
+        }
+      }
+    } catch (error) {
+      if ((error as Error).name === 'AbortError') return
+
+      console.error('Batch run error:', error)
+      setProgress((prev) =>
+        prev.map((p) =>
+          p.status === 'pending' || p.status === 'running'
+            ? { ...p, status: 'error', error: (error as Error).message }
+            : p
+        )
+      )
+    } finally {
+      onComplete()
+    }
+  }
+
+  const handleEvent = (event: JobStreamEvent) => {
+    setProgress((prev) => {
+      const idx = prev.findIndex((p) => p.path === event.project)
+      if (idx === -1) return prev
+
+      const updated = [...prev]
+      const project = { ...updated[idx] }
+
+      switch (event.type) {
+        case 'pre-check':
+          project.status = event.skipped ? 'skipped' : 'pending'
+          break
+        case 'start':
+          project.status = 'running'
+          break
+        case 'content':
+          project.output += event.text || ''
+          break
+        case 'complete':
+          project.status = 'complete'
+          project.needsHuman = event.needsHuman
+          if (event.error) {
+            project.status = 'error'
+            project.error = event.error
+          }
+          break
+        case 'error':
+          project.status = 'error'
+          project.error = event.error
+          break
+      }
+
+      updated[idx] = project
+      return updated
+    })
+  }
+
+  const handleCancel = () => {
+    abortControllerRef.current?.abort()
+    setIsRunning(false)
+  }
+
+  const isDone = isRunning && progress.every(
+    (p) => p.status === 'complete' || p.status === 'skipped' || p.status === 'error'
+  )
+  const hasErrors = progress.some((p) => p.status === 'error')
+  const needsHuman = progress.some((p) => p.needsHuman)
+
+  return (
+    <Dialog open={open} onOpenChange={(open) => !open && !isRunning && onClose()}>
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {isRunning && !isDone && <Loader2 className="h-4 w-4 animate-spin" />}
+            {isDone && hasErrors && <XCircle className="h-4 w-4 text-destructive" />}
+            {isDone && needsHuman && !hasErrors && (
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+            )}
+            {isDone && !hasErrors && !needsHuman && (
+              <CheckCircle2 className="h-4 w-4 text-green-500" />
+            )}
+            {isRunning ? 'Running Batch Prompt' : 'Batch Prompt'}
+          </DialogTitle>
+          <DialogDescription>
+            {isRunning
+              ? `Running on ${projects.length} projects...`
+              : `Send a prompt to ${projects.length} selected projects`}
+          </DialogDescription>
+        </DialogHeader>
+
+        <ScrollArea className="flex-1 pr-4">
+          {!isRunning ? (
+            <div className="space-y-6 py-4">
+              {/* Selected projects */}
+              <div className="space-y-2">
+                <Label>Selected Projects ({projects.length})</Label>
+                <div className="flex flex-wrap gap-1">
+                  {projects.map((p) => (
+                    <Badge key={p.slug} variant="secondary">
+                      {p.name}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* Prompt */}
+              <div className="space-y-2">
+                <Label htmlFor="batch-prompt">Prompt</Label>
+                <Textarea
+                  id="batch-prompt"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder="Enter the prompt to run on all selected projects..."
+                  className="min-h-[150px]"
+                />
+              </div>
+
+              {/* Save as job option */}
+              <div className="space-y-4 p-4 rounded-lg border bg-muted/30">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="save-as-job"
+                    checked={saveAsJob}
+                    onCheckedChange={(checked) => setSaveAsJob(!!checked)}
+                  />
+                  <Label htmlFor="save-as-job" className="cursor-pointer">
+                    Save as job for later
+                  </Label>
+                </div>
+
+                {saveAsJob && (
+                  <div className="space-y-2 pl-6">
+                    <Label htmlFor="job-name">Job Name</Label>
+                    <Input
+                      id="job-name"
+                      value={jobName}
+                      onChange={(e) => setJobName(e.target.value)}
+                      placeholder="e.g., Weekly Code Review"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2 py-4">
+              {progress.map((project) => (
+                <Card
+                  key={project.path}
+                  className={`cursor-pointer hover:bg-muted/50 transition-colors ${
+                    expandedProject === project.path ? 'border-primary' : ''
+                  }`}
+                  onClick={() =>
+                    setExpandedProject(
+                      expandedProject === project.path ? null : project.path
+                    )
+                  }
+                >
+                  <CardContent className="p-3 flex items-center gap-3">
+                    {project.status === 'pending' && (
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    {project.status === 'running' && (
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    )}
+                    {project.status === 'skipped' && (
+                      <SkipForward className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    {project.status === 'complete' && !project.needsHuman && (
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    )}
+                    {project.status === 'complete' && project.needsHuman && (
+                      <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    )}
+                    {project.status === 'error' && (
+                      <XCircle className="h-4 w-4 text-destructive" />
+                    )}
+
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{project.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {project.status === 'pending' && 'Waiting...'}
+                        {project.status === 'running' && 'Running Claude...'}
+                        {project.status === 'skipped' && 'Skipped'}
+                        {project.status === 'complete' &&
+                          (project.needsHuman ? 'Needs review' : 'Complete')}
+                        {project.status === 'error' && project.error}
+                      </div>
+                    </div>
+                  </CardContent>
+
+                  {expandedProject === project.path && project.output && (
+                    <CardContent className="pt-0 pb-3 px-3">
+                      <pre className="text-xs font-mono whitespace-pre-wrap max-h-[200px] overflow-auto p-2 bg-muted/50 rounded">
+                        {project.output}
+                      </pre>
+                    </CardContent>
+                  )}
+                </Card>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+
+        <DialogFooter>
+          {!isRunning ? (
+            <>
+              <Button variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleRun}
+                disabled={!prompt.trim() || (saveAsJob && !jobName.trim())}
+              >
+                <Play className="h-4 w-4 mr-2" />
+                Run Now
+              </Button>
+            </>
+          ) : isDone ? (
+            <Button onClick={onClose}>Close</Button>
+          ) : (
+            <Button variant="destructive" onClick={handleCancel}>
+              Cancel
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

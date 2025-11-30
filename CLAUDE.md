@@ -26,6 +26,7 @@ A personal dashboard/homepage with accordion sidebar navigation. Features weathe
 | [docs/terminal-integration.md](docs/terminal-integration.md) | Chrome extension terminal bookmarks |
 | [docs/design-system.md](docs/design-system.md) | Themes, glassmorphism, backgrounds |
 | [docs/state-management.md](docs/state-management.md) | TanStack Query, caching |
+| [docs/claude-jobs.md](docs/claude-jobs.md) | Automated Claude prompts across projects |
 | [docs/roadmap.md](docs/roadmap.md) | Planned features |
 
 ## Sections
@@ -41,6 +42,8 @@ A personal dashboard/homepage with accordion sidebar navigation. Features weathe
 | Search Hub | `app/sections/search-hub.tsx` | Search + AI chat |
 | Paper Trading | `app/sections/stocks-dashboard.tsx` | Stock trading practice |
 | Tasks | `app/sections/tasks.tsx` | Quick todo list (localStorage) |
+| Jobs | `app/sections/jobs.tsx` | Claude batch prompts + results inbox |
+| AI Workspace | `app/sections/ai-workspace.tsx` | Claude Code chat interface |
 | Integrations | `app/sections/integrations.tsx` | Connected services status |
 | Profile | `app/sections/profile.tsx` | Auth, sync status |
 | Settings | `app/page.tsx` (SettingsSection) | Theme, sections, API keys |
