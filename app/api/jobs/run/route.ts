@@ -10,16 +10,17 @@
 import { NextRequest } from 'next/server'
 import { getJob, updateJobRunStatus } from '@/lib/jobs/storage'
 import { runJobOnProjects, generateRunId, getProjectName } from '@/lib/jobs/runner'
-import type { RunJobRequest, JobStreamEvent, JobRun, ProjectRunResult } from '@/lib/jobs/types'
+import type { RunJobRequest, JobStreamEvent, JobRun, ProjectRunResult, JobBackend } from '@/lib/jobs/types'
 
 export async function POST(request: NextRequest) {
   try {
     const body: RunJobRequest = await request.json()
-    const { jobId, prompt, projectPaths, preCheck, maxParallel } = body
+    const { jobId, prompt, projectPaths, backend, preCheck, maxParallel } = body
 
     // Resolve job details
     let resolvedPrompt: string
     let resolvedProjectPaths: string[]
+    let resolvedBackend: JobBackend = backend || 'claude'
     let resolvedPreCheck = preCheck
     let resolvedMaxParallel = maxParallel || 3
     let jobName = 'Ad-hoc Job'
@@ -36,6 +37,7 @@ export async function POST(request: NextRequest) {
 
       resolvedPrompt = job.prompt
       resolvedProjectPaths = job.projectPaths
+      resolvedBackend = job.backend || 'claude'
       resolvedPreCheck = job.preCheck
       resolvedMaxParallel = job.maxParallel || 3
       jobName = job.name
@@ -78,6 +80,7 @@ export async function POST(request: NextRequest) {
             resolvedProjectPaths,
             resolvedPreCheck,
             resolvedMaxParallel,
+            resolvedBackend,
             sendEvent
           )
 

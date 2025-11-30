@@ -6,7 +6,7 @@
 import { spawn, exec } from 'child_process'
 import { promisify } from 'util'
 import path from 'path'
-import type { PreCheck, JobStreamEvent, ProjectRunResult } from './types'
+import type { PreCheck, JobStreamEvent, ProjectRunResult, JobBackend } from './types'
 
 const execAsync = promisify(exec)
 
@@ -209,8 +209,8 @@ export async function runClaudeOnProject(
 }
 
 /**
- * Detect if Claude's output indicates need for human review
- * Looks for common patterns that Claude uses to flag issues
+ * Detect if output indicates need for human review
+ * Looks for common patterns that AI uses to flag issues
  */
 function detectNeedsHuman(output: string): boolean {
   const patterns = [
@@ -230,6 +230,210 @@ function detectNeedsHuman(output: string): boolean {
 }
 
 /**
+ * Run Codex against a project (non-streaming)
+ * Command: codex exec -m gpt-5 -c model_reasoning_effort="high" --sandbox read-only "prompt"
+ */
+export async function runCodexOnProject(
+  projectPath: string,
+  prompt: string,
+  onEvent: (event: JobStreamEvent) => void
+): Promise<ProjectRunResult> {
+  const projectName = getProjectName(projectPath)
+  const startedAt = new Date().toISOString()
+
+  // Emit start event
+  onEvent({
+    type: 'start',
+    project: projectPath,
+    projectName
+  })
+
+  return new Promise((resolve) => {
+    let fullOutput = ''
+    let hasError = false
+    let errorMessage = ''
+
+    const args = [
+      'exec',
+      '-m', 'gpt-5',
+      '-c', 'model_reasoning_effort="high"',
+      '--sandbox', 'read-only',
+      prompt
+    ]
+
+    const codex = spawn('codex', args, {
+      cwd: projectPath,
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: false
+    })
+
+    codex.stdout.on('data', (chunk: Buffer) => {
+      fullOutput += chunk.toString()
+    })
+
+    codex.stderr.on('data', (chunk: Buffer) => {
+      console.error('Codex CLI stderr:', chunk.toString())
+    })
+
+    codex.on('close', (code) => {
+      if (code !== 0 && !hasError) {
+        hasError = true
+        errorMessage = `Codex CLI exited with code ${code}`
+      }
+
+      const needsHuman = detectNeedsHuman(fullOutput)
+
+      const result: ProjectRunResult = {
+        path: projectPath,
+        name: projectName,
+        preCheckSkipped: false,
+        output: fullOutput,
+        error: hasError ? errorMessage : undefined,
+        needsHuman,
+        startedAt,
+        completedAt: new Date().toISOString()
+      }
+
+      // Emit complete event
+      onEvent({
+        type: 'complete',
+        project: projectPath,
+        projectName,
+        output: fullOutput,
+        needsHuman,
+        error: hasError ? errorMessage : undefined
+      })
+
+      resolve(result)
+    })
+
+    codex.on('error', (error) => {
+      hasError = true
+      errorMessage = error.message
+
+      const result: ProjectRunResult = {
+        path: projectPath,
+        name: projectName,
+        preCheckSkipped: false,
+        error: errorMessage,
+        needsHuman: false,
+        startedAt,
+        completedAt: new Date().toISOString()
+      }
+
+      onEvent({
+        type: 'error',
+        project: projectPath,
+        projectName,
+        error: errorMessage
+      })
+
+      resolve(result)
+    })
+  })
+}
+
+/**
+ * Run Gemini against a project (non-streaming)
+ * Command: gemini -p "prompt"
+ */
+export async function runGeminiOnProject(
+  projectPath: string,
+  prompt: string,
+  onEvent: (event: JobStreamEvent) => void
+): Promise<ProjectRunResult> {
+  const projectName = getProjectName(projectPath)
+  const startedAt = new Date().toISOString()
+
+  // Emit start event
+  onEvent({
+    type: 'start',
+    project: projectPath,
+    projectName
+  })
+
+  return new Promise((resolve) => {
+    let fullOutput = ''
+    let hasError = false
+    let errorMessage = ''
+
+    const args = ['-p', prompt]
+
+    const gemini = spawn('gemini', args, {
+      cwd: projectPath,
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: false
+    })
+
+    gemini.stdout.on('data', (chunk: Buffer) => {
+      fullOutput += chunk.toString()
+    })
+
+    gemini.stderr.on('data', (chunk: Buffer) => {
+      console.error('Gemini CLI stderr:', chunk.toString())
+    })
+
+    gemini.on('close', (code) => {
+      if (code !== 0 && !hasError) {
+        hasError = true
+        errorMessage = `Gemini CLI exited with code ${code}`
+      }
+
+      const needsHuman = detectNeedsHuman(fullOutput)
+
+      const result: ProjectRunResult = {
+        path: projectPath,
+        name: projectName,
+        preCheckSkipped: false,
+        output: fullOutput,
+        error: hasError ? errorMessage : undefined,
+        needsHuman,
+        startedAt,
+        completedAt: new Date().toISOString()
+      }
+
+      // Emit complete event
+      onEvent({
+        type: 'complete',
+        project: projectPath,
+        projectName,
+        output: fullOutput,
+        needsHuman,
+        error: hasError ? errorMessage : undefined
+      })
+
+      resolve(result)
+    })
+
+    gemini.on('error', (error) => {
+      hasError = true
+      errorMessage = error.message
+
+      const result: ProjectRunResult = {
+        path: projectPath,
+        name: projectName,
+        preCheckSkipped: false,
+        error: errorMessage,
+        needsHuman: false,
+        startedAt,
+        completedAt: new Date().toISOString()
+      }
+
+      onEvent({
+        type: 'error',
+        project: projectPath,
+        projectName,
+        error: errorMessage
+      })
+
+      resolve(result)
+    })
+  })
+}
+
+/**
  * Run a job against multiple projects with parallel limit
  */
 export async function runJobOnProjects(
@@ -237,6 +441,7 @@ export async function runJobOnProjects(
   projectPaths: string[],
   preCheck: PreCheck | undefined,
   maxParallel: number = DEFAULT_MAX_PARALLEL,
+  backend: JobBackend = 'claude',
   onEvent: (event: JobStreamEvent) => void
 ): Promise<ProjectRunResult[]> {
   const results: ProjectRunResult[] = []
@@ -276,8 +481,20 @@ export async function runJobOnProjects(
           }
         }
 
-        // Run Claude on the project
-        const result = await runClaudeOnProject(projectPath, prompt, onEvent)
+        // Run AI backend on the project
+        let result: ProjectRunResult
+        switch (backend) {
+          case 'codex':
+            result = await runCodexOnProject(projectPath, prompt, onEvent)
+            break
+          case 'gemini':
+            result = await runGeminiOnProject(projectPath, prompt, onEvent)
+            break
+          case 'claude':
+          default:
+            result = await runClaudeOnProject(projectPath, prompt, onEvent)
+            break
+        }
         results.push(result)
       })()
 

@@ -13,6 +13,11 @@ export type JobTrigger =
   | 'before-first-prompt' // Before first chat message of session
 
 /**
+ * Job backend types - which AI to run
+ */
+export type JobBackend = 'claude' | 'codex' | 'gemini'
+
+/**
  * Pre-check configuration - cheap shell command to run before Claude
  */
 export interface PreCheck {
@@ -32,11 +37,12 @@ export type JobStatus = 'idle' | 'running' | 'needs-human' | 'error'
 export interface Job {
   id: string
   name: string
-  prompt: string            // The Claude prompt
+  prompt: string            // The prompt to run
   projectPaths: string[]    // Local project paths to run against
   trigger: JobTrigger
-  preCheck?: PreCheck       // Optional cheap check before running Claude
-  maxParallel?: number      // Max concurrent claude processes (default: 3)
+  backend: JobBackend       // Which AI backend to use (default: 'claude')
+  preCheck?: PreCheck       // Optional cheap check before running AI
+  maxParallel?: number      // Max concurrent processes (default: 3)
 
   // Execution state
   lastRun?: string          // ISO date string
@@ -86,6 +92,7 @@ export interface RunJobRequest {
   // OR ad-hoc:
   prompt?: string
   projectPaths?: string[]
+  backend?: JobBackend      // Default: 'claude'
   preCheck?: PreCheck
   maxParallel?: number      // Default: 3
 }
@@ -155,6 +162,7 @@ export interface CreateJobRequest {
   prompt: string
   projectPaths: string[]
   trigger: JobTrigger
+  backend?: JobBackend      // Default: 'claude'
   preCheck?: PreCheck
   maxParallel?: number
 }

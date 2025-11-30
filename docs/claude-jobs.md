@@ -1,40 +1,58 @@
 # Claude Jobs
 
-Automated and on-demand Claude Code prompts across multiple projects with GitHub-based logging.
+Automated and on-demand AI prompts across multiple projects using Claude, Codex, or Gemini.
 
 ## Overview
 
-Claude Jobs enables running prompts against multiple projects simultaneously, with event-driven triggers and smart pre-checks to avoid wasting tokens. Results are stored locally with plans for GitHub sync.
+Claude Jobs enables running prompts against multiple projects simultaneously using your choice of AI backend (Claude, OpenAI Codex, or Google Gemini). Features include event-driven triggers, smart pre-checks to avoid wasting tokens, and a results inbox. Results are stored locally with plans for GitHub sync.
 
 ## Architecture
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   Homepage UI   │────▶│  Next.js API    │────▶│  claude -p      │
+│   Homepage UI   │────▶│  Next.js API    │────▶│  AI Backend     │
 │   (trigger)     │     │  /api/jobs/run  │     │  (per project)  │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
         │                                               │
-        │                                               │
-        ▼                                               ▼
-┌─────────────────┐                           ┌─────────────────┐
-│   localStorage  │◀──────────────────────────│  SSE Stream     │
-│   (jobs.json)   │                           │  (results)      │
-│   (results)     │                           └─────────────────┘
+        │                                       ┌───────┼───────┐
+        ▼                                       ▼       ▼       ▼
+┌─────────────────┐                          Claude  Codex  Gemini
+│   localStorage  │◀────────────────────────────────────┘
+│   (jobs.json)   │
+│   (results)     │
 └─────────────────┘
 ```
+
+## AI Backends
+
+Jobs can run on any of three AI backends:
+
+| Backend | CLI Command | Streaming | Notes |
+|---------|-------------|-----------|-------|
+| **Claude** | `claude --print --output-format stream-json` | Yes | Default, uses Claude Code CLI |
+| **Codex** | `codex exec -m gpt-5 --sandbox read-only` | No | OpenAI Codex with high reasoning |
+| **Gemini** | `gemini -p` | No | Google Gemini, free tier available |
+
+Select the backend when creating a job. Each has different strengths:
+- **Claude** - Best for code understanding and file operations
+- **Codex** - Strong reasoning, good for complex debugging
+- **Gemini** - Free tier, good for second opinions
 
 ## Data Model
 
 ### Job Definition
 
 ```typescript
+type JobBackend = 'claude' | 'codex' | 'gemini'
+
 interface Job {
   id: string
   name: string
-  prompt: string                    // The Claude prompt template
+  prompt: string                    // The prompt to send to the AI
   projectPaths: string[]            // Local project paths to run against
   trigger: JobTrigger
-  preCheck?: PreCheck               // Optional cheap check before running Claude
+  backend: JobBackend               // Which AI to use (default: 'claude')
+  preCheck?: PreCheck               // Optional cheap check before running AI
 
   // Execution state
   lastRun?: Date

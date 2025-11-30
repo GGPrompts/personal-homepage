@@ -87,6 +87,7 @@ export async function createJob(request: CreateJobRequest): Promise<Job> {
     prompt: request.prompt,
     projectPaths: request.projectPaths,
     trigger: request.trigger,
+    backend: request.backend || 'claude',
     preCheck: request.preCheck,
     maxParallel: request.maxParallel,
     status: 'idle',

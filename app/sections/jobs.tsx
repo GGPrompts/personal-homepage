@@ -59,8 +59,11 @@ import {
   ArrowLeft,
   Eye,
   EyeOff,
+  Bot,
+  Zap,
+  Sparkles,
 } from "lucide-react"
-import type { Job, JobTrigger, PreCheck, JobStreamEvent, CreateJobRequest, JobResult, ProjectRunResult } from "@/lib/jobs/types"
+import type { Job, JobTrigger, JobBackend, PreCheck, JobStreamEvent, CreateJobRequest, JobResult, ProjectRunResult } from "@/lib/jobs/types"
 import type { LocalProject } from "@/lib/projects"
 import { useJobResults } from "@/hooks/useJobResults"
 
@@ -107,6 +110,30 @@ function getTriggerLabel(trigger: JobTrigger) {
   }
 }
 
+function getBackendIcon(backend: JobBackend) {
+  switch (backend) {
+    case 'codex':
+      return <Zap className="h-4 w-4" />
+    case 'gemini':
+      return <Sparkles className="h-4 w-4" />
+    case 'claude':
+    default:
+      return <Bot className="h-4 w-4" />
+  }
+}
+
+function getBackendLabel(backend: JobBackend) {
+  switch (backend) {
+    case 'codex':
+      return 'Codex'
+    case 'gemini':
+      return 'Gemini'
+    case 'claude':
+    default:
+      return 'Claude'
+  }
+}
+
 function formatRelativeTime(dateStr?: string) {
   if (!dateStr) return 'Never'
   const date = new Date(dateStr)
@@ -143,6 +170,7 @@ function JobModal({ open, onClose, job, projects }: JobModalProps) {
   const [prompt, setPrompt] = React.useState(job?.prompt || '')
   const [selectedProjects, setSelectedProjects] = React.useState<string[]>(job?.projectPaths || [])
   const [trigger, setTrigger] = React.useState<JobTrigger>(job?.trigger || 'manual')
+  const [backend, setBackend] = React.useState<JobBackend>(job?.backend || 'claude')
   const [usePreCheck, setUsePreCheck] = React.useState(!!job?.preCheck)
   const [preCheckCommand, setPreCheckCommand] = React.useState(job?.preCheck?.command || '')
   const [preCheckSkipIf, setPreCheckSkipIf] = React.useState<PreCheck['skipIf']>(job?.preCheck?.skipIf || 'empty')
@@ -155,6 +183,7 @@ function JobModal({ open, onClose, job, projects }: JobModalProps) {
       setPrompt(job?.prompt || '')
       setSelectedProjects(job?.projectPaths || [])
       setTrigger(job?.trigger || 'manual')
+      setBackend(job?.backend || 'claude')
       setUsePreCheck(!!job?.preCheck)
       setPreCheckCommand(job?.preCheck?.command || '')
       setPreCheckSkipIf(job?.preCheck?.skipIf || 'empty')
@@ -188,6 +217,7 @@ function JobModal({ open, onClose, job, projects }: JobModalProps) {
       prompt: prompt.trim(),
       projectPaths: selectedProjects,
       trigger,
+      backend,
       maxParallel,
       ...(usePreCheck && preCheckCommand
         ? {
@@ -293,6 +323,41 @@ function JobModal({ open, onClose, job, projects }: JobModalProps) {
                 {trigger === 'manual'
                   ? 'Run manually by clicking the Run button'
                   : 'Automatically run when you log in'}
+              </p>
+            </div>
+
+            {/* Backend */}
+            <div className="space-y-2">
+              <Label>AI Backend</Label>
+              <Select value={backend} onValueChange={(v) => setBackend(v as JobBackend)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="claude">
+                    <div className="flex items-center gap-2">
+                      <Bot className="h-4 w-4" />
+                      Claude
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="codex">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-4 w-4" />
+                      Codex (OpenAI)
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="gemini">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4" />
+                      Gemini (Google)
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {backend === 'claude' && 'Use Claude Code CLI for streaming output'}
+                {backend === 'codex' && 'Use OpenAI Codex CLI (gpt-5)'}
+                {backend === 'gemini' && 'Use Google Gemini CLI'}
               </p>
             </div>
 
@@ -740,6 +805,10 @@ function JobCard({ job, onRun, onEdit, onDelete, isExpanded, onToggleExpand }: J
                   className={'className' in statusBadge ? statusBadge.className : undefined}
                 >
                   {statusBadge.label}
+                </Badge>
+                <Badge variant="outline" className="text-xs flex items-center gap-1">
+                  {getBackendIcon(job.backend || 'claude')}
+                  {getBackendLabel(job.backend || 'claude')}
                 </Badge>
                 <Badge variant="outline" className="text-xs">
                   {getTriggerLabel(job.trigger)}
