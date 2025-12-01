@@ -627,7 +627,9 @@ export default function GitHubActivity({ activeSubItem, onSubItemHandled }: GitH
               </div>
               <div className="flex items-center gap-6">
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-foreground">{userData.public_repos}</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {isOwnProfile && reposData ? reposData.length : userData.public_repos}
+                  </p>
                   <p className="text-xs text-muted-foreground">Repos</p>
                 </div>
                 <div className="text-center">
