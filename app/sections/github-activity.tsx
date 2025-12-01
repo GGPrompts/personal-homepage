@@ -166,16 +166,21 @@ const LANGUAGE_COLORS: Record<string, string> = {
 // ============================================================================
 
 function useUsername() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, getGitHubToken } = useAuth()
   const [username, setUsername] = useState<string>(DEFAULT_USERNAME)
   const [isLoaded, setIsLoaded] = useState(false)
+
+  // Get the authenticated user's GitHub username
+  const authUsername = user?.user_metadata?.user_name as string | undefined
+
+  // Check if we're viewing our own profile
+  const isOwnProfile = !!authUsername && username.toLowerCase() === authUsername.toLowerCase()
 
   // Get GitHub username from authenticated user or localStorage
   useEffect(() => {
     if (authLoading) return
 
     // Priority: 1) authenticated GitHub user, 2) localStorage, 3) default
-    const authUsername = user?.user_metadata?.user_name as string | undefined
     const saved = localStorage.getItem(STORAGE_KEY)
 
     if (authUsername) {
@@ -184,7 +189,7 @@ function useUsername() {
       setUsername(saved)
     }
     setIsLoaded(true)
-  }, [user, authLoading])
+  }, [user, authLoading, authUsername])
 
   // Save to localStorage on change (only if manually changed, not from auth)
   useEffect(() => {
@@ -193,7 +198,7 @@ function useUsername() {
     }
   }, [username, isLoaded])
 
-  return { username, setUsername, isLoaded }
+  return { username, setUsername, isLoaded, isOwnProfile, getGitHubToken }
 }
 
 // ============================================================================
@@ -344,7 +349,7 @@ function generateActivityData(events: GitHubEvent[]): { day: string; count: numb
 
 export default function GitHubActivity({ activeSubItem, onSubItemHandled }: GitHubActivityProps) {
   const queryClient = useQueryClient()
-  const { username, setUsername, isLoaded } = useUsername()
+  const { username, setUsername, isLoaded, isOwnProfile, getGitHubToken } = useUsername()
 
   const [usernameInput, setUsernameInput] = useState(username)
   const [selectedRepo, setSelectedRepo] = useState<GitHubRepo | null>(null)
@@ -369,9 +374,14 @@ export default function GitHubActivity({ activeSubItem, onSubItemHandled }: GitH
 
   // Fetch user profile
   const { data: userData, isLoading: userLoading, error: userError } = useQuery<GitHubUser>({
-    queryKey: ["github-user", username],
+    queryKey: ["github-user", username, isOwnProfile],
     queryFn: async () => {
-      const res = await fetch(`https://api.github.com/users/${username}`)
+      const headers: HeadersInit = {}
+      if (isOwnProfile) {
+        const token = await getGitHubToken()
+        if (token) headers.Authorization = `Bearer ${token}`
+      }
+      const res = await fetch(`https://api.github.com/users/${username}`, { headers })
       if (!res.ok) {
         if (res.status === 404) throw new Error("User not found")
         if (res.status === 403) throw new Error("Rate limited - try again later")
@@ -384,11 +394,22 @@ export default function GitHubActivity({ activeSubItem, onSubItemHandled }: GitH
     retry: false,
   })
 
-  // Fetch public events
+  // Fetch events (includes private events when viewing own profile with auth)
   const { data: eventsData, isLoading: eventsLoading, refetch: refetchEvents } = useQuery<GitHubEvent[]>({
-    queryKey: ["github-events", username],
+    queryKey: ["github-events", username, isOwnProfile],
     queryFn: async () => {
-      const res = await fetch(`https://api.github.com/users/${username}/events/public?per_page=100`)
+      const headers: HeadersInit = {}
+      // Use authenticated endpoint for own profile to see private activity
+      let url = `https://api.github.com/users/${username}/events/public?per_page=100`
+      if (isOwnProfile) {
+        const token = await getGitHubToken()
+        if (token) {
+          headers.Authorization = `Bearer ${token}`
+          // Remove /public to get all events including private
+          url = `https://api.github.com/users/${username}/events?per_page=100`
+        }
+      }
+      const res = await fetch(url, { headers })
       if (!res.ok) {
         if (res.status === 404) throw new Error("User not found")
         if (res.status === 403) throw new Error("Rate limited")
@@ -401,11 +422,22 @@ export default function GitHubActivity({ activeSubItem, onSubItemHandled }: GitH
     retry: false,
   })
 
-  // Fetch repositories
+  // Fetch repositories (includes private repos when viewing own profile with auth)
   const { data: reposData, isLoading: reposLoading, refetch: refetchRepos } = useQuery<GitHubRepo[]>({
-    queryKey: ["github-repos", username],
+    queryKey: ["github-repos", username, isOwnProfile],
     queryFn: async () => {
-      const res = await fetch(`https://api.github.com/users/${username}/repos?sort=updated&per_page=100`)
+      const headers: HeadersInit = {}
+      // Use authenticated endpoint for own profile to see private repos
+      let url = `https://api.github.com/users/${username}/repos?sort=updated&per_page=100`
+      if (isOwnProfile) {
+        const token = await getGitHubToken()
+        if (token) {
+          headers.Authorization = `Bearer ${token}`
+          // Use /user/repos to get all repos including private
+          url = `https://api.github.com/user/repos?sort=pushed&per_page=100&affiliation=owner`
+        }
+      }
+      const res = await fetch(url, { headers })
       if (!res.ok) {
         if (res.status === 404) throw new Error("User not found")
         if (res.status === 403) throw new Error("Rate limited")
