@@ -536,6 +536,184 @@ const SAMPLE_COLLECTIONS: Collection[] = [
       },
     ],
   },
+  {
+    id: "spacex",
+    name: "SpaceX API",
+    expanded: false,
+    requests: [
+      {
+        id: "sx1",
+        name: "Next Launch",
+        method: "GET",
+        url: "https://api.spacexdata.com/v5/launches/next",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "https://api.spacexdata.com/v5/launches/next",
+        },
+      },
+      {
+        id: "sx2",
+        name: "Upcoming Launches",
+        method: "GET",
+        url: "https://api.spacexdata.com/v5/launches/upcoming",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "https://api.spacexdata.com/v5/launches/upcoming",
+        },
+      },
+      {
+        id: "sx3",
+        name: "Past Launches",
+        method: "GET",
+        url: "https://api.spacexdata.com/v5/launches/past",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "https://api.spacexdata.com/v5/launches/past",
+        },
+      },
+      {
+        id: "sx4",
+        name: "All Rockets",
+        method: "GET",
+        url: "https://api.spacexdata.com/v4/rockets",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "https://api.spacexdata.com/v4/rockets",
+        },
+      },
+      {
+        id: "sx5",
+        name: "All Launchpads",
+        method: "GET",
+        url: "https://api.spacexdata.com/v4/launchpads",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "https://api.spacexdata.com/v4/launchpads",
+        },
+      },
+      {
+        id: "sx6",
+        name: "Company Info",
+        method: "GET",
+        url: "https://api.spacexdata.com/v4/company",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "https://api.spacexdata.com/v4/company",
+        },
+      },
+    ],
+  },
+  {
+    id: "ai",
+    name: "AI APIs",
+    expanded: false,
+    requests: [
+      {
+        id: "ai1",
+        name: "List Available Models",
+        method: "GET",
+        url: "/api/ai/models",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "/api/ai/models",
+        },
+      },
+      {
+        id: "ai2",
+        name: "Chat Completion",
+        method: "POST",
+        url: "/api/ai/chat",
+        config: {
+          ...DEFAULT_CONFIG,
+          method: "POST",
+          url: "/api/ai/chat",
+          body: {
+            type: "json",
+            content: `{
+  "messages": [
+    { "role": "user", "content": "Hello, what can you help me with?" }
+  ],
+  "model": "claude-sonnet",
+  "temperature": 0.7
+}`,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: "jobs",
+    name: "Claude Jobs API",
+    expanded: false,
+    requests: [
+      {
+        id: "job1",
+        name: "List All Jobs",
+        method: "GET",
+        url: "/api/jobs",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "/api/jobs",
+        },
+      },
+      {
+        id: "job2",
+        name: "Run Job",
+        method: "POST",
+        url: "/api/jobs/run",
+        config: {
+          ...DEFAULT_CONFIG,
+          method: "POST",
+          url: "/api/jobs/run",
+          body: {
+            type: "json",
+            content: `{
+  "prompt": "Summarize the README",
+  "projectPaths": ["/home/matt/projects/personal-homepage"],
+  "backend": "claude"
+}`,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: "projects",
+    name: "Projects API",
+    expanded: false,
+    requests: [
+      {
+        id: "proj1",
+        name: "List Local Projects",
+        method: "GET",
+        url: "/api/projects/local",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "/api/projects/local",
+        },
+      },
+      {
+        id: "proj2",
+        name: "Get GitHub Repos",
+        method: "GET",
+        url: "/api/projects/github",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "/api/projects/github",
+        },
+      },
+      {
+        id: "proj3",
+        name: "Get Project Metadata",
+        method: "GET",
+        url: "/api/projects/meta",
+        config: {
+          ...DEFAULT_CONFIG,
+          url: "/api/projects/meta",
+        },
+      },
+    ],
+  },
 ]
 
 // ============================================================================

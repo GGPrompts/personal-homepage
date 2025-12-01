@@ -14,6 +14,9 @@ import {
   Settings,
   TrendingUp,
   Rss,
+  Rocket,
+  Bot,
+  Terminal,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -258,6 +261,26 @@ export default function IntegrationsSection({
       status: "connected",
       statusMessage: "Public APIs, no configuration required",
       configLocation: "feed",
+    },
+    {
+      id: "spacex",
+      name: "SpaceX API",
+      description: "Launch schedules, rocket data, and mission tracking",
+      icon: Rocket,
+      category: "data",
+      status: "connected",
+      statusMessage: "Free public API, no configuration required",
+      docsUrl: "https://github.com/r-spacex/SpaceX-API",
+    },
+    {
+      id: "claude-cli",
+      name: "Claude CLI",
+      description: "AI Workspace and Claude Jobs powered by Claude Code CLI",
+      icon: Terminal,
+      category: "api",
+      status: "connected",
+      statusMessage: "Uses local Claude CLI installation",
+      docsUrl: "https://docs.anthropic.com/en/docs/claude-code",
     },
   ]
 
