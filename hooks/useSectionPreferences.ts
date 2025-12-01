@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 
 // Section IDs that can be toggled (excluding home and settings which are always visible)
-export type ToggleableSection = "weather" | "feed" | "api-playground" | "notes" | "bookmarks" | "search" | "stocks" | "tasks" | "projects" | "jobs" | "integrations" | "profile" | "ai-workspace"
+export type ToggleableSection = "weather" | "feed" | "api-playground" | "notes" | "bookmarks" | "search" | "stocks" | "crypto" | "spacex" | "github-activity" | "disasters" | "tasks" | "projects" | "jobs" | "integrations" | "profile" | "ai-workspace"
 
 // All sections including non-toggleable ones
 export type Section = "home" | ToggleableSection | "settings"
@@ -18,6 +18,10 @@ export const DEFAULT_SECTION_ORDER: ToggleableSection[] = [
   "search",
   "ai-workspace",
   "stocks",
+  "crypto",
+  "spacex",
+  "github-activity",
+  "disasters",
   "tasks",
   "projects",
   "jobs",
@@ -35,6 +39,10 @@ export const DEFAULT_VISIBILITY: Record<ToggleableSection, boolean> = {
   search: true,
   "ai-workspace": true,
   stocks: true,
+  crypto: true,
+  spacex: true,
+  "github-activity": true,
+  disasters: true,
   tasks: true,
   projects: true,
   jobs: true,

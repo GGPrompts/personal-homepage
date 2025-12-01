@@ -20,6 +20,10 @@ import {
   FolderGit2,
   MessageSquare,
   Play,
+  Bitcoin,
+  Rocket,
+  Github,
+  AlertCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -39,6 +43,10 @@ const sectionMeta: Record<ToggleableSection, { label: string; icon: React.Elemen
   search: { label: "Search Hub", icon: Search, description: "Search, AI & Image" },
   "ai-workspace": { label: "AI Workspace", icon: MessageSquare, description: "Chat with AI models" },
   stocks: { label: "Paper Trading", icon: TrendingUp, description: "Practice stock trading" },
+  crypto: { label: "Crypto", icon: Bitcoin, description: "Live cryptocurrency prices" },
+  spacex: { label: "SpaceX Launches", icon: Rocket, description: "Track rocket launches" },
+  "github-activity": { label: "GitHub Activity", icon: Github, description: "GitHub events & repos" },
+  disasters: { label: "Disasters", icon: AlertCircle, description: "Earthquakes & alerts" },
   tasks: { label: "Tasks", icon: CheckCircle2, description: "Quick todo list" },
   projects: { label: "Projects", icon: FolderGit2, description: "GitHub & local repos" },
   jobs: { label: "Jobs", icon: Play, description: "Claude batch prompts" },

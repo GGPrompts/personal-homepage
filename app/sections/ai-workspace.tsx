@@ -501,7 +501,7 @@ export default function AIWorkspaceSection({
 
   // Get pinned projects with their paths
   const pinnedProjects = React.useMemo(() => {
-    if (!localProjects || !projectsConfigured) return []
+    if (!localProjects || !Array.isArray(localProjects) || !projectsConfigured) return []
     const pinnedSlugs = getPinnedSlugs()
     return localProjects.filter(p => {
       const slug = `local-${p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`

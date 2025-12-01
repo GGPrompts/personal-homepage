@@ -45,6 +45,10 @@ import {
   Terminal,
   MessageSquare,
   Play,
+  Bitcoin,
+  Rocket,
+  Activity,
+  AlertCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -77,6 +81,10 @@ import TasksSection from "./sections/tasks"
 import ProjectsDashboard from "./sections/projects-dashboard"
 import JobsSection from "./sections/jobs"
 import IntegrationsSection from "./sections/integrations"
+import CryptoDashboard from "./sections/crypto-dashboard"
+import SpaceXTracker from "./sections/spacex-tracker"
+import GitHubActivity from "./sections/github-activity"
+import DisastersMonitor from "./sections/disasters-monitor"
 import { useLoginTrigger } from "@/hooks/useLoginTrigger"
 import { StartupJobsModal } from "@/components/StartupJobsModal"
 import { useJobResults } from "@/hooks/useJobResults"
@@ -189,6 +197,46 @@ const navigationItems: NavigationItem[] = [
       { id: "portfolio", label: "Portfolio", icon: Wallet },
       { id: "watchlist", label: "Watchlist", icon: LineChart },
       { id: "history", label: "History", icon: History },
+    ]
+  },
+  {
+    id: "crypto",
+    label: "Crypto",
+    icon: Bitcoin,
+    description: "Live cryptocurrency prices",
+    subItems: [
+      { id: "market", label: "Market", icon: TrendingUp },
+      { id: "favorites", label: "Favorites", icon: Star },
+    ]
+  },
+  {
+    id: "spacex",
+    label: "SpaceX Launches",
+    icon: Rocket,
+    description: "Track rocket launches",
+    subItems: [
+      { id: "upcoming", label: "Upcoming", icon: Calendar },
+      { id: "past", label: "Past", icon: History },
+    ]
+  },
+  {
+    id: "github-activity",
+    label: "GitHub Activity",
+    icon: Github,
+    description: "GitHub events & repos",
+    subItems: [
+      { id: "events", label: "Events", icon: Activity },
+      { id: "repos", label: "Repos", icon: FolderGit2 },
+    ]
+  },
+  {
+    id: "disasters",
+    label: "Disasters",
+    icon: AlertCircle,
+    description: "Earthquakes & alerts",
+    subItems: [
+      { id: "recent", label: "Recent", icon: Clock },
+      { id: "significant", label: "Significant", icon: AlertTriangle },
     ]
   },
   {
@@ -1061,6 +1109,14 @@ export default function PersonalHomepage() {
         return <AIWorkspaceSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "stocks":
         return <StocksDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("settings")} />
+      case "crypto":
+        return <CryptoDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "spacex":
+        return <SpaceXTracker activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "github-activity":
+        return <GitHubActivity activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "disasters":
+        return <DisastersMonitor activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "tasks":
         return <TasksSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "projects":
