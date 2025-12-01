@@ -37,6 +37,7 @@ import {
   getFile,
   saveFile,
   deleteFile,
+  getDefaultBranch,
   cacheFile,
   getCachedFile,
   getCachedFilePaths,
@@ -164,6 +165,7 @@ function FileTreeItem({
   onToggleExpand,
   expandedPaths,
   repo,
+  defaultBranch,
 }: {
   node: FileTreeNode
   depth: number
@@ -172,6 +174,7 @@ function FileTreeItem({
   onToggleExpand: (path: string) => void
   expandedPaths: Set<string>
   repo: string | null
+  defaultBranch: string
 }) {
   const Icon = getFileIcon(node)
   const isDir = node.type === "dir"
@@ -186,7 +189,7 @@ function FileTreeItem({
       onSelect(node)
     } else if (repo) {
       // Open non-markdown files on GitHub
-      window.open(`https://github.com/${repo}/blob/main/${node.path}`, "_blank")
+      window.open(`https://github.com/${repo}/blob/${defaultBranch}/${node.path}`, "_blank")
     }
   }
 
@@ -235,6 +238,7 @@ function FileTreeItem({
               onToggleExpand={onToggleExpand}
               expandedPaths={expandedPaths}
               repo={repo}
+              defaultBranch={defaultBranch}
             />
           ))}
         </div>
@@ -310,6 +314,7 @@ export default function QuickNotesSection({
   // GitHub config
   const [token, setToken] = React.useState<string | null>(null)
   const [repo, setRepo] = React.useState<string | null>(null)
+  const [defaultBranch, setDefaultBranch] = React.useState<string>("main")
   const [showAuthModal, setShowAuthModal] = React.useState(false)
 
   // UI state
@@ -337,6 +342,22 @@ export default function QuickNotesSection({
     const savedRepo = localStorage.getItem("github-notes-repo")
     setRepo(savedRepo)
   }, [user, getGitHubToken])
+
+  // Fetch default branch when repo changes
+  React.useEffect(() => {
+    if (!token || !repo) return
+
+    const fetchBranch = async () => {
+      try {
+        const branch = await getDefaultBranch(token, repo)
+        setDefaultBranch(branch)
+      } catch {
+        // Fall back to "main" if we can't fetch
+        setDefaultBranch("main")
+      }
+    }
+    fetchBranch()
+  }, [token, repo])
 
   // Handle repo change - clear state and save to localStorage
   const handleRepoChange = React.useCallback((newRepo: string) => {
@@ -802,6 +823,7 @@ export default function QuickNotesSection({
                     onToggleExpand={handleToggleExpand}
                     expandedPaths={expandedPaths}
                     repo={repo}
+                    defaultBranch={defaultBranch}
                   />
                 ))}
               </div>
