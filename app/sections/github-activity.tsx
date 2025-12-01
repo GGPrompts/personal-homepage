@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useAuth } from "@/components/AuthProvider"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   GitBranch,
@@ -165,19 +166,27 @@ const LANGUAGE_COLORS: Record<string, string> = {
 // ============================================================================
 
 function useUsername() {
+  const { user, loading: authLoading } = useAuth()
   const [username, setUsername] = useState<string>(DEFAULT_USERNAME)
   const [isLoaded, setIsLoaded] = useState(false)
 
-  // Load from localStorage on mount
+  // Get GitHub username from authenticated user or localStorage
   useEffect(() => {
+    if (authLoading) return
+
+    // Priority: 1) authenticated GitHub user, 2) localStorage, 3) default
+    const authUsername = user?.user_metadata?.user_name as string | undefined
     const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
+
+    if (authUsername) {
+      setUsername(authUsername)
+    } else if (saved) {
       setUsername(saved)
     }
     setIsLoaded(true)
-  }, [])
+  }, [user, authLoading])
 
-  // Save to localStorage on change
+  // Save to localStorage on change (only if manually changed, not from auth)
   useEffect(() => {
     if (isLoaded && username) {
       localStorage.setItem(STORAGE_KEY, username)
