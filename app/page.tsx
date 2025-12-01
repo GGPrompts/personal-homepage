@@ -570,9 +570,11 @@ async function fetchHomeWeather(lat: number, lon: number, unit: "fahrenheit" | "
   }
 }
 
-function HomeSection({ onNavigate, userName, isVisible, prefsLoaded }: { onNavigate: (section: Section) => void; userName?: string | null; isVisible: (section: ToggleableSection) => boolean; prefsLoaded: boolean }) {
+function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrder }: { onNavigate: (section: Section) => void; userName?: string | null; isVisible: (section: ToggleableSection) => boolean; prefsLoaded: boolean; sectionOrder: ToggleableSection[] }) {
   // Use default visibility (all visible) during SSR to prevent hydration mismatch
   const checkVisible = (section: ToggleableSection) => prefsLoaded ? isVisible(section) : true
+  // Use default order during SSR to prevent hydration mismatch
+  const effectiveOrder = prefsLoaded ? sectionOrder : DEFAULT_SECTION_ORDER
   // Get saved location and temp unit from localStorage (same as Weather section)
   const [location, setLocation] = React.useState(() => {
     if (typeof window !== "undefined") {
@@ -645,195 +647,119 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded }: { onNavig
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {/* Weather Card */}
-        {checkVisible("weather") && (
-          <button
-            onClick={() => onNavigate("weather")}
-            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <Cloud className="h-8 w-8 text-primary" />
-              {weather && (
-                <span className="text-3xl font-bold text-primary">{weather.temp}°</span>
-              )}
-            </div>
-            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Weather</h3>
-            {weather ? (
-              <div className="text-sm text-muted-foreground space-y-1">
-                <p>{weather.condition}</p>
-                <div className="flex items-center gap-3 text-xs">
-                  <span className="flex items-center gap-0.5">
-                    <ArrowUp className="h-3 w-3 text-red-400" />
-                    {weather.high}°
-                  </span>
-                  <span className="flex items-center gap-0.5">
-                    <ArrowDown className="h-3 w-3 text-blue-400" />
-                    {weather.low}°
-                  </span>
+        {/* Render tiles in order from section preferences */}
+        {effectiveOrder.map((sectionId) => {
+          if (!checkVisible(sectionId)) return null
+
+          // Weather tile - has dynamic data
+          if (sectionId === "weather") {
+            return (
+              <button
+                key={sectionId}
+                onClick={() => onNavigate("weather")}
+                className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <Cloud className="h-8 w-8 text-primary" />
+                  {weather && (
+                    <span className="text-3xl font-bold text-primary">{weather.temp}°</span>
+                  )}
                 </div>
-                <p className="flex items-center gap-1 text-xs">
-                  <MapPin className="h-3 w-3" />
-                  {location.name}
-                </p>
+                <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Weather</h3>
+                {weather ? (
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    <p>{weather.condition}</p>
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="flex items-center gap-0.5">
+                        <ArrowUp className="h-3 w-3 text-red-400" />
+                        {weather.high}°
+                      </span>
+                      <span className="flex items-center gap-0.5">
+                        <ArrowDown className="h-3 w-3 text-blue-400" />
+                        {weather.low}°
+                      </span>
+                    </div>
+                    <p className="flex items-center gap-1 text-xs">
+                      <MapPin className="h-3 w-3" />
+                      {location.name}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {weatherLoading ? "Loading weather data..." : "Unable to load weather"}
+                  </p>
+                )}
+              </button>
+            )
+          }
+
+          // Feed tile - has dynamic data
+          if (sectionId === "feed") {
+            return (
+              <button
+                key={sectionId}
+                onClick={() => onNavigate("feed")}
+                className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <Newspaper className="h-8 w-8 text-primary" />
+                  {feedCount !== null && (
+                    <span className="text-3xl font-bold text-primary">{feedCount}</span>
+                  )}
+                </div>
+                <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Daily Feed</h3>
+                {feedCount !== null ? (
+                  <p className="text-sm text-muted-foreground">
+                    {feedCount} items from HN, GitHub, Reddit & more
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Loading feed...</p>
+                )}
+              </button>
+            )
+          }
+
+          // Static tiles configuration
+          const tileConfig: Record<ToggleableSection, { icon: React.ElementType; label: string; description: string } | null> = {
+            weather: null, // Handled above
+            feed: null, // Handled above
+            "api-playground": { icon: Zap, label: "API Playground", description: "Test and debug API requests" },
+            notes: { icon: FileText, label: "Quick Notes", description: "GitHub-synced markdown notes" },
+            bookmarks: { icon: Bookmark, label: "Bookmarks", description: "Organized quick links" },
+            search: { icon: Search, label: "Search Hub", description: "Multi-engine web search" },
+            "ai-workspace": { icon: MessageSquare, label: "AI Workspace", description: "Chat with Claude & local models" },
+            stocks: { icon: TrendingUp, label: "Paper Trading", description: "Practice stock trading" },
+            crypto: { icon: Bitcoin, label: "Crypto", description: "Live cryptocurrency prices" },
+            spacex: { icon: Rocket, label: "SpaceX Launches", description: "Track rocket launches" },
+            "github-activity": { icon: Github, label: "GitHub Activity", description: "GitHub events & repos" },
+            disasters: { icon: AlertCircle, label: "Disasters", description: "Earthquakes & alerts" },
+            tasks: { icon: CheckCircle2, label: "Tasks", description: "Quick todo list" },
+            projects: { icon: FolderGit2, label: "Projects", description: "GitHub & local repos" },
+            jobs: { icon: Play, label: "Jobs", description: "Claude batch prompts" },
+            integrations: { icon: Link2, label: "Integrations", description: "Connected services" },
+            profile: { icon: User, label: "Profile", description: "Account & sync status" },
+          }
+
+          const config = tileConfig[sectionId]
+          if (!config) return null
+
+          const Icon = config.icon
+          return (
+            <button
+              key={sectionId}
+              onClick={() => onNavigate(sectionId)}
+              className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <Icon className="h-8 w-8 text-primary" />
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {weatherLoading ? "Loading weather data..." : "Unable to load weather"}
-              </p>
-            )}
-          </button>
-        )}
+              <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">{config.label}</h3>
+              <p className="text-sm text-muted-foreground">{config.description}</p>
+            </button>
+          )
+        })}
 
-        {/* Daily Feed Card */}
-        {checkVisible("feed") && (
-          <button
-            onClick={() => onNavigate("feed")}
-            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <Newspaper className="h-8 w-8 text-primary" />
-              {feedCount !== null && (
-                <span className="text-3xl font-bold text-primary">{feedCount}</span>
-              )}
-            </div>
-            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Daily Feed</h3>
-            {feedCount !== null ? (
-              <p className="text-sm text-muted-foreground">
-                {feedCount} items from HN, GitHub, Reddit & more
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">Loading feed...</p>
-            )}
-          </button>
-        )}
-
-        {/* API Playground Card */}
-        {checkVisible("api-playground") && (
-          <button
-            onClick={() => onNavigate("api-playground")}
-            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <Zap className="h-8 w-8 text-primary" />
-            </div>
-            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">API Playground</h3>
-            <p className="text-sm text-muted-foreground">Test and debug API requests</p>
-          </button>
-        )}
-
-        {/* Quick Notes Card */}
-        {checkVisible("notes") && (
-          <button
-            onClick={() => onNavigate("notes")}
-            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <FileText className="h-8 w-8 text-primary" />
-            </div>
-            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Quick Notes</h3>
-            <p className="text-sm text-muted-foreground">GitHub-synced markdown notes</p>
-          </button>
-        )}
-
-        {/* Bookmarks Card */}
-        {checkVisible("bookmarks") && (
-          <button
-            onClick={() => onNavigate("bookmarks")}
-            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <Bookmark className="h-8 w-8 text-primary" />
-            </div>
-            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Bookmarks</h3>
-            <p className="text-sm text-muted-foreground">Organized quick links</p>
-          </button>
-        )}
-
-        {/* Search Hub Card */}
-        {checkVisible("search") && (
-          <button
-            onClick={() => onNavigate("search")}
-            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <Search className="h-8 w-8 text-primary" />
-            </div>
-            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Search Hub</h3>
-            <p className="text-sm text-muted-foreground">Multi-engine web search</p>
-          </button>
-        )}
-
-        {/* AI Workspace Card */}
-        {checkVisible("ai-workspace") && (
-          <button
-            onClick={() => onNavigate("ai-workspace")}
-            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <MessageSquare className="h-8 w-8 text-primary" />
-            </div>
-            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">AI Workspace</h3>
-            <p className="text-sm text-muted-foreground">Chat with Claude & local models</p>
-          </button>
-        )}
-
-        {/* Paper Trading Card */}
-        {checkVisible("stocks") && (
-          <button
-            onClick={() => onNavigate("stocks")}
-            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <TrendingUp className="h-8 w-8 text-primary" />
-            </div>
-            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Paper Trading</h3>
-            <p className="text-sm text-muted-foreground">Practice stock trading</p>
-          </button>
-        )}
-
-        {/* Tasks Card */}
-        {checkVisible("tasks") && (
-          <button
-            onClick={() => onNavigate("tasks")}
-            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <CheckCircle2 className="h-8 w-8 text-primary" />
-            </div>
-            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Tasks</h3>
-            <p className="text-sm text-muted-foreground">Quick todo list</p>
-          </button>
-        )}
-
-        {/* Projects Card */}
-        {checkVisible("projects") && (
-          <button
-            onClick={() => onNavigate("projects")}
-            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <FolderGit2 className="h-8 w-8 text-primary" />
-            </div>
-            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Projects</h3>
-            <p className="text-sm text-muted-foreground">GitHub & local repos</p>
-          </button>
-        )}
-
-        {/* Integrations Card */}
-        {checkVisible("integrations") && (
-          <button
-            onClick={() => onNavigate("integrations")}
-            className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <Link2 className="h-8 w-8 text-primary" />
-            </div>
-            <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Integrations</h3>
-            <p className="text-sm text-muted-foreground">Connected services</p>
-          </button>
-        )}
-
-        {/* Settings Card - always visible */}
+        {/* Settings Card - always visible at the end */}
         <button
           onClick={() => onNavigate("settings")}
           className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
@@ -1092,7 +1018,7 @@ export default function PersonalHomepage() {
   const renderContent = () => {
     switch (activeSection) {
       case "home":
-        return <HomeSection onNavigate={setActiveSection} userName={userName} isVisible={isVisible} prefsLoaded={isLoaded} />
+        return <HomeSection onNavigate={setActiveSection} userName={userName} isVisible={isVisible} prefsLoaded={isLoaded} sectionOrder={order} />
       case "weather":
         return <WeatherDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onAlertCountChange={setWeatherAlertCount} />
       case "feed":
@@ -1130,7 +1056,7 @@ export default function PersonalHomepage() {
       case "settings":
         return <SettingsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       default:
-        return <HomeSection onNavigate={setActiveSection} userName={userName} isVisible={isVisible} prefsLoaded={isLoaded} />
+        return <HomeSection onNavigate={setActiveSection} userName={userName} isVisible={isVisible} prefsLoaded={isLoaded} sectionOrder={order} />
     }
   }
 
