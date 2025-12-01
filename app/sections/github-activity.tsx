@@ -283,6 +283,7 @@ function getEventDescription(event: GitHubEvent): string {
   switch (type) {
     case "PushEvent":
       const commitCount = payload.commits?.length || 0
+      if (commitCount === 0) return `Updated branch in ${repoName}`
       return `Pushed ${commitCount} commit${commitCount !== 1 ? "s" : ""} to ${repoName}`
     case "PullRequestEvent":
       return `${payload.action === "opened" ? "Opened" : payload.action === "closed" ? "Closed" : "Updated"} PR #${payload.pull_request?.number} in ${repoName}`
