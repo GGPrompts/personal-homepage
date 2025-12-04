@@ -1676,7 +1676,7 @@ export default function WeatherDashboard({
               {/* Hourly Chart */}
               <div className="mt-4 sm:mt-6 h-[150px] sm:h-[200px] w-full min-w-0">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={hourlyForecast}>
+                  <AreaChart data={hourlyForecast} margin={{ left: -15, right: 5 }}>
                     <defs>
                       <linearGradient id="tempGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
@@ -1687,13 +1687,24 @@ export default function WeatherDashboard({
                     <XAxis
                       dataKey="hour"
                       stroke="hsl(var(--muted-foreground))"
-                      tick={{ fontSize: 12 }}
-                      tickFormatter={(value, index) => (index % 4 === 0 ? value : "")}
+                      tick={{ fontSize: 10 }}
+                      tickFormatter={(value, index) => {
+                        if (index % 4 !== 0) return ""
+                        // Convert "07:00 AM" to "7AM"
+                        const match = value.match(/^(\d{1,2}):00\s*(AM|PM)$/i)
+                        if (match) {
+                          const hour = parseInt(match[1], 10)
+                          return `${hour}${match[2].toUpperCase()}`
+                        }
+                        return value
+                      }}
+                      interval="preserveStartEnd"
                     />
                     <YAxis
                       stroke="hsl(var(--muted-foreground))"
-                      tick={{ fontSize: 12 }}
+                      tick={{ fontSize: 10 }}
                       tickFormatter={(value) => `${value}°`}
+                      width={35}
                     />
                     <Tooltip
                       contentStyle={{
@@ -1701,7 +1712,9 @@ export default function WeatherDashboard({
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "8px",
                       }}
-                      formatter={(value: number) => [`${value}°F`, "Temperature"]}
+                      labelStyle={{ color: "hsl(var(--foreground))" }}
+                      itemStyle={{ color: "hsl(var(--foreground))" }}
+                      formatter={(value: number) => [`${value}°`, "Temp"]}
                     />
                     <Area
                       type="monotone"
