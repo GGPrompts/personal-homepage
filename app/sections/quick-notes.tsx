@@ -323,6 +323,7 @@ export default function QuickNotesSection({
   const [loadingPaths, setLoadingPaths] = React.useState<Set<string>>(new Set())
   const [selectedFile, setSelectedFile] = React.useState<FileTreeNode | null>(null)
   const [showPreview, setShowPreview] = React.useState(true)
+  const [showOnlyMarkdown, setShowOnlyMarkdown] = React.useState(false)
   const [newFileName, setNewFileName] = React.useState("")
   const [newFileDialogOpen, setNewFileDialogOpen] = React.useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
@@ -440,7 +441,12 @@ export default function QuickNotesSection({
     files: GitHubFile[],
     parentPath: string
   ): FileTreeNode[] => {
-    return files.map((file) => {
+    // Filter files if showOnlyMarkdown is enabled
+    const filteredFiles = showOnlyMarkdown
+      ? files.filter((file) => file.type === "dir" || isMarkdownFile(file.name))
+      : files
+
+    return filteredFiles.map((file) => {
       const node: FileTreeNode = {
         ...file,
         isExpanded: expandedPaths.has(file.path),
@@ -734,6 +740,15 @@ export default function QuickNotesSection({
               Files
             </h3>
             <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`h-7 w-7 ${showOnlyMarkdown ? "text-primary" : ""}`}
+                onClick={() => setShowOnlyMarkdown(!showOnlyMarkdown)}
+                title={showOnlyMarkdown ? "Show all files" : "Show only .md files"}
+              >
+                <FileText className={`h-3.5 w-3.5 ${showOnlyMarkdown ? "text-primary" : ""}`} />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"

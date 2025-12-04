@@ -48,7 +48,7 @@ const sectionMeta: Record<ToggleableSection, { label: string; icon: React.Elemen
   spacex: { label: "SpaceX Launches", icon: Rocket, description: "Track rocket launches" },
   "github-activity": { label: "GitHub Activity", icon: Github, description: "GitHub events & repos" },
   disasters: { label: "Disasters", icon: AlertCircle, description: "Earthquakes & alerts" },
-  tasks: { label: "Tasks", icon: CheckCircle2, description: "Quick todo list" },
+  tasks: { label: "Notes & Tasks", icon: CheckCircle2, description: "Quick notes and todos" },
   projects: { label: "Projects", icon: FolderGit2, description: "GitHub & local repos" },
   jobs: { label: "Jobs", icon: Play, description: "Claude batch prompts" },
   integrations: { label: "Integrations", icon: Link2, description: "Connected services" },

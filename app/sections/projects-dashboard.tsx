@@ -42,6 +42,7 @@ import {
   AlertTriangle,
   SkipForward,
   Save,
+  FileText,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -141,9 +142,11 @@ function SortableHeader({
 export default function ProjectsDashboard({
   activeSubItem,
   onSubItemHandled,
+  onNavigateToSection,
 }: {
   activeSubItem?: string | null
   onSubItemHandled?: () => void
+  onNavigateToSection?: (section: string, repo?: string) => void
 }) {
   const { user, getGitHubToken } = useAuth()
   const { available: terminalAvailable, runCommand } = useTerminalExtension()
@@ -540,6 +543,28 @@ export default function ProjectsDashboard({
                   <FolderOpen className="h-4 w-4" />
                 </Button>
               )}
+              {/* Docs - only if has github */}
+              {project.github && onNavigateToSection && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => {
+                          // Set the repo for Quick Notes and navigate
+                          localStorage.setItem("github-notes-repo", project.github!.full_name)
+                          onNavigateToSection("notes")
+                        }}
+                      >
+                        <FileText className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Browse Docs</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
               {/* GitHub - only if has github */}
               {project.github && (
                 <Button
@@ -574,7 +599,7 @@ export default function ProjectsDashboard({
         },
       },
     ],
-    [terminalAvailable, runCommand, isPinned, togglePinned, metaConfigured, metaSyncing]
+    [terminalAvailable, runCommand, isPinned, togglePinned, metaConfigured, metaSyncing, onNavigateToSection]
   )
 
   // TanStack Table instance

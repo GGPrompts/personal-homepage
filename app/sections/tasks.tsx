@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   Plus,
   Trash2,
@@ -8,15 +9,30 @@ import {
   ChevronDown,
   CheckCircle2,
   Circle,
-  RotateCcw,
   Calendar,
   Clock,
-  GripVertical,
+  StickyNote,
+  ListTodo,
+  FolderGit2,
+  User,
+  Inbox,
+  RotateCw,
+  AlertCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  SelectSeparator,
+} from "@/components/ui/select"
+import type { QuickNote } from "@/app/api/quicknotes/route"
 
 // ============================================================================
 // TYPES
@@ -28,6 +44,11 @@ interface Task {
   completed: boolean
   createdAt: string
   completedAt?: string
+}
+
+interface LocalProject {
+  name: string
+  path: string
 }
 
 // ============================================================================
@@ -170,16 +191,262 @@ function TaskItem({
 }
 
 // ============================================================================
-// MAIN COMPONENT
+// NOTE ITEM COMPONENT
 // ============================================================================
 
-export default function TasksSection({
-  activeSubItem,
-  onSubItemHandled,
+function NoteItem({
+  note,
+  onDelete,
 }: {
-  activeSubItem?: string | null
-  onSubItemHandled?: () => void
+  note: QuickNote
+  onDelete: () => void
 }) {
+  return (
+    <div className="group flex items-start gap-3 p-3 rounded-lg border border-border bg-background/50 hover:border-primary/30 transition-all">
+      <StickyNote className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-foreground whitespace-pre-wrap">{note.text}</p>
+        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+          <Clock className="h-3 w-3" />
+          {formatDate(note.createdAt)}
+        </p>
+      </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-400"
+        onClick={onDelete}
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </div>
+  )
+}
+
+// ============================================================================
+// NOTES TAB COMPONENT
+// ============================================================================
+
+function NotesTab() {
+  const queryClient = useQueryClient()
+  const [newNoteText, setNewNoteText] = React.useState("")
+  const [selectedProject, setSelectedProject] = React.useState("general")
+  const inputRef = React.useRef<HTMLInputElement>(null)
+
+  // Fetch notes
+  const {
+    data: notesData,
+    isLoading: notesLoading,
+    error: notesError,
+  } = useQuery({
+    queryKey: ["quicknotes"],
+    queryFn: async () => {
+      const res = await fetch("/api/quicknotes")
+      if (!res.ok) throw new Error("Failed to fetch notes")
+      return res.json() as Promise<{ version: number; notes: QuickNote[] }>
+    },
+    staleTime: 30 * 1000, // 30 seconds
+  })
+
+  // Fetch local projects for the selector
+  const { data: projectsData } = useQuery({
+    queryKey: ["projects-local"],
+    queryFn: async () => {
+      const res = await fetch("/api/projects/local")
+      if (!res.ok) throw new Error("Failed to fetch projects")
+      return res.json() as Promise<{ projects: LocalProject[]; count: number }>
+    },
+    staleTime: 60 * 1000, // 1 minute
+  })
+
+  // Add note mutation
+  const addNoteMutation = useMutation({
+    mutationFn: async ({ project, text }: { project: string; text: string }) => {
+      const res = await fetch("/api/quicknotes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project, text }),
+      })
+      if (!res.ok) throw new Error("Failed to add note")
+      return res.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quicknotes"] })
+      setNewNoteText("")
+      inputRef.current?.focus()
+    },
+  })
+
+  // Delete note mutation
+  const deleteNoteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/quicknotes?id=${id}`, { method: "DELETE" })
+      if (!res.ok) throw new Error("Failed to delete note")
+      return res.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quicknotes"] })
+    },
+  })
+
+  const handleAddNote = () => {
+    const text = newNoteText.trim()
+    if (!text) return
+    addNoteMutation.mutate({ project: selectedProject, text })
+  }
+
+  // Group notes by project
+  const groupedNotes = React.useMemo(() => {
+    if (!notesData?.notes) return new Map<string, QuickNote[]>()
+
+    const groups = new Map<string, QuickNote[]>()
+    for (const note of notesData.notes) {
+      const existing = groups.get(note.project) || []
+      existing.push(note)
+      groups.set(note.project, existing)
+    }
+    return groups
+  }, [notesData?.notes])
+
+  // Get display name for project
+  const getProjectDisplayName = (project: string) => {
+    if (project === "general") return "General"
+    if (project === "personal") return "Personal"
+    return project
+  }
+
+  // Get icon for project
+  const getProjectIcon = (project: string) => {
+    if (project === "general") return <Inbox className="h-4 w-4" />
+    if (project === "personal") return <User className="h-4 w-4" />
+    return <FolderGit2 className="h-4 w-4" />
+  }
+
+  const totalNotes = notesData?.notes.length || 0
+  const projects = projectsData?.projects || []
+
+  // Backend unavailable state
+  if (notesError) {
+    return (
+      <Card className="glass p-8 text-center">
+        <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4 opacity-70" />
+        <h3 className="text-lg font-medium mb-2">Backend Required</h3>
+        <p className="text-sm text-muted-foreground mb-2">
+          Notes are stored locally and require the backend to be running.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Run <code className="bg-muted px-1 py-0.5 rounded">npm run dev</code> locally to enable notes.
+        </p>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Add Note Input */}
+      <Card className="glass p-4">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Select value={selectedProject} onValueChange={setSelectedProject}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="Select project" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="general">
+                <div className="flex items-center gap-2">
+                  <Inbox className="h-4 w-4" />
+                  General
+                </div>
+              </SelectItem>
+              <SelectItem value="personal">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Personal
+                </div>
+              </SelectItem>
+              {projects.length > 0 && <SelectSeparator />}
+              {projects.map((project) => (
+                <SelectItem key={project.path} value={project.name}>
+                  <div className="flex items-center gap-2">
+                    <FolderGit2 className="h-4 w-4" />
+                    {project.name}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              handleAddNote()
+            }}
+            className="flex gap-3 flex-1"
+          >
+            <Input
+              ref={inputRef}
+              placeholder="Quick note..."
+              value={newNoteText}
+              onChange={(e) => setNewNoteText(e.target.value)}
+              className="flex-1"
+              disabled={addNoteMutation.isPending}
+            />
+            <Button type="submit" disabled={!newNoteText.trim() || addNoteMutation.isPending}>
+              {addNoteMutation.isPending ? (
+                <RotateCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4 mr-2" />
+              )}
+              {!addNoteMutation.isPending && "Add"}
+            </Button>
+          </form>
+        </div>
+      </Card>
+
+      {/* Loading State */}
+      {notesLoading && (
+        <Card className="glass p-8 text-center">
+          <RotateCw className="h-8 w-8 text-primary mx-auto mb-4 animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading notes...</p>
+        </Card>
+      )}
+
+      {/* Empty State */}
+      {!notesLoading && totalNotes === 0 && (
+        <Card className="glass p-8 text-center">
+          <StickyNote className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+          <h3 className="text-lg font-medium mb-2">No notes yet</h3>
+          <p className="text-sm text-muted-foreground">
+            Add a quick note above to get started
+          </p>
+        </Card>
+      )}
+
+      {/* Notes grouped by project */}
+      {!notesLoading && Array.from(groupedNotes.entries()).map(([project, notes]) => (
+        <div key={project} className="space-y-2">
+          <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            {getProjectIcon(project)}
+            {getProjectDisplayName(project)} ({notes.length})
+          </h3>
+          <div className="space-y-2">
+            {notes.map((note) => (
+              <NoteItem
+                key={note.id}
+                note={note}
+                onDelete={() => deleteNoteMutation.mutate(note.id)}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ============================================================================
+// TASKS TAB COMPONENT
+// ============================================================================
+
+function TasksTab() {
   const [tasks, setTasks] = React.useState<Task[]>([])
   const [newTaskText, setNewTaskText] = React.useState("")
   const [isLoaded, setIsLoaded] = React.useState(false)
@@ -198,17 +465,6 @@ export default function TasksSection({
       saveTasks(tasks)
     }
   }, [tasks, isLoaded])
-
-  // Handle sub-item navigation
-  React.useEffect(() => {
-    if (activeSubItem) {
-      const element = document.getElementById(`tasks-${activeSubItem}`)
-      if (element) {
-        element.scrollIntoView({ behavior: "smooth", block: "start" })
-      }
-      onSubItemHandled?.()
-    }
-  }, [activeSubItem, onSubItemHandled])
 
   // Add a new task
   const addTask = () => {
@@ -276,74 +532,97 @@ export default function TasksSection({
   const pendingTasks = tasks.filter((t) => !t.completed)
   const completedTasks = tasks.filter((t) => t.completed)
 
-  // Stats
   const totalTasks = tasks.length
   const completedCount = completedTasks.length
   const pendingCount = pendingTasks.length
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-2">
-        <h1 className="text-3xl font-bold terminal-glow">Tasks</h1>
-        {totalTasks > 0 && (
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-primary border-primary/30">
-              {pendingCount} pending
-            </Badge>
-            {completedCount > 0 && (
-              <Badge variant="outline" className="text-emerald-500 border-emerald-500/30">
-                {completedCount} done
-              </Badge>
-            )}
-          </div>
-        )}
-      </div>
-      <p className="text-muted-foreground mb-8">Quick task tracking for your day</p>
+    <div className="space-y-6">
+      {/* Add Task Input */}
+      <Card className="glass p-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            addTask()
+          }}
+          className="flex gap-3"
+        >
+          <Input
+            ref={inputRef}
+            placeholder="What needs to be done?"
+            value={newTaskText}
+            onChange={(e) => setNewTaskText(e.target.value)}
+            className="flex-1"
+          />
+          <Button type="submit" disabled={!newTaskText.trim()}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add
+          </Button>
+        </form>
+      </Card>
 
-      <div className="max-w-2xl">
-        {/* Add Task Input */}
-        <Card className="glass p-4 mb-6">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              addTask()
-            }}
-            className="flex gap-3"
-          >
-            <Input
-              ref={inputRef}
-              placeholder="What needs to be done?"
-              value={newTaskText}
-              onChange={(e) => setNewTaskText(e.target.value)}
-              className="flex-1"
-            />
-            <Button type="submit" disabled={!newTaskText.trim()}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add
-            </Button>
-          </form>
+      {/* Empty State */}
+      {totalTasks === 0 && isLoaded && (
+        <Card className="glass p-8 text-center">
+          <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+          <h3 className="text-lg font-medium mb-2">No tasks yet</h3>
+          <p className="text-sm text-muted-foreground">
+            Add your first task above to get started
+          </p>
         </Card>
+      )}
 
-        {/* Empty State */}
-        {totalTasks === 0 && isLoaded && (
-          <Card className="glass p-8 text-center">
-            <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-            <h3 className="text-lg font-medium mb-2">No tasks yet</h3>
-            <p className="text-sm text-muted-foreground">
-              Add your first task above to get started
-            </p>
-          </Card>
-        )}
+      {/* Pending Tasks */}
+      {pendingTasks.length > 0 && (
+        <div id="tasks-pending" className="scroll-mt-6">
+          <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+            <Circle className="h-4 w-4" />
+            To Do ({pendingCount})
+          </h3>
+          <div className="space-y-2">
+            {pendingTasks.map((task, index) => (
+              <TaskItem
+                key={task.id}
+                task={task}
+                onToggle={() => toggleTask(task.id)}
+                onDelete={() => deleteTask(task.id)}
+                onMoveUp={() => moveUp(tasks.indexOf(task))}
+                onMoveDown={() => moveDown(tasks.indexOf(task))}
+                isFirst={index === 0}
+                isLast={index === pendingTasks.length - 1}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
-        {/* Pending Tasks */}
-        {pendingTasks.length > 0 && (
-          <div id="tasks-pending" className="mb-6 scroll-mt-6">
-            <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-              <Circle className="h-4 w-4" />
-              To Do ({pendingCount})
-            </h3>
+      {/* Completed Tasks */}
+      {completedTasks.length > 0 && (
+        <div id="tasks-completed" className="scroll-mt-6">
+          <div className="flex items-center justify-between mb-3">
+            <button
+              onClick={() => setShowCompleted(!showCompleted)}
+              className="text-sm font-medium text-muted-foreground flex items-center gap-2 hover:text-foreground transition-colors"
+            >
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              Completed ({completedCount})
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${showCompleted ? "" : "-rotate-90"}`}
+              />
+            </button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearCompleted}
+              className="text-xs h-7 gap-1 text-muted-foreground hover:text-red-400"
+            >
+              <Trash2 className="h-3 w-3" />
+              Clear
+            </Button>
+          </div>
+          {showCompleted && (
             <div className="space-y-2">
-              {pendingTasks.map((task, index) => (
+              {completedTasks.map((task, index) => (
                 <TaskItem
                   key={task.id}
                   task={task}
@@ -352,55 +631,91 @@ export default function TasksSection({
                   onMoveUp={() => moveUp(tasks.indexOf(task))}
                   onMoveDown={() => moveDown(tasks.indexOf(task))}
                   isFirst={index === 0}
-                  isLast={index === pendingTasks.length - 1}
+                  isLast={index === completedTasks.length - 1}
                 />
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
-        {/* Completed Tasks */}
-        {completedTasks.length > 0 && (
-          <div id="tasks-completed" className="scroll-mt-6">
-            <div className="flex items-center justify-between mb-3">
-              <button
-                onClick={() => setShowCompleted(!showCompleted)}
-                className="text-sm font-medium text-muted-foreground flex items-center gap-2 hover:text-foreground transition-colors"
-              >
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                Completed ({completedCount})
-                <ChevronDown
-                  className={`h-4 w-4 transition-transform ${showCompleted ? "" : "-rotate-90"}`}
-                />
-              </button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearCompleted}
-                className="text-xs h-7 gap-1 text-muted-foreground hover:text-red-400"
-              >
-                <Trash2 className="h-3 w-3" />
-                Clear
-              </Button>
-            </div>
-            {showCompleted && (
-              <div className="space-y-2">
-                {completedTasks.map((task, index) => (
-                  <TaskItem
-                    key={task.id}
-                    task={task}
-                    onToggle={() => toggleTask(task.id)}
-                    onDelete={() => deleteTask(task.id)}
-                    onMoveUp={() => moveUp(tasks.indexOf(task))}
-                    onMoveDown={() => moveDown(tasks.indexOf(task))}
-                    isFirst={index === 0}
-                    isLast={index === completedTasks.length - 1}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
+export default function TasksSection({
+  activeSubItem,
+  onSubItemHandled,
+}: {
+  activeSubItem?: string | null
+  onSubItemHandled?: () => void
+}) {
+  const [activeTab, setActiveTab] = React.useState("tasks")
+
+  // Handle sub-item navigation
+  React.useEffect(() => {
+    if (activeSubItem) {
+      if (activeSubItem === "notes") {
+        setActiveTab("notes")
+      } else {
+        const element = document.getElementById(`tasks-${activeSubItem}`)
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" })
+        }
+      }
+      onSubItemHandled?.()
+    }
+  }, [activeSubItem, onSubItemHandled])
+
+  // Count notes for badge (fetch separately to avoid prop drilling)
+  const { data: notesData } = useQuery({
+    queryKey: ["quicknotes"],
+    queryFn: async () => {
+      const res = await fetch("/api/quicknotes")
+      if (!res.ok) return { notes: [] }
+      return res.json() as Promise<{ notes: QuickNote[] }>
+    },
+    staleTime: 30 * 1000,
+  })
+
+  const notesCount = notesData?.notes?.length || 0
+
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-between mb-2">
+        <h1 className="text-3xl font-bold terminal-glow">Quick Notes & Tasks</h1>
+      </div>
+      <p className="text-muted-foreground mb-6">Capture thoughts and track todos</p>
+
+      <div className="max-w-2xl">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-6">
+            <TabsTrigger value="tasks" className="gap-2">
+              <ListTodo className="h-4 w-4" />
+              Tasks
+            </TabsTrigger>
+            <TabsTrigger value="notes" className="gap-2">
+              <StickyNote className="h-4 w-4" />
+              Notes
+              {notesCount > 0 && (
+                <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
+                  {notesCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="tasks">
+            <TasksTab />
+          </TabsContent>
+
+          <TabsContent value="notes">
+            <NotesTab />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   )

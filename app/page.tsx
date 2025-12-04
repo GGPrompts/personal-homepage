@@ -49,6 +49,7 @@ import {
   Rocket,
   Activity,
   AlertCircle,
+  StickyNote,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -252,10 +253,11 @@ const navigationItems: NavigationItem[] = [
   },
   {
     id: "tasks",
-    label: "Tasks",
+    label: "Notes & Tasks",
     icon: CheckCircle2,
-    description: "Quick todo list",
+    description: "Quick notes and todos",
     subItems: [
+      { id: "notes", label: "Notes", icon: StickyNote },
       { id: "pending", label: "To Do", icon: Clock },
       { id: "completed", label: "Completed", icon: CheckCircle2 },
     ]
@@ -745,7 +747,7 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
             spacex: { icon: Rocket, label: "SpaceX Launches", description: "Track rocket launches" },
             "github-activity": { icon: Github, label: "GitHub Activity", description: "GitHub events & repos" },
             disasters: { icon: AlertCircle, label: "Disasters", description: "Earthquakes & alerts" },
-            tasks: { icon: CheckCircle2, label: "Tasks", description: "Quick todo list" },
+            tasks: { icon: CheckCircle2, label: "Notes & Tasks", description: "Quick notes and todos" },
             projects: { icon: FolderGit2, label: "Projects", description: "GitHub & local repos" },
             jobs: { icon: Play, label: "Jobs", description: "Claude batch prompts" },
             integrations: { icon: Link2, label: "Integrations", description: "Connected services" },
@@ -1060,7 +1062,7 @@ export default function PersonalHomepage() {
       case "tasks":
         return <TasksSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "projects":
-        return <ProjectsDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+        return <ProjectsDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSection={(section) => setActiveSection(section as Section)} />
       case "jobs":
         return <JobsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "integrations":
