@@ -85,6 +85,7 @@ import CryptoDashboard from "./sections/crypto-dashboard"
 import SpaceXTracker from "./sections/spacex-tracker"
 import GitHubActivity from "./sections/github-activity"
 import DisastersMonitor from "./sections/disasters-monitor"
+import MarketPulseSection from "./sections/market-pulse"
 import { useLoginTrigger } from "@/hooks/useLoginTrigger"
 import { StartupJobsModal } from "@/components/StartupJobsModal"
 import { useJobResults } from "@/hooks/useJobResults"
@@ -135,6 +136,16 @@ const navigationItems: NavigationItem[] = [
       { id: "sources", label: "Sources", icon: Rss },
       { id: "saved", label: "Saved Items", icon: Star },
       { id: "refresh", label: "Refresh", icon: Timer },
+    ]
+  },
+  {
+    id: "market-pulse",
+    label: "Market Pulse",
+    icon: TrendingUp,
+    description: "Tech salary & job trends",
+    subItems: [
+      { id: "salaries", label: "Salaries", icon: LineChart },
+      { id: "trends", label: "Trends", icon: TrendingUp },
     ]
   },
   {
@@ -723,6 +734,7 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
           const tileConfig: Record<ToggleableSection, { icon: React.ElementType; label: string; description: string } | null> = {
             weather: null, // Handled above
             feed: null, // Handled above
+            "market-pulse": { icon: TrendingUp, label: "Market Pulse", description: "Tech salary & job trends" },
             "api-playground": { icon: Zap, label: "API Playground", description: "Test and debug API requests" },
             notes: { icon: FileText, label: "Quick Notes", description: "GitHub-synced markdown notes" },
             bookmarks: { icon: Bookmark, label: "Bookmarks", description: "Organized quick links" },
@@ -1023,6 +1035,8 @@ export default function PersonalHomepage() {
         return <WeatherDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onAlertCountChange={setWeatherAlertCount} />
       case "feed":
         return <DailyFeedSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "market-pulse":
+        return <MarketPulseSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "api-playground":
         return <ApiPlaygroundSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "notes":

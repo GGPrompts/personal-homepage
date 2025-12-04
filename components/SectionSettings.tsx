@@ -37,6 +37,7 @@ import {
 const sectionMeta: Record<ToggleableSection, { label: string; icon: React.ElementType; description: string }> = {
   weather: { label: "Weather", icon: Cloud, description: "Live weather monitoring" },
   feed: { label: "Daily Feed", icon: Newspaper, description: "Aggregated content" },
+  "market-pulse": { label: "Market Pulse", icon: TrendingUp, description: "Tech salary & job trends" },
   "api-playground": { label: "API Playground", icon: Zap, description: "Test & debug APIs" },
   notes: { label: "Quick Notes", icon: FileText, description: "GitHub-synced notes" },
   bookmarks: { label: "Bookmarks", icon: Bookmark, description: "Quick links" },
