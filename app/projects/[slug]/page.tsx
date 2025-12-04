@@ -16,6 +16,7 @@ import ProjectOverview from "@/components/projects/ProjectOverview"
 import ProjectCommands from "@/components/projects/ProjectCommands"
 import ProjectKanban from "@/components/projects/ProjectKanban"
 import ProjectLinks from "@/components/projects/ProjectLinks"
+import ProjectSourceControl from "@/components/projects/ProjectSourceControl"
 
 export default function ProjectDetailPage() {
   const params = useParams()
@@ -90,6 +91,7 @@ export default function ProjectDetailPage() {
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="glass">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="source-control">Source Control</TabsTrigger>
           <TabsTrigger value="commands">Commands</TabsTrigger>
           <TabsTrigger value="kanban">Kanban</TabsTrigger>
           <TabsTrigger value="links">Links</TabsTrigger>
@@ -97,6 +99,10 @@ export default function ProjectDetailPage() {
 
         <TabsContent value="overview">
           <ProjectOverview project={project} />
+        </TabsContent>
+
+        <TabsContent value="source-control">
+          <ProjectSourceControl project={project} />
         </TabsContent>
 
         <TabsContent value="commands">

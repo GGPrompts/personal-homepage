@@ -50,9 +50,9 @@ interface Task {
   completedAt?: string
 }
 
-interface LocalProject {
+interface GitHubRepo {
   name: string
-  path: string
+  full_name: string
 }
 
 interface QuickNote {
@@ -302,15 +302,19 @@ function NotesTab({ onNavigateToSettings }: { onNavigateToSettings?: () => void 
     staleTime: 30 * 1000,
   })
 
-  // Fetch local projects for the selector
-  const { data: projectsData } = useQuery({
-    queryKey: ["projects-local"],
+  // Fetch GitHub repos for the selector
+  const { data: reposData } = useQuery({
+    queryKey: ["projects-github"],
     queryFn: async () => {
-      const res = await fetch("/api/projects/local")
-      if (!res.ok) return { projects: [], count: 0 }
-      return res.json() as Promise<{ projects: LocalProject[]; count: number }>
+      if (!token) return { repos: [], count: 0 }
+      const res = await fetch("/api/projects/github", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) return { repos: [], count: 0 }
+      return res.json() as Promise<{ repos: GitHubRepo[]; count: number }>
     },
-    staleTime: 60 * 1000,
+    enabled: !!token,
+    staleTime: 5 * 60 * 1000,
   })
 
   // Save mutation
@@ -387,7 +391,7 @@ function NotesTab({ onNavigateToSettings }: { onNavigateToSettings?: () => void 
   }
 
   const totalNotes = notesData?.notes.length || 0
-  const projects = projectsData?.projects || []
+  const repos = reposData?.repos || []
   const isConfigured = !!token && !!repo
 
   // Not logged in state
@@ -447,12 +451,12 @@ function NotesTab({ onNavigateToSettings }: { onNavigateToSettings?: () => void 
                   Personal
                 </div>
               </SelectItem>
-              {projects.length > 0 && <SelectSeparator />}
-              {projects.map((project) => (
-                <SelectItem key={project.path} value={project.name}>
+              {repos.length > 0 && <SelectSeparator />}
+              {repos.map((repo) => (
+                <SelectItem key={repo.full_name} value={repo.name}>
                   <div className="flex items-center gap-2">
                     <FolderGit2 className="h-4 w-4" />
-                    {project.name}
+                    {repo.name}
                   </div>
                 </SelectItem>
               ))}
