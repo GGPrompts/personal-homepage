@@ -18,6 +18,8 @@ import {
   Inbox,
   RotateCw,
   AlertCircle,
+  Github,
+  Settings,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,7 +34,9 @@ import {
   SelectValue,
   SelectSeparator,
 } from "@/components/ui/select"
-import type { QuickNote } from "@/app/api/quicknotes/route"
+import { getFile, saveFile, type GitHubError } from "@/lib/github"
+import { useAuth } from "@/components/AuthProvider"
+import { AuthModal } from "@/components/AuthModal"
 
 // ============================================================================
 // TYPES
@@ -51,11 +55,30 @@ interface LocalProject {
   path: string
 }
 
+interface QuickNote {
+  id: string
+  project: string // "general" | "personal" | project name
+  text: string
+  createdAt: string
+  updatedAt?: string
+}
+
+interface NotesData {
+  version: number
+  notes: QuickNote[]
+}
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
 const STORAGE_KEY = "quick-tasks"
+const NOTES_FILE = "quicknotes.json"
+
+const DEFAULT_NOTES_DATA: NotesData = {
+  version: 1,
+  notes: [],
+}
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -224,28 +247,59 @@ function NoteItem({
 }
 
 // ============================================================================
-// NOTES TAB COMPONENT
+// NOTES TAB COMPONENT (GitHub Storage)
 // ============================================================================
 
-function NotesTab() {
+function NotesTab({ onNavigateToSettings }: { onNavigateToSettings?: () => void }) {
   const queryClient = useQueryClient()
+  const { user, getGitHubToken } = useAuth()
   const [newNoteText, setNewNoteText] = React.useState("")
   const [selectedProject, setSelectedProject] = React.useState("general")
+  const [showAuthModal, setShowAuthModal] = React.useState(false)
   const inputRef = React.useRef<HTMLInputElement>(null)
 
-  // Fetch notes
+  // GitHub config
+  const [token, setToken] = React.useState<string | null>(null)
+  const [repo, setRepo] = React.useState<string | null>(null)
+  const [fileSha, setFileSha] = React.useState<string | null>(null)
+
+  // Load token and repo
+  React.useEffect(() => {
+    const loadToken = async () => {
+      const authToken = await getGitHubToken()
+      setToken(authToken)
+    }
+    loadToken()
+    const savedRepo = localStorage.getItem("github-notes-repo")
+    setRepo(savedRepo)
+  }, [user, getGitHubToken])
+
+  // Fetch notes from GitHub
   const {
     data: notesData,
     isLoading: notesLoading,
     error: notesError,
+    refetch,
   } = useQuery({
-    queryKey: ["quicknotes"],
+    queryKey: ["quicknotes", repo],
     queryFn: async () => {
-      const res = await fetch("/api/quicknotes")
-      if (!res.ok) throw new Error("Failed to fetch notes")
-      return res.json() as Promise<{ version: number; notes: QuickNote[] }>
+      if (!token || !repo) return DEFAULT_NOTES_DATA
+      try {
+        const result = await getFile(token, repo, NOTES_FILE)
+        setFileSha(result.sha)
+        return JSON.parse(result.content) as NotesData
+      } catch (err) {
+        const githubError = err as GitHubError
+        if (githubError.status === 404) {
+          // File doesn't exist yet
+          setFileSha(null)
+          return DEFAULT_NOTES_DATA
+        }
+        throw err
+      }
     },
-    staleTime: 30 * 1000, // 30 seconds
+    enabled: !!token && !!repo,
+    staleTime: 30 * 1000,
   })
 
   // Fetch local projects for the selector
@@ -253,46 +307,56 @@ function NotesTab() {
     queryKey: ["projects-local"],
     queryFn: async () => {
       const res = await fetch("/api/projects/local")
-      if (!res.ok) throw new Error("Failed to fetch projects")
+      if (!res.ok) return { projects: [], count: 0 }
       return res.json() as Promise<{ projects: LocalProject[]; count: number }>
     },
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 60 * 1000,
   })
 
-  // Add note mutation
-  const addNoteMutation = useMutation({
-    mutationFn: async ({ project, text }: { project: string; text: string }) => {
-      const res = await fetch("/api/quicknotes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project, text }),
-      })
-      if (!res.ok) throw new Error("Failed to add note")
-      return res.json()
+  // Save mutation
+  const saveMutation = useMutation({
+    mutationFn: async (data: NotesData) => {
+      if (!token || !repo) throw new Error("Not configured")
+      const content = JSON.stringify(data, null, 2)
+      const result = await saveFile(token, repo, NOTES_FILE, content, fileSha, "Update quick notes")
+      setFileSha(result.sha)
+      return data
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["quicknotes"] })
-      setNewNoteText("")
-      inputRef.current?.focus()
-    },
-  })
-
-  // Delete note mutation
-  const deleteNoteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await fetch(`/api/quicknotes?id=${id}`, { method: "DELETE" })
-      if (!res.ok) throw new Error("Failed to delete note")
-      return res.json()
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["quicknotes"] })
+    onSuccess: (data) => {
+      queryClient.setQueryData(["quicknotes", repo], data)
     },
   })
 
   const handleAddNote = () => {
     const text = newNoteText.trim()
-    if (!text) return
-    addNoteMutation.mutate({ project: selectedProject, text })
+    if (!text || !notesData) return
+
+    const newNote: QuickNote = {
+      id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      project: selectedProject,
+      text,
+      createdAt: new Date().toISOString(),
+    }
+
+    const updatedData: NotesData = {
+      ...notesData,
+      notes: [newNote, ...notesData.notes],
+    }
+
+    saveMutation.mutate(updatedData)
+    setNewNoteText("")
+    inputRef.current?.focus()
+  }
+
+  const handleDeleteNote = (id: string) => {
+    if (!notesData) return
+
+    const updatedData: NotesData = {
+      ...notesData,
+      notes: notesData.notes.filter((n) => n.id !== id),
+    }
+
+    saveMutation.mutate(updatedData)
   }
 
   // Group notes by project
@@ -324,19 +388,39 @@ function NotesTab() {
 
   const totalNotes = notesData?.notes.length || 0
   const projects = projectsData?.projects || []
+  const isConfigured = !!token && !!repo
 
-  // Backend unavailable state
-  if (notesError) {
+  // Not logged in state
+  if (!user) {
     return (
       <Card className="glass p-8 text-center">
-        <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4 opacity-70" />
-        <h3 className="text-lg font-medium mb-2">Backend Required</h3>
-        <p className="text-sm text-muted-foreground mb-2">
-          Notes are stored locally and require the backend to be running.
+        <Github className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+        <h3 className="text-lg font-medium mb-2">Sign in to use Notes</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Notes are synced to your GitHub repository
         </p>
-        <p className="text-xs text-muted-foreground">
-          Run <code className="bg-muted px-1 py-0.5 rounded">npm run dev</code> locally to enable notes.
+        <Button onClick={() => setShowAuthModal(true)}>
+          <Github className="h-4 w-4 mr-2" />
+          Sign in with GitHub
+        </Button>
+        <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+      </Card>
+    )
+  }
+
+  // Repo not configured state
+  if (!repo) {
+    return (
+      <Card className="glass p-8 text-center">
+        <Settings className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+        <h3 className="text-lg font-medium mb-2">Configure Notes Repository</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Select a GitHub repo to sync your notes
         </p>
+        <Button variant="outline" onClick={onNavigateToSettings}>
+          <Settings className="h-4 w-4 mr-2" />
+          Go to Settings
+        </Button>
       </Card>
     )
   }
@@ -387,15 +471,15 @@ function NotesTab() {
               value={newNoteText}
               onChange={(e) => setNewNoteText(e.target.value)}
               className="flex-1"
-              disabled={addNoteMutation.isPending}
+              disabled={saveMutation.isPending}
             />
-            <Button type="submit" disabled={!newNoteText.trim() || addNoteMutation.isPending}>
-              {addNoteMutation.isPending ? (
+            <Button type="submit" disabled={!newNoteText.trim() || saveMutation.isPending || !isConfigured}>
+              {saveMutation.isPending ? (
                 <RotateCw className="h-4 w-4 animate-spin" />
               ) : (
                 <Plus className="h-4 w-4 mr-2" />
               )}
-              {!addNoteMutation.isPending && "Add"}
+              {!saveMutation.isPending && "Add"}
             </Button>
           </form>
         </div>
@@ -432,7 +516,7 @@ function NotesTab() {
               <NoteItem
                 key={note.id}
                 note={note}
-                onDelete={() => deleteNoteMutation.mutate(note.id)}
+                onDelete={() => handleDeleteNote(note.id)}
               />
             ))}
           </div>
@@ -649,10 +733,13 @@ function TasksTab() {
 export default function TasksSection({
   activeSubItem,
   onSubItemHandled,
+  onNavigateToSettings,
 }: {
   activeSubItem?: string | null
   onSubItemHandled?: () => void
+  onNavigateToSettings?: () => void
 }) {
+  const { user, getGitHubToken } = useAuth()
   const [activeTab, setActiveTab] = React.useState("tasks")
 
   // Handle sub-item navigation
@@ -670,14 +757,32 @@ export default function TasksSection({
     }
   }, [activeSubItem, onSubItemHandled])
 
-  // Count notes for badge (fetch separately to avoid prop drilling)
+  // Get repo config for notes count
+  const [token, setToken] = React.useState<string | null>(null)
+  const [repo, setRepo] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    const loadToken = async () => {
+      const authToken = await getGitHubToken()
+      setToken(authToken)
+    }
+    loadToken()
+    setRepo(localStorage.getItem("github-notes-repo"))
+  }, [user, getGitHubToken])
+
+  // Count notes for badge (from GitHub)
   const { data: notesData } = useQuery({
-    queryKey: ["quicknotes"],
+    queryKey: ["quicknotes", repo],
     queryFn: async () => {
-      const res = await fetch("/api/quicknotes")
-      if (!res.ok) return { notes: [] }
-      return res.json() as Promise<{ notes: QuickNote[] }>
+      if (!token || !repo) return DEFAULT_NOTES_DATA
+      try {
+        const result = await getFile(token, repo, NOTES_FILE)
+        return JSON.parse(result.content) as NotesData
+      } catch {
+        return DEFAULT_NOTES_DATA
+      }
     },
+    enabled: !!token && !!repo,
     staleTime: 30 * 1000,
   })
 
@@ -713,7 +818,7 @@ export default function TasksSection({
           </TabsContent>
 
           <TabsContent value="notes">
-            <NotesTab />
+            <NotesTab onNavigateToSettings={onNavigateToSettings} />
           </TabsContent>
         </Tabs>
       </div>

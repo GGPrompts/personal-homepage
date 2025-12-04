@@ -66,6 +66,15 @@ Show upcoming events:
 - Countdown to important dates
 - **Complexity**: Medium (OAuth)
 
+### Gmail / Email Widget
+Quick email overview from homepage:
+- Unread count and inbox summary
+- Recent important emails list
+- Quick actions (archive, mark read)
+- Storage usage indicator
+- Gmail API integration (reuse Google OAuth from Calendar)
+- **Complexity**: Medium (OAuth already needed for Calendar)
+
 ## Ideas / Backlog
 
 - PWA support for mobile installation

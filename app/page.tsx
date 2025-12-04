@@ -1060,7 +1060,7 @@ export default function PersonalHomepage() {
       case "disasters":
         return <DisastersMonitor activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "tasks":
-        return <TasksSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+        return <TasksSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("profile")} />
       case "projects":
         return <ProjectsDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSection={(section) => setActiveSection(section as Section)} />
       case "jobs":
