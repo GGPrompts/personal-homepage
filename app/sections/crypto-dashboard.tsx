@@ -530,7 +530,7 @@ export default function CryptoDashboard({ activeSubItem, onSubItemHandled }: Cry
                     <p>No coins found</p>
                   </div>
                 ) : (
-                  <div className="space-y-2 pr-2">
+                  <div className="space-y-2 px-1">
                     {filteredCoins.map((coin) => (
                       <motion.div
                         key={coin.id}

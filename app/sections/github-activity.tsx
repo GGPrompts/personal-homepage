@@ -877,7 +877,7 @@ export default function GitHubActivity({ activeSubItem, onSubItemHandled }: GitH
                   <p>No repositories found</p>
                 </div>
               ) : (
-                <div className="space-y-2 pr-2">
+                <div className="space-y-2 px-1">
                   {filteredRepos.map((repo) => (
                     <motion.div
                       key={repo.id}
