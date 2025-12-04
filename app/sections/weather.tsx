@@ -39,6 +39,8 @@ import {
   ArrowUp,
   ArrowDown,
   Minus,
+  X,
+  ExternalLink,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -134,10 +136,12 @@ interface WeatherAlert {
   severity: AlertSeverity
   title: string
   description: string
+  fullDescription?: string
   affectedAreas: string[]
   startTime: Date
   endTime: Date
   safetyInstructions: string[]
+  detailsUrl?: string
 }
 
 interface AirQuality {
@@ -542,16 +546,21 @@ async function fetchNWSAlerts(lat: number, lon: number): Promise<WeatherAlert[]>
         ? props.instruction.split(/[.!]/).filter((s: string) => s.trim().length > 10).slice(0, 3).map((s: string) => s.trim())
         : []
 
+      // Get the alert URL - either from feature.id or construct from props.id
+      const alertUrl = feature.id || (props["@id"] ? props["@id"] : null)
+
       return {
         id: props.id || `nws-alert-${index}`,
         type: alertType,
         severity,
         title: props.event || "Weather Alert",
         description: props.headline || props.description?.slice(0, 200) || "Weather alert in effect",
+        fullDescription: props.description || props.headline || "",
         affectedAreas,
         startTime: new Date(props.effective || Date.now()),
         endTime: new Date(props.expires || Date.now() + 86400000),
         safetyInstructions: instructions.length > 0 ? instructions : ["Stay weather aware", "Monitor local news"],
+        detailsUrl: alertUrl,
       }
     })
   } catch (error) {
@@ -960,6 +969,34 @@ export default function WeatherDashboard({
     return "fahrenheit"
   })
 
+  // Dismissed alerts (persisted in localStorage)
+  const [dismissedAlertIds, setDismissedAlertIds] = useState<Set<string>>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("weather-dismissed-alerts")
+      if (saved) {
+        try {
+          return new Set(JSON.parse(saved))
+        } catch {
+          // Invalid JSON
+        }
+      }
+    }
+    return new Set()
+  })
+
+  const dismissAlert = (alertId: string) => {
+    setDismissedAlertIds(prev => {
+      const next = new Set(prev)
+      next.add(alertId)
+      return next
+    })
+  }
+
+  // Persist dismissed alerts
+  useEffect(() => {
+    localStorage.setItem("weather-dismissed-alerts", JSON.stringify([...dismissedAlertIds]))
+  }, [dismissedAlertIds])
+
   // Persist temperature unit preference
   useEffect(() => {
     localStorage.setItem("weather-temp-unit", tempUnit)
@@ -990,7 +1027,8 @@ export default function WeatherDashboard({
   const hourlyForecast = weatherData?.hourlyForecast ?? []
   const dailyForecast = weatherData?.dailyForecast ?? []
   const airQuality = weatherData?.airQuality ?? AIR_QUALITY
-  const weatherAlerts = weatherData?.weatherAlerts ?? []
+  const allWeatherAlerts = weatherData?.weatherAlerts ?? []
+  const weatherAlerts = allWeatherAlerts.filter(alert => !dismissedAlertIds.has(alert.id))
   const isDaytime = weatherData?.isDaytime ?? true
 
   // Report alert count to parent for sidebar badge
@@ -1322,42 +1360,52 @@ export default function WeatherDashboard({
           <Card className="border-amber-500/50 bg-amber-500/10">
             <CardContent className="pt-4 space-y-4">
               {weatherAlerts.map((alert) => (
-                <Dialog key={alert.id}>
-                  <DialogTrigger asChild>
-                    <button className="w-full text-left flex items-start gap-3 hover:bg-amber-500/10 rounded-lg p-2 -m-2 transition-colors cursor-pointer">
-                      <AlertTriangle className="h-6 w-6 text-amber-500 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-semibold text-amber-500">{alert.title}</p>
-                          <Badge
-                            variant={
-                              alert.severity === "extreme" || alert.severity === "severe"
-                                ? "destructive"
-                                : "default"
-                            }
-                            className="capitalize"
-                          >
-                            {alert.severity}
-                          </Badge>
+                <div key={alert.id} className="relative">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute -top-1 -right-1 h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-background/50 z-10"
+                    onClick={() => dismissAlert(alert.id)}
+                    title="Dismiss alert"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <button className="w-full text-left flex items-start gap-3 hover:bg-amber-500/10 rounded-lg p-2 -m-2 transition-colors cursor-pointer pr-6">
+                        <AlertTriangle className="h-6 w-6 text-amber-500 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-semibold text-amber-500">{alert.title}</p>
+                            <Badge
+                              variant={
+                                alert.severity === "extreme" || alert.severity === "severe"
+                                  ? "destructive"
+                                  : "default"
+                              }
+                              className="capitalize"
+                            >
+                              {alert.severity}
+                            </Badge>
+                          </div>
+                          <p className="mt-1 text-sm line-clamp-2">{alert.description}</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                            <span suppressHydrationWarning>
+                              Until: {alert.endTime.toLocaleString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit"
+                              })}
+                            </span>
+                            {alert.affectedAreas.length > 0 && (
+                              <span className="truncate max-w-[200px]">Areas: {alert.affectedAreas.join(", ")}</span>
+                            )}
+                            <span className="text-amber-500 font-medium">Click for details →</span>
+                          </div>
                         </div>
-                        <p className="mt-1 text-sm line-clamp-2">{alert.description}</p>
-                        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                          <span suppressHydrationWarning>
-                            Until: {alert.endTime.toLocaleString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit"
-                            })}
-                          </span>
-                          {alert.affectedAreas.length > 0 && (
-                            <span className="truncate max-w-[200px]">Areas: {alert.affectedAreas.join(", ")}</span>
-                          )}
-                          <span className="text-amber-500 font-medium">Click for details →</span>
-                        </div>
-                      </div>
-                    </button>
-                  </DialogTrigger>
+                      </button>
+                    </DialogTrigger>
                   <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
                       <div className="flex items-center gap-3">
@@ -1385,7 +1433,9 @@ export default function WeatherDashboard({
                     <div className="space-y-4 mt-4">
                       <div>
                         <h4 className="text-sm font-semibold mb-2">Description</h4>
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{alert.description}</p>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                          {alert.fullDescription || alert.description}
+                        </p>
                       </div>
 
                       <Separator />
@@ -1441,9 +1491,29 @@ export default function WeatherDashboard({
                           </div>
                         </>
                       )}
+
+                      {alert.detailsUrl && (
+                        <>
+                          <Separator />
+                          <div className="flex justify-center">
+                            <Button variant="outline" size="sm" asChild>
+                              <a
+                                href={alert.detailsUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="gap-2"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                                View on weather.gov
+                              </a>
+                            </Button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </DialogContent>
-                </Dialog>
+                  </Dialog>
+                </div>
               ))}
             </CardContent>
           </Card>
