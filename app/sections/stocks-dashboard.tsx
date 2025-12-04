@@ -924,14 +924,14 @@ export default function StocksDashboard({ activeSubItem, onSubItemHandled, onNav
               </div>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
+              <div className="h-[250px] sm:h-[300px]">
                 {historyLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
                 ) : chartData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData}>
+                    <AreaChart data={chartData} margin={{ left: -10, right: 10 }}>
                       <defs>
                         <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
                           <stop
@@ -950,14 +950,16 @@ export default function StocksDashboard({ activeSubItem, onSubItemHandled, onNav
                       <XAxis
                         dataKey="time"
                         stroke="hsl(var(--muted-foreground))"
-                        tick={{ fontSize: 12 }}
-                        tickFormatter={(value, index) => (index % Math.ceil(chartData.length / 6) === 0 ? value : "")}
+                        tick={{ fontSize: 10 }}
+                        tickFormatter={(value, index) => (index % Math.ceil(chartData.length / 4) === 0 ? value : "")}
+                        interval="preserveStartEnd"
                       />
                       <YAxis
                         stroke="hsl(var(--muted-foreground))"
                         domain={["auto", "auto"]}
-                        tick={{ fontSize: 12 }}
+                        tick={{ fontSize: 10 }}
                         tickFormatter={(value) => `$${value}`}
+                        width={50}
                       />
                       <Tooltip
                         contentStyle={{
@@ -965,6 +967,8 @@ export default function StocksDashboard({ activeSubItem, onSubItemHandled, onNav
                           border: "1px solid hsl(var(--border))",
                           borderRadius: "8px",
                         }}
+                        labelStyle={{ color: "hsl(var(--foreground))" }}
+                        itemStyle={{ color: "hsl(var(--foreground))" }}
                         formatter={(value: number) => [formatCurrency(value), "Price"]}
                       />
                       <Area
@@ -995,9 +999,9 @@ export default function StocksDashboard({ activeSubItem, onSubItemHandled, onNav
                 }))
 
                 return (
-                  <div className="mt-4 h-[80px]">
+                  <div className="mt-4 h-[60px] sm:h-[80px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={normalizedData}>
+                      <BarChart data={normalizedData} margin={{ left: -10, right: 10 }}>
                         <XAxis dataKey="time" hide />
                         <YAxis hide />
                         <Tooltip
@@ -1006,6 +1010,8 @@ export default function StocksDashboard({ activeSubItem, onSubItemHandled, onNav
                             border: "1px solid hsl(var(--border))",
                             borderRadius: "8px",
                           }}
+                          labelStyle={{ color: "hsl(var(--foreground))" }}
+                          itemStyle={{ color: "hsl(var(--foreground))" }}
                           formatter={(value: number, name: string) => {
                             // Show original volume in tooltip
                             const idx = normalizedData.findIndex((d) => d.volumeNormalized === value)

@@ -337,6 +337,7 @@ export default function MarketPulseSection({ activeSubItem, onSubItemHandled }: 
                       padding: "12px",
                     }}
                     labelStyle={{ color: "hsl(var(--popover-foreground))" }}
+                    itemStyle={{ color: "hsl(var(--popover-foreground))" }}
                     formatter={(value: number) => formatFullSalary(value)}
                   />
                   <Bar dataKey="salary" radius={[0, 4, 4, 0]}>
@@ -420,6 +421,7 @@ export default function MarketPulseSection({ activeSubItem, onSubItemHandled }: 
                       padding: "12px",
                     }}
                     labelStyle={{ color: "hsl(var(--popover-foreground))" }}
+                    itemStyle={{ color: "hsl(var(--popover-foreground))" }}
                     formatter={(value: number) => formatFullSalary(value)}
                   />
                   <Legend />

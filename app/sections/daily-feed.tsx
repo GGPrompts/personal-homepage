@@ -945,7 +945,7 @@ export default function DailyFeedSection({
       {/* Feed List */}
       {filteredItems.length > 0 && (
         <ScrollArea className="flex-1 -mx-6 px-6">
-          <div className="space-y-3 pb-6">
+          <div className="space-y-3 pb-6 pr-1">
             {filteredItems.map((item) => (
               <FeedCard
                 key={item.id}
