@@ -219,14 +219,14 @@ export default function ProfileSection() {
     <div className="space-y-6">
       {/* Profile Header */}
       <div className="glass rounded-xl p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16 border-2 border-primary/20">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="flex items-center gap-4 min-w-0">
+            <Avatar className="h-16 w-16 border-2 border-primary/20 flex-shrink-0">
               <AvatarImage src={avatarUrl} alt={fullName} />
               <AvatarFallback>{fullName?.charAt(0) || "U"}</AvatarFallback>
             </Avatar>
-            <div>
-              <h2 className="text-xl font-bold">{fullName}</h2>
+            <div className="min-w-0">
+              <h2 className="text-xl font-bold truncate">{fullName}</h2>
               {githubUsername && (
                 <a
                   href={`https://github.com/${githubUsername}`}
@@ -238,14 +238,14 @@ export default function ProfileSection() {
                   <ExternalLink className="h-3 w-3" />
                 </a>
               )}
-              <p className="text-sm text-muted-foreground mt-1">{user.email}</p>
+              <p className="text-sm text-muted-foreground mt-1 truncate">{user.email}</p>
             </div>
           </div>
           <Button
             variant="outline"
             onClick={handleSignOut}
             disabled={signingOut}
-            className="glass-dark"
+            className="glass-dark flex-shrink-0 w-full sm:w-auto"
           >
             {signingOut ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
