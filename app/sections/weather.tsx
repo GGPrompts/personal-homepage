@@ -1856,63 +1856,6 @@ export default function WeatherDashboard({
 
         {/* Right Column */}
         <div className="space-y-4 sm:space-y-6 min-w-0">
-          {/* Air Quality */}
-          <Card className="glass border-border">
-            <CardHeader>
-              <CardTitle className="text-lg">Air Quality Index</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-6 text-center">
-                <motion.p
-                  key={Math.floor(airQuality.aqi / 10)}
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="text-5xl font-bold"
-                  style={{ color: AQI_COLORS[airQuality.category] }}
-                >
-                  {Math.round(airQuality.aqi)}
-                </motion.p>
-                <Badge
-                  variant="outline"
-                  className="mt-2 capitalize"
-                  style={{ borderColor: AQI_COLORS[airQuality.category] }}
-                >
-                  {airQuality.category.replace("-", " ")}
-                </Badge>
-                <p className="mt-3 text-sm text-muted-foreground">{airQuality.healthRecommendation}</p>
-              </div>
-
-              <div className="relative h-4 overflow-hidden rounded-full bg-muted">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${(airQuality.aqi / 500) * 100}%` }}
-                  style={{ backgroundColor: AQI_COLORS[airQuality.category] }}
-                  className="h-full"
-                  transition={{ duration: 0.5 }}
-                />
-              </div>
-
-              <div className="mt-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">PM2.5</span>
-                  <span className="font-semibold">{airQuality.pm25.toFixed(1)} µg/m³</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">PM10</span>
-                  <span className="font-semibold">{airQuality.pm10.toFixed(1)} µg/m³</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">O₃ (Ozone)</span>
-                  <span className="font-semibold">{airQuality.o3} ppb</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">CO</span>
-                  <span className="font-semibold">{airQuality.co.toFixed(1)} ppm</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Weather Map */}
           <Card id="weather-radar" className="glass border-border scroll-mt-6">
             <CardHeader>
@@ -2003,6 +1946,63 @@ export default function WeatherDashboard({
                 >
                   RainViewer
                 </a>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Air Quality */}
+          <Card className="glass border-border">
+            <CardHeader>
+              <CardTitle className="text-lg">Air Quality Index</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-6 text-center">
+                <motion.p
+                  key={Math.floor(airQuality.aqi / 10)}
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="text-5xl font-bold"
+                  style={{ color: AQI_COLORS[airQuality.category] }}
+                >
+                  {Math.round(airQuality.aqi)}
+                </motion.p>
+                <Badge
+                  variant="outline"
+                  className="mt-2 capitalize"
+                  style={{ borderColor: AQI_COLORS[airQuality.category] }}
+                >
+                  {airQuality.category.replace("-", " ")}
+                </Badge>
+                <p className="mt-3 text-sm text-muted-foreground">{airQuality.healthRecommendation}</p>
+              </div>
+
+              <div className="relative h-4 overflow-hidden rounded-full bg-muted">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(airQuality.aqi / 500) * 100}%` }}
+                  style={{ backgroundColor: AQI_COLORS[airQuality.category] }}
+                  className="h-full"
+                  transition={{ duration: 0.5 }}
+                />
+              </div>
+
+              <div className="mt-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">PM2.5</span>
+                  <span className="font-semibold">{airQuality.pm25.toFixed(1)} µg/m³</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">PM10</span>
+                  <span className="font-semibold">{airQuality.pm10.toFixed(1)} µg/m³</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">O₃ (Ozone)</span>
+                  <span className="font-semibold">{airQuality.o3} ppb</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">CO</span>
+                  <span className="font-semibold">{airQuality.co.toFixed(1)} ppm</span>
+                </div>
               </div>
             </CardContent>
           </Card>

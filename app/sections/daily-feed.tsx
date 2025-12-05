@@ -262,9 +262,9 @@ function FeedCard({
           {/* Tags */}
           {item.tags && item.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
-              {item.tags.slice(0, 4).map((tag) => (
+              {item.tags.slice(0, 4).map((tag, tagIndex) => (
                 <Badge
-                  key={tag}
+                  key={`${tag}-${tagIndex}`}
                   variant="secondary"
                   className="text-xs py-0 bg-primary/10 text-primary/80"
                 >

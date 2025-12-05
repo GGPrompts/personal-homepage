@@ -523,7 +523,7 @@ export default function SearchHubSection({
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder={currentEngine.placeholder}
-                    className="text-base sm:text-lg h-11 sm:h-12 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 px-0"
+                    className="text-base sm:text-lg h-11 sm:h-12 bg-transparent border border-transparent rounded-lg px-3 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-0 focus-visible:border-primary/30"
                   />
                 </div>
               </div>
