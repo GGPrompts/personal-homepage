@@ -66,7 +66,9 @@ import { SectionSettings } from "@/components/SectionSettings"
 import { useAuth } from "@/components/AuthProvider"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useSectionPreferences, ToggleableSection, DEFAULT_SECTION_ORDER, DEFAULT_VISIBILITY } from "@/hooks/useSectionPreferences"
+import { useEnvironment, requiresLocalhost } from "@/hooks/useEnvironment"
 import { WorldClocks } from "@/components/WorldClocks"
+import { LocalOnlyOverlay, LocalOnlyBadge, EnvironmentBadge } from "@/components/LocalOnlyOverlay"
 
 // Import page content components
 import WeatherDashboard from "./sections/weather"
@@ -338,6 +340,7 @@ function SidebarContent({
   sectionOrder,
   sectionVisibility,
   prefsLoaded = false,
+  isLocal = false,
 }: {
   activeSection: Section
   setActiveSection: (section: Section) => void
@@ -354,6 +357,7 @@ function SidebarContent({
   sectionOrder: ToggleableSection[]
   sectionVisibility: Record<ToggleableSection, boolean>
   prefsLoaded?: boolean
+  isLocal?: boolean
 }) {
   const handleSectionClick = (id: Section) => {
     // Navigate to section
@@ -392,7 +396,10 @@ function SidebarContent({
                 <Home className="h-5 w-5 text-primary" />
               </div>
               <div className={`flex-1 transition-all duration-300 overflow-hidden ${collapsed && !mobile ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>
-                <p className="font-semibold text-foreground">Personal Home</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-foreground">Personal Home</p>
+                  <EnvironmentBadge isLocal={isLocal} collapsed={collapsed && !mobile} />
+                </div>
                 <p className="text-xs text-muted-foreground">Dashboard</p>
               </div>
               {userAvatar && !collapsed && (
@@ -465,6 +472,10 @@ function SidebarContent({
                       <span className={`flex-1 text-left transition-all duration-300 overflow-hidden whitespace-nowrap ${
                         collapsed && !mobile ? 'w-0 opacity-0' : 'w-auto opacity-100'
                       }`}>{item.label}</span>
+                      {/* Local-only badge for sections requiring localhost */}
+                      {!isLocal && requiresLocalhost(item.id) && !(collapsed && !mobile) && (
+                        <LocalOnlyBadge />
+                      )}
                       {/* Chevron for expandable items */}
                       {hasSubItems && !(collapsed && !mobile) && (
                         <ChevronDown
@@ -998,6 +1009,7 @@ function SettingsSection({ activeSubItem, onSubItemHandled }: { activeSubItem?: 
 export default function PersonalHomepage() {
   const { user } = useAuth()
   const { visibility, order, isVisible, isLoaded } = useSectionPreferences()
+  const { isLocal } = useEnvironment()
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
   const [activeSection, setActiveSection] = React.useState<Section>("home")
@@ -1048,6 +1060,9 @@ export default function PersonalHomepage() {
       case "search":
         return <SearchHubSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "ai-workspace":
+        if (!isLocal) {
+          return <LocalOnlyOverlay sectionName="AI Workspace" description="This feature streams from local AI CLIs (Claude, Gemini, Codex) that require localhost to run." />
+        }
         return <AIWorkspaceSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "stocks":
         return <StocksDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("settings")} />
@@ -1062,8 +1077,14 @@ export default function PersonalHomepage() {
       case "tasks":
         return <TasksSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("profile")} />
       case "projects":
+        if (!isLocal) {
+          return <LocalOnlyOverlay sectionName="Projects" description="This feature scans your local ~/projects/ directory and requires localhost to access the file system." />
+        }
         return <ProjectsDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSection={(section) => setActiveSection(section as Section)} />
       case "jobs":
+        if (!isLocal) {
+          return <LocalOnlyOverlay sectionName="Jobs" description="This feature executes Claude CLI commands against local projects and requires localhost to run." />
+        }
         return <JobsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "integrations":
         return <IntegrationsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSection={(section) => setActiveSection(section as Section)} />
@@ -1110,6 +1131,7 @@ export default function PersonalHomepage() {
               sectionOrder={order}
               sectionVisibility={visibility}
               prefsLoaded={isLoaded}
+              isLocal={isLocal}
             />
           </SheetContent>
         </Sheet>
@@ -1136,6 +1158,7 @@ export default function PersonalHomepage() {
                 sectionOrder={order}
                 sectionVisibility={visibility}
                 prefsLoaded={isLoaded}
+                isLocal={isLocal}
               />
             </aside>
 
