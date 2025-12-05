@@ -30,6 +30,7 @@ import type { Project, LocalProject } from "@/lib/projects"
 // ============================================================================
 
 type MessageRole = 'user' | 'assistant' | 'system'
+type AIBackend = 'claude' | 'gemini' | 'codex' | 'docker' | 'mock'
 
 interface Message {
   id: string
@@ -38,6 +39,7 @@ interface Message {
   timestamp: Date
   feedback?: 'up' | 'down'
   isStreaming?: boolean
+  model?: AIBackend  // Which model generated this response
 }
 
 interface Conversation {
@@ -48,6 +50,22 @@ interface Conversation {
   updatedAt: Date
   model?: string
   projectPath?: string | null
+  settings?: ConversationSettings
+  claudeSessionId?: string | null
+}
+
+// Settings stored per-conversation
+interface ConversationSettings {
+  systemPrompt?: string
+  // Claude CLI specific options
+  claudeModel?: string
+  additionalDirs?: string[]
+  allowedTools?: string[]
+  disallowedTools?: string[]
+  permissionMode?: 'acceptEdits' | 'bypassPermissions' | 'default' | 'plan'
+  // Docker model options (only applicable for docker backend)
+  temperature?: number
+  maxTokens?: number
 }
 
 interface ChatSettings {
@@ -84,8 +102,25 @@ const DEFAULT_SETTINGS: ChatSettings = {
 interface ModelInfo {
   id: string
   name: string
-  backend: 'claude' | 'docker' | 'mock'
+  backend: AIBackend
   description?: string
+}
+
+// Model colors for badges
+const MODEL_COLORS: Record<AIBackend, { bg: string; text: string; border: string }> = {
+  claude: { bg: 'bg-orange-500/20', text: 'text-orange-400', border: 'border-orange-500/40' },
+  gemini: { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/40' },
+  codex: { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/40' },
+  docker: { bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/40' },
+  mock: { bg: 'bg-gray-500/20', text: 'text-gray-400', border: 'border-gray-500/40' },
+}
+
+const MODEL_ICONS: Record<AIBackend, string> = {
+  claude: '🧡',
+  gemini: '💎',
+  codex: '🤖',
+  docker: '🐳',
+  mock: '🎭',
 }
 
 interface BackendStatus {
@@ -267,13 +302,19 @@ interface MessageBubbleProps {
   onRegenerate: () => void
   onFeedback: (type: 'up' | 'down') => void
   userAvatarUrl?: string | null
+  availableModels?: ModelInfo[]
 }
 
-function MessageBubble({ message, onCopy, onRegenerate, onFeedback, userAvatarUrl }: MessageBubbleProps) {
+function MessageBubble({ message, onCopy, onRegenerate, onFeedback, userAvatarUrl, availableModels }: MessageBubbleProps) {
   const [showActions, setShowActions] = React.useState(false)
   const [copied, setCopied] = React.useState(false)
 
   const isUser = message.role === 'user'
+  const modelColors = message.model ? MODEL_COLORS[message.model] : null
+  const modelIcon = message.model ? MODEL_ICONS[message.model] : null
+  const modelName = message.model
+    ? availableModels?.find(m => m.backend === message.model)?.name || message.model
+    : null
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content)
@@ -373,6 +414,15 @@ function MessageBubble({ message, onCopy, onRegenerate, onFeedback, userAvatarUr
           <div className="flex items-center gap-2 mt-2 text-xs opacity-60">
             <Clock className="h-3 w-3" />
             {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {!isUser && modelColors && modelName && (
+              <>
+                <span className="opacity-50">•</span>
+                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded ${modelColors.bg} ${modelColors.text} border ${modelColors.border}`}>
+                  <span>{modelIcon}</span>
+                  <span className="capitalize text-[10px]">{modelName}</span>
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -657,6 +707,10 @@ export default function AIWorkspaceSection({
     const selectedModel = availableModels.find(m => m.id === settings.model)
     const backend = selectedModel?.backend || 'mock'
 
+    // Use conversation settings if available, fall back to global
+    const convSettings = activeConv.settings || {}
+    const effectiveProjectPath = activeConv.projectPath ?? selectedProjectPath
+
     try {
       // Call API with streaming
       const response = await fetch('/api/ai/chat', {
@@ -665,18 +719,19 @@ export default function AIWorkspaceSection({
         body: JSON.stringify({
           messages: allMessages,
           backend,
-          model: settings.model,
+          model: activeConv.model || settings.model,
           settings: {
-            temperature: settings.temperature,
-            maxTokens: settings.maxTokens,
-            systemPrompt: settings.systemPrompt,
-            additionalDirs: settings.additionalDirs,
-            claudeModel: settings.claudeModel,
-            allowedTools: settings.allowedTools,
-            disallowedTools: settings.disallowedTools,
-            permissionMode: settings.permissionMode,
+            temperature: convSettings.temperature ?? settings.temperature,
+            maxTokens: convSettings.maxTokens ?? settings.maxTokens,
+            systemPrompt: convSettings.systemPrompt ?? settings.systemPrompt,
+            additionalDirs: convSettings.additionalDirs ?? settings.additionalDirs,
+            claudeModel: convSettings.claudeModel ?? settings.claudeModel,
+            allowedTools: convSettings.allowedTools ?? settings.allowedTools,
+            disallowedTools: convSettings.disallowedTools ?? settings.disallowedTools,
+            permissionMode: convSettings.permissionMode ?? settings.permissionMode,
           },
-          cwd: selectedProjectPath || undefined
+          cwd: effectiveProjectPath || undefined,
+          claudeSessionId: activeConv.claudeSessionId || undefined
         })
       })
 
@@ -686,13 +741,14 @@ export default function AIWorkspaceSection({
 
       setIsTyping(false)
 
-      // Create assistant message
+      // Create assistant message with model info
       const assistantMessage: Message = {
         id: generateId(),
         role: 'assistant',
         content: '',
         timestamp: new Date(),
         isStreaming: true,
+        model: backend as AIBackend,
       }
 
       setConversations(prev => prev.map(conv => {
@@ -755,6 +811,17 @@ export default function AIWorkspaceSection({
               console.error('Stream error:', chunk.error)
               setIsStreaming(false)
               break
+            }
+
+            // Capture claudeSessionId from done event
+            if (chunk.done && chunk.claudeSessionId) {
+              setConversations(prev => prev.map(conv => {
+                if (conv.id !== activeConvId) return conv
+                return {
+                  ...conv,
+                  claudeSessionId: chunk.claudeSessionId,
+                }
+              }))
             }
 
             if (chunk.content) {
@@ -852,6 +919,7 @@ export default function AIWorkspaceSection({
   }
 
   const createNewConversation = () => {
+    // Copy current settings to the new conversation
     const newConv: Conversation = {
       id: generateId(),
       title: 'New Conversation',
@@ -860,6 +928,17 @@ export default function AIWorkspaceSection({
       updatedAt: new Date(),
       model: settings.model,
       projectPath: selectedProjectPath,
+      settings: {
+        systemPrompt: settings.systemPrompt,
+        claudeModel: settings.claudeModel,
+        additionalDirs: settings.additionalDirs,
+        allowedTools: settings.allowedTools,
+        disallowedTools: settings.disallowedTools,
+        permissionMode: settings.permissionMode,
+        temperature: settings.temperature,
+        maxTokens: settings.maxTokens,
+      },
+      claudeSessionId: null,
     }
 
     setConversations(prev => [newConv, ...prev])
@@ -919,7 +998,7 @@ export default function AIWorkspaceSection({
             initial={{ x: -300, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -300, opacity: 0 }}
-            className="w-full lg:w-80 glass-dark border-r border-border/40 flex flex-col lg:relative absolute inset-y-0 left-0 z-10"
+            className="w-full lg:w-80 lg:min-w-80 lg:max-w-80 glass-dark border-r border-border/40 flex flex-col lg:relative absolute inset-y-0 left-0 z-10 overflow-hidden"
           >
             <div className="p-4 border-b border-border/40">
               <Button
@@ -931,12 +1010,12 @@ export default function AIWorkspaceSection({
               </Button>
             </div>
 
-            <ScrollArea className="flex-1">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden">
               <div className="p-4 space-y-2">
                 {conversations.map(conv => (
                   <Card
                     key={conv.id}
-                    className={`glass cursor-pointer transition-all group ${
+                    className={`glass cursor-pointer transition-all group max-w-full ${
                       conv.id === activeConvId ? 'border-primary/60 border-glow' : ''
                     }`}
                     onClick={() => setActiveConvId(conv.id)}
@@ -952,16 +1031,16 @@ export default function AIWorkspaceSection({
                               {conv.messages.length} messages
                             </p>
                             {conv.model && (
-                              <div className="flex items-center gap-1">
-                                <Cpu className="h-3 w-3 text-muted-foreground" />
+                              <div className="flex items-center gap-1 overflow-hidden">
+                                <Cpu className="h-3 w-3 text-muted-foreground shrink-0" />
                                 <p className="text-xs text-muted-foreground truncate">
                                   {availableModels.find(m => m.id === conv.model)?.name || conv.model}
                                 </p>
                               </div>
                             )}
                             {conv.projectPath && (
-                              <div className="flex items-center gap-1">
-                                <FolderOpen className="h-3 w-3 text-muted-foreground" />
+                              <div className="flex items-center gap-1 overflow-hidden">
+                                <FolderOpen className="h-3 w-3 text-muted-foreground shrink-0" />
                                 <p className="text-xs text-muted-foreground truncate">
                                   {conv.projectPath.split('/').pop()}
                                 </p>
@@ -976,7 +1055,7 @@ export default function AIWorkspaceSection({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                           onClick={(e) => {
                             e.stopPropagation()
                             deleteConversation(conv.id)
@@ -989,7 +1068,7 @@ export default function AIWorkspaceSection({
                   </Card>
                 ))}
               </div>
-            </ScrollArea>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1014,10 +1093,12 @@ export default function AIWorkspaceSection({
               </div>
               <div className="min-w-0">
                 <h2 className="font-semibold terminal-glow truncate">{activeConv.title}</h2>
-                <p className="text-xs text-muted-foreground flex items-center gap-2">
-                  <Cpu className="h-3 w-3 shrink-0" />
-                  <span className="truncate">
-                    {availableModels.find(m => m.id === settings.model)?.name || 'Loading...'}
+                <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+                  <span className="flex items-center gap-1">
+                    <Cpu className="h-3 w-3 shrink-0" />
+                    <span className="truncate">
+                      {availableModels.find(m => m.id === (activeConv.model || settings.model))?.name || 'Loading...'}
+                    </span>
                   </span>
                   {(isTyping || isStreaming) && (
                     <motion.span
@@ -1028,9 +1109,23 @@ export default function AIWorkspaceSection({
                       • Generating
                     </motion.span>
                   )}
-                  <span className="opacity-50 hidden sm:inline">•</span>
-                  <span className="hidden sm:inline">{totalTokens} / {settings.maxTokens} tokens</span>
-                </p>
+                  {activeConv.claudeSessionId && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20 cursor-help">
+                            <span className="text-[10px]">Session:</span>
+                            <code className="text-[10px] font-mono">{activeConv.claudeSessionId.slice(0, 8)}...</code>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-xs">
+                          <p className="font-mono text-xs break-all">{activeConv.claudeSessionId}</p>
+                          <p className="text-muted-foreground text-xs mt-1">Claude will remember conversation context</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1150,6 +1245,7 @@ export default function AIWorkspaceSection({
                       onRegenerate={handleRegenerate}
                       onFeedback={(type) => handleFeedback(message.id, type)}
                       userAvatarUrl={userAvatarUrl}
+                      availableModels={availableModels}
                     />
                   ))}
 
@@ -1237,6 +1333,11 @@ export default function AIWorkspaceSection({
               </div>
 
               <Separator />
+
+              {/* Note about settings scope */}
+              <p className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
+                Settings apply to <strong>new conversations</strong>. Each conversation keeps its own settings.
+              </p>
 
               {/* Model Selection */}
               <div className="space-y-3">

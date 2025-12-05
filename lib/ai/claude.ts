@@ -7,13 +7,17 @@ import { spawn } from 'child_process'
 import type { ChatMessage, ChatSettings } from './types'
 
 interface ClaudeStreamEvent {
-  type: 'message_start' | 'content_block_delta' | 'message_delta' | 'message_stop' | 'error'
+  type: 'system' | 'assistant' | 'result' | 'error' | 'content_block_delta' | 'message_stop'
+  subtype?: string
+  session_id?: string
+  message?: {
+    content: Array<{ type: 'text'; text: string }>
+  }
+  result?: string
+  is_error?: boolean
   delta?: {
     type: 'text_delta'
     text: string
-  }
-  message?: {
-    content: Array<{ type: 'text'; text: string }>
   }
   error?: {
     type: string
@@ -21,14 +25,21 @@ interface ClaudeStreamEvent {
   }
 }
 
+export interface ClaudeStreamResult {
+  stream: ReadableStream<string>
+  getSessionId: () => string | null
+}
+
 /**
  * Stream chat completions from Claude CLI
+ * Returns stream and a function to get the captured session_id
  */
 export async function streamClaude(
   messages: ChatMessage[],
   settings?: ChatSettings,
-  cwd?: string
-): Promise<ReadableStream<string>> {
+  cwd?: string,
+  sessionId?: string
+): Promise<ClaudeStreamResult> {
   // Build the conversation context
   const systemPrompt = settings?.systemPrompt || ''
   const conversationHistory = messages
@@ -44,8 +55,14 @@ export async function streamClaude(
 
   const args = [
     '--print',
-    '--output-format', 'stream-json'
+    '--output-format', 'stream-json',
+    '--verbose'
   ]
+
+  // Resume existing session if we have a session ID
+  if (sessionId) {
+    args.push('--resume', sessionId)
+  }
 
   if (systemPrompt) {
     args.push('--append-system-prompt', systemPrompt)
@@ -93,7 +110,10 @@ export async function streamClaude(
     detached: false
   })
 
-  return new ReadableStream<string>({
+  // Capture session_id from stream events
+  let capturedSessionId: string | null = null
+
+  const stream = new ReadableStream<string>({
     start(controller) {
       let buffer = ''
 
@@ -111,7 +131,32 @@ export async function streamClaude(
           try {
             const event: ClaudeStreamEvent = JSON.parse(line)
 
-            if (event.type === 'content_block_delta' && event.delta?.text) {
+            // Capture session_id from init event (first priority)
+            if (event.type === 'system' && event.subtype === 'init' && event.session_id) {
+              capturedSessionId = event.session_id
+            }
+
+            // Handle Claude CLI stream-json format
+            if (event.type === 'assistant' && event.message?.content) {
+              // Extract text from assistant message
+              for (const block of event.message.content) {
+                if (block.type === 'text' && block.text) {
+                  controller.enqueue(block.text)
+                }
+              }
+            } else if (event.type === 'result') {
+              // Also capture session_id from result event (backup)
+              if (event.session_id) {
+                capturedSessionId = event.session_id
+              }
+              // End of stream
+              if (event.is_error) {
+                controller.error(new Error(event.result || 'Claude CLI error'))
+              } else {
+                controller.close()
+              }
+            } else if (event.type === 'content_block_delta' && event.delta?.text) {
+              // Legacy format support
               controller.enqueue(event.delta.text)
             } else if (event.type === 'message_stop') {
               controller.close()
@@ -150,6 +195,11 @@ export async function streamClaude(
       claude.kill()
     }
   })
+
+  return {
+    stream,
+    getSessionId: () => capturedSessionId
+  }
 }
 
 /**

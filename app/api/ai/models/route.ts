@@ -1,10 +1,10 @@
 /**
  * AI Models API
- * Lists available models from all backends
+ * Lists available models from all backends (Claude, Gemini, Codex, Docker, Mock)
  */
 
 import { NextResponse } from 'next/server'
-import { detectAvailableBackends } from '@/lib/ai/detect'
+import { getAvailableBackends } from '@/lib/ai/detect'
 import { listDockerModels } from '@/lib/ai/docker'
 import { getMockModel } from '@/lib/ai/mock'
 import type { Model } from '@/lib/ai/types'
@@ -14,16 +14,38 @@ export async function GET() {
     const models: Model[] = []
 
     // Check which backends are available
-    const backends = await detectAvailableBackends()
+    const backends = await getAvailableBackends()
 
     // Add Claude if available
     const claudeBackend = backends.find(b => b.backend === 'claude')
     if (claudeBackend?.available) {
       models.push({
         id: 'claude',
-        name: 'Claude (Local)',
+        name: 'Claude',
         backend: 'claude',
-        description: 'Via CLI on this machine using Max subscription'
+        description: 'Claude Code CLI (Max subscription)'
+      })
+    }
+
+    // Add Gemini if available
+    const geminiBackend = backends.find(b => b.backend === 'gemini')
+    if (geminiBackend?.available) {
+      models.push({
+        id: 'gemini',
+        name: 'Gemini',
+        backend: 'gemini',
+        description: 'Google Gemini CLI'
+      })
+    }
+
+    // Add Codex if available
+    const codexBackend = backends.find(b => b.backend === 'codex')
+    if (codexBackend?.available) {
+      models.push({
+        id: 'codex',
+        name: 'Codex',
+        backend: 'codex',
+        description: 'OpenAI Codex CLI (GPT-5)'
       })
     }
 

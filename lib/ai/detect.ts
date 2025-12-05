@@ -5,14 +5,13 @@
 
 import { exec } from 'child_process'
 import { promisify } from 'util'
+import type { AIBackend } from './types'
 
 const execAsync = promisify(exec)
 
 const DOCKER_API_BASE = process.env.DOCKER_MODEL_API
   ? `${process.env.DOCKER_MODEL_API}/engines/v1`
   : 'http://localhost:12434/engines/v1'
-
-export type AIBackend = 'claude' | 'docker' | 'mock'
 
 export interface BackendStatus {
   backend: AIBackend
@@ -21,18 +20,50 @@ export interface BackendStatus {
 }
 
 /**
+ * Check if a CLI tool is available
+ */
+async function checkCLI(command: string): Promise<boolean> {
+  try {
+    await execAsync(`command -v ${command}`)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * Check if Claude CLI is available
  */
 export async function checkClaudeCLI(): Promise<BackendStatus> {
-  try {
-    await execAsync('command -v claude')
-    return { backend: 'claude', available: true }
-  } catch (error) {
-    return {
-      backend: 'claude',
-      available: false,
-      error: 'Claude CLI not found. Install with: npm install -g @anthropic-ai/claude-code'
-    }
+  const available = await checkCLI('claude')
+  return {
+    backend: 'claude',
+    available,
+    error: available ? undefined : 'Claude CLI not found. Install with: npm install -g @anthropic-ai/claude-code'
+  }
+}
+
+/**
+ * Check if Gemini CLI is available
+ */
+export async function checkGeminiCLI(): Promise<BackendStatus> {
+  const available = await checkCLI('gemini')
+  return {
+    backend: 'gemini',
+    available,
+    error: available ? undefined : 'Gemini CLI not found'
+  }
+}
+
+/**
+ * Check if Codex CLI is available
+ */
+export async function checkCodexCLI(): Promise<BackendStatus> {
+  const available = await checkCLI('codex')
+  return {
+    backend: 'codex',
+    available,
+    error: available ? undefined : 'Codex CLI not found'
   }
 }
 
@@ -78,21 +109,28 @@ export function checkMock(): BackendStatus {
 /**
  * Check all backends and return their status
  */
-export async function detectAvailableBackends(): Promise<BackendStatus[]> {
-  const [claude, docker, mock] = await Promise.all([
+export async function getAvailableBackends(): Promise<BackendStatus[]> {
+  const [claude, gemini, codex, docker, mock] = await Promise.all([
     checkClaudeCLI(),
+    checkGeminiCLI(),
+    checkCodexCLI(),
     checkDockerModels(),
     Promise.resolve(checkMock())
   ])
 
-  return [claude, docker, mock]
+  return [claude, gemini, codex, docker, mock]
 }
 
 /**
- * Get the first available backend (priority order: claude, docker, mock)
+ * Alias for getAvailableBackends (legacy name)
+ */
+export const detectBackend = getAvailableBackends
+
+/**
+ * Get the first available backend (priority order: claude, gemini, codex, docker, mock)
  */
 export async function getDefaultBackend(): Promise<AIBackend> {
-  const backends = await detectAvailableBackends()
+  const backends = await getAvailableBackends()
   const available = backends.find(b => b.available)
   return available?.backend || 'mock'
 }

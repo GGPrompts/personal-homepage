@@ -526,7 +526,7 @@ export default function DisastersMonitor({ activeSubItem, onSubItemHandled }: Di
                     <p className="text-xs">Try adjusting the filter</p>
                   </div>
                 ) : (
-                  <div className="space-y-3 px-1">
+                  <div className="space-y-3 px-3 py-2">
                     <AnimatePresence mode="popLayout">
                       {activeQuakes.map((quake) => {
                         const { properties: props, geometry, id } = quake

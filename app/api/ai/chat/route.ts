@@ -1,52 +1,145 @@
 /**
  * AI Chat API
  * Handles chat requests with streaming responses
+ * Supports multi-model conversations via JSONL storage
  */
 
 import { NextRequest } from 'next/server'
 import { streamClaude } from '@/lib/ai/claude'
 import { streamDockerModel } from '@/lib/ai/docker'
 import { streamMock } from '@/lib/ai/mock'
-import type { ChatRequest } from '@/lib/ai/types'
+import { streamGemini } from '@/lib/ai/gemini'
+import { streamCodex } from '@/lib/ai/codex'
+import {
+  readConversation,
+  appendMessage,
+  buildModelContext,
+  createConversation,
+  type ModelId
+} from '@/lib/ai/conversation'
+import type { ChatRequest, AIBackend } from '@/lib/ai/types'
+
+// Map API backend names to conversation ModelId
+function toModelId(backend: AIBackend): ModelId {
+  if (backend === 'mock') return 'claude' // Mock pretends to be Claude
+  return backend as ModelId
+}
 
 export async function POST(request: NextRequest) {
   try {
     const body: ChatRequest = await request.json()
 
-    const { messages, backend, model, settings, cwd } = body
+    const { messages, backend, model, settings, cwd, conversationId, claudeSessionId } = body
 
-    if (!messages || messages.length === 0) {
+    // Validate we have either messages or a conversationId
+    if ((!messages || messages.length === 0) && !conversationId) {
       return new Response(
-        JSON.stringify({ error: 'No messages provided' }),
+        JSON.stringify({ error: 'No messages or conversationId provided' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
-    // Get the appropriate stream based on backend
     let stream: ReadableStream<string>
+    let messageId: string | undefined
+    let convId = conversationId
+    let getSessionId: (() => string | null) | undefined
 
     try {
-      if (backend === 'claude') {
-        stream = await streamClaude(messages, settings, cwd)
-      } else if (backend === 'docker') {
-        if (!model) {
+      // JSONL conversation mode - multi-model aware
+      if (conversationId || body.conversationId) {
+        convId = conversationId || createConversation()
+
+        // Get the last user message from the request
+        const lastUserMessage = messages?.findLast(m => m.role === 'user')
+        if (!lastUserMessage) {
           return new Response(
-            JSON.stringify({ error: 'Model required for Docker backend' }),
+            JSON.stringify({ error: 'No user message found' }),
             { status: 400, headers: { 'Content-Type': 'application/json' } }
           )
         }
-        stream = await streamDockerModel(model, messages, settings)
+
+        // Append user message to conversation
+        const userMsg = appendMessage(convId, {
+          role: 'user',
+          content: lastUserMessage.content
+        })
+
+        // Read full conversation and build model-aware context
+        const history = readConversation(convId)
+        const modelId = toModelId(backend)
+        const context = buildModelContext(
+          history,
+          modelId,
+          settings?.systemPrompt,
+          50 // max messages for context
+        )
+
+        // Get stream from appropriate backend with model-aware context
+        if (backend === 'claude') {
+          // Claude uses its own conversation format for now
+          // Pass session ID for multi-turn context
+          const result = await streamClaude(messages, settings, cwd, claudeSessionId)
+          stream = result.stream
+          getSessionId = result.getSessionId
+        } else if (backend === 'gemini') {
+          stream = await streamGemini(context, settings, cwd)
+        } else if (backend === 'codex') {
+          stream = await streamCodex(context, settings, cwd)
+        } else if (backend === 'docker') {
+          if (!model) {
+            return new Response(
+              JSON.stringify({ error: 'Model required for Docker backend' }),
+              { status: 400, headers: { 'Content-Type': 'application/json' } }
+            )
+          }
+          stream = await streamDockerModel(model, messages, settings)
+        } else {
+          stream = await streamMock(messages)
+        }
+
+        // We'll append the assistant response after streaming completes
+        messageId = `msg_${Date.now()}_pending`
+
       } else {
-        stream = await streamMock(messages)
+        // Legacy mode - no JSONL, just pass messages directly
+        if (backend === 'claude') {
+          const result = await streamClaude(messages, settings, cwd, claudeSessionId)
+          stream = result.stream
+          getSessionId = result.getSessionId
+        } else if (backend === 'gemini') {
+          const context = {
+            systemPrompt: settings?.systemPrompt || '',
+            messages: messages.map(m => ({ role: m.role, content: m.content }))
+          }
+          stream = await streamGemini(context, settings, cwd)
+        } else if (backend === 'codex') {
+          const context = {
+            systemPrompt: settings?.systemPrompt || '',
+            messages: messages.map(m => ({ role: m.role, content: m.content }))
+          }
+          stream = await streamCodex(context, settings, cwd)
+        } else if (backend === 'docker') {
+          if (!model) {
+            return new Response(
+              JSON.stringify({ error: 'Model required for Docker backend' }),
+              { status: 400, headers: { 'Content-Type': 'application/json' } }
+            )
+          }
+          stream = await streamDockerModel(model, messages, settings)
+        } else {
+          stream = await streamMock(messages)
+        }
       }
     } catch (error) {
       console.error('Backend error, falling back to mock:', error)
-      // Fallback to mock if the selected backend fails
       stream = await streamMock(messages)
     }
 
     // Convert to SSE (Server-Sent Events) format
+    // Also collect full response for JSONL storage
     const encoder = new TextEncoder()
+    let fullResponse = ''
+
     const sseStream = new ReadableStream({
       async start(controller) {
         const reader = stream.getReader()
@@ -56,14 +149,40 @@ export async function POST(request: NextRequest) {
             const { done, value } = await reader.read()
 
             if (done) {
-              // Send done event
-              controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+              // If using JSONL mode, save the assistant response
+              if (convId) {
+                appendMessage(convId, {
+                  role: 'assistant',
+                  content: fullResponse,
+                  model: toModelId(backend),
+                  metadata: {
+                    cwd
+                  }
+                })
+              }
+
+              // Send done event with conversation metadata
+              const doneData = JSON.stringify({
+                done: true,
+                conversationId: convId,
+                model: backend,
+                claudeSessionId: getSessionId?.() || undefined
+              })
+              controller.enqueue(encoder.encode(`data: ${doneData}\n\n`))
               controller.close()
               break
             }
 
+            // Accumulate response for JSONL storage
+            fullResponse += value
+
             // Send content chunk
-            const data = JSON.stringify({ content: value, done: false })
+            const data = JSON.stringify({
+              content: value,
+              done: false,
+              model: backend,
+              conversationId: convId
+            })
             controller.enqueue(encoder.encode(`data: ${data}\n\n`))
           }
         } catch (error) {

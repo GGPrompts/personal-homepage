@@ -754,8 +754,17 @@ export default function DailyFeedSection({
       return sortItems(Array.from(savedItemsData.values()))
     }
 
+    // Deduplicate items by source+id (in case API returns duplicates)
+    const seen = new Set<string>()
+    const uniqueItems = items.filter((item) => {
+      const key = `${item.source}-${item.id}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+
     // Filter out hidden items
-    const visibleItems = items.filter((item) => !hiddenItems.has(item.id))
+    const visibleItems = uniqueItems.filter((item) => !hiddenItems.has(item.id))
 
     // If "all" mode or no sources selected, show all visible items
     if (viewMode === "all" || selectedSources.size === 0) {
@@ -948,7 +957,7 @@ export default function DailyFeedSection({
           <div className="space-y-3 pb-6 pr-1">
             {filteredItems.map((item) => (
               <FeedCard
-                key={item.id}
+                key={`${item.source}-${item.id}`}
                 item={item}
                 isSaved={savedItems.has(item.id)}
                 onSave={() => toggleSave(item)}

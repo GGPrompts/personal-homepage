@@ -691,7 +691,7 @@ export default function StocksDashboard({ activeSubItem, onSubItemHandled, onNav
                     <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
                 ) : (
-                  <div className="space-y-2 px-1">
+                  <div className="space-y-2 px-3 py-2">
                     {filteredWatchlist.map((stock) => {
                       const position = portfolio.positions.find((p) => p.symbol === stock.symbol)
                       return (
