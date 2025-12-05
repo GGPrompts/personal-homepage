@@ -13,7 +13,13 @@ const execAsync = promisify(exec)
 const DEFAULT_MAX_PARALLEL = 3
 
 interface ClaudeStreamEvent {
-  type: 'message_start' | 'content_block_delta' | 'message_delta' | 'message_stop' | 'error'
+  type: 'system' | 'assistant' | 'result' | 'message_start' | 'content_block_delta' | 'message_delta' | 'message_stop' | 'error'
+  subtype?: string
+  message?: {
+    content: Array<{ type: 'text'; text: string }>
+  }
+  result?: string
+  is_error?: boolean
   delta?: {
     type: 'text_delta'
     text: string
@@ -99,6 +105,7 @@ export async function runClaudeOnProject(
     const args = [
       '--print',
       '--output-format', 'stream-json',
+      '--verbose',
       prompt
     ]
 
@@ -126,7 +133,40 @@ export async function runClaudeOnProject(
         try {
           const event: ClaudeStreamEvent = JSON.parse(line)
 
-          if (event.type === 'content_block_delta' && event.delta?.text) {
+          // Handle Claude CLI stream-json format
+          if (event.type === 'assistant' && event.message?.content) {
+            // Extract text from assistant message
+            for (const block of event.message.content) {
+              if (block.type === 'text' && block.text) {
+                const text = block.text
+                fullOutput += text
+                onEvent({
+                  type: 'content',
+                  project: projectPath,
+                  projectName,
+                  text
+                })
+              }
+            }
+          } else if (event.type === 'result') {
+            // Result contains the final output
+            if (event.result && !event.is_error) {
+              // Only add to output if we haven't captured it already
+              if (!fullOutput && event.result) {
+                fullOutput = event.result
+                onEvent({
+                  type: 'content',
+                  project: projectPath,
+                  projectName,
+                  text: event.result
+                })
+              }
+            } else if (event.is_error) {
+              hasError = true
+              errorMessage = event.result || 'Claude CLI error'
+            }
+          } else if (event.type === 'content_block_delta' && event.delta?.text) {
+            // Legacy format support
             const text = event.delta.text
             fullOutput += text
             onEvent({

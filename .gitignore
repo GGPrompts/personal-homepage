@@ -47,3 +47,7 @@ next-env.d.ts
 *.obs
 /recordings/raw/
 .venv/
+
+# AI conversation and jobs data
+.conversations/
+.jobs-data/

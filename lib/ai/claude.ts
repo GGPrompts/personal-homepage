@@ -3,21 +3,46 @@
  * Uses the @anthropic-ai/claude-code CLI with Max subscription
  */
 
-import { spawn } from 'child_process'
+import { spawn, ChildProcess } from 'child_process'
 import type { ChatMessage, ChatSettings } from './types'
 
+// Content block types from Claude CLI stream-json
+interface TextBlock {
+  type: 'text'
+  text: string
+}
+
+interface ToolUseBlock {
+  type: 'tool_use'
+  id: string
+  name: string
+  input: Record<string, unknown>
+}
+
+interface ToolResultBlock {
+  type: 'tool_result'
+  tool_use_id: string
+  content: string
+  is_error?: boolean
+}
+
+type ContentBlock = TextBlock | ToolUseBlock | ToolResultBlock
+
 interface ClaudeStreamEvent {
-  type: 'system' | 'assistant' | 'result' | 'error' | 'content_block_delta' | 'message_stop'
+  type: 'system' | 'assistant' | 'result' | 'error' | 'content_block_start' | 'content_block_delta' | 'content_block_stop' | 'message_start' | 'message_stop'
   subtype?: string
   session_id?: string
   message?: {
-    content: Array<{ type: 'text'; text: string }>
+    content: ContentBlock[]
   }
+  index?: number
+  content_block?: ContentBlock
   result?: string
   is_error?: boolean
   delta?: {
-    type: 'text_delta'
-    text: string
+    type: 'text_delta' | 'input_json_delta'
+    text?: string
+    partial_json?: string
   }
   error?: {
     type: string
@@ -25,14 +50,36 @@ interface ClaudeStreamEvent {
   }
 }
 
+// Stream chunk types for the client
+export interface StreamChunk {
+  type: 'text' | 'tool_start' | 'tool_input' | 'tool_end' | 'heartbeat' | 'error' | 'done'
+  content?: string
+  tool?: {
+    id: string
+    name: string
+    input?: string
+  }
+  error?: string
+  sessionId?: string
+}
+
 export interface ClaudeStreamResult {
   stream: ReadableStream<string>
   getSessionId: () => string | null
 }
 
+// Heartbeat interval in ms (send every 15 seconds to keep connection alive)
+const HEARTBEAT_INTERVAL = 15000
+
 /**
  * Stream chat completions from Claude CLI
  * Returns stream and a function to get the captured session_id
+ *
+ * Features:
+ * - Heartbeat to keep connection alive during long operations
+ * - Tool use events surfaced to client
+ * - Proper cleanup on cancel/error
+ * - Protection against double-close
  */
 export async function streamClaude(
   messages: ChatMessage[],
@@ -42,10 +89,6 @@ export async function streamClaude(
 ): Promise<ClaudeStreamResult> {
   // Build the conversation context
   const systemPrompt = settings?.systemPrompt || ''
-  const conversationHistory = messages
-    .filter(m => m.role !== 'system')
-    .map(m => `${m.role === 'user' ? 'Human' : 'Assistant'}: ${m.content}`)
-    .join('\n\n')
 
   // Get the last user message as the prompt
   const lastUserMessage = messages.findLast(m => m.role === 'user')
@@ -95,31 +138,106 @@ export async function streamClaude(
   // Add the prompt as the last argument
   args.push(lastUserMessage.content)
 
-  // Note: Claude CLI doesn't directly support conversation history in the command
-  // For multi-turn conversations, we'd need to include context in the prompt
-  // or use the API directly. For now, we'll pass just the user message.
-
   const claude = spawn('claude', args, {
     env: {
       ...process.env,
       // Remove ANTHROPIC_API_KEY to force subscription auth
       ANTHROPIC_API_KEY: undefined
     },
-    cwd: cwd || process.cwd(), // Use project path if provided
-    stdio: ['ignore', 'pipe', 'pipe'], // Don't inherit stdin, pipe stdout/stderr
+    cwd: cwd || process.cwd(),
+    stdio: ['ignore', 'pipe', 'pipe'],
     detached: false
   })
 
   // Capture session_id from stream events
   let capturedSessionId: string | null = null
 
+  // Track stream state to prevent double operations
+  let isClosed = false
+  let heartbeatInterval: NodeJS.Timeout | null = null
+  let lastActivity = Date.now()
+
+  // Track current tool use for streaming input
+  const activeTools = new Map<number, { id: string; name: string; input: string }>()
+
+  // Helper to safely close the stream
+  const safeClose = (controller: ReadableStreamDefaultController<string>) => {
+    if (isClosed) return
+    isClosed = true
+
+    // Clear heartbeat
+    if (heartbeatInterval) {
+      clearInterval(heartbeatInterval)
+      heartbeatInterval = null
+    }
+
+    // Kill process if still running
+    if (!claude.killed) {
+      claude.kill()
+    }
+
+    try {
+      controller.close()
+    } catch {
+      // Already closed
+    }
+  }
+
+  // Helper to safely error the stream
+  const safeError = (controller: ReadableStreamDefaultController<string>, error: Error) => {
+    if (isClosed) return
+    isClosed = true
+
+    if (heartbeatInterval) {
+      clearInterval(heartbeatInterval)
+      heartbeatInterval = null
+    }
+
+    if (!claude.killed) {
+      claude.kill()
+    }
+
+    try {
+      controller.error(error)
+    } catch {
+      // Already closed/errored
+    }
+  }
+
+  // Helper to enqueue with JSON encoding for structured data
+  const enqueueChunk = (controller: ReadableStreamDefaultController<string>, chunk: StreamChunk) => {
+    if (isClosed) return
+    lastActivity = Date.now()
+
+    // For text content, just send the raw text for backwards compatibility
+    if (chunk.type === 'text' && chunk.content) {
+      controller.enqueue(chunk.content)
+    } else {
+      // For structured events (tool use, heartbeat), send as JSON with marker
+      controller.enqueue(`\n__CLAUDE_EVENT__${JSON.stringify(chunk)}__END_EVENT__\n`)
+    }
+  }
+
   const stream = new ReadableStream<string>({
     start(controller) {
       let buffer = ''
 
+      // Start heartbeat to keep connection alive
+      heartbeatInterval = setInterval(() => {
+        if (isClosed) return
+
+        const timeSinceActivity = Date.now() - lastActivity
+        if (timeSinceActivity >= HEARTBEAT_INTERVAL) {
+          enqueueChunk(controller, { type: 'heartbeat' })
+        }
+      }, HEARTBEAT_INTERVAL)
+
       // Process stream-json format from Claude CLI
       claude.stdout.on('data', (chunk: Buffer) => {
+        if (isClosed) return
+
         buffer += chunk.toString()
+        lastActivity = Date.now()
 
         // Process complete JSON lines
         const lines = buffer.split('\n')
@@ -131,37 +249,109 @@ export async function streamClaude(
           try {
             const event: ClaudeStreamEvent = JSON.parse(line)
 
-            // Capture session_id from init event (first priority)
+            // Capture session_id from init event
             if (event.type === 'system' && event.subtype === 'init' && event.session_id) {
               capturedSessionId = event.session_id
             }
 
-            // Handle Claude CLI stream-json format
-            if (event.type === 'assistant' && event.message?.content) {
-              // Extract text from assistant message
-              for (const block of event.message.content) {
-                if (block.type === 'text' && block.text) {
-                  controller.enqueue(block.text)
+            // Handle different event types
+            switch (event.type) {
+              case 'assistant':
+                // Full assistant message with content blocks
+                if (event.message?.content) {
+                  for (const block of event.message.content) {
+                    if (block.type === 'text' && block.text) {
+                      enqueueChunk(controller, { type: 'text', content: block.text })
+                    } else if (block.type === 'tool_use') {
+                      // Tool use in assistant message
+                      enqueueChunk(controller, {
+                        type: 'tool_start',
+                        tool: {
+                          id: block.id,
+                          name: block.name,
+                          input: JSON.stringify(block.input, null, 2)
+                        }
+                      })
+                      enqueueChunk(controller, {
+                        type: 'tool_end',
+                        tool: { id: block.id, name: block.name }
+                      })
+                    }
+                  }
                 }
-              }
-            } else if (event.type === 'result') {
-              // Also capture session_id from result event (backup)
-              if (event.session_id) {
-                capturedSessionId = event.session_id
-              }
-              // End of stream
-              if (event.is_error) {
-                controller.error(new Error(event.result || 'Claude CLI error'))
-              } else {
-                controller.close()
-              }
-            } else if (event.type === 'content_block_delta' && event.delta?.text) {
-              // Legacy format support
-              controller.enqueue(event.delta.text)
-            } else if (event.type === 'message_stop') {
-              controller.close()
-            } else if (event.type === 'error') {
-              controller.error(new Error(event.error?.message || 'Claude CLI error'))
+                break
+
+              case 'content_block_start':
+                // Start of a content block (text or tool_use)
+                if (event.content_block?.type === 'tool_use' && event.index !== undefined) {
+                  const tool = event.content_block as ToolUseBlock
+                  activeTools.set(event.index, { id: tool.id, name: tool.name, input: '' })
+                  enqueueChunk(controller, {
+                    type: 'tool_start',
+                    tool: { id: tool.id, name: tool.name }
+                  })
+                }
+                break
+
+              case 'content_block_delta':
+                if (event.delta?.type === 'text_delta' && event.delta.text) {
+                  // Text streaming
+                  enqueueChunk(controller, { type: 'text', content: event.delta.text })
+                } else if (event.delta?.type === 'input_json_delta' && event.delta.partial_json && event.index !== undefined) {
+                  // Tool input streaming
+                  const activeTool = activeTools.get(event.index)
+                  if (activeTool) {
+                    activeTool.input += event.delta.partial_json
+                    enqueueChunk(controller, {
+                      type: 'tool_input',
+                      tool: {
+                        id: activeTool.id,
+                        name: activeTool.name,
+                        input: event.delta.partial_json
+                      }
+                    })
+                  }
+                }
+                break
+
+              case 'content_block_stop':
+                // End of a content block
+                if (event.index !== undefined) {
+                  const activeTool = activeTools.get(event.index)
+                  if (activeTool) {
+                    enqueueChunk(controller, {
+                      type: 'tool_end',
+                      tool: {
+                        id: activeTool.id,
+                        name: activeTool.name,
+                        input: activeTool.input
+                      }
+                    })
+                    activeTools.delete(event.index)
+                  }
+                }
+                break
+
+              case 'result':
+                // Capture session_id from result event
+                if (event.session_id) {
+                  capturedSessionId = event.session_id
+                }
+                // End of stream
+                if (event.is_error) {
+                  safeError(controller, new Error(event.result || 'Claude CLI error'))
+                } else {
+                  safeClose(controller)
+                }
+                break
+
+              case 'message_stop':
+                safeClose(controller)
+                break
+
+              case 'error':
+                safeError(controller, new Error(event.error?.message || 'Claude CLI error'))
+                break
             }
           } catch (error) {
             console.error('Failed to parse Claude stream-json:', line, error)
@@ -170,29 +360,41 @@ export async function streamClaude(
       })
 
       claude.stderr.on('data', (chunk: Buffer) => {
-        console.error('Claude CLI stderr:', chunk.toString())
+        const stderr = chunk.toString()
+        console.error('Claude CLI stderr:', stderr)
+
+        // Check for fatal errors in stderr
+        if (stderr.includes('Error:') || stderr.includes('FATAL')) {
+          safeError(controller, new Error(`Claude CLI: ${stderr.trim()}`))
+        }
       })
 
       claude.on('close', (code) => {
-        if (code !== 0) {
-          controller.error(new Error(`Claude CLI exited with code ${code}`))
-          return
-        }
-        // Controller might already be closed by message_stop event
-        try {
-          controller.close()
-        } catch {
-          // Already closed
+        if (isClosed) return
+
+        if (code !== 0 && code !== null) {
+          safeError(controller, new Error(`Claude CLI exited with code ${code}`))
+        } else {
+          safeClose(controller)
         }
       })
 
       claude.on('error', (error) => {
-        controller.error(error)
+        safeError(controller, error)
       })
     },
 
     cancel() {
-      claude.kill()
+      isClosed = true
+
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval)
+        heartbeatInterval = null
+      }
+
+      if (!claude.killed) {
+        claude.kill()
+      }
     }
   })
 

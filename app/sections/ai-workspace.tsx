@@ -20,6 +20,7 @@ import {
   MessageSquare, Send, Bot, User, Copy, RotateCw, ThumbsUp, ThumbsDown,
   Settings, ChevronDown, Plus, X, Trash2, Code, CheckCheck,
   Sparkles, StopCircle, Clock, Cpu, FileJson, FileText, FolderOpen,
+  Wrench, Loader2, ChevronRight,
 } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { useAllProjectsMeta } from "@/hooks/useProjectMeta"
@@ -32,6 +33,14 @@ import type { Project, LocalProject } from "@/lib/projects"
 type MessageRole = 'user' | 'assistant' | 'system'
 type AIBackend = 'claude' | 'gemini' | 'codex' | 'docker' | 'mock'
 
+// Tool use tracking
+interface ToolUse {
+  id: string
+  name: string
+  input?: string
+  status: 'running' | 'complete'
+}
+
 interface Message {
   id: string
   role: MessageRole
@@ -40,6 +49,20 @@ interface Message {
   feedback?: 'up' | 'down'
   isStreaming?: boolean
   model?: AIBackend  // Which model generated this response
+  toolUses?: ToolUse[]  // Tool uses in this message
+}
+
+// Claude stream event types (matching lib/ai/claude.ts)
+interface ClaudeStreamEvent {
+  type: 'text' | 'tool_start' | 'tool_input' | 'tool_end' | 'heartbeat' | 'error' | 'done'
+  content?: string
+  tool?: {
+    id: string
+    name: string
+    input?: string
+  }
+  error?: string
+  sessionId?: string
 }
 
 interface Conversation {
@@ -144,6 +167,28 @@ const MOCK_RESPONSES: Record<string, string> = {
 
 function generateId() {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+}
+
+// Parse Claude events from content that may contain __CLAUDE_EVENT__<JSON>__END_EVENT__ markers
+function parseClaudeEvents(content: string): { text: string; events: ClaudeStreamEvent[] } {
+  const events: ClaudeStreamEvent[] = []
+  const eventRegex = /__CLAUDE_EVENT__(.*?)__END_EVENT__/g
+  let text = content
+
+  let match
+  while ((match = eventRegex.exec(content)) !== null) {
+    try {
+      const event = JSON.parse(match[1]) as ClaudeStreamEvent
+      events.push(event)
+    } catch {
+      // Invalid JSON, skip
+    }
+  }
+
+  // Remove event markers from text
+  text = content.replace(/__CLAUDE_EVENT__.*?__END_EVENT__/g, '').replace(/\n{3,}/g, '\n\n')
+
+  return { text, events }
 }
 
 // Helper to render text with clickable links
@@ -264,6 +309,84 @@ function loadSettings(): ChatSettings {
 // ============================================================================
 // SUB-COMPONENTS
 // ============================================================================
+
+// Tool use display with auto-expand and auto-collapse
+function ToolUseDisplay({ tool }: { tool: ToolUse }) {
+  const [isOpen, setIsOpen] = React.useState(true) // Start expanded
+  const collapseTimerRef = React.useRef<NodeJS.Timeout | null>(null)
+  const manuallyToggledRef = React.useRef(false) // Track if user manually toggled
+
+  React.useEffect(() => {
+    // Auto-collapse after 4 seconds when tool completes (unless manually toggled)
+    if (tool.status === 'complete' && isOpen && !manuallyToggledRef.current) {
+      collapseTimerRef.current = setTimeout(() => {
+        setIsOpen(false)
+      }, 4000)
+    }
+
+    // Clear timer on cleanup or if tool starts running again
+    return () => {
+      if (collapseTimerRef.current) {
+        clearTimeout(collapseTimerRef.current)
+      }
+    }
+  }, [tool.status, isOpen])
+
+  // Keep expanded while running
+  React.useEffect(() => {
+    if (tool.status === 'running') {
+      setIsOpen(true)
+      manuallyToggledRef.current = false // Reset manual toggle when tool starts
+      // Clear any pending collapse timer
+      if (collapseTimerRef.current) {
+        clearTimeout(collapseTimerRef.current)
+      }
+    }
+  }, [tool.status])
+
+  // Handle manual toggle
+  const handleOpenChange = (open: boolean) => {
+    manuallyToggledRef.current = true // User manually toggled
+    setIsOpen(open)
+    // Clear any pending auto-collapse
+    if (collapseTimerRef.current) {
+      clearTimeout(collapseTimerRef.current)
+      collapseTimerRef.current = null
+    }
+  }
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={handleOpenChange}>
+      <CollapsibleTrigger className="flex items-center gap-2 w-full text-left">
+        <div className={`flex items-center gap-2 px-2 py-1 rounded text-xs ${
+          tool.status === 'running'
+            ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+            : 'bg-green-500/20 text-green-400 border border-green-500/30'
+        }`}>
+          {tool.status === 'running' ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <Wrench className="h-3 w-3" />
+          )}
+          <span className="font-mono">{tool.name}</span>
+          {tool.status === 'running' && (
+            <span className="text-[10px] opacity-70">running...</span>
+          )}
+        </div>
+        {tool.input && (
+          <ChevronRight className="h-3 w-3 text-muted-foreground transition-transform data-[state=open]:rotate-90" />
+        )}
+      </CollapsibleTrigger>
+      {tool.input && (
+        <CollapsibleContent>
+          <div className="mt-1 ml-2 p-2 bg-muted/30 rounded text-xs font-mono overflow-x-auto max-h-32 overflow-y-auto">
+            <pre className="whitespace-pre-wrap break-all">{tool.input}</pre>
+          </div>
+        </CollapsibleContent>
+      )}
+    </Collapsible>
+  )
+}
 
 function TypingIndicator() {
   return (
@@ -407,6 +530,15 @@ function MessageBubble({ message, onCopy, onRegenerate, onFeedback, userAvatarUr
               : 'glass'
           }`}
         >
+          {/* Tool uses display */}
+          {!isUser && message.toolUses && message.toolUses.length > 0 && (
+            <div className="mb-3 space-y-2">
+              {message.toolUses.map((tool) => (
+                <ToolUseDisplay key={tool.id} tool={tool} />
+              ))}
+            </div>
+          )}
+
           <div className="prose prose-sm max-w-none dark:prose-invert">
             {renderContent(message.content)}
           </div>
@@ -532,8 +664,73 @@ export default function AIWorkspaceSection({
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
+  const abortControllerRef = React.useRef<AbortController | null>(null)
 
   const activeConv = conversations.find(c => c.id === activeConvId) || conversations[0]
+
+  // Note: We intentionally do NOT abort streaming on unmount
+  // The server-side request continues and writes to JSONL
+  // When user returns, we sync from server to get any missed messages
+
+  // Sync from server-side JSONL on mount and when active conversation changes
+  // This catches any responses that completed while user was away
+  React.useEffect(() => {
+    async function syncFromServer() {
+      if (!activeConv?.id) return
+
+      try {
+        // Check if server has messages for this conversation
+        const response = await fetch(`/api/ai/conversations?id=${activeConv.id}`)
+        if (!response.ok) return
+
+        const data = await response.json()
+        if (!data.messages || data.messages.length === 0) return
+
+        // Find the last assistant message from server
+        const serverMessages = data.messages.filter((m: any) => m.role !== 'system')
+        const lastServerAssistant = [...serverMessages].reverse().find((m: any) => m.role === 'assistant')
+
+        if (!lastServerAssistant) return
+
+        // Check if we're missing this message locally
+        const localMessages = activeConv.messages
+        const lastLocalAssistant = [...localMessages].reverse().find(m => m.role === 'assistant')
+
+        // If server has a newer assistant message than local, sync it
+        if (lastServerAssistant.ts > (lastLocalAssistant?.timestamp?.getTime() || 0)) {
+          console.log('Syncing missed response from server')
+
+          // Add the missing assistant message
+          const syncedMessage: Message = {
+            id: lastServerAssistant.id,
+            role: 'assistant',
+            content: lastServerAssistant.content,
+            timestamp: new Date(lastServerAssistant.ts),
+            model: lastServerAssistant.model as AIBackend,
+            isStreaming: false,
+          }
+
+          setConversations(prev => prev.map(conv => {
+            if (conv.id !== activeConvId) return conv
+            // Only add if we don't already have it
+            if (conv.messages.find(m => m.id === syncedMessage.id)) return conv
+            return {
+              ...conv,
+              messages: [...conv.messages, syncedMessage],
+              updatedAt: new Date(),
+            }
+          }))
+        }
+      } catch (error) {
+        // Silent fail - sync is best-effort
+        console.debug('Server sync failed:', error)
+      }
+    }
+
+    // Sync when component mounts or conversation changes
+    syncFromServer()
+  }, [activeConvId])
+
   const selectedModel = availableModels.find(m => m.id === settings.model)
 
   // Fetch local projects and pinned status
@@ -712,7 +909,16 @@ export default function AIWorkspaceSection({
     const effectiveProjectPath = activeConv.projectPath ?? selectedProjectPath
 
     try {
+      // Cancel any previous request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+
+      // Create new abort controller for this request
+      abortControllerRef.current = new AbortController()
+
       // Call API with streaming
+      // Include conversationId so server writes to JSONL (enables background processing)
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -720,6 +926,7 @@ export default function AIWorkspaceSection({
           messages: allMessages,
           backend,
           model: activeConv.model || settings.model,
+          conversationId: activeConvId, // Server writes to JSONL for persistence
           settings: {
             temperature: convSettings.temperature ?? settings.temperature,
             maxTokens: convSettings.maxTokens ?? settings.maxTokens,
@@ -732,7 +939,8 @@ export default function AIWorkspaceSection({
           },
           cwd: effectiveProjectPath || undefined,
           claudeSessionId: activeConv.claudeSessionId || undefined
-        })
+        }),
+        signal: abortControllerRef.current.signal
       })
 
       if (!response.ok) {
@@ -825,18 +1033,72 @@ export default function AIWorkspaceSection({
             }
 
             if (chunk.content) {
-              setConversations(prev => prev.map(conv => {
-                if (conv.id !== activeConvId) return conv
-                return {
-                  ...conv,
-                  messages: conv.messages.map(msg =>
-                    msg.id === assistantMessage.id
-                      ? { ...msg, content: msg.content + chunk.content }
-                      : msg
-                  ),
-                  updatedAt: new Date(),
+              // Parse for Claude events (tool use, heartbeat, etc.)
+              const { text, events } = parseClaudeEvents(chunk.content)
+
+              // Process events
+              for (const event of events) {
+                if (event.type === 'tool_start' && event.tool) {
+                  // Add new tool use
+                  setConversations(prev => prev.map(conv => {
+                    if (conv.id !== activeConvId) return conv
+                    return {
+                      ...conv,
+                      messages: conv.messages.map(msg => {
+                        if (msg.id !== assistantMessage.id) return msg
+                        const existingTools = msg.toolUses || []
+                        // Don't add if already exists
+                        if (existingTools.find(t => t.id === event.tool!.id)) return msg
+                        return {
+                          ...msg,
+                          toolUses: [...existingTools, {
+                            id: event.tool!.id,
+                            name: event.tool!.name,
+                            input: event.tool!.input,
+                            status: 'running' as const
+                          }]
+                        }
+                      }),
+                    }
+                  }))
+                } else if (event.type === 'tool_end' && event.tool) {
+                  // Mark tool as complete
+                  setConversations(prev => prev.map(conv => {
+                    if (conv.id !== activeConvId) return conv
+                    return {
+                      ...conv,
+                      messages: conv.messages.map(msg => {
+                        if (msg.id !== assistantMessage.id) return msg
+                        return {
+                          ...msg,
+                          toolUses: (msg.toolUses || []).map(t =>
+                            t.id === event.tool!.id
+                              ? { ...t, status: 'complete' as const, input: event.tool!.input || t.input }
+                              : t
+                          )
+                        }
+                      }),
+                    }
+                  }))
                 }
-              }))
+                // Heartbeat events are just for keeping connection alive, no action needed
+              }
+
+              // Add text content (if any after removing events)
+              if (text.trim()) {
+                setConversations(prev => prev.map(conv => {
+                  if (conv.id !== activeConvId) return conv
+                  return {
+                    ...conv,
+                    messages: conv.messages.map(msg =>
+                      msg.id === assistantMessage.id
+                        ? { ...msg, content: msg.content + text }
+                        : msg
+                    ),
+                    updatedAt: new Date(),
+                  }
+                }))
+              }
             }
           } catch (error) {
             console.error('Failed to parse SSE chunk:', data, error)
@@ -845,10 +1107,20 @@ export default function AIWorkspaceSection({
       }
 
       setIsStreaming(false)
+      abortControllerRef.current = null
     } catch (error) {
+      // Don't show error for intentional abort (navigation away)
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('Chat request aborted (user navigated away or new request started)')
+        setIsTyping(false)
+        setIsStreaming(false)
+        return
+      }
+
       console.error('Chat error:', error)
       setIsTyping(false)
       setIsStreaming(false)
+      abortControllerRef.current = null
 
       // Show error message
       const errorMessage: Message = {
