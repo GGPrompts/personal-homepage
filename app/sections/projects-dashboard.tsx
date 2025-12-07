@@ -43,6 +43,7 @@ import {
   SkipForward,
   Save,
   FileText,
+  MessageSquare,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -534,7 +535,9 @@ export default function ProjectsDashboard({
                   className="h-8 w-8"
                   onClick={() => {
                     if (terminalAvailable) {
-                      runCommand(`xdg-open "${project.local!.path}" || open "${project.local!.path}"`, { name: `Open: ${project.name}` })
+                      // Try explorer.exe for WSL, then xdg-open for Linux, then open for macOS
+                      const path = project.local!.path
+                      runCommand(`explorer.exe "$(wslpath -w "${path}")" 2>/dev/null || xdg-open "${path}" 2>/dev/null || open "${path}"`, { name: `Open: ${project.name}` })
                     }
                   }}
                   title="Open Folder"
@@ -542,6 +545,24 @@ export default function ProjectsDashboard({
                 >
                   <FolderOpen className="h-4 w-4" />
                 </Button>
+              )}
+              {/* Chat - only if both local and remote (cloned) */}
+              {project.source === 'both' && project.local && onNavigateToSection && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => onNavigateToSection("ai-workspace", project.local!.path)}
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Chat with Claude</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
               {/* Docs - only if has github */}
               {project.github && onNavigateToSection && (

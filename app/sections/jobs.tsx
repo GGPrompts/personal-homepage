@@ -159,9 +159,10 @@ interface JobModalProps {
   onClose: () => void
   job?: Job | null
   projects: LocalProject[]
+  projectsLoading?: boolean
 }
 
-function JobModal({ open, onClose, job, projects }: JobModalProps) {
+function JobModal({ open, onClose, job, projects, projectsLoading }: JobModalProps) {
   const queryClient = useQueryClient()
   const isEditing = !!job
 
@@ -280,7 +281,12 @@ function JobModal({ open, onClose, job, projects }: JobModalProps) {
             <div className="space-y-2">
               <Label>Projects ({selectedProjects.length} selected)</Label>
               <div className="border rounded-lg max-h-[200px] overflow-y-auto">
-                {projects.length === 0 ? (
+                {projectsLoading ? (
+                  <div className="p-4 text-center text-muted-foreground flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading projects...
+                  </div>
+                ) : projects.length === 0 ? (
                   <div className="p-4 text-center text-muted-foreground">
                     No local projects found
                   </div>
@@ -1218,7 +1224,7 @@ export default function JobsSection({
   })
 
   // Fetch local projects for job creation
-  const { data: projectsData } = useQuery({
+  const { data: projectsData, isLoading: projectsLoading } = useQuery({
     queryKey: ['local-projects'],
     queryFn: async () => {
       const res = await fetch('/api/projects/local')
@@ -1394,6 +1400,7 @@ export default function JobsSection({
         }}
         job={editingJob}
         projects={projects}
+        projectsLoading={projectsLoading}
       />
 
       {/* Running Job Modal */}

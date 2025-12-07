@@ -23,8 +23,9 @@ import {
   Wrench, Loader2, ChevronRight,
 } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
+import { useSearchParams } from "next/navigation"
 import { useAllProjectsMeta } from "@/hooks/useProjectMeta"
-import type { Project, LocalProject } from "@/lib/projects"
+import { mergeProjects, type Project, type LocalProject, type GitHubRepo } from "@/lib/projects"
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -637,9 +638,13 @@ function MessageBubble({ message, onCopy, onRegenerate, onFeedback, userAvatarUr
 export default function AIWorkspaceSection({
   activeSubItem,
   onSubItemHandled,
+  initialProjectPath,
+  onProjectPathConsumed,
 }: {
   activeSubItem?: string | null
   onSubItemHandled?: () => void
+  initialProjectPath?: string | null
+  onProjectPathConsumed?: () => void
 }) {
   // Auth for user avatar
   const { user } = useAuth()
@@ -732,9 +737,10 @@ export default function AIWorkspaceSection({
   }, [activeConvId])
 
   const selectedModel = availableModels.find(m => m.id === settings.model)
+  const searchParams = useSearchParams()
+  const { getGitHubToken } = useAuth()
 
-  // Fetch local projects and pinned status
-  const { getPinnedSlugs, isConfigured: projectsConfigured } = useAllProjectsMeta()
+  // Fetch local projects
   const { data: localProjects } = useQuery({
     queryKey: ['local-projects'],
     queryFn: async () => {
@@ -743,20 +749,71 @@ export default function AIWorkspaceSection({
       const data = await res.json()
       return (data.projects || []) as LocalProject[]
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   })
 
-  // Get pinned projects with their paths
-  const pinnedProjects = React.useMemo(() => {
-    if (!localProjects || !Array.isArray(localProjects) || !projectsConfigured) return []
-    const pinnedSlugs = getPinnedSlugs()
-    return localProjects.filter(p => {
-      const slug = `local-${p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
-      return pinnedSlugs.includes(slug)
-    })
-  }, [localProjects, getPinnedSlugs, projectsConfigured])
+  // Fetch GitHub projects
+  const { data: githubProjects } = useQuery({
+    queryKey: ['github-projects-for-ai'],
+    queryFn: async () => {
+      const token = await getGitHubToken()
+      if (!token) return []
+      const res = await fetch('/api/projects/github', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) return []
+      const data = await res.json()
+      return (data.repos || []) as GitHubRepo[]
+    },
+    staleTime: 5 * 60 * 1000,
+  })
 
-  const selectedProject = pinnedProjects.find(p => p.path === selectedProjectPath)
+  // Get pinned status
+  const { getPinnedSlugs, isPinned } = useAllProjectsMeta()
+
+  // Get all cloned projects (both local + remote), with pinned at top
+  const availableProjects = React.useMemo(() => {
+    // Ensure both are arrays before merging
+    if (!Array.isArray(localProjects) || !Array.isArray(githubProjects)) return []
+
+    // Merge to find projects that are both local and remote
+    const merged = mergeProjects(githubProjects, localProjects)
+    const clonedProjects = merged.filter(p => p.source === 'both' && p.local)
+
+    // Sort: pinned first, then alphabetically
+    return clonedProjects.sort((a, b) => {
+      const aPinned = isPinned(a.slug)
+      const bPinned = isPinned(b.slug)
+      if (aPinned && !bPinned) return -1
+      if (!aPinned && bPinned) return 1
+      return a.name.localeCompare(b.name)
+    })
+  }, [localProjects, githubProjects, isPinned])
+
+  const selectedProject = availableProjects.find(p => p.local?.path === selectedProjectPath)
+
+  // Handle URL query param for project selection
+  React.useEffect(() => {
+    const projectParam = searchParams.get('project')
+    if (projectParam && availableProjects.length > 0) {
+      // Find project by path
+      const project = availableProjects.find(p => p.local?.path === projectParam)
+      if (project?.local?.path) {
+        setSelectedProjectPath(project.local.path)
+      }
+    }
+  }, [searchParams, availableProjects])
+
+  // Handle initial project path from parent navigation
+  React.useEffect(() => {
+    if (initialProjectPath && availableProjects.length > 0) {
+      const project = availableProjects.find(p => p.local?.path === initialProjectPath)
+      if (project?.local?.path) {
+        setSelectedProjectPath(project.local.path)
+      }
+      onProjectPathConsumed?.()
+    }
+  }, [initialProjectPath, availableProjects, onProjectPathConsumed])
 
   // Fetch available models on mount
   React.useEffect(() => {
@@ -1404,7 +1461,7 @@ export default function AIWorkspaceSection({
 
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             {/* Project Selector */}
-            {pinnedProjects.length > 0 && (
+            {availableProjects.length > 0 && (
               <Select
                 value={selectedProjectPath || "none"}
                 onValueChange={(value) => setSelectedProjectPath(value === "none" ? null : value)}
@@ -1417,9 +1474,12 @@ export default function AIWorkspaceSection({
                   <SelectItem value="none">
                     <span className="text-muted-foreground">No project context</span>
                   </SelectItem>
-                  {pinnedProjects.map(project => (
-                    <SelectItem key={project.path} value={project.path}>
-                      {project.name}
+                  {availableProjects.map(project => (
+                    <SelectItem key={project.local!.path} value={project.local!.path}>
+                      <span className="flex items-center gap-1">
+                        {isPinned(project.slug) && <span className="text-amber-500">★</span>}
+                        {project.name}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>

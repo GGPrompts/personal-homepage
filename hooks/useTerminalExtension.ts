@@ -58,18 +58,21 @@ export function useTerminalExtension() {
   // Check if extension is available
   const checkExtension = useCallback(async (extensionId: string): Promise<boolean> => {
     if (typeof window === "undefined" || !window.chrome?.runtime?.sendMessage) {
+      console.log("[Terminal] Chrome runtime not available")
       return false
     }
 
+    console.log("[Terminal] Checking extension:", extensionId.slice(0, 8) + "...")
     return new Promise((resolve) => {
       try {
         window.chrome!.runtime!.sendMessage(extensionId, { type: "PING" }, (response) => {
           if (window.chrome?.runtime?.lastError) {
-            // Extension not found or not responding
+            console.warn("[Terminal] Extension check failed:", window.chrome.runtime.lastError.message)
             resolve(false)
             return
           }
           if (response?.ok) {
+            console.log("[Terminal] Extension connected, version:", response.version)
             setState({
               available: true,
               version: response.version || null,
@@ -78,6 +81,7 @@ export function useTerminalExtension() {
             setStoredExtensionId(extensionId)
             resolve(true)
           } else {
+            console.warn("[Terminal] Extension responded but not ok:", response)
             resolve(false)
           }
         })
@@ -110,9 +114,11 @@ export function useTerminalExtension() {
   const runCommand = useCallback(
     async (command: string, options?: { workingDir?: string; name?: string }): Promise<boolean> => {
       if (!state.available || !state.extensionId || !window.chrome?.runtime?.sendMessage) {
+        console.warn("[Terminal] Cannot run command - extension not available")
         return false
       }
 
+      console.log("[Terminal] Spawning:", command, options)
       return new Promise((resolve) => {
         try {
           window.chrome!.runtime!.sendMessage(
@@ -125,15 +131,16 @@ export function useTerminalExtension() {
             },
             (response) => {
               if (window.chrome?.runtime?.lastError) {
-                console.error("Terminal extension error:", window.chrome.runtime.lastError)
+                console.error("[Terminal] Spawn failed:", window.chrome.runtime.lastError.message)
                 resolve(false)
                 return
               }
+              console.log("[Terminal] Spawn response:", response)
               resolve(response?.ok ?? false)
             }
           )
         } catch (err) {
-          console.error("Failed to send to terminal extension:", err)
+          console.error("[Terminal] Failed to send message:", err)
           resolve(false)
         }
       })

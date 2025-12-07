@@ -660,11 +660,7 @@ export default function BookmarksSection({
                 <ContextMenuTrigger asChild>
                   {bookmark.type === "terminal" ? (
                     <button
-                      onClick={() => {
-                        if (terminalAvailable && bookmark.command) {
-                          runCommand(bookmark.command, { workingDir: bookmark.workingDir, name: bookmark.name })
-                        }
-                      }}
+                      data-terminal-command={bookmark.command}
                       className="group flex flex-col items-center p-3 rounded-lg hover:bg-primary/10 transition-colors"
                     >
                       <div className="h-12 w-12 flex items-center justify-center mb-1 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
@@ -675,9 +671,7 @@ export default function BookmarksSection({
                         )}
                       </div>
                       <span className="text-xs text-center line-clamp-2">{bookmark.name}</span>
-                      {terminalAvailable && (
-                        <Play className="h-3 w-3 text-emerald-400 mt-0.5" />
-                      )}
+                      <Play className="h-3 w-3 text-emerald-400 mt-0.5" />
                     </button>
                   ) : (
                     <a
@@ -711,8 +705,8 @@ export default function BookmarksSection({
                         <ContextMenuItem
                           onClick={() => runCommand(bookmark.command!, { workingDir: bookmark.workingDir, name: bookmark.name })}
                         >
-                          <Play className="h-4 w-4 mr-2" />
-                          Run in Terminal
+                          <Plus className="h-4 w-4 mr-2" />
+                          Spawn New Terminal
                         </ContextMenuItem>
                       )}
                       <ContextMenuItem
@@ -721,11 +715,6 @@ export default function BookmarksSection({
                         <Copy className="h-4 w-4 mr-2" />
                         Copy Command
                       </ContextMenuItem>
-                      {!terminalAvailable && (
-                        <ContextMenuItem disabled className="text-muted-foreground text-xs">
-                          Terminal extension not detected
-                        </ContextMenuItem>
-                      )}
                     </>
                   ) : (
                     <>
@@ -816,11 +805,7 @@ export default function BookmarksSection({
               >
                 {bookmark.type === "terminal" ? (
                   <button
-                    onClick={() => {
-                      if (terminalAvailable && bookmark.command) {
-                        runCommand(bookmark.command, { workingDir: bookmark.workingDir, name: bookmark.name })
-                      }
-                    }}
+                    data-terminal-command={bookmark.command}
                     className="flex items-center gap-3 flex-1 min-w-0 text-left"
                   >
                     <div className="h-8 w-8 flex items-center justify-center flex-shrink-0 rounded-md bg-emerald-500/20 border border-emerald-500/30">
@@ -839,9 +824,7 @@ export default function BookmarksSection({
                         {bookmark.workingDir}
                       </p>
                     )}
-                    {terminalAvailable && (
-                      <Play className="h-4 w-4 text-emerald-400 flex-shrink-0" />
-                    )}
+                    <Play className="h-4 w-4 text-emerald-400 flex-shrink-0" />
                   </button>
                 ) : (
                   <a
@@ -888,8 +871,8 @@ export default function BookmarksSection({
                           <DropdownMenuItem
                             onClick={() => runCommand(bookmark.command!, { workingDir: bookmark.workingDir, name: bookmark.name })}
                           >
-                            <Play className="h-4 w-4 mr-2" />
-                            Run in Terminal
+                            <Plus className="h-4 w-4 mr-2" />
+                            Spawn New Terminal
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuItem

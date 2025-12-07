@@ -38,8 +38,10 @@ export async function streamGemini(
 
   const args = ['-p', fullPrompt]
 
-  // Note: Gemini CLI doesn't have as many flags as Claude
-  // Add any available options here as the CLI evolves
+  // Add Gemini model if specified
+  if (settings?.geminiModel) {
+    args.push('--model', settings.geminiModel)
+  }
 
   const gemini = spawn('gemini', args, {
     cwd: cwd || process.cwd(),

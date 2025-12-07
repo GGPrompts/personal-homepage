@@ -26,6 +26,8 @@ export interface ChatSettings {
   codexModel?: string  // Default: gpt-5
   reasoningEffort?: 'low' | 'medium' | 'high'
   sandbox?: 'read-only' | 'full' | 'off'
+  // Gemini CLI specific options
+  geminiModel?: string  // --model (e.g., flash-2.5)
 }
 
 export interface ChatRequest {

@@ -1015,6 +1015,7 @@ export default function PersonalHomepage() {
   const [activeSection, setActiveSection] = React.useState<Section>("home")
   const [expandedSection, setExpandedSection] = React.useState<Section | null>(null)
   const [activeSubItem, setActiveSubItem] = React.useState<string | null>(null)
+  const [aiWorkspaceProject, setAiWorkspaceProject] = React.useState<string | null>(null)
 
   // Get user info for personalization
   const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.user_metadata?.user_name || null
@@ -1063,7 +1064,7 @@ export default function PersonalHomepage() {
         if (!isLocal) {
           return <LocalOnlyOverlay sectionName="AI Workspace" description="This feature streams from local AI CLIs (Claude, Gemini, Codex) that require localhost to run." />
         }
-        return <AIWorkspaceSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+        return <AIWorkspaceSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} initialProjectPath={aiWorkspaceProject} onProjectPathConsumed={() => setAiWorkspaceProject(null)} />
       case "stocks":
         return <StocksDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("settings")} />
       case "crypto":
@@ -1080,7 +1081,12 @@ export default function PersonalHomepage() {
         if (!isLocal) {
           return <LocalOnlyOverlay sectionName="Projects" description="This feature scans your local ~/projects/ directory and requires localhost to access the file system." />
         }
-        return <ProjectsDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSection={(section) => setActiveSection(section as Section)} />
+        return <ProjectsDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSection={(section, projectPath) => {
+          if (section === 'ai-workspace' && projectPath) {
+            setAiWorkspaceProject(projectPath)
+          }
+          setActiveSection(section as Section)
+        }} />
       case "jobs":
         if (!isLocal) {
           return <LocalOnlyOverlay sectionName="Jobs" description="This feature executes Claude CLI commands against local projects and requires localhost to run." />
