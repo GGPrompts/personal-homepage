@@ -163,9 +163,9 @@ const navigationItems: NavigationItem[] = [
   },
   {
     id: "notes",
-    label: "Quick Notes",
+    label: "Docs Editor",
     icon: FileText,
-    description: "GitHub-synced notes",
+    description: "GitHub-synced documentation",
     subItems: [
       { id: "files", label: "Browse Files", icon: FolderOpen },
       { id: "recent", label: "Recent", icon: Clock },
@@ -255,7 +255,7 @@ const navigationItems: NavigationItem[] = [
   },
   {
     id: "tasks",
-    label: "Notes & Tasks",
+    label: "Scratchpad",
     icon: CheckCircle2,
     description: "Quick notes and todos",
     subItems: [
@@ -749,7 +749,7 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
             feed: null, // Handled above
             "market-pulse": { icon: TrendingUp, label: "Market Pulse", description: "Tech salary & job trends" },
             "api-playground": { icon: Zap, label: "API Playground", description: "Test and debug API requests" },
-            notes: { icon: FileText, label: "Quick Notes", description: "GitHub-synced markdown notes" },
+            notes: { icon: FileText, label: "Docs Editor", description: "GitHub-synced documentation" },
             bookmarks: { icon: Bookmark, label: "Bookmarks", description: "Organized quick links" },
             search: { icon: Search, label: "Search Hub", description: "Multi-engine web search" },
             "ai-workspace": { icon: MessageSquare, label: "AI Workspace", description: "Chat with Claude & local models" },
@@ -758,7 +758,7 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
             spacex: { icon: Rocket, label: "SpaceX Launches", description: "Track rocket launches" },
             "github-activity": { icon: Github, label: "GitHub Activity", description: "GitHub events & repos" },
             disasters: { icon: AlertCircle, label: "Disasters", description: "Earthquakes & alerts" },
-            tasks: { icon: CheckCircle2, label: "Notes & Tasks", description: "Quick notes and todos" },
+            tasks: { icon: CheckCircle2, label: "Scratchpad", description: "Quick notes and todos" },
             projects: { icon: FolderGit2, label: "Projects", description: "GitHub & local repos" },
             jobs: { icon: Play, label: "Jobs", description: "Claude batch prompts" },
             integrations: { icon: Link2, label: "Integrations", description: "Connected services" },

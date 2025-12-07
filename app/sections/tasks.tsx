@@ -795,7 +795,7 @@ export default function TasksSection({
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-2">
-        <h1 className="text-3xl font-bold terminal-glow">Quick Notes & Tasks</h1>
+        <h1 className="text-3xl font-bold terminal-glow">Scratchpad</h1>
       </div>
       <p className="text-muted-foreground mb-6">Capture thoughts and track todos</p>
 
