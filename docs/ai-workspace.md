@@ -45,9 +45,12 @@ Claude Code works great in Termux, but xterm.js terminals don't work on mobile (
 ### Conversation Management
 - Multiple conversation threads
 - Auto-generated titles from first message
-- Search/filter conversations
-- Export to Markdown or JSON
-- GitHub sync for persistence (optional)
+- Search/filter conversations (planned)
+- Export to Markdown (Download button in header)
+- Background generation support - responses continue when navigating away
+- Context usage indicator with warning/danger thresholds
+- "Continue in new chat" with AI-generated summary when context gets high
+- GitHub sync for persistence (planned)
 
 ### Context Injection
 - Paste code snippets with language detection
@@ -525,16 +528,53 @@ See `docs/ai-backend-integration-notes.md` for detailed implementation notes and
 - Claude CLI uses `~/.claude/local/claude` path directly (supports v2.0.59+ features)
 - Detection checks specific path instead of relying on PATH
 
-### Phase 4: Saved Prompts
+### Phase 4: Background Processing & Resilience ✅ COMPLETED
+- [x] Background conversation support - Conversations continue when navigating away
+- [x] Generating state persistence (localStorage tracks active generations)
+- [x] Sidebar spinner indicator for conversations still generating
+- [x] Poll server for completion when returning to workspace
+- [x] Cross-tab sync via storage events
+- [x] Stale flag cleanup (10-minute timeout)
+- [x] Server-side JSONL persistence (responses saved even if client disconnects)
+
+**How it works:**
+1. User sends message → generation starts → flag saved to localStorage
+2. User navigates away → stream aborts locally but server continues writing to JSONL
+3. User returns → detects generating flag → polls server for completion
+4. Server response found → syncs to local state → clears flag
+
+### Phase 5: Export & Context Management ✅ COMPLETED
+- [x] Export conversation as markdown (Download button in header)
+- [x] Context usage indicator with warning/danger thresholds (70%/90%)
+- [x] "Continue in new chat" feature when context gets high
+- [x] AI-generated summary for conversation handoffs
+- [x] Multi-model attribution in summaries
+
+**Export Format:**
+- Markdown with metadata (title, date, model, project)
+- Each message attributed: `## User` / `## Claude` / `## Gemini` etc.
+- Filename: `{conversation-title}-{date}.md`
+
+**Context Warning Banner:**
+- Appears at 70% (warning/yellow) and 90% (danger/red)
+- Buttons: "Continue in new chat" | "Dismiss"
+- Dismissal is per-conversation
+
+**Continue in New Chat:**
+- Creates new conversation titled "Continued: {original title}"
+- Copies settings & project path from original
+- Sends prompt asking AI to generate structured summary
+- Summary includes: what we're working on, key decisions (with model attribution), current state, important context, next steps
+
+### Phase 6: Saved Prompts
 - [ ] Prompt CRUD operations
 - [ ] Prompt palette UI (⌘K)
 - [ ] Variable interpolation
 - [ ] GitHub sync for prompts
 
-### Phase 5: Polish
+### Phase 7: Polish
 - [ ] Conversation GitHub sync
 - [ ] Search/filter conversations
-- [ ] Export functionality
 - [ ] System prompt presets
 - [ ] Mobile optimizations
 

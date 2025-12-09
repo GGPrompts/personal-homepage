@@ -20,7 +20,8 @@ import {
   MessageSquare, Send, Bot, User, Copy, RotateCw, ThumbsUp, ThumbsDown,
   Settings, ChevronDown, Plus, X, Trash2, Code, CheckCheck,
   Sparkles, StopCircle, Clock, Cpu, FileJson, FileText, FolderOpen,
-  Wrench, Loader2, ChevronRight, Search, Pencil,
+  Wrench, Loader2, ChevronRight, Search, Pencil, Gauge, AlertTriangle,
+  Download, ArrowRight,
 } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { useSearchParams } from "next/navigation"
@@ -342,6 +343,173 @@ function loadSettings(): ChatSettings {
   }
 
   return DEFAULT_SETTINGS
+}
+
+// ============================================================================
+// GENERATING STATE TRACKING
+// ============================================================================
+
+interface GeneratingState {
+  startedAt: number
+  model: string
+}
+
+type GeneratingConversations = Record<string, GeneratingState>
+
+const GENERATING_STORAGE_KEY = 'ai-workspace-generating'
+const GENERATING_STALE_THRESHOLD = 10 * 60 * 1000 // 10 minutes
+
+function loadGeneratingConversations(): GeneratingConversations {
+  if (typeof window === "undefined") return {}
+
+  try {
+    const saved = localStorage.getItem(GENERATING_STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved) as GeneratingConversations
+      // Clean up stale entries
+      const now = Date.now()
+      const cleaned: GeneratingConversations = {}
+      for (const [id, state] of Object.entries(parsed)) {
+        if (now - state.startedAt < GENERATING_STALE_THRESHOLD) {
+          cleaned[id] = state
+        }
+      }
+      // Save cleaned version if different
+      if (Object.keys(cleaned).length !== Object.keys(parsed).length) {
+        localStorage.setItem(GENERATING_STORAGE_KEY, JSON.stringify(cleaned))
+      }
+      return cleaned
+    }
+  } catch {
+    // Invalid JSON
+  }
+  return {}
+}
+
+function setGenerating(convId: string, model: string): void {
+  if (typeof window === "undefined") return
+
+  const current = loadGeneratingConversations()
+  current[convId] = { startedAt: Date.now(), model }
+  localStorage.setItem(GENERATING_STORAGE_KEY, JSON.stringify(current))
+
+  // Dispatch storage event for cross-tab sync
+  window.dispatchEvent(new StorageEvent('storage', {
+    key: GENERATING_STORAGE_KEY,
+    newValue: JSON.stringify(current)
+  }))
+}
+
+function clearGenerating(convId: string): void {
+  if (typeof window === "undefined") return
+
+  const current = loadGeneratingConversations()
+  delete current[convId]
+  localStorage.setItem(GENERATING_STORAGE_KEY, JSON.stringify(current))
+
+  // Dispatch storage event for cross-tab sync
+  window.dispatchEvent(new StorageEvent('storage', {
+    key: GENERATING_STORAGE_KEY,
+    newValue: JSON.stringify(current)
+  }))
+}
+
+function isGenerating(convId: string): boolean {
+  const current = loadGeneratingConversations()
+  return convId in current
+}
+
+// ============================================================================
+// EXPORT & COMPACT UTILITIES
+// ============================================================================
+
+const MODEL_DISPLAY_NAMES: Record<string, string> = {
+  claude: 'Claude',
+  gemini: 'Gemini',
+  codex: 'Codex',
+  docker: 'Local Model',
+  mock: 'Mock AI',
+}
+
+function exportConversationToMarkdown(conv: Conversation): string {
+  const lines: string[] = [
+    `# ${conv.title}`,
+    '',
+    `**Created:** ${conv.createdAt.toLocaleString()}`,
+    `**Last updated:** ${conv.updatedAt.toLocaleString()}`,
+    conv.model ? `**Model:** ${conv.model}` : '',
+    conv.projectPath ? `**Project:** ${conv.projectPath}` : '',
+    '',
+    '---',
+    '',
+  ].filter(Boolean)
+
+  for (const msg of conv.messages) {
+    if (msg.role === 'user') {
+      lines.push(`## User`)
+      lines.push('')
+      lines.push(msg.content)
+    } else if (msg.role === 'assistant') {
+      const modelName = msg.model ? MODEL_DISPLAY_NAMES[msg.model] || msg.model : 'Assistant'
+      lines.push(`## ${modelName}`)
+      lines.push('')
+      lines.push(msg.content)
+    }
+    lines.push('')
+    lines.push('---')
+    lines.push('')
+  }
+
+  return lines.join('\n')
+}
+
+function downloadMarkdown(content: string, filename: string): void {
+  const blob = new Blob([content], { type: 'text/markdown' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+// Generate a compact summary prompt for the AI
+function generateCompactPrompt(conv: Conversation): string {
+  const modelNames = new Set<string>()
+  for (const msg of conv.messages) {
+    if (msg.role === 'assistant' && msg.model) {
+      modelNames.add(MODEL_DISPLAY_NAMES[msg.model] || msg.model)
+    }
+  }
+
+  const modelsUsed = modelNames.size > 0 ? Array.from(modelNames).join(', ') : 'AI'
+
+  return `Please generate a compact summary of our conversation so far that can be used to continue in a new chat. Use this format:
+
+## Conversation Summary
+**Original conversation:** "${conv.title}"
+**Models used:** ${modelsUsed}
+**Messages:** ${conv.messages.length}
+
+### What we're working on
+- [Primary task/topic]
+
+### Key decisions made
+- [Important choices, noting which model suggested them if relevant]
+
+### Current state
+- [Where we left off]
+- [Any files modified or created]
+
+### Important context
+- [Technical details that matter for continuing]
+
+### Next steps
+- [Immediate next action]
+
+Be concise but capture what's needed to continue without re-explaining. Focus on actionable state, not conversation history.`
 }
 
 // ============================================================================
@@ -709,31 +877,61 @@ export default function AIWorkspaceSection({
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const abortControllerRef = React.useRef<AbortController | null>(null)
 
+  // Track which conversations are generating (for cross-tab sync and sidebar indicators)
+  const [generatingConvs, setGeneratingConvs] = React.useState<GeneratingConversations>(() => loadGeneratingConversations())
+
+  // Track if user has dismissed the context warning for this conversation
+  const [contextWarningDismissed, setContextWarningDismissed] = React.useState<Set<string>>(new Set())
+
   const activeConv = conversations.find(c => c.id === activeConvId) || conversations[0]
 
   // Note: We intentionally do NOT abort streaming on unmount
   // The server-side request continues and writes to JSONL
   // When user returns, we sync from server to get any missed messages
 
+  // Listen for cross-tab storage events to sync generating state
+  React.useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === GENERATING_STORAGE_KEY) {
+        setGeneratingConvs(loadGeneratingConversations())
+      }
+    }
+    window.addEventListener('storage', handleStorage)
+    return () => window.removeEventListener('storage', handleStorage)
+  }, [])
+
+  // Periodic cleanup of stale generating flags (handles long-running generations that fail)
+  React.useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      // loadGeneratingConversations already cleans stale entries
+      setGeneratingConvs(loadGeneratingConversations())
+    }, 60000) // Check every minute
+
+    return () => clearInterval(cleanupInterval)
+  }, [])
+
   // Sync from server-side JSONL on mount and when active conversation changes
   // This catches any responses that completed while user was away
   React.useEffect(() => {
-    async function syncFromServer() {
-      if (!activeConv?.id) return
+    let pollInterval: NodeJS.Timeout | null = null
+    let mounted = true
+
+    async function syncFromServer(): Promise<boolean> {
+      if (!activeConv?.id) return false
 
       try {
         // Check if server has messages for this conversation
         const response = await fetch(`/api/ai/conversations?id=${activeConv.id}`)
-        if (!response.ok) return
+        if (!response.ok) return false
 
         const data = await response.json()
-        if (!data.messages || data.messages.length === 0) return
+        if (!data.messages || data.messages.length === 0) return false
 
         // Find the last assistant message from server
         const serverMessages = data.messages.filter((m: any) => m.role !== 'system')
         const lastServerAssistant = [...serverMessages].reverse().find((m: any) => m.role === 'assistant')
 
-        if (!lastServerAssistant) return
+        if (!lastServerAssistant) return false
 
         // Check if we're missing this message locally
         const localMessages = activeConv.messages
@@ -753,25 +951,65 @@ export default function AIWorkspaceSection({
             isStreaming: false,
           }
 
-          setConversations(prev => prev.map(conv => {
-            if (conv.id !== activeConvId) return conv
-            // Only add if we don't already have it
-            if (conv.messages.find(m => m.id === syncedMessage.id)) return conv
-            return {
-              ...conv,
-              messages: [...conv.messages, syncedMessage],
-              updatedAt: new Date(),
-            }
-          }))
+          if (mounted) {
+            setConversations(prev => prev.map(conv => {
+              if (conv.id !== activeConvId) return conv
+              // Only add if we don't already have it
+              if (conv.messages.find(m => m.id === syncedMessage.id)) return conv
+              return {
+                ...conv,
+                messages: [...conv.messages, syncedMessage],
+                updatedAt: new Date(),
+              }
+            }))
+
+            // Response found - clear generating flag
+            clearGenerating(activeConvId)
+            setGeneratingConvs(loadGeneratingConversations())
+          }
+          return true // Synced successfully
         }
+        return false
       } catch (error) {
         // Silent fail - sync is best-effort
         console.debug('Server sync failed:', error)
+        return false
       }
     }
 
-    // Sync when component mounts or conversation changes
+    // Initial sync
     syncFromServer()
+
+    // If conversation was generating in background, poll for completion
+    const wasGenerating = isGenerating(activeConvId)
+    if (wasGenerating) {
+      console.log('Conversation was generating in background, polling for completion...')
+
+      let pollCount = 0
+      const maxPolls = 30 // Poll for up to 30 seconds
+      pollInterval = setInterval(async () => {
+        pollCount++
+
+        // Check if we synced successfully
+        const synced = await syncFromServer()
+        if (synced || pollCount >= maxPolls) {
+          if (pollInterval) clearInterval(pollInterval)
+
+          // If we hit max polls without finding response, the generation may have failed
+          // Clear the stale flag
+          if (!synced && pollCount >= maxPolls) {
+            console.log('Background generation polling timed out, clearing flag')
+            clearGenerating(activeConvId)
+            setGeneratingConvs(loadGeneratingConversations())
+          }
+        }
+      }, 1000) // Poll every second
+    }
+
+    return () => {
+      mounted = false
+      if (pollInterval) clearInterval(pollInterval)
+    }
   }, [activeConvId])
 
   const selectedModel = availableModels.find(m => m.id === settings.model)
@@ -809,17 +1047,18 @@ export default function AIWorkspaceSection({
   // Get pinned status
   const { getPinnedSlugs, isPinned } = useAllProjectsMeta()
 
-  // Get all cloned projects (both local + remote), with pinned at top
+  // Get all projects with local paths (for cwd), with pinned at top
   const availableProjects = React.useMemo(() => {
     // Ensure both are arrays before merging
     if (!Array.isArray(localProjects) || !Array.isArray(githubProjects)) return []
 
-    // Merge to find projects that are both local and remote
+    // Merge projects from both sources
     const merged = mergeProjects(githubProjects, localProjects)
-    const clonedProjects = merged.filter(p => p.source === 'both' && p.local)
+    // Filter to projects that have a local path (source: 'local' or 'both')
+    const projectsWithLocalPath = merged.filter(p => p.local?.path)
 
     // Sort: pinned first, then alphabetically
-    return clonedProjects.sort((a, b) => {
+    return projectsWithLocalPath.sort((a, b) => {
       const aPinned = isPinned(a.slug)
       const bPinned = isPinned(b.slug)
       if (aPinned && !bPinned) return -1
@@ -1043,6 +1282,7 @@ export default function AIWorkspaceSection({
             systemPrompt: convSettings.systemPrompt ?? settings.systemPrompt,
             additionalDirs: convSettings.additionalDirs ?? settings.additionalDirs,
             claudeModel: convSettings.claudeModel ?? settings.claudeModel,
+            claudeAgent: settings.claudeAgent,
             allowedTools: convSettings.allowedTools ?? settings.allowedTools,
             disallowedTools: convSettings.disallowedTools ?? settings.disallowedTools,
             permissionMode: convSettings.permissionMode ?? settings.permissionMode,
@@ -1080,6 +1320,10 @@ export default function AIWorkspaceSection({
 
       setIsStreaming(true)
 
+      // Mark conversation as generating (persists if user navigates away)
+      setGenerating(activeConvId, backend)
+      setGeneratingConvs(loadGeneratingConversations())
+
       // Parse SSE stream
       const reader = response.body?.getReader()
       const decoder = new TextDecoder()
@@ -1108,6 +1352,9 @@ export default function AIWorkspaceSection({
 
           if (data === '[DONE]') {
             setIsStreaming(false)
+            // Clear generating flag - response complete
+            clearGenerating(activeConvId)
+            setGeneratingConvs(loadGeneratingConversations())
             setConversations(prev => prev.map(conv => {
               if (conv.id !== activeConvId) return conv
               return {
@@ -1128,6 +1375,9 @@ export default function AIWorkspaceSection({
             if (chunk.error) {
               console.error('Stream error:', chunk.error)
               setIsStreaming(false)
+              // Clear generating flag on error
+              clearGenerating(activeConvId)
+              setGeneratingConvs(loadGeneratingConversations())
               break
             }
 
@@ -1217,6 +1467,9 @@ export default function AIWorkspaceSection({
       }
 
       setIsStreaming(false)
+      // Clear generating flag - streaming finished normally
+      clearGenerating(activeConvId)
+      setGeneratingConvs(loadGeneratingConversations())
       abortControllerRef.current = null
     } catch (error) {
       // Don't show error for intentional abort (navigation away)
@@ -1224,12 +1477,17 @@ export default function AIWorkspaceSection({
         console.log('Chat request aborted (user navigated away or new request started)')
         setIsTyping(false)
         setIsStreaming(false)
+        // NOTE: Don't clear generating flag on abort - server may still be processing
+        // The flag will be cleared when user returns and syncs, or it will expire
         return
       }
 
       console.error('Chat error:', error)
       setIsTyping(false)
       setIsStreaming(false)
+      // Clear generating flag on error (not abort)
+      clearGenerating(activeConvId)
+      setGeneratingConvs(loadGeneratingConversations())
       abortControllerRef.current = null
 
       // Show error message
@@ -1362,10 +1620,77 @@ export default function AIWorkspaceSection({
     }))
   }
 
-  // Calculate token usage (mock)
-  const totalTokens = activeConv.messages.reduce((sum, msg) =>
-    sum + Math.ceil(msg.content.length / 4), 0
-  )
+  const handleExportConversation = () => {
+    const markdown = exportConversationToMarkdown(activeConv)
+    const filename = `${activeConv.title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${new Date().toISOString().split('T')[0]}.md`
+    downloadMarkdown(markdown, filename)
+  }
+
+  const handleContinueInNewChat = () => {
+    // Generate the compact prompt and send it as a message
+    // This will trigger the AI to generate a summary
+    const compactPrompt = generateCompactPrompt(activeConv)
+
+    // Create new conversation with settings from current one
+    const newConv: Conversation = {
+      id: generateId(),
+      title: `Continued: ${activeConv.title}`,
+      messages: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      model: activeConv.model || settings.model,
+      projectPath: activeConv.projectPath ?? selectedProjectPath,
+      settings: activeConv.settings || {
+        systemPrompt: settings.systemPrompt,
+        claudeModel: settings.claudeModel,
+        additionalDirs: settings.additionalDirs,
+        allowedTools: settings.allowedTools,
+        disallowedTools: settings.disallowedTools,
+        permissionMode: settings.permissionMode,
+        temperature: settings.temperature,
+        maxTokens: settings.maxTokens,
+      },
+      claudeSessionId: null, // Fresh session
+    }
+
+    setConversations(prev => [newConv, ...prev])
+    setActiveConvId(newConv.id)
+
+    // After switching, send the compact prompt to generate summary
+    setTimeout(() => {
+      sendMessage(compactPrompt)
+    }, 100)
+  }
+
+  const dismissContextWarning = () => {
+    setContextWarningDismissed(prev => new Set(prev).add(activeConvId))
+  }
+
+  // Calculate token usage (estimate: ~4 chars per token)
+  // Claude's context window is 200k tokens
+  const CONTEXT_LIMIT = 200000
+  const WARNING_THRESHOLD = 0.7 // 70% - show warning
+  const DANGER_THRESHOLD = 0.9 // 90% - show danger
+
+  // Baseline overhead from system prompt, tools, MCP, agents, memory files
+  // Based on actual /context output: ~44k tokens before any messages
+  const BASELINE_TOKENS = 44000
+
+  const messageTokens = activeConv.messages.reduce((sum, msg) => {
+    // Estimate tokens: ~4 chars per token for English text
+    // Add overhead for tool uses if present
+    const contentTokens = Math.ceil(msg.content.length / 4)
+    const toolTokens = msg.toolUses?.reduce((t, tool) =>
+      t + Math.ceil((tool.input?.length || 0) / 4) + 20, 0) || 0
+    return sum + contentTokens + toolTokens
+  }, 0)
+
+  const totalTokens = BASELINE_TOKENS + messageTokens
+  const contextUsage = totalTokens / CONTEXT_LIMIT
+  const contextPercentage = Math.min(Math.round(contextUsage * 100), 100)
+  const contextStatus = contextUsage >= DANGER_THRESHOLD ? 'danger'
+    : contextUsage >= WARNING_THRESHOLD ? 'warning'
+    : 'ok'
 
   // ============================================================================
   // RENDER
@@ -1405,12 +1730,27 @@ export default function AIWorkspaceSection({
                     <CardContent className="p-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-medium truncate terminal-glow">
-                            {conv.title}
-                          </h4>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-medium truncate terminal-glow">
+                              {conv.title}
+                            </h4>
+                            {/* Generating indicator */}
+                            {generatingConvs[conv.id] && (
+                              <motion.div
+                                animate={{ opacity: [0.5, 1, 0.5] }}
+                                transition={{ duration: 1.2, repeat: Infinity }}
+                                className="flex items-center gap-1 shrink-0"
+                              >
+                                <Loader2 className="h-3 w-3 text-primary animate-spin" />
+                              </motion.div>
+                            )}
+                          </div>
                           <div className="mt-1 space-y-0.5">
                             <p className="text-xs text-muted-foreground">
                               {conv.messages.length} messages
+                              {generatingConvs[conv.id] && (
+                                <span className="text-primary ml-1">• generating</span>
+                              )}
                             </p>
                             {conv.model && (
                               <div className="flex items-center gap-1 overflow-hidden">
@@ -1507,6 +1847,49 @@ export default function AIWorkspaceSection({
                       </Tooltip>
                     </TooltipProvider>
                   )}
+                  {/* Context Usage Indicator */}
+                  {activeConv.messages.length > 0 && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className={`hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded cursor-help ${
+                            contextStatus === 'danger'
+                              ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                              : contextStatus === 'warning'
+                              ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                              : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          }`}>
+                            {contextStatus === 'danger' ? (
+                              <AlertTriangle className="h-3 w-3" />
+                            ) : (
+                              <Gauge className="h-3 w-3" />
+                            )}
+                            <span className="text-[10px] font-mono">{contextPercentage}%</span>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-xs">
+                          <p className="font-medium text-xs">Context Usage: ~{totalTokens.toLocaleString()} tokens</p>
+                          <div className="w-32 h-1.5 bg-muted rounded-full mt-1.5 overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                contextStatus === 'danger' ? 'bg-red-500'
+                                : contextStatus === 'warning' ? 'bg-yellow-500'
+                                : 'bg-emerald-500'
+                              }`}
+                              style={{ width: `${contextPercentage}%` }}
+                            />
+                          </div>
+                          <p className="text-muted-foreground text-xs mt-1.5">
+                            {contextStatus === 'danger'
+                              ? 'Context nearly full! Start a new conversation soon.'
+                              : contextStatus === 'warning'
+                              ? 'Context getting full. Consider a new conversation.'
+                              : 'Plenty of context remaining.'}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                 </div>
               </div>
             </div>
@@ -1538,6 +1921,22 @@ export default function AIWorkspaceSection({
                 </SelectContent>
               </Select>
             )}
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleExportConversation}
+                    disabled={activeConv.messages.length === 0}
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Export as markdown</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             <TooltipProvider>
               <Tooltip>
@@ -1622,6 +2021,59 @@ export default function AIWorkspaceSection({
                 </motion.div>
               ) : (
                 <>
+                  {/* Context Warning Banner */}
+                  {(contextStatus === 'warning' || contextStatus === 'danger') &&
+                   !contextWarningDismissed.has(activeConvId) && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`mb-4 p-4 rounded-lg border ${
+                        contextStatus === 'danger'
+                          ? 'bg-red-500/10 border-red-500/30'
+                          : 'bg-yellow-500/10 border-yellow-500/30'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className={`h-5 w-5 mt-0.5 shrink-0 ${
+                          contextStatus === 'danger' ? 'text-red-400' : 'text-yellow-400'
+                        }`} />
+                        <div className="flex-1 min-w-0">
+                          <h4 className={`font-medium ${
+                            contextStatus === 'danger' ? 'text-red-400' : 'text-yellow-400'
+                          }`}>
+                            {contextStatus === 'danger'
+                              ? 'Context nearly full!'
+                              : 'Context getting full'}
+                          </h4>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {contextStatus === 'danger'
+                              ? `At ${contextPercentage}% capacity. Continue in a new chat with a summary to avoid losing context.`
+                              : `At ${contextPercentage}% capacity. Consider continuing in a new chat soon.`
+                            }
+                          </p>
+                          <div className="flex items-center gap-2 mt-3">
+                            <Button
+                              size="sm"
+                              variant={contextStatus === 'danger' ? 'default' : 'outline'}
+                              onClick={handleContinueInNewChat}
+                              className="gap-1"
+                            >
+                              <ArrowRight className="h-3 w-3" />
+                              Continue in new chat
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={dismissContextWarning}
+                            >
+                              Dismiss
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
                   {activeConv.messages.map(message => (
                     <MessageBubble
                       key={message.id}

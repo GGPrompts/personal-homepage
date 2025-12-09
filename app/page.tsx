@@ -197,10 +197,7 @@ const navigationItems: NavigationItem[] = [
     label: "AI Workspace",
     icon: MessageSquare,
     description: "Chat with AI models",
-    subItems: [
-      { id: "chat", label: "Chat", icon: MessageSquare },
-      { id: "history", label: "History", icon: History },
-    ]
+    // History is shown in the sidebar within AI Workspace
   },
   {
     id: "stocks",
@@ -1016,6 +1013,23 @@ export default function PersonalHomepage() {
   const [expandedSection, setExpandedSection] = React.useState<Section | null>(null)
   const [activeSubItem, setActiveSubItem] = React.useState<string | null>(null)
   const [aiWorkspaceProject, setAiWorkspaceProject] = React.useState<string | null>(null)
+  const [sectionRestored, setSectionRestored] = React.useState(false)
+
+  // Restore active section from localStorage after mount (avoids hydration mismatch)
+  React.useEffect(() => {
+    const saved = localStorage.getItem("active-section")
+    if (saved && navigationItems.some(item => item.id === saved)) {
+      setActiveSection(saved as Section)
+    }
+    setSectionRestored(true)
+  }, [])
+
+  // Persist active section to localStorage (only after initial restore)
+  React.useEffect(() => {
+    if (sectionRestored) {
+      localStorage.setItem("active-section", activeSection)
+    }
+  }, [activeSection, sectionRestored])
 
   // Get user info for personalization
   const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.user_metadata?.user_name || null
