@@ -9,47 +9,27 @@ import {
   Menu,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
   Home,
-  Calendar,
   Bookmark,
   RefreshCw,
   RotateCw,
   MapPin,
   ArrowUp,
   ArrowDown,
-  Radio,
-  AlertTriangle,
-  Rss,
-  Star,
-  Timer,
   Zap,
-  FolderOpen,
-  History,
-  Palette,
-  SlidersHorizontal,
-  Key,
   FileText,
-  Clock,
   CheckCircle2,
-  Grid,
   Search,
-  Globe,
   TrendingUp,
-  Wallet,
-  LineChart,
   User,
   Link2,
   FolderGit2,
   Github,
-  Terminal,
   MessageSquare,
   Play,
   Bitcoin,
   Rocket,
-  Activity,
   AlertCircle,
-  StickyNote,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -100,18 +80,11 @@ import { useJobResults } from "@/hooks/useJobResults"
 // Re-export Section type from hook for consistency
 type Section = "home" | ToggleableSection | "settings"
 
-interface SubItem {
-  id: string
-  label: string
-  icon: React.ElementType
-}
-
 interface NavigationItem {
   id: Section
   label: string
   icon: React.ElementType
   description: string
-  subItems?: SubItem[]
 }
 
 // ============================================================================
@@ -119,202 +92,25 @@ interface NavigationItem {
 // ============================================================================
 
 const navigationItems: NavigationItem[] = [
-  {
-    id: "weather",
-    label: "Weather",
-    icon: Cloud,
-    description: "Live weather monitoring",
-    subItems: [
-      { id: "forecast", label: "Forecast", icon: Calendar },
-      { id: "radar", label: "Radar", icon: Radio },
-      { id: "alerts", label: "Alerts", icon: AlertTriangle },
-    ]
-  },
-  {
-    id: "feed",
-    label: "Daily Feed",
-    icon: Newspaper,
-    description: "Aggregated content",
-    subItems: [
-      { id: "sources", label: "Sources", icon: Rss },
-      { id: "saved", label: "Saved Items", icon: Star },
-      { id: "refresh", label: "Refresh", icon: Timer },
-    ]
-  },
-  {
-    id: "market-pulse",
-    label: "Market Pulse",
-    icon: TrendingUp,
-    description: "Tech salary & job trends",
-    subItems: [
-      { id: "salaries", label: "Salaries", icon: LineChart },
-      { id: "trends", label: "Trends", icon: TrendingUp },
-    ]
-  },
-  {
-    id: "api-playground",
-    label: "API Playground",
-    icon: Zap,
-    description: "Test & debug APIs",
-    subItems: [
-      { id: "collections", label: "Collections", icon: FolderOpen },
-      { id: "history", label: "History", icon: History },
-    ]
-  },
-  {
-    id: "notes",
-    label: "Docs Editor",
-    icon: FileText,
-    description: "GitHub-synced documentation",
-    subItems: [
-      { id: "files", label: "Browse Files", icon: FolderOpen },
-      { id: "recent", label: "Recent", icon: Clock },
-    ]
-  },
-  {
-    id: "bookmarks",
-    label: "Bookmarks",
-    icon: Bookmark,
-    description: "Quick links",
-    subItems: [
-      { id: "all", label: "All Links", icon: Grid },
-      { id: "search", label: "Search", icon: Search },
-    ]
-  },
-  {
-    id: "search",
-    label: "Search Hub",
-    icon: Search,
-    description: "Search, AI & Image",
-    subItems: [
-      { id: "search", label: "Search", icon: Globe },
-      { id: "ai", label: "AI Chat", icon: Zap },
-      { id: "image", label: "Image AI", icon: Palette },
-    ]
-  },
-  {
-    id: "ai-workspace",
-    label: "AI Workspace",
-    icon: MessageSquare,
-    description: "Chat with AI models",
-    // History is shown in the sidebar within AI Workspace
-  },
-  {
-    id: "stocks",
-    label: "Paper Trading",
-    icon: TrendingUp,
-    description: "Practice stock trading",
-    subItems: [
-      { id: "portfolio", label: "Portfolio", icon: Wallet },
-      { id: "watchlist", label: "Watchlist", icon: LineChart },
-      { id: "history", label: "History", icon: History },
-    ]
-  },
-  {
-    id: "crypto",
-    label: "Crypto",
-    icon: Bitcoin,
-    description: "Live cryptocurrency prices",
-    subItems: [
-      { id: "market", label: "Market", icon: TrendingUp },
-      { id: "favorites", label: "Favorites", icon: Star },
-    ]
-  },
-  {
-    id: "spacex",
-    label: "SpaceX Launches",
-    icon: Rocket,
-    description: "Track rocket launches",
-    subItems: [
-      { id: "upcoming", label: "Upcoming", icon: Calendar },
-      { id: "past", label: "Past", icon: History },
-    ]
-  },
-  {
-    id: "github-activity",
-    label: "GitHub Activity",
-    icon: Github,
-    description: "GitHub events & repos",
-    subItems: [
-      { id: "events", label: "Events", icon: Activity },
-      { id: "repos", label: "Repos", icon: FolderGit2 },
-    ]
-  },
-  {
-    id: "disasters",
-    label: "Disasters",
-    icon: AlertCircle,
-    description: "Earthquakes & alerts",
-    subItems: [
-      { id: "recent", label: "Recent", icon: Clock },
-      { id: "significant", label: "Significant", icon: AlertTriangle },
-    ]
-  },
-  {
-    id: "tasks",
-    label: "Scratchpad",
-    icon: CheckCircle2,
-    description: "Quick notes and todos",
-    subItems: [
-      { id: "notes", label: "Notes", icon: StickyNote },
-      { id: "pending", label: "To Do", icon: Clock },
-      { id: "completed", label: "Completed", icon: CheckCircle2 },
-    ]
-  },
-  {
-    id: "projects",
-    label: "Projects",
-    icon: FolderGit2,
-    description: "GitHub & local repos",
-    subItems: [
-      { id: "all", label: "All Projects", icon: Grid },
-      { id: "github", label: "GitHub Repos", icon: Github },
-      { id: "local", label: "Local Projects", icon: Terminal },
-    ]
-  },
-  {
-    id: "jobs",
-    label: "Jobs",
-    icon: Play,
-    description: "Claude batch prompts",
-    subItems: [
-      { id: "all", label: "All Jobs", icon: Grid },
-      { id: "history", label: "Run History", icon: History },
-    ]
-  },
-  {
-    id: "integrations",
-    label: "Integrations",
-    icon: Link2,
-    description: "Connected services",
-    subItems: [
-      { id: "auth", label: "Authentication", icon: Key },
-      { id: "apis", label: "API Services", icon: Zap },
-      { id: "data", label: "Data Sources", icon: Rss },
-    ]
-  },
-  {
-    id: "profile",
-    label: "Profile",
-    icon: User,
-    description: "Account & sync",
-    subItems: [
-      { id: "account", label: "Account", icon: User },
-      { id: "sync", label: "Sync Status", icon: RefreshCw },
-    ]
-  },
-  {
-    id: "settings",
-    label: "Settings",
-    icon: Settings,
-    description: "Theme & preferences",
-    subItems: [
-      { id: "appearance", label: "Appearance", icon: Palette },
-      { id: "sections", label: "Sections", icon: Grid },
-      { id: "feed-config", label: "Feed Config", icon: SlidersHorizontal },
-      { id: "api-keys", label: "API Keys", icon: Key },
-    ]
-  },
+  { id: "weather", label: "Weather", icon: Cloud, description: "Live weather monitoring" },
+  { id: "feed", label: "Daily Feed", icon: Newspaper, description: "Aggregated content" },
+  { id: "market-pulse", label: "Market Pulse", icon: TrendingUp, description: "Tech salary & job trends" },
+  { id: "api-playground", label: "API Playground", icon: Zap, description: "Test & debug APIs" },
+  { id: "notes", label: "Docs Editor", icon: FileText, description: "GitHub-synced documentation" },
+  { id: "bookmarks", label: "Bookmarks", icon: Bookmark, description: "Quick links" },
+  { id: "search", label: "Search Hub", icon: Search, description: "Search, AI & Image" },
+  { id: "ai-workspace", label: "AI Workspace", icon: MessageSquare, description: "Chat with AI models" },
+  { id: "stocks", label: "Paper Trading", icon: TrendingUp, description: "Practice stock trading" },
+  { id: "crypto", label: "Crypto", icon: Bitcoin, description: "Live cryptocurrency prices" },
+  { id: "spacex", label: "SpaceX Launches", icon: Rocket, description: "Track rocket launches" },
+  { id: "github-activity", label: "GitHub Activity", icon: Github, description: "GitHub events & repos" },
+  { id: "disasters", label: "Disasters", icon: AlertCircle, description: "Earthquakes & alerts" },
+  { id: "tasks", label: "Scratchpad", icon: CheckCircle2, description: "Quick notes and todos" },
+  { id: "projects", label: "Projects", icon: FolderGit2, description: "GitHub & local repos" },
+  { id: "jobs", label: "Jobs", icon: Play, description: "Claude batch prompts" },
+  { id: "integrations", label: "Integrations", icon: Link2, description: "Connected services" },
+  { id: "profile", label: "Profile", icon: User, description: "Account & sync" },
+  { id: "settings", label: "Settings", icon: Settings, description: "Theme & preferences" },
 ]
 
 // ============================================================================
@@ -324,10 +120,6 @@ const navigationItems: NavigationItem[] = [
 function SidebarContent({
   activeSection,
   setActiveSection,
-  expandedSection,
-  setExpandedSection,
-  setActiveSubItem,
-  weatherAlertCount = 0,
   jobsNeedsHumanCount = 0,
   collapsed = false,
   mobile = false,
@@ -341,10 +133,6 @@ function SidebarContent({
 }: {
   activeSection: Section
   setActiveSection: (section: Section) => void
-  expandedSection: Section | null
-  setExpandedSection: (section: Section | null) => void
-  setActiveSubItem?: (subItem: string | null) => void
-  weatherAlertCount?: number
   jobsNeedsHumanCount?: number
   collapsed?: boolean
   mobile?: boolean
@@ -357,25 +145,12 @@ function SidebarContent({
   isLocal?: boolean
 }) {
   const handleSectionClick = (id: Section) => {
-    // Navigate to section
     setActiveSection(id)
-    // Clear any active sub-item when clicking section header
-    setActiveSubItem?.(null)
-    // Toggle expand (collapse if already expanded, expand otherwise)
-    setExpandedSection(expandedSection === id ? null : id)
-    // Don't close mobile menu on section click - let user explore sub-items
-  }
-
-  const handleSubItemClick = (sectionId: Section, subItemId: string) => {
-    setActiveSection(sectionId)
-    // Trigger scroll to the sub-item's anchor
-    setActiveSubItem?.(subItemId)
-    onNavigate?.() // Close mobile menu when sub-item is clicked
+    onNavigate?.() // Close mobile menu when section is clicked
   }
 
   const handleHomeClick = () => {
     setActiveSection("home")
-    setExpandedSection(null)
     onNavigate?.()
   }
 
@@ -439,8 +214,6 @@ function SidebarContent({
           })().map((item) => {
             const Icon = item.icon
             const isActive = activeSection === item.id
-            const isExpanded = expandedSection === item.id
-            const hasSubItems = item.subItems && item.subItems.length > 0
 
             return (
               <li key={item.id}>
@@ -473,14 +246,6 @@ function SidebarContent({
                       {!isLocal && requiresLocalhost(item.id) && !(collapsed && !mobile) && (
                         <LocalOnlyBadge />
                       )}
-                      {/* Chevron for expandable items */}
-                      {hasSubItems && !(collapsed && !mobile) && (
-                        <ChevronDown
-                          className={`h-4 w-4 flex-shrink-0 transition-transform duration-200 ${
-                            isExpanded ? 'rotate-0' : '-rotate-90'
-                          }`}
-                        />
-                      )}
                     </button>
                   </TooltipTrigger>
                   {collapsed && !mobile && (
@@ -489,43 +254,6 @@ function SidebarContent({
                     </TooltipContent>
                   )}
                 </Tooltip>
-
-                {/* Sub-items (accordion content) */}
-                {hasSubItems && !(collapsed && !mobile) && (
-                  <div
-                    className={`overflow-hidden transition-all duration-200 ease-in-out ${
-                      isExpanded ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'
-                    }`}
-                  >
-                    <ul className="ml-4 mt-1 space-y-0.5 border-l border-border/20 pl-3">
-                      {item.subItems!.map((subItem) => {
-                        const SubIcon = subItem.icon
-                        // Show alert count badge for weather alerts
-                        const showAlertBadge = item.id === "weather" && subItem.id === "alerts"
-                        return (
-                          <li key={subItem.id}>
-                            <button
-                              onClick={() => handleSubItemClick(item.id, subItem.id)}
-                              className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-primary/5 rounded transition-colors"
-                            >
-                              <SubIcon className="h-3.5 w-3.5" />
-                              <span className="flex-1 text-left">{subItem.label}</span>
-                              {showAlertBadge && (
-                                <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-                                  weatherAlertCount > 0
-                                    ? 'bg-red-500/20 text-red-400'
-                                    : 'bg-emerald-500/20 text-emerald-400'
-                                }`}>
-                                  ({weatherAlertCount})
-                                </span>
-                              )}
-                            </button>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  </div>
-                )}
               </li>
             )
           })}
@@ -1010,7 +738,6 @@ export default function PersonalHomepage() {
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
   const [activeSection, setActiveSection] = React.useState<Section>("home")
-  const [expandedSection, setExpandedSection] = React.useState<Section | null>(null)
   const [activeSubItem, setActiveSubItem] = React.useState<string | null>(null)
   const [aiWorkspaceProject, setAiWorkspaceProject] = React.useState<string | null>(null)
   const [sectionRestored, setSectionRestored] = React.useState(false)
@@ -1139,10 +866,6 @@ export default function PersonalHomepage() {
             <SidebarContent
               activeSection={activeSection}
               setActiveSection={setActiveSection}
-              expandedSection={expandedSection}
-              setExpandedSection={setExpandedSection}
-              setActiveSubItem={setActiveSubItem}
-              weatherAlertCount={weatherAlertCount}
               jobsNeedsHumanCount={needsHumanCount}
               mobile
               onNavigate={() => setMobileMenuOpen(false)}
@@ -1167,10 +890,6 @@ export default function PersonalHomepage() {
               <SidebarContent
                 activeSection={activeSection}
                 setActiveSection={setActiveSection}
-                expandedSection={expandedSection}
-                setExpandedSection={setExpandedSection}
-                setActiveSubItem={setActiveSubItem}
-                weatherAlertCount={weatherAlertCount}
                 jobsNeedsHumanCount={needsHumanCount}
                 collapsed={sidebarCollapsed}
                 userAvatar={userAvatar}
