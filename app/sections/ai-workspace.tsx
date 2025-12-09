@@ -20,7 +20,7 @@ import {
   MessageSquare, Send, Bot, User, Copy, RotateCw, ThumbsUp, ThumbsDown,
   Settings, ChevronDown, Plus, X, Trash2, Code, CheckCheck,
   Sparkles, StopCircle, Clock, Cpu, FileJson, FileText, FolderOpen,
-  Wrench, Loader2, ChevronRight,
+  Wrench, Loader2, ChevronRight, Search, Pencil,
 } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { useSearchParams } from "next/navigation"
@@ -92,35 +92,60 @@ interface ConversationSettings {
   maxTokens?: number
 }
 
+interface SuggestedPrompt {
+  text: string
+  category: string
+}
+
 interface ChatSettings {
   model: string
   temperature: number
   maxTokens: number
   systemPrompt: string
+  suggestedPrompts?: SuggestedPrompt[]
   // Claude CLI specific options
   additionalDirs?: string[]
   claudeModel?: string
+  claudeAgent?: string  // --agent flag
   allowedTools?: string[]
   disallowedTools?: string[]
   permissionMode?: 'acceptEdits' | 'bypassPermissions' | 'default' | 'plan'
+  // Gemini CLI specific options
+  geminiModel?: string
+  // Codex CLI specific options
+  codexModel?: string
+  reasoningEffort?: 'low' | 'medium' | 'high'
+  sandbox?: 'read-only' | 'full' | 'off'
 }
 
 // ============================================================================
 // MOCK DATA & UTILITIES
 // ============================================================================
 
-const SUGGESTED_PROMPTS = [
-  { icon: Code, text: "Help me debug this TypeScript error", category: "Debug" },
-  { icon: Sparkles, text: "Explain how async/await works", category: "Learn" },
-  { icon: Code, text: "Generate a React component", category: "Create" },
-  { icon: CheckCheck, text: "Review my code for best practices", category: "Review" },
+const DEFAULT_SUGGESTED_PROMPTS: SuggestedPrompt[] = [
+  { text: "What files are in this project?", category: "Explore" },
+  { text: "Explain the architecture of this codebase", category: "Learn" },
+  { text: "Find any TODO comments in the code", category: "Search" },
+  { text: "What dependencies does this project use?", category: "Info" },
 ]
+
+// Icon mapping for prompt categories
+const PROMPT_CATEGORY_ICONS: Record<string, typeof Code> = {
+  Debug: Code,
+  Learn: Sparkles,
+  Create: Code,
+  Review: CheckCheck,
+  Explore: FolderOpen,
+  Search: Search,
+  Info: Sparkles,
+}
 
 const DEFAULT_SETTINGS: ChatSettings = {
   model: 'mock', // Default to mock until we fetch real models
   temperature: 0.7,
   maxTokens: 2048,
-  systemPrompt: 'You are a helpful AI coding assistant. Provide clear, concise answers with code examples when relevant.',
+  systemPrompt: '', // Empty by default - let the AI use its vanilla behavior
+  suggestedPrompts: DEFAULT_SUGGESTED_PROMPTS,
 }
 
 interface ModelInfo {
@@ -263,20 +288,32 @@ function getResponseForPrompt(prompt: string): string {
 function loadConversations(): Conversation[] {
   if (typeof window === "undefined") return []
 
+  const now = new Date()
+  const today = now.toDateString()
+
   try {
     const saved = localStorage.getItem("ai-workspace-conversations")
     if (saved) {
       const parsed = JSON.parse(saved)
       // Convert date strings back to Date objects
-      return parsed.map((conv: any) => ({
-        ...conv,
-        createdAt: new Date(conv.createdAt),
-        updatedAt: new Date(conv.updatedAt),
-        messages: conv.messages.map((msg: any) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp),
-        })),
-      }))
+      // Also refresh empty conversations to current date
+      return parsed.map((conv: any) => {
+        const createdAt = new Date(conv.createdAt)
+        const updatedAt = new Date(conv.updatedAt)
+        const isEmpty = !conv.messages || conv.messages.length === 0
+        const isOldEmptyConversation = isEmpty && createdAt.toDateString() !== today
+
+        return {
+          ...conv,
+          // Reset empty conversations to today's date
+          createdAt: isOldEmptyConversation ? now : createdAt,
+          updatedAt: isOldEmptyConversation ? now : updatedAt,
+          messages: conv.messages.map((msg: any) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp),
+          })),
+        }
+      })
     }
   } catch {
     // Invalid JSON, use defaults
@@ -286,8 +323,8 @@ function loadConversations(): Conversation[] {
     id: generateId(),
     title: 'New Conversation',
     messages: [],
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: now,
+    updatedAt: now,
   }]
 }
 
@@ -665,6 +702,7 @@ export default function AIWorkspaceSection({
   const [availableModels, setAvailableModels] = React.useState<ModelInfo[]>([])
   const [backends, setBackends] = React.useState<BackendStatus[]>([])
   const [modelsLoading, setModelsLoading] = React.useState(true)
+  const [availableAgents, setAvailableAgents] = React.useState<{ name: string; description: string; model?: string; filename: string }[]>([])
   const [selectedProjectPath, setSelectedProjectPath] = React.useState<string | null>(null)
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
@@ -815,7 +853,7 @@ export default function AIWorkspaceSection({
     }
   }, [initialProjectPath, availableProjects, onProjectPathConsumed])
 
-  // Fetch available models on mount
+  // Fetch available models and agents on mount
   React.useEffect(() => {
     async function fetchModels() {
       try {
@@ -849,7 +887,20 @@ export default function AIWorkspaceSection({
       }
     }
 
+    async function fetchAgents() {
+      try {
+        const response = await fetch('/api/ai/agents')
+        const data = await response.json()
+        if (data.agents) {
+          setAvailableAgents(data.agents)
+        }
+      } catch (error) {
+        console.error('Failed to fetch agents:', error)
+      }
+    }
+
     fetchModels()
+    fetchAgents()
   }, [])
 
   // Save conversations to localStorage whenever they change
@@ -863,14 +914,16 @@ export default function AIWorkspaceSection({
   }, [settings])
 
   // Restore model and project context when switching conversations
+  // But don't override if we have an initialProjectPath from navigation
   React.useEffect(() => {
     if (activeConv.model && activeConv.model !== settings.model) {
       setSettings(prev => ({ ...prev, model: activeConv.model! }))
     }
-    if (activeConv.projectPath !== undefined && activeConv.projectPath !== selectedProjectPath) {
+    // Only restore project path from conversation if not navigating from projects page
+    if (!initialProjectPath && activeConv.projectPath !== undefined && activeConv.projectPath !== selectedProjectPath) {
       setSelectedProjectPath(activeConv.projectPath)
     }
-  }, [activeConvId])
+  }, [activeConvId, initialProjectPath])
 
   // Responsive sidebar - hide on mobile by default
   React.useEffect(() => {
@@ -1537,8 +1590,8 @@ export default function AIWorkspaceSection({
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3 max-w-2xl mx-auto">
-                    {SUGGESTED_PROMPTS.map((prompt, idx) => {
-                      const Icon = prompt.icon
+                    {(settings.suggestedPrompts || DEFAULT_SUGGESTED_PROMPTS).map((prompt, idx) => {
+                      const Icon = PROMPT_CATEGORY_ICONS[prompt.category] || Sparkles
                       return (
                         <motion.div
                           key={idx}
@@ -1715,52 +1768,50 @@ export default function AIWorkspaceSection({
                 )}
               </div>
 
-              {/* Temperature */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Temperature</Label>
-                  <span className="text-sm text-muted-foreground">{settings.temperature.toFixed(1)}</span>
+              {/* Temperature - Only for Docker models */}
+              {selectedModel?.backend === 'docker' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Temperature</Label>
+                    <span className="text-sm text-muted-foreground">{settings.temperature.toFixed(1)}</span>
+                  </div>
+                  <Slider
+                    value={[settings.temperature]}
+                    onValueChange={([value]) => setSettings({ ...settings, temperature: value })}
+                    min={0}
+                    max={1}
+                    step={0.1}
+                    className="glass"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Higher values make output more random
+                  </p>
                 </div>
-                <Slider
-                  value={[settings.temperature]}
-                  onValueChange={([value]) => setSettings({ ...settings, temperature: value })}
-                  min={0}
-                  max={1}
-                  step={0.1}
-                  className="glass"
-                  disabled={selectedModel?.backend === 'claude' || selectedModel?.backend === 'mock'}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Higher values make output more random
-                  {(selectedModel?.backend === 'claude' || selectedModel?.backend === 'mock') &&
-                    ' (only applies to Docker models)'}
-                </p>
-              </div>
+              )}
 
-              {/* Max Tokens */}
-              <div className="space-y-3">
-                <Label>Max Tokens</Label>
-                <Input
-                  type="number"
-                  value={settings.maxTokens}
-                  onChange={(e) => setSettings({ ...settings, maxTokens: parseInt(e.target.value) || 2048 })}
-                  min={256}
-                  max={8192}
-                  step={256}
-                  className="glass"
-                  disabled={selectedModel?.backend === 'claude' || selectedModel?.backend === 'mock'}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Maximum length of the response
-                  {(selectedModel?.backend === 'claude' || selectedModel?.backend === 'mock') &&
-                    ' (only applies to Docker models)'}
-                </p>
-              </div>
+              {/* Max Tokens - Only for Docker models */}
+              {selectedModel?.backend === 'docker' && (
+                <div className="space-y-3">
+                  <Label>Max Tokens</Label>
+                  <Input
+                    type="number"
+                    value={settings.maxTokens}
+                    onChange={(e) => setSettings({ ...settings, maxTokens: parseInt(e.target.value) || 2048 })}
+                    min={256}
+                    max={8192}
+                    step={256}
+                    className="glass"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Maximum length of the response
+                  </p>
+                </div>
+              )}
 
-              {/* System Prompt */}
+              {/* Append System Prompt */}
               <Collapsible className="space-y-3">
                 <CollapsibleTrigger className="flex items-center justify-between w-full">
-                  <Label>System Prompt</Label>
+                  <Label>Append System Prompt</Label>
                   <ChevronDown className="h-4 w-4" />
                 </CollapsibleTrigger>
                 <CollapsibleContent>
@@ -1768,14 +1819,91 @@ export default function AIWorkspaceSection({
                     value={settings.systemPrompt}
                     onChange={(e) => setSettings({ ...settings, systemPrompt: e.target.value })}
                     className="glass min-h-[120px]"
-                    placeholder="Customize the AI's behavior..."
+                    placeholder="Leave empty for vanilla behavior..."
                     disabled={selectedModel?.backend === 'mock'}
                   />
                   <p className="text-xs text-muted-foreground mt-2">
-                    {selectedModel?.backend === 'claude' && 'Appends to Claude\'s default system prompt'}
-                    {selectedModel?.backend === 'docker' && 'Define how the AI should respond'}
+                    {selectedModel?.backend === 'claude' && 'Appended via --append-system-prompt flag'}
+                    {selectedModel?.backend === 'gemini' && 'Prepended to conversation as system context'}
+                    {selectedModel?.backend === 'codex' && 'Prepended to conversation as system context'}
+                    {selectedModel?.backend === 'docker' && 'Sent as system role message'}
                     {selectedModel?.backend === 'mock' && 'Not used for mock responses'}
                   </p>
+                </CollapsibleContent>
+              </Collapsible>
+
+              {/* Suggested Prompts */}
+              <Collapsible className="space-y-3">
+                <CollapsibleTrigger className="flex items-center justify-between w-full">
+                  <Label className="flex items-center gap-2">
+                    <Pencil className="h-3 w-3" />
+                    Quick Prompts
+                  </Label>
+                  <ChevronDown className="h-4 w-4" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-3 pt-2">
+                  <p className="text-xs text-muted-foreground">
+                    Edit the prompts shown on new conversations. Categories: Explore, Learn, Search, Info, Debug, Create, Review
+                  </p>
+                  {(settings.suggestedPrompts || DEFAULT_SUGGESTED_PROMPTS).map((prompt, idx) => (
+                    <div key={idx} className="space-y-2 p-3 glass rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={prompt.category}
+                          onChange={(e) => {
+                            const newPrompts = [...(settings.suggestedPrompts || DEFAULT_SUGGESTED_PROMPTS)]
+                            newPrompts[idx] = { ...newPrompts[idx], category: e.target.value }
+                            setSettings({ ...settings, suggestedPrompts: newPrompts })
+                          }}
+                          className="glass w-24 text-xs"
+                          placeholder="Category"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0"
+                          onClick={() => {
+                            const newPrompts = (settings.suggestedPrompts || DEFAULT_SUGGESTED_PROMPTS).filter((_, i) => i !== idx)
+                            setSettings({ ...settings, suggestedPrompts: newPrompts.length > 0 ? newPrompts : undefined })
+                          }}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <Input
+                        value={prompt.text}
+                        onChange={(e) => {
+                          const newPrompts = [...(settings.suggestedPrompts || DEFAULT_SUGGESTED_PROMPTS)]
+                          newPrompts[idx] = { ...newPrompts[idx], text: e.target.value }
+                          setSettings({ ...settings, suggestedPrompts: newPrompts })
+                        }}
+                        className="glass text-xs"
+                        placeholder="Prompt text..."
+                      />
+                    </div>
+                  ))}
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 glass"
+                      onClick={() => {
+                        const newPrompts = [...(settings.suggestedPrompts || DEFAULT_SUGGESTED_PROMPTS), { text: '', category: 'Info' }]
+                        setSettings({ ...settings, suggestedPrompts: newPrompts })
+                      }}
+                    >
+                      <Plus className="h-3 w-3 mr-2" />
+                      Add Prompt
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="glass"
+                      onClick={() => setSettings({ ...settings, suggestedPrompts: DEFAULT_SUGGESTED_PROMPTS })}
+                    >
+                      Reset
+                    </Button>
+                  </div>
                 </CollapsibleContent>
               </Collapsible>
 
@@ -1796,15 +1924,48 @@ export default function AIWorkspaceSection({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="default">Default (from config)</SelectItem>
-                        <SelectItem value="sonnet">Sonnet 4.5</SelectItem>
-                        <SelectItem value="opus">Opus 4</SelectItem>
-                        <SelectItem value="haiku">Haiku 3.5</SelectItem>
+                        <SelectItem value="opus">Opus</SelectItem>
+                        <SelectItem value="sonnet">Sonnet</SelectItem>
+                        <SelectItem value="haiku">Haiku</SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
                       Override the default model for this conversation
                     </p>
                   </div>
+
+                  {/* Agent */}
+                  {availableAgents.length > 0 && (
+                    <div className="space-y-3">
+                      <Label>Agent</Label>
+                      <Select
+                        value={settings.claudeAgent || 'none'}
+                        onValueChange={(value) => setSettings({ ...settings, claudeAgent: value === 'none' ? undefined : value })}
+                      >
+                        <SelectTrigger className="glass">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None (default)</SelectItem>
+                          {availableAgents.map(agent => (
+                            <SelectItem key={agent.filename} value={agent.filename}>
+                              <div className="flex flex-col items-start">
+                                <span className="font-medium">{agent.name}</span>
+                                {agent.description && (
+                                  <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                    {agent.description}
+                                  </span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Use an agent from ~/.claude/agents/
+                      </p>
+                    </div>
+                  )}
 
                   {/* Permission Mode */}
                   <div className="space-y-3">
@@ -1877,6 +2038,110 @@ export default function AIWorkspaceSection({
                       </p>
                     </CollapsibleContent>
                   </Collapsible>
+                </>
+              )}
+
+              {/* Gemini-specific settings */}
+              {selectedModel?.backend === 'gemini' && (
+                <>
+                  <Separator />
+
+                  {/* Gemini Model */}
+                  <div className="space-y-3">
+                    <Label>Gemini Model</Label>
+                    <Select
+                      value={settings.geminiModel || 'default'}
+                      onValueChange={(value) => setSettings({ ...settings, geminiModel: value === 'default' ? undefined : value })}
+                    >
+                      <SelectTrigger className="glass">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">Default</SelectItem>
+                        <SelectItem value="gemini-2.5-pro">Gemini 2.5 Pro</SelectItem>
+                        <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash</SelectItem>
+                        <SelectItem value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</SelectItem>
+                        <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Select the Gemini model variant
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {/* Codex-specific settings */}
+              {selectedModel?.backend === 'codex' && (
+                <>
+                  <Separator />
+
+                  {/* Codex Model */}
+                  <div className="space-y-3">
+                    <Label>Codex Model</Label>
+                    <Select
+                      value={settings.codexModel || 'default'}
+                      onValueChange={(value) => setSettings({ ...settings, codexModel: value === 'default' ? undefined : value })}
+                    >
+                      <SelectTrigger className="glass">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">Default (gpt-5)</SelectItem>
+                        <SelectItem value="gpt-5">GPT-5 Codex</SelectItem>
+                        <SelectItem value="gpt-5-mini">GPT-5 Codex Mini</SelectItem>
+                        <SelectItem value="gpt-5.1">GPT-5.1 Codex</SelectItem>
+                        <SelectItem value="gpt-5.1-mini">GPT-5.1 Codex Mini</SelectItem>
+                        <SelectItem value="gpt-5.1-max">GPT-5.1 Codex Max</SelectItem>
+                        <SelectItem value="codex-mini-latest">Codex Mini (Latest)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Select the OpenAI Codex model
+                    </p>
+                  </div>
+
+                  {/* Reasoning Effort */}
+                  <div className="space-y-3">
+                    <Label>Reasoning Effort</Label>
+                    <Select
+                      value={settings.reasoningEffort || 'high'}
+                      onValueChange={(value) => setSettings({ ...settings, reasoningEffort: value as 'low' | 'medium' | 'high' })}
+                    >
+                      <SelectTrigger className="glass">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      How much reasoning to apply (higher = more thorough)
+                    </p>
+                  </div>
+
+                  {/* Sandbox Mode */}
+                  <div className="space-y-3">
+                    <Label>Sandbox Mode</Label>
+                    <Select
+                      value={settings.sandbox || 'read-only'}
+                      onValueChange={(value) => setSettings({ ...settings, sandbox: value as 'read-only' | 'full' | 'off' })}
+                    >
+                      <SelectTrigger className="glass">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="read-only">Read Only</SelectItem>
+                        <SelectItem value="full">Full Access</SelectItem>
+                        <SelectItem value="off">Off (No Sandbox)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Control file system access level
+                    </p>
+                  </div>
                 </>
               )}
 

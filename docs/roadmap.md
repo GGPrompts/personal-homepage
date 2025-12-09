@@ -4,6 +4,9 @@ Future enhancements and planned features.
 
 ## Recently Completed
 
+- **AI Workspace Multi-Provider** - Gemini + Codex CLI support, Claude agents dropdown, provider-specific settings
+- **AI Workspace Settings Overhaul** - Editable quick prompts, simplified model names, empty system prompt default
+- **Projects → AI Workspace Navigation** - "Chat with Claude" button properly passes project context
 - **Integrations Page** - Central hub showing all connected services, API status, configuration links
 - **World Clocks** - Multiple timezone display on Home page, configurable with popular timezones
 - **Tasks / Quick Todo** - Simple task list with checkboxes, reordering, localStorage persistence, completion tracking
@@ -44,13 +47,8 @@ Monitor personal services:
 - Alerts when something goes down
 - **Complexity**: Medium
 
-### AI Chat Widget
-Quick AI access from homepage:
-- Claude/GPT API integration
-- Conversation history
-- Suggested prompts
-- Code highlighting in responses
-- **Complexity**: Medium-High (API key management)
+### AI Chat Widget ✅ COMPLETED
+See AI Workspace section - supports Claude, Gemini, Codex CLIs + Docker models.
 
 ### Data Viz / Personal Analytics
 Visualize personal data:

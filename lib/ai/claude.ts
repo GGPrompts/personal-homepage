@@ -4,7 +4,12 @@
  */
 
 import { spawn, ChildProcess } from 'child_process'
+import { homedir } from 'os'
+import { join } from 'path'
 import type { ChatMessage, ChatSettings } from './types'
+
+// Path to the Claude CLI binary (local install)
+const CLAUDE_BIN = join(homedir(), '.claude', 'local', 'claude')
 
 // Content block types from Claude CLI stream-json
 interface TextBlock {
@@ -116,6 +121,11 @@ export async function streamClaude(
     args.push('--model', settings.claudeModel)
   }
 
+  // Add agent (from ~/.claude/agents/)
+  if (settings?.claudeAgent) {
+    args.push('--agent', settings.claudeAgent)
+  }
+
   // Add additional directories
   if (settings?.additionalDirs && settings.additionalDirs.length > 0) {
     args.push('--add-dir', ...settings.additionalDirs)
@@ -138,7 +148,7 @@ export async function streamClaude(
   // Add the prompt as the last argument
   args.push(lastUserMessage.content)
 
-  const claude = spawn('claude', args, {
+  const claude = spawn(CLAUDE_BIN, args, {
     env: {
       ...process.env,
       // Remove ANTHROPIC_API_KEY to force subscription auth
@@ -409,7 +419,7 @@ export async function streamClaude(
  */
 export async function isClaudeAuthenticated(): Promise<boolean> {
   return new Promise((resolve) => {
-    const claude = spawn('claude', ['--version'])
+    const claude = spawn(CLAUDE_BIN, ['--version'])
 
     claude.on('close', (code) => {
       resolve(code === 0)

@@ -19,6 +19,7 @@ export interface ChatSettings {
   // Claude CLI specific options
   additionalDirs?: string[]  // --add-dir
   claudeModel?: string  // --model (sonnet, opus, haiku, or full model name)
+  claudeAgent?: string  // --agent (agent name from ~/.claude/agents/)
   allowedTools?: string[]  // --allowed-tools
   disallowedTools?: string[]  // --disallowed-tools
   permissionMode?: 'acceptEdits' | 'bypassPermissions' | 'default' | 'plan'  // --permission-mode

@@ -5,9 +5,15 @@
 
 import { exec } from 'child_process'
 import { promisify } from 'util'
+import { homedir } from 'os'
+import { join } from 'path'
+import { access } from 'fs/promises'
 import type { AIBackend } from './types'
 
 const execAsync = promisify(exec)
+
+// Path to the Claude CLI binary (local install)
+const CLAUDE_BIN = join(homedir(), '.claude', 'local', 'claude')
 
 const DOCKER_API_BASE = process.env.DOCKER_MODEL_API
   ? `${process.env.DOCKER_MODEL_API}/engines/v1`
@@ -35,11 +41,18 @@ async function checkCLI(command: string): Promise<boolean> {
  * Check if Claude CLI is available
  */
 export async function checkClaudeCLI(): Promise<BackendStatus> {
-  const available = await checkCLI('claude')
-  return {
-    backend: 'claude',
-    available,
-    error: available ? undefined : 'Claude CLI not found. Install with: npm install -g @anthropic-ai/claude-code'
+  try {
+    // Check if the claude binary exists at the expected path
+    await access(CLAUDE_BIN)
+    return { backend: 'claude', available: true }
+  } catch {
+    // Fall back to checking PATH
+    const available = await checkCLI('claude')
+    return {
+      backend: 'claude',
+      available,
+      error: available ? undefined : 'Claude CLI not found at ~/.claude/local/claude'
+    }
   }
 }
 
