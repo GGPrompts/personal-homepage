@@ -674,20 +674,20 @@ function MessageBubble({ message, onCopy, onRegenerate, onFeedback, userAvatarUr
       const language = match[1] || 'text'
       const code = match[2]
       parts.push(
-        <div key={`code-${match.index}`} className="my-3 rounded-lg overflow-hidden border border-border/40">
-          <div className="bg-muted/30 px-4 py-2 flex items-center justify-between">
+        <div key={`code-${match.index}`} className="my-3 rounded-lg overflow-hidden border border-border/40 max-w-full">
+          <div className="bg-muted/30 px-3 sm:px-4 py-2 flex items-center justify-between">
             <span className="text-xs text-muted-foreground font-mono">{language}</span>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => navigator.clipboard.writeText(code)}
-              className="h-6 px-2"
+              className="h-6 px-2 shrink-0"
             >
               <Copy className="h-3 w-3" />
             </Button>
           </div>
-          <pre className="p-4 overflow-x-auto bg-muted/20">
-            <code className="text-sm font-mono">{code}</code>
+          <pre className="p-3 sm:p-4 overflow-x-auto bg-muted/20 max-w-full">
+            <code className="text-xs sm:text-sm font-mono">{code}</code>
           </pre>
         </div>
       )
@@ -728,9 +728,9 @@ function MessageBubble({ message, onCopy, onRegenerate, onFeedback, userAvatarUr
         </AvatarFallback>
       </Avatar>
 
-      <div className={`flex-1 max-w-full sm:max-w-[85%] ${isUser ? 'flex justify-end' : ''}`}>
+      <div className={`flex-1 min-w-0 max-w-[calc(100%-2rem)] sm:max-w-[85%] ${isUser ? 'flex justify-end' : ''}`}>
         <div
-          className={`rounded-lg px-4 py-3 ${
+          className={`rounded-lg px-3 sm:px-4 py-3 overflow-hidden ${
             isUser
               ? 'bg-primary text-primary-foreground ml-auto'
               : 'glass'
@@ -745,7 +745,7 @@ function MessageBubble({ message, onCopy, onRegenerate, onFeedback, userAvatarUr
             </div>
           )}
 
-          <div className="prose prose-sm max-w-none dark:prose-invert">
+          <div className="prose prose-sm max-w-none dark:prose-invert break-words overflow-hidden">
             {renderContent(message.content)}
           </div>
 
@@ -1697,7 +1697,7 @@ export default function AIWorkspaceSection({
   // ============================================================================
 
   return (
-    <div className="h-screen flex flex-col lg:flex-row overflow-hidden">
+    <div className="h-[100dvh] flex flex-col lg:flex-row overflow-hidden">
       {/* Conversations Sidebar */}
       <AnimatePresence>
         {showSidebar && (
@@ -1796,9 +1796,9 @@ export default function AIWorkspaceSection({
       </AnimatePresence>
 
       {/* Main Chat Interface */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* Header */}
-        <div className="glass-dark border-b border-border/40 px-4 sm:px-6 py-4 flex items-center justify-between">
+        <div className="glass-dark border-b border-border/40 px-3 sm:px-6 py-2 sm:py-4 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <Button
               variant="ghost"
@@ -1967,28 +1967,28 @@ export default function AIWorkspaceSection({
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden min-h-0">
           <ScrollArea className="h-full">
-            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-4xl mx-auto">
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-4xl mx-auto w-full box-border">
               {activeConv.messages.length === 0 ? (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="text-center py-6 sm:py-12 space-y-6 sm:space-y-8"
+                  className="text-center py-4 sm:py-12 space-y-4 sm:space-y-8"
                 >
-                  <div className="space-y-3 sm:space-y-4">
-                    <div className="inline-flex p-3 sm:p-4 rounded-full glass border-glow">
-                      <Sparkles className="h-8 w-8 sm:h-12 sm:w-12 text-primary terminal-glow" />
+                  <div className="space-y-2 sm:space-y-4">
+                    <div className="inline-flex p-2 sm:p-4 rounded-full glass border-glow">
+                      <Sparkles className="h-6 w-6 sm:h-12 sm:w-12 text-primary terminal-glow" />
                     </div>
-                    <h3 className="text-xl sm:text-2xl font-bold terminal-glow">
+                    <h3 className="text-lg sm:text-2xl font-bold terminal-glow">
                       How can I help you today?
                     </h3>
-                    <p className="text-sm sm:text-base text-muted-foreground max-w-md mx-auto px-2">
-                      Choose a suggested prompt below or ask me anything about coding.
+                    <p className="text-xs sm:text-base text-muted-foreground max-w-md mx-auto px-2">
+                      Choose a prompt or ask anything
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3 max-w-2xl mx-auto">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 max-w-2xl mx-auto px-2">
                     {(settings.suggestedPrompts || DEFAULT_SUGGESTED_PROMPTS).map((prompt, idx) => {
                       const Icon = PROMPT_CATEGORY_ICONS[prompt.category] || Sparkles
                       return (
@@ -1996,21 +1996,21 @@ export default function AIWorkspaceSection({
                           key={idx}
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: idx * 0.1 }}
+                          transition={{ delay: idx * 0.05 }}
                         >
                           <Card
                             className="glass hover:border-glow cursor-pointer transition-all group"
                             onClick={() => handleSuggestedPrompt(prompt.text)}
                           >
-                            <CardContent className="p-3 sm:p-4 flex items-start gap-3">
-                              <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors shrink-0">
-                                <Icon className="h-4 w-4 text-primary" />
+                            <CardContent className="p-2 sm:p-4 flex items-start gap-2 sm:gap-3">
+                              <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors shrink-0">
+                                <Icon className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                               </div>
                               <div className="flex-1 text-left min-w-0">
-                                <Badge variant="secondary" className="mb-2 text-xs">
+                                <Badge variant="secondary" className="mb-1 sm:mb-2 text-[10px] sm:text-xs">
                                   {prompt.category}
                                 </Badge>
-                                <p className="text-sm">{prompt.text}</p>
+                                <p className="text-xs sm:text-sm line-clamp-2">{prompt.text}</p>
                               </div>
                             </CardContent>
                           </Card>
@@ -2096,10 +2096,10 @@ export default function AIWorkspaceSection({
         </div>
 
         {/* Input Area */}
-        <div className="glass-dark border-t border-border/40 p-3 sm:p-4">
+        <div className="glass-dark border-t border-border/40 p-2 sm:p-4 shrink-0">
           <div className="max-w-4xl mx-auto">
             <div className="flex gap-2">
-              <div className="flex-1 relative">
+              <div className="flex-1 relative min-w-0">
                 <Textarea
                   ref={textareaRef}
                   value={inputValue}
@@ -2107,7 +2107,7 @@ export default function AIWorkspaceSection({
                   onKeyDown={handleKeyDown}
                   placeholder={isStreaming ? "Wait for response..." : "Ask me anything..."}
                   disabled={isStreaming}
-                  className="resize-none min-h-[48px] sm:min-h-[52px] max-h-[120px] glass text-sm sm:text-base"
+                  className="resize-none min-h-[44px] sm:min-h-[52px] max-h-[100px] sm:max-h-[120px] glass text-sm sm:text-base"
                   rows={1}
                 />
               </div>
@@ -2120,20 +2120,20 @@ export default function AIWorkspaceSection({
                   <Button
                     size="icon"
                     variant="destructive"
-                    className="h-[48px] w-[48px] sm:h-[52px] sm:w-[52px] shrink-0"
+                    className="h-[44px] w-[44px] sm:h-[52px] sm:w-[52px] shrink-0"
                     onClick={() => setIsStreaming(false)}
                   >
-                    <StopCircle className="h-5 w-5" />
+                    <StopCircle className="h-4 w-4 sm:h-5 sm:w-5" />
                   </Button>
                 </motion.div>
               ) : (
                 <Button
                   size="icon"
-                  className="h-[48px] w-[48px] sm:h-[52px] sm:w-[52px] border-glow shrink-0"
+                  className="h-[44px] w-[44px] sm:h-[52px] sm:w-[52px] border-glow shrink-0"
                   onClick={handleSend}
                   disabled={!inputValue.trim() || isStreaming || isTyping}
                 >
-                  <Send className="h-5 w-5" />
+                  <Send className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
               )}
             </div>

@@ -1641,4 +1641,53 @@
   :root[data-theme="slate"] .md-em {
     color: hsl(195 90% 60%);
   }
+
+  /* ===== MOBILE VIEWPORT HANDLING ===== */
+  /* Handle mobile browser viewport changes (keyboard, address bar) */
+
+  /* Prevent horizontal overflow on mobile */
+  .overflow-x-clip {
+    overflow-x: clip;
+  }
+
+  /* Touch-friendly scrolling */
+  .touch-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* Prevent text selection on interactive elements */
+  .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* Mobile-safe fixed positioning */
+  @supports (height: 100dvh) {
+    .h-screen-safe {
+      height: 100dvh;
+    }
+    .min-h-screen-safe {
+      min-height: 100dvh;
+    }
+    .max-h-screen-safe {
+      max-height: 100dvh;
+    }
+  }
+
+  @supports not (height: 100dvh) {
+    .h-screen-safe {
+      height: 100vh;
+      height: -webkit-fill-available;
+    }
+    .min-h-screen-safe {
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+    }
+    .max-h-screen-safe {
+      max-height: 100vh;
+      max-height: -webkit-fill-available;
+    }
+  }
 }
