@@ -6,10 +6,12 @@
 import { spawn, ChildProcess } from 'child_process'
 import { homedir } from 'os'
 import { join } from 'path'
+import { existsSync } from 'fs'
 import type { ChatMessage, ChatSettings } from './types'
 
-// Path to the Claude CLI binary (local install)
-const CLAUDE_BIN = join(homedir(), '.claude', 'local', 'claude')
+// Path to the Claude CLI binary - check local install first, fall back to PATH
+const LOCAL_CLAUDE = join(homedir(), '.claude', 'local', 'claude')
+const CLAUDE_BIN = existsSync(LOCAL_CLAUDE) ? LOCAL_CLAUDE : 'claude'
 
 // Content block types from Claude CLI stream-json
 interface TextBlock {
