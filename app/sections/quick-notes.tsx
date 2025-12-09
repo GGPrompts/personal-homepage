@@ -441,12 +441,8 @@ export default function QuickNotesSection({
     files: GitHubFile[],
     parentPath: string
   ): FileTreeNode[] => {
-    // Filter files if showOnlyMarkdown is enabled
-    const filteredFiles = showOnlyMarkdown
-      ? files.filter((file) => file.type === "dir" || isMarkdownFile(file.name))
-      : files
-
-    return filteredFiles.map((file) => {
+    // First, build all nodes with their children (recursively)
+    const nodes = files.map((file) => {
       const node: FileTreeNode = {
         ...file,
         isExpanded: expandedPaths.has(file.path),
@@ -461,6 +457,34 @@ export default function QuickNotesSection({
       }
 
       return node
+    })
+
+    // If not filtering, return all nodes
+    if (!showOnlyMarkdown) {
+      return nodes
+    }
+
+    // Filter nodes based on markdown-only setting
+    return nodes.filter((node) => {
+      // Keep markdown files
+      if (node.type !== "dir") {
+        return isMarkdownFile(node.name)
+      }
+
+      // For directories:
+      // - If not expanded, show it (we don't know its contents yet)
+      // - If expanded but still loading/no children array, show it
+      // - If expanded with children, only show if it has visible children
+      if (!expandedPaths.has(node.path)) {
+        return true
+      }
+
+      if (!node.children) {
+        return true
+      }
+
+      // Only show folder if it has markdown files or subfolders with markdown
+      return node.children.length > 0
     })
   }
 

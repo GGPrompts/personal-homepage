@@ -757,9 +757,14 @@ export default function GitHubActivity({ activeSubItem, onSubItemHandled }: GitH
                               <div className="mt-2 space-y-1">
                                 {event.payload.commits.slice(0, 3).map((commit) => (
                                   <div key={commit.sha} className="flex items-start gap-2 text-xs">
-                                    <code className="text-muted-foreground font-mono">
+                                    <a
+                                      href={`https://github.com/${event.repo.name}/commit/${commit.sha}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-muted-foreground font-mono hover:text-primary transition-colors"
+                                    >
                                       {commit.sha.slice(0, 7)}
-                                    </code>
+                                    </a>
                                     <span className="text-muted-foreground truncate">
                                       {commit.message.split("\n")[0]}
                                     </span>
