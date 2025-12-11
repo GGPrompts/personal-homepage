@@ -222,7 +222,7 @@ function SidebarContent({
                     <button
                       onClick={() => handleSectionClick(item.id)}
                       className={`
-                        w-full flex items-center rounded-lg transition-all duration-200
+                        w-full flex items-center rounded-lg transition-[background-color,color,padding,gap] duration-200
                         ${collapsed && !mobile ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'}
                         ${isActive
                           ? 'glass text-primary border-glow'
