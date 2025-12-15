@@ -5,6 +5,25 @@ import { useState, useEffect, useCallback } from "react"
 // TabzChrome REST API configuration
 const TABZ_API_BASE = "http://localhost:8129"
 const TOKEN_STORAGE_KEY = "tabz-api-token"
+const DEFAULT_WORKDIR_KEY = "tabz-default-workdir"
+
+function getDefaultWorkDir(): string {
+  if (typeof window === "undefined") return "~/projects"
+  try {
+    return localStorage.getItem(DEFAULT_WORKDIR_KEY) || "~/projects"
+  } catch {
+    return "~/projects"
+  }
+}
+
+function setDefaultWorkDir(dir: string): void {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(DEFAULT_WORKDIR_KEY, dir)
+  } catch {
+    // Ignore storage errors
+  }
+}
 
 // Check if we're running on localhost (safe to probe local network)
 function isLocalhost(): boolean {
@@ -64,6 +83,7 @@ export function useTerminalExtension() {
     error: null,
   })
   const [token, setToken] = useState<string | null>(null)
+  const [defaultWorkDir, setDefaultWorkDirState] = useState<string>(() => getDefaultWorkDir())
   const [isLoaded, setIsLoaded] = useState(false)
 
   // Try to fetch token from backend (only when on localhost to avoid permission prompts)
@@ -189,6 +209,9 @@ export function useTerminalExtension() {
       }
 
       try {
+        // Use default workDir if none provided
+        const workingDir = options?.workingDir || defaultWorkDir || getDefaultWorkDir()
+
         const response = await fetch(`${TABZ_API_BASE}/api/spawn`, {
           method: "POST",
           headers: {
@@ -197,7 +220,7 @@ export function useTerminalExtension() {
           },
           body: JSON.stringify({
             name: options?.name || "Terminal",
-            workingDir: options?.workingDir,
+            workingDir,
             command,
           }),
         })
@@ -259,8 +282,14 @@ export function useTerminalExtension() {
         }
       }
     },
-    [token]
+    [token, defaultWorkDir]
   )
+
+  // Set default working directory
+  const updateDefaultWorkDir = useCallback((dir: string) => {
+    setDefaultWorkDir(dir)
+    setDefaultWorkDirState(dir)
+  }, [])
 
   // Set API token manually (for settings UI)
   const setApiToken = useCallback(
@@ -320,11 +349,13 @@ export function useTerminalExtension() {
     error: state.error,
     isLoaded,
     hasToken: !!token,
+    defaultWorkDir,
 
     // Actions
     runCommand,
     setApiToken,
     clearApiToken,
     refreshStatus,
+    updateDefaultWorkDir,
   }
 }

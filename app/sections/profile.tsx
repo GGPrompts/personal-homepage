@@ -45,9 +45,11 @@ export default function ProfileSection() {
     authenticated: terminalAuthenticated,
     error: terminalError,
     hasToken: hasTerminalToken,
+    defaultWorkDir,
     setApiToken,
     clearApiToken,
     refreshStatus,
+    updateDefaultWorkDir,
     isLoaded: terminalLoaded,
   } = useTerminalExtension()
   const [showAuthModal, setShowAuthModal] = useState(false)
@@ -63,6 +65,12 @@ export default function ProfileSection() {
   const [terminalTokenError, setTerminalTokenError] = useState<string | null>(null)
   const [showTerminalToken, setShowTerminalToken] = useState(false)
   const [refreshingTerminal, setRefreshingTerminal] = useState(false)
+  const [workDirInput, setWorkDirInput] = useState(defaultWorkDir)
+
+  // Sync workDirInput when defaultWorkDir loads
+  useEffect(() => {
+    setWorkDirInput(defaultWorkDir)
+  }, [defaultWorkDir])
 
   // Load token when user is available
   useEffect(() => {
@@ -553,6 +561,29 @@ export default function ProfileSection() {
               </p>
             </div>
           )}
+
+          {/* Default Working Directory */}
+          <div className="pt-2 border-t border-border/50">
+            <Label className="text-sm mb-2 block">Default Working Directory</Label>
+            <div className="flex gap-2">
+              <Input
+                value={workDirInput}
+                onChange={(e) => setWorkDirInput(e.target.value)}
+                placeholder="~/projects"
+                className="font-mono text-sm"
+              />
+              <Button
+                onClick={() => updateDefaultWorkDir(workDirInput)}
+                disabled={workDirInput === defaultWorkDir}
+                variant={workDirInput === defaultWorkDir ? "outline" : "default"}
+              >
+                {workDirInput === defaultWorkDir ? "Saved" : "Save"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Used when launching terminals without a specific working directory.
+            </p>
+          </div>
         </div>
       </div>
     </div>
