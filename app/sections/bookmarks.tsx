@@ -164,6 +164,7 @@ export default function BookmarksSection({
     available: terminalAvailable,
     backendRunning,
     error: terminalError,
+    defaultWorkDir,
     runCommand,
   } = useTerminalExtension()
 
@@ -691,7 +692,9 @@ export default function BookmarksSection({
                         )}
                       </div>
                       <span className="text-xs text-center line-clamp-2">{bookmark.name}</span>
-                      <Play className="h-3 w-3 text-emerald-400 mt-0.5" />
+                      <span className="text-[10px] text-muted-foreground truncate max-w-full mt-0.5 font-mono">
+                        {bookmark.workingDir || <span className="italic">{defaultWorkDir}</span>}
+                      </span>
                     </button>
                   ) : (
                     <a
@@ -839,13 +842,11 @@ export default function BookmarksSection({
                     </div>
                     <div className="min-w-0 w-48 lg:w-64 flex-shrink-0">
                       <p className="font-medium truncate">{bookmark.name}</p>
-                      <p className="text-xs text-muted-foreground truncate font-mono">{bookmark.command}</p>
+                      <p className="text-xs text-muted-foreground truncate font-mono">{bookmark.command || <span className="italic">no command</span>}</p>
                     </div>
-                    {bookmark.workingDir && (
-                      <p className="text-xs text-muted-foreground hidden lg:block flex-1 truncate font-mono">
-                        {bookmark.workingDir}
-                      </p>
-                    )}
+                    <p className="text-xs text-muted-foreground hidden lg:block flex-1 truncate font-mono">
+                      {bookmark.workingDir || <span className="italic">{defaultWorkDir}</span>}
+                    </p>
                     <Play className="h-4 w-4 text-emerald-400 flex-shrink-0" />
                   </button>
                 ) : (
