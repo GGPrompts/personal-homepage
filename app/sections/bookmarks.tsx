@@ -681,7 +681,7 @@ export default function BookmarksSection({
                     <button
                       data-terminal-command={bookmark.command}
                       className="group flex flex-col items-center p-3 rounded-lg hover:bg-primary/10 transition-colors"
-                      onClick={() => bookmark.command && handleLaunchTerminal(bookmark.command, { workingDir: bookmark.workingDir, name: bookmark.name })}
+                      onClick={() => handleLaunchTerminal(bookmark.command || "", { workingDir: bookmark.workingDir, name: bookmark.name })}
                     >
                       <div className="h-12 w-12 flex items-center justify-center mb-1 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
                         {bookmark.icon ? (
@@ -828,7 +828,7 @@ export default function BookmarksSection({
                   <button
                     data-terminal-command={bookmark.command}
                     className="flex items-center gap-3 flex-1 min-w-0 text-left"
-                    onClick={() => bookmark.command && handleLaunchTerminal(bookmark.command, { workingDir: bookmark.workingDir, name: bookmark.name })}
+                    onClick={() => handleLaunchTerminal(bookmark.command || "", { workingDir: bookmark.workingDir, name: bookmark.name })}
                   >
                     <div className="h-8 w-8 flex items-center justify-center flex-shrink-0 rounded-md bg-emerald-500/20 border border-emerald-500/30">
                       {bookmark.icon ? (
