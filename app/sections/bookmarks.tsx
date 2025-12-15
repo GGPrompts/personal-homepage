@@ -23,6 +23,7 @@ import {
   AppWindow,
   Terminal,
   Play,
+  Check,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -165,6 +166,7 @@ export default function BookmarksSection({
     backendRunning,
     error: terminalError,
     defaultWorkDir,
+    updateDefaultWorkDir,
     runCommand,
   } = useTerminalExtension()
 
@@ -201,6 +203,13 @@ export default function BookmarksSection({
   const [currentFolderId, setCurrentFolderId] = React.useState<string | null>(null)
   const [searchQuery, setSearchQuery] = React.useState("")
   const [showSearch, setShowSearch] = React.useState(false)
+  const [workDirInput, setWorkDirInput] = React.useState(defaultWorkDir)
+  const [showWorkDirEdit, setShowWorkDirEdit] = React.useState(false)
+
+  // Sync workDirInput when defaultWorkDir changes
+  React.useEffect(() => {
+    setWorkDirInput(defaultWorkDir)
+  }, [defaultWorkDir])
 
   // Dialog state
   const [addBookmarkOpen, setAddBookmarkOpen] = React.useState(false)
@@ -563,6 +572,63 @@ export default function BookmarksSection({
             </Button>
           </div>
 
+          {/* Default Working Dir */}
+          <div className="hidden sm:flex items-center gap-1">
+            {showWorkDirEdit ? (
+              <div className="flex items-center gap-1">
+                <Input
+                  value={workDirInput}
+                  onChange={(e) => setWorkDirInput(e.target.value)}
+                  className="h-8 w-40 text-xs font-mono"
+                  placeholder="~/projects"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      updateDefaultWorkDir(workDirInput)
+                      setShowWorkDirEdit(false)
+                    } else if (e.key === "Escape") {
+                      setWorkDirInput(defaultWorkDir)
+                      setShowWorkDirEdit(false)
+                    }
+                  }}
+                  autoFocus
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => {
+                    updateDefaultWorkDir(workDirInput)
+                    setShowWorkDirEdit(false)
+                  }}
+                >
+                  <Check className="h-4 w-4 text-emerald-400" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => {
+                    setWorkDirInput(defaultWorkDir)
+                    setShowWorkDirEdit(false)
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs font-mono text-muted-foreground hover:text-foreground gap-1"
+                onClick={() => setShowWorkDirEdit(true)}
+                title="Default working directory for terminals"
+              >
+                <Terminal className="h-3 w-3" />
+                {defaultWorkDir}
+              </Button>
+            )}
+          </div>
+
           {/* Add buttons */}
           <Button variant="outline" size="sm" onClick={() => { resetForm(); setAddFolderOpen(true) }}>
             <FolderPlus className="h-4 w-4 sm:mr-2" />
@@ -721,7 +787,7 @@ export default function BookmarksSection({
                     </a>
                   )}
                 </ContextMenuTrigger>
-                <ContextMenuContent className="w-48">
+                <ContextMenuContent className="w-48 bg-popover/95 backdrop-blur-sm">
                   {bookmark.type === "terminal" ? (
                     <>
                       {bookmark.command && (
@@ -805,7 +871,7 @@ export default function BookmarksSection({
                       <Pencil className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent>
+                  <DropdownMenuContent className="bg-popover/95 backdrop-blur-sm">
                     <DropdownMenuItem onClick={() => openEditFolder(folder)}>
                       <Pencil className="h-4 w-4 mr-2" />
                       Edit
@@ -887,7 +953,7 @@ export default function BookmarksSection({
                       <Pencil className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent>
+                  <DropdownMenuContent className="bg-popover/95 backdrop-blur-sm">
                     {bookmark.type === "terminal" ? (
                       <>
                         {bookmark.command && (
