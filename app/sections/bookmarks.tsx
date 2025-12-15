@@ -896,7 +896,7 @@ export default function BookmarksSection({
                 {bookmark.type === "terminal" ? (
                   <button
                     data-terminal-command={bookmark.command}
-                    className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                    className="flex items-center gap-3 min-w-0 text-left"
                     onClick={() => handleLaunchTerminal(bookmark.command || "", { workingDir: bookmark.workingDir, name: bookmark.name })}
                   >
                     <div className="h-8 w-8 flex items-center justify-center flex-shrink-0 rounded-md bg-emerald-500/20 border border-emerald-500/30">
@@ -910,7 +910,7 @@ export default function BookmarksSection({
                       <p className="font-medium truncate">{bookmark.name}</p>
                       <p className="text-xs text-muted-foreground truncate font-mono">{bookmark.command || <span className="italic">no command</span>}</p>
                     </div>
-                    <p className="text-xs text-muted-foreground hidden lg:block flex-1 truncate font-mono">
+                    <p className="text-xs text-muted-foreground hidden lg:block w-32 lg:w-48 truncate font-mono flex-shrink-0">
                       {bookmark.workingDir || <span className="italic">{defaultWorkDir}</span>}
                     </p>
                     <Play className="h-4 w-4 text-emerald-400 flex-shrink-0" />
@@ -920,7 +920,7 @@ export default function BookmarksSection({
                     href={bookmark.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 flex-1 min-w-0"
+                    className="flex items-center gap-3 min-w-0"
                   >
                     <div className="h-8 w-8 flex items-center justify-center flex-shrink-0 rounded-md bg-white/15">
                       {bookmark.icon ? (
@@ -941,7 +941,7 @@ export default function BookmarksSection({
                       <p className="text-xs text-muted-foreground truncate">{getDomain(bookmark.url)}</p>
                     </div>
                     {bookmark.description && (
-                      <p className="text-xs text-muted-foreground hidden lg:block flex-1 truncate">
+                      <p className="text-xs text-muted-foreground hidden lg:block w-32 lg:w-48 truncate flex-shrink-0">
                         {bookmark.description}
                       </p>
                     )}
