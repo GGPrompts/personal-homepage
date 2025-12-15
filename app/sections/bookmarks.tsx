@@ -61,6 +61,7 @@ import { useAuth } from "@/components/AuthProvider"
 import { AuthModal } from "@/components/AuthModal"
 import { useTerminalExtension } from "@/hooks/useTerminalExtension"
 import { Github, User } from "lucide-react"
+import { toast } from "sonner"
 
 // ============================================================================
 // TYPES
@@ -159,7 +160,25 @@ export default function BookmarksSection({
 }) {
   const queryClient = useQueryClient()
   const { user, getGitHubToken } = useAuth()
-  const { available: terminalAvailable, runCommand } = useTerminalExtension()
+  const {
+    available: terminalAvailable,
+    backendRunning,
+    error: terminalError,
+    runCommand,
+  } = useTerminalExtension()
+
+  // Handler for launching terminals with toast feedback
+  const handleLaunchTerminal = React.useCallback(async (
+    command: string,
+    options?: { workingDir?: string; name?: string }
+  ) => {
+    const result = await runCommand(command, options)
+    if (result.success) {
+      toast.success(`Terminal launched: ${options?.name || "Terminal"}`)
+    } else {
+      toast.error(result.error || "Failed to launch terminal")
+    }
+  }, [runCommand])
 
   // GitHub config
   const [token, setToken] = React.useState<string | null>(null)
@@ -701,12 +720,13 @@ export default function BookmarksSection({
                 <ContextMenuContent className="w-48">
                   {bookmark.type === "terminal" ? (
                     <>
-                      {terminalAvailable && bookmark.command && (
+                      {bookmark.command && (
                         <ContextMenuItem
-                          onClick={() => runCommand(bookmark.command!, { workingDir: bookmark.workingDir, name: bookmark.name })}
+                          onClick={() => handleLaunchTerminal(bookmark.command!, { workingDir: bookmark.workingDir, name: bookmark.name })}
+                          disabled={!terminalAvailable}
                         >
                           <Plus className="h-4 w-4 mr-2" />
-                          Spawn New Terminal
+                          {terminalAvailable ? "Spawn New Terminal" : "Terminal Not Connected"}
                         </ContextMenuItem>
                       )}
                       <ContextMenuItem
@@ -867,12 +887,13 @@ export default function BookmarksSection({
                   <DropdownMenuContent>
                     {bookmark.type === "terminal" ? (
                       <>
-                        {terminalAvailable && bookmark.command && (
+                        {bookmark.command && (
                           <DropdownMenuItem
-                            onClick={() => runCommand(bookmark.command!, { workingDir: bookmark.workingDir, name: bookmark.name })}
+                            onClick={() => handleLaunchTerminal(bookmark.command!, { workingDir: bookmark.workingDir, name: bookmark.name })}
+                            disabled={!terminalAvailable}
                           >
                             <Plus className="h-4 w-4 mr-2" />
-                            Spawn New Terminal
+                            {terminalAvailable ? "Spawn New Terminal" : "Terminal Not Connected"}
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuItem

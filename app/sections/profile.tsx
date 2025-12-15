@@ -16,6 +16,10 @@ import {
   Loader2,
   Terminal,
   X,
+  Key,
+  Server,
+  Eye,
+  EyeOff,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -35,7 +39,17 @@ interface SyncStatus {
 
 export default function ProfileSection() {
   const { user, loading, signOut, getGitHubToken, isConfigured } = useAuth()
-  const { available: terminalAvailable, version: terminalVersion, extensionId, setExtensionId, clearExtensionId } = useTerminalExtension()
+  const {
+    available: terminalAvailable,
+    backendRunning,
+    authenticated: terminalAuthenticated,
+    error: terminalError,
+    hasToken: hasTerminalToken,
+    setApiToken,
+    clearApiToken,
+    refreshStatus,
+    isLoaded: terminalLoaded,
+  } = useTerminalExtension()
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const [notesRepo, setNotesRepo] = useState(
@@ -45,8 +59,10 @@ export default function ProfileSection() {
     () => typeof window !== "undefined" ? localStorage.getItem("github-bookmarks-repo") || "" : ""
   )
   const [token, setToken] = useState<string | null>(null)
-  const [terminalIdInput, setTerminalIdInput] = useState("")
-  const [terminalIdError, setTerminalIdError] = useState<string | null>(null)
+  const [terminalTokenInput, setTerminalTokenInput] = useState("")
+  const [terminalTokenError, setTerminalTokenError] = useState<string | null>(null)
+  const [showTerminalToken, setShowTerminalToken] = useState(false)
+  const [refreshingTerminal, setRefreshingTerminal] = useState(false)
 
   // Load token when user is available
   useEffect(() => {
@@ -131,15 +147,23 @@ export default function ProfileSection() {
     localStorage.setItem("github-bookmarks-repo", repo)
   }
 
-  const handleTerminalIdSubmit = async () => {
-    if (!terminalIdInput.trim()) return
-    setTerminalIdError(null)
-    const success = await setExtensionId(terminalIdInput.trim())
+  const handleTerminalTokenSubmit = async () => {
+    if (!terminalTokenInput.trim()) return
+    setTerminalTokenError(null)
+    const success = await setApiToken(terminalTokenInput.trim())
     if (success) {
-      setTerminalIdInput("")
+      setTerminalTokenInput("")
+      setShowTerminalToken(false)
     } else {
-      setTerminalIdError("Extension not found or not responding. Check the ID and ensure the extension is installed.")
+      setTerminalTokenError("Could not verify token. Make sure the TabzChrome backend is running.")
     }
+  }
+
+  const handleRefreshTerminal = async () => {
+    setRefreshingTerminal(true)
+    setTerminalTokenError(null)
+    await refreshStatus()
+    setRefreshingTerminal(false)
   }
 
   const notesStatus = getNotesStatus()
@@ -387,62 +411,145 @@ export default function ProfileSection() {
         </div>
       </div>
 
-      {/* Terminal Extension */}
+      {/* Terminal Integration */}
       <div className="glass rounded-xl p-6">
-        <h3 className="font-semibold mb-4 flex items-center gap-2">
-          <Terminal className="h-5 w-5 text-emerald-400" />
-          Terminal Extension
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Terminal className="h-5 w-5 text-emerald-400" />
+            TabzChrome Terminal
+          </h3>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={handleRefreshTerminal}
+            disabled={refreshingTerminal}
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshingTerminal ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
+
         <div className="space-y-4">
-          {terminalAvailable ? (
-            <div className="flex items-center justify-between p-3 glass-dark rounded-lg">
-              <div className="flex items-center gap-3">
-                <Terminal className="h-5 w-5 text-emerald-400" />
-                <div>
-                  <p className="font-medium">TabzChrome Extension</p>
-                  <p className="text-xs text-muted-foreground font-mono">
-                    {extensionId?.slice(0, 8)}...{extensionId?.slice(-8)}
-                    {terminalVersion && ` • v${terminalVersion}`}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="bg-emerald-500/20 text-emerald-400">
-                  Connected
-                </Badge>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                  onClick={clearExtensionId}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+          {/* Backend Status */}
+          <div className="flex items-center justify-between p-3 glass-dark rounded-lg">
+            <div className="flex items-center gap-3">
+              <Server className={`h-5 w-5 ${backendRunning ? "text-emerald-400" : "text-muted-foreground"}`} />
+              <div>
+                <p className="font-medium">Backend Server</p>
+                <p className="text-xs text-muted-foreground">localhost:8129</p>
               </div>
             </div>
-          ) : (
-            <div>
-              <Label className="text-sm mb-2 block">Extension ID</Label>
+            <Badge
+              variant="secondary"
+              className={backendRunning
+                ? "bg-emerald-500/20 text-emerald-400"
+                : "bg-muted text-muted-foreground"
+              }
+            >
+              {backendRunning ? "Running" : "Not Running"}
+            </Badge>
+          </div>
+
+          {/* Auth Status */}
+          <div className="flex items-center justify-between p-3 glass-dark rounded-lg">
+            <div className="flex items-center gap-3">
+              <Key className={`h-5 w-5 ${terminalAuthenticated ? "text-emerald-400" : hasTerminalToken ? "text-amber-400" : "text-muted-foreground"}`} />
+              <div>
+                <p className="font-medium">API Token</p>
+                <p className="text-xs text-muted-foreground">
+                  {terminalAuthenticated
+                    ? "Authenticated"
+                    : hasTerminalToken
+                    ? "Token stored (not verified)"
+                    : "Not configured"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {terminalAuthenticated ? (
+                <>
+                  <Badge variant="secondary" className="bg-emerald-500/20 text-emerald-400">
+                    Connected
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={clearApiToken}
+                    title="Remove token"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : hasTerminalToken ? (
+                <>
+                  <Badge variant="secondary" className="bg-amber-500/20 text-amber-400">
+                    Stored
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={clearApiToken}
+                    title="Remove token"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : (
+                <Badge variant="outline" className="text-muted-foreground">
+                  Required
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          {/* Error Message */}
+          {terminalError && !terminalAvailable && (
+            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <p className="text-sm text-amber-400">{terminalError}</p>
+            </div>
+          )}
+
+          {/* Token Input */}
+          {!terminalAuthenticated && (
+            <div className="pt-2">
+              <Label className="text-sm mb-2 block">API Token</Label>
               <div className="flex gap-2">
-                <Input
-                  value={terminalIdInput}
-                  onChange={(e) => {
-                    setTerminalIdInput(e.target.value)
-                    setTerminalIdError(null)
-                  }}
-                  placeholder="e.g., abcdefghijklmnopqrstuvwxyz123456"
-                  className="font-mono text-sm"
-                />
-                <Button onClick={handleTerminalIdSubmit} disabled={!terminalIdInput.trim()}>
-                  Connect
+                <div className="relative flex-1">
+                  <Input
+                    type={showTerminalToken ? "text" : "password"}
+                    value={terminalTokenInput}
+                    onChange={(e) => {
+                      setTerminalTokenInput(e.target.value)
+                      setTerminalTokenError(null)
+                    }}
+                    placeholder="Paste your TabzChrome API token"
+                    className="font-mono text-sm pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowTerminalToken(!showTerminalToken)}
+                  >
+                    {showTerminalToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <Button
+                  onClick={handleTerminalTokenSubmit}
+                  disabled={!terminalTokenInput.trim()}
+                >
+                  Save
                 </Button>
               </div>
-              {terminalIdError && (
-                <p className="text-xs text-destructive mt-2">{terminalIdError}</p>
+              {terminalTokenError && (
+                <p className="text-xs text-destructive mt-2">{terminalTokenError}</p>
               )}
               <p className="text-xs text-muted-foreground mt-2">
-                Find your extension ID at <code className="bg-muted px-1 rounded">chrome://extensions</code> with Developer mode enabled.
-                Required for terminal bookmarks.
+                Get your API token from TabzChrome extension: <strong>Settings &rarr; API Token &rarr; Copy</strong>.
+                Required for launching terminals from bookmarks.
               </p>
             </div>
           )}

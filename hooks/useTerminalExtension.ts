@@ -2,179 +2,296 @@
 
 import { useState, useEffect, useCallback } from "react"
 
-// Chrome extension types (for externally_connectable messaging)
-declare global {
-  interface Window {
-    chrome?: {
-      runtime?: {
-        sendMessage: (
-          extensionId: string,
-          message: Record<string, unknown>,
-          callback: (response: { ok?: boolean; version?: string; error?: string } | undefined) => void
-        ) => void
-        lastError?: { message: string }
-      }
-    }
+// TabzChrome REST API configuration
+const TABZ_API_BASE = "http://localhost:8129"
+const TOKEN_STORAGE_KEY = "tabz-api-token"
+
+interface TerminalState {
+  available: boolean
+  backendRunning: boolean
+  authenticated: boolean
+  error: string | null
+}
+
+interface SpawnResult {
+  success: boolean
+  error?: string
+  terminal?: {
+    id: string
+    name: string
   }
 }
 
-// Extension ID for TabzChrome-simplified
-// You can find this in chrome://extensions when the extension is loaded
-
-interface TerminalExtensionState {
-  available: boolean
-  version: string | null
-  extensionId: string | null
-}
-
-const STORAGE_KEY = "terminal-extension-id"
-
-function getStoredExtensionId(): string | null {
+function getStoredToken(): string | null {
   if (typeof window === "undefined") return null
   try {
-    return localStorage.getItem(STORAGE_KEY)
+    return localStorage.getItem(TOKEN_STORAGE_KEY)
   } catch {
     return null
   }
 }
 
-function setStoredExtensionId(id: string): void {
+function setStoredToken(token: string): void {
   if (typeof window === "undefined") return
   try {
-    localStorage.setItem(STORAGE_KEY, id)
+    localStorage.setItem(TOKEN_STORAGE_KEY, token)
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+function clearStoredToken(): void {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.removeItem(TOKEN_STORAGE_KEY)
   } catch {
     // Ignore storage errors
   }
 }
 
 export function useTerminalExtension() {
-  const [state, setState] = useState<TerminalExtensionState>({
+  const [state, setState] = useState<TerminalState>({
     available: false,
-    version: null,
-    extensionId: null,
+    backendRunning: false,
+    authenticated: false,
+    error: null,
   })
+  const [token, setToken] = useState<string | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
 
-  // Check if extension is available
-  const checkExtension = useCallback(async (extensionId: string): Promise<boolean> => {
-    if (typeof window === "undefined" || !window.chrome?.runtime?.sendMessage) {
-      console.log("[Terminal] Chrome runtime not available")
-      return false
-    }
-
-    console.log("[Terminal] Checking extension:", extensionId.slice(0, 8) + "...")
-    return new Promise((resolve) => {
-      try {
-        window.chrome!.runtime!.sendMessage(extensionId, { type: "PING" }, (response) => {
-          if (window.chrome?.runtime?.lastError) {
-            console.warn("[Terminal] Extension check failed:", window.chrome.runtime.lastError.message)
-            resolve(false)
-            return
-          }
-          if (response?.ok) {
-            console.log("[Terminal] Extension connected, version:", response.version)
-            setState({
-              available: true,
-              version: response.version || null,
-              extensionId,
-            })
-            setStoredExtensionId(extensionId)
-            resolve(true)
-          } else {
-            console.warn("[Terminal] Extension responded but not ok:", response)
-            resolve(false)
-          }
-        })
-      } catch {
-        resolve(false)
+  // Try to fetch token from backend (only works from localhost)
+  const fetchTokenFromBackend = useCallback(async (): Promise<string | null> => {
+    try {
+      const response = await fetch(`${TABZ_API_BASE}/api/auth/token`, {
+        method: "GET",
+      })
+      if (response.ok) {
+        const data = await response.json()
+        return data.token || null
       }
-    })
+    } catch {
+      // Backend not reachable or not localhost - expected for external sites
+    }
+    return null
   }, [])
 
-  // Initialize - try stored extension ID or prompt user
-  useEffect(() => {
-    const init = async () => {
-      const storedId = getStoredExtensionId()
-      if (storedId) {
-        const found = await checkExtension(storedId)
-        if (found) {
-          setIsLoaded(true)
-          return
+  // Check if backend is running and we have valid auth
+  const checkBackend = useCallback(async (authToken: string | null): Promise<TerminalState> => {
+    // First, check if backend is running at all
+    try {
+      const response = await fetch(`${TABZ_API_BASE}/api/health`, {
+        method: "GET",
+      })
+      if (!response.ok) {
+        return {
+          available: false,
+          backendRunning: false,
+          authenticated: false,
+          error: "TabzChrome backend not responding",
         }
       }
-      // Extension not found with stored ID
-      setState({ available: false, version: null, extensionId: null })
+    } catch {
+      return {
+        available: false,
+        backendRunning: false,
+        authenticated: false,
+        error: "TabzChrome backend not running. Start the backend on localhost:8129",
+      }
+    }
+
+    // Backend is running - check if we have a token
+    if (!authToken) {
+      return {
+        available: false,
+        backendRunning: true,
+        authenticated: false,
+        error: "API token required. Copy from TabzChrome extension Settings > API Token",
+      }
+    }
+
+    // We have a token - verify it works by attempting a lightweight call
+    // The spawn endpoint will validate the token
+    return {
+      available: true,
+      backendRunning: true,
+      authenticated: true,
+      error: null,
+    }
+  }, [])
+
+  // Initialize - try to get token and check backend
+  useEffect(() => {
+    const init = async () => {
+      // First, try to fetch token from backend (works if on localhost)
+      let authToken = await fetchTokenFromBackend()
+
+      // If that failed, use stored token
+      if (!authToken) {
+        authToken = getStoredToken()
+      } else {
+        // If we fetched from backend, store it for future use
+        setStoredToken(authToken)
+      }
+
+      setToken(authToken)
+
+      const newState = await checkBackend(authToken)
+      setState(newState)
       setIsLoaded(true)
     }
 
     init()
-  }, [checkExtension])
+  }, [fetchTokenFromBackend, checkBackend])
 
-  // Run a command in the terminal
+  // Run a command in the terminal via REST API
   const runCommand = useCallback(
-    async (command: string, options?: { workingDir?: string; name?: string }): Promise<boolean> => {
-      if (!state.available || !state.extensionId || !window.chrome?.runtime?.sendMessage) {
-        console.warn("[Terminal] Cannot run command - extension not available")
+    async (command: string, options?: { workingDir?: string; name?: string }): Promise<SpawnResult> => {
+      const currentToken = token || getStoredToken()
+
+      if (!currentToken) {
+        return {
+          success: false,
+          error: "API token required. Add your TabzChrome API token in Profile settings.",
+        }
+      }
+
+      try {
+        const response = await fetch(`${TABZ_API_BASE}/api/spawn`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Auth-Token": currentToken,
+          },
+          body: JSON.stringify({
+            name: options?.name || "Terminal",
+            workingDir: options?.workingDir,
+            command,
+          }),
+        })
+
+        const data = await response.json()
+
+        if (response.status === 401 || response.status === 403) {
+          // Token is invalid
+          setState(prev => ({
+            ...prev,
+            authenticated: false,
+            available: false,
+            error: "Invalid API token. Copy a fresh token from TabzChrome extension Settings > API Token",
+          }))
+          return {
+            success: false,
+            error: "Authentication failed. Your API token may be expired or invalid.",
+          }
+        }
+
+        if (!response.ok) {
+          return {
+            success: false,
+            error: data.error || `Request failed with status ${response.status}`,
+          }
+        }
+
+        if (data.success) {
+          return {
+            success: true,
+            terminal: data.terminal,
+          }
+        } else {
+          return {
+            success: false,
+            error: data.error || "Unknown error",
+          }
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Unknown error"
+
+        // Check if it's a network error (backend not running)
+        if (errorMessage.includes("fetch") || errorMessage.includes("network")) {
+          setState({
+            available: false,
+            backendRunning: false,
+            authenticated: false,
+            error: "TabzChrome backend not running. Start the backend on localhost:8129",
+          })
+          return {
+            success: false,
+            error: "Cannot connect to TabzChrome backend. Make sure it's running on localhost:8129",
+          }
+        }
+
+        return {
+          success: false,
+          error: errorMessage,
+        }
+      }
+    },
+    [token]
+  )
+
+  // Set API token manually (for settings UI)
+  const setApiToken = useCallback(
+    async (newToken: string): Promise<boolean> => {
+      if (!newToken.trim()) {
         return false
       }
 
-      console.log("[Terminal] Spawning:", command, options)
-      return new Promise((resolve) => {
-        try {
-          window.chrome!.runtime!.sendMessage(
-            state.extensionId!,
-            {
-              type: "SPAWN_TERMINAL",
-              command,
-              workingDir: options?.workingDir,
-              name: options?.name,
-            },
-            (response) => {
-              if (window.chrome?.runtime?.lastError) {
-                console.error("[Terminal] Spawn failed:", window.chrome.runtime.lastError.message)
-                resolve(false)
-                return
-              }
-              console.log("[Terminal] Spawn response:", response)
-              resolve(response?.ok ?? false)
-            }
-          )
-        } catch (err) {
-          console.error("[Terminal] Failed to send message:", err)
-          resolve(false)
-        }
-      })
+      // Store the token
+      setStoredToken(newToken.trim())
+      setToken(newToken.trim())
+
+      // Check if it works
+      const newState = await checkBackend(newToken.trim())
+      setState(newState)
+
+      return newState.authenticated
     },
-    [state.available, state.extensionId]
+    [checkBackend]
   )
 
-  // Set extension ID manually (for settings UI)
-  const setExtensionId = useCallback(
-    async (id: string): Promise<boolean> => {
-      const found = await checkExtension(id)
-      if (!found) {
-        setState({ available: false, version: null, extensionId: null })
-      }
-      return found
-    },
-    [checkExtension]
-  )
-
-  // Clear extension ID
-  const clearExtensionId = useCallback(() => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(STORAGE_KEY)
-    }
-    setState({ available: false, version: null, extensionId: null })
+  // Clear API token
+  const clearApiToken = useCallback(() => {
+    clearStoredToken()
+    setToken(null)
+    setState(prev => ({
+      ...prev,
+      authenticated: false,
+      available: false,
+      error: "API token required. Copy from TabzChrome extension Settings > API Token",
+    }))
   }, [])
 
+  // Refresh connection status
+  const refreshStatus = useCallback(async () => {
+    // Try to fetch token from backend first
+    let authToken = await fetchTokenFromBackend()
+
+    if (!authToken) {
+      authToken = getStoredToken()
+    } else {
+      setStoredToken(authToken)
+    }
+
+    setToken(authToken)
+    const newState = await checkBackend(authToken)
+    setState(newState)
+
+    return newState.available
+  }, [fetchTokenFromBackend, checkBackend])
+
   return {
+    // Status
     available: state.available,
-    version: state.version,
-    extensionId: state.extensionId,
+    backendRunning: state.backendRunning,
+    authenticated: state.authenticated,
+    error: state.error,
     isLoaded,
+    hasToken: !!token,
+
+    // Actions
     runCommand,
-    setExtensionId,
-    clearExtensionId,
+    setApiToken,
+    clearApiToken,
+    refreshStatus,
   }
 }

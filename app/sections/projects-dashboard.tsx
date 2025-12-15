@@ -94,6 +94,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { useAuth } from "@/components/AuthProvider"
 import { AuthModal } from "@/components/AuthModal"
 import { useTerminalExtension } from "@/hooks/useTerminalExtension"
+import { toast } from "sonner"
 import {
   mergeProjects,
   getStatusBadge,
@@ -152,6 +153,19 @@ export default function ProjectsDashboard({
   const { user, getGitHubToken } = useAuth()
   const { available: terminalAvailable, runCommand } = useTerminalExtension()
   const { isPinned, togglePinned, isConfigured: metaConfigured, isSyncing: metaSyncing } = useAllProjectsMeta()
+
+  // Handler for launching terminals with toast feedback
+  const handleLaunchTerminal = React.useCallback(async (
+    command: string,
+    options?: { workingDir?: string; name?: string }
+  ) => {
+    const result = await runCommand(command, options)
+    if (result.success) {
+      toast.success(`Launched: ${options?.name || "Terminal"}`)
+    } else {
+      toast.error(result.error || "Failed to launch")
+    }
+  }, [runCommand])
   const [showAuthModal, setShowAuthModal] = React.useState(false)
 
   const queryClient = useQueryClient()
@@ -499,13 +513,14 @@ export default function ProjectsDashboard({
                 </TooltipProvider>
               )}
               {/* Terminal - only if local */}
-              {project.local && terminalAvailable && (
+              {project.local && (
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
-                  onClick={() => runCommand("", { workingDir: project.local!.path, name: project.name })}
-                  title="Open Terminal"
+                  onClick={() => handleLaunchTerminal("", { workingDir: project.local!.path, name: project.name })}
+                  title={terminalAvailable ? "Open Terminal" : "Terminal not connected"}
+                  disabled={!terminalAvailable}
                 >
                   <Terminal className="h-4 w-4" />
                 </Button>
@@ -516,12 +531,8 @@ export default function ProjectsDashboard({
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
-                  onClick={() => {
-                    if (terminalAvailable) {
-                      runCommand(`code "${project.local!.path}"`, { name: `VS Code: ${project.name}` })
-                    }
-                  }}
-                  title="Open in VS Code"
+                  onClick={() => handleLaunchTerminal(`code "${project.local!.path}"`, { name: `VS Code: ${project.name}` })}
+                  title={terminalAvailable ? "Open in VS Code" : "Terminal not connected"}
                   disabled={!terminalAvailable}
                 >
                   <Code className="h-4 w-4" />
@@ -534,13 +545,11 @@ export default function ProjectsDashboard({
                   size="icon"
                   className="h-8 w-8"
                   onClick={() => {
-                    if (terminalAvailable) {
-                      // Try explorer.exe for WSL, then xdg-open for Linux, then open for macOS
-                      const path = project.local!.path
-                      runCommand(`explorer.exe "$(wslpath -w "${path}")" 2>/dev/null || xdg-open "${path}" 2>/dev/null || open "${path}"`, { name: `Open: ${project.name}` })
-                    }
+                    // Try explorer.exe for WSL, then xdg-open for Linux, then open for macOS
+                    const path = project.local!.path
+                    handleLaunchTerminal(`explorer.exe "$(wslpath -w "${path}")" 2>/dev/null || xdg-open "${path}" 2>/dev/null || open "${path}"`, { name: `Open: ${project.name}` })
                   }}
-                  title="Open Folder"
+                  title={terminalAvailable ? "Open Folder" : "Terminal not connected"}
                   disabled={!terminalAvailable}
                 >
                   <FolderOpen className="h-4 w-4" />
@@ -620,7 +629,7 @@ export default function ProjectsDashboard({
         },
       },
     ],
-    [terminalAvailable, runCommand, isPinned, togglePinned, metaConfigured, metaSyncing, onNavigateToSection]
+    [terminalAvailable, handleLaunchTerminal, isPinned, togglePinned, metaConfigured, metaSyncing, onNavigateToSection]
   )
 
   // TanStack Table instance
