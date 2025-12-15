@@ -6,6 +6,13 @@ import { useState, useEffect, useCallback } from "react"
 const TABZ_API_BASE = "http://localhost:8129"
 const TOKEN_STORAGE_KEY = "tabz-api-token"
 
+// Check if we're running on localhost (safe to probe local network)
+function isLocalhost(): boolean {
+  if (typeof window === "undefined") return false
+  const hostname = window.location.hostname
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("192.168.") || hostname.startsWith("10.")
+}
+
 interface TerminalState {
   available: boolean
   backendRunning: boolean
@@ -59,8 +66,11 @@ export function useTerminalExtension() {
   const [token, setToken] = useState<string | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
 
-  // Try to fetch token from backend (only works from localhost)
+  // Try to fetch token from backend (only when on localhost to avoid permission prompts)
   const fetchTokenFromBackend = useCallback(async (): Promise<string | null> => {
+    // Don't probe localhost from remote sites - causes browser permission prompts
+    if (!isLocalhost()) return null
+
     try {
       const response = await fetch(`${TABZ_API_BASE}/api/auth/token`, {
         method: "GET",
@@ -70,14 +80,34 @@ export function useTerminalExtension() {
         return data.token || null
       }
     } catch {
-      // Backend not reachable or not localhost - expected for external sites
+      // Backend not reachable - expected when backend isn't running
     }
     return null
   }, [])
 
   // Check if backend is running and we have valid auth
-  const checkBackend = useCallback(async (authToken: string | null): Promise<TerminalState> => {
-    // First, check if backend is running at all
+  // skipProbe: true = don't make network requests (for remote sites on init)
+  const checkBackend = useCallback(async (authToken: string | null, skipProbe = false): Promise<TerminalState> => {
+    // From remote sites, don't auto-probe - just check if we have a stored token
+    if (skipProbe) {
+      if (!authToken) {
+        return {
+          available: false,
+          backendRunning: false, // unknown
+          authenticated: false,
+          error: "API token required. Paste from TabzChrome extension Settings > API Token",
+        }
+      }
+      // Have a token but haven't verified - optimistically assume it works
+      return {
+        available: true,
+        backendRunning: true, // assume true since we have a token
+        authenticated: true,
+        error: null,
+      }
+    }
+
+    // On localhost, actually check if backend is running
     try {
       const response = await fetch(`${TABZ_API_BASE}/api/health`, {
         method: "GET",
@@ -122,7 +152,9 @@ export function useTerminalExtension() {
   // Initialize - try to get token and check backend
   useEffect(() => {
     const init = async () => {
-      // First, try to fetch token from backend (works if on localhost)
+      const onLocalhost = isLocalhost()
+
+      // First, try to fetch token from backend (only on localhost)
       let authToken = await fetchTokenFromBackend()
 
       // If that failed, use stored token
@@ -135,7 +167,8 @@ export function useTerminalExtension() {
 
       setToken(authToken)
 
-      const newState = await checkBackend(authToken)
+      // Skip network probe from remote sites to avoid permission prompts
+      const newState = await checkBackend(authToken, !onLocalhost)
       setState(newState)
       setIsLoaded(true)
     }
