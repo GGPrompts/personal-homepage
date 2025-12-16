@@ -51,7 +51,9 @@ interface SpawnResult {
 function getStoredToken(): string | null {
   if (typeof window === "undefined") return null
   try {
-    return localStorage.getItem(TOKEN_STORAGE_KEY)
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY)
+    // Sanitize token - remove any non-ASCII characters that would break HTTP headers
+    return token ? token.replace(/[^\x00-\xFF]/g, '') : null
   } catch {
     return null
   }
@@ -307,13 +309,21 @@ export function useTerminalExtension() {
         return false
       }
 
+      // Sanitize token - remove any non-ASCII characters that would break HTTP headers
+      // HTTP headers only support ISO-8859-1 characters
+      const sanitizedToken = newToken.trim().replace(/[^\x00-\xFF]/g, '')
+
+      if (sanitizedToken !== newToken.trim()) {
+        console.warn("[useTerminalExtension] Token contained invalid characters, sanitized")
+      }
+
       // Store the token
-      setStoredToken(newToken.trim())
-      setToken(newToken.trim())
+      setStoredToken(sanitizedToken)
+      setToken(sanitizedToken)
 
       // Check if it works - skip probe from remote sites to avoid CORS errors
       const onLocalhost = isLocalhost()
-      const newState = await checkBackend(newToken.trim(), !onLocalhost)
+      const newState = await checkBackend(sanitizedToken, !onLocalhost)
       setState(newState)
 
       return newState.authenticated
