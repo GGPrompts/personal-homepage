@@ -699,7 +699,7 @@ export default function GitHubActivity({ activeSubItem, onSubItemHandled }: GitH
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Activity Feed */}
-        <Card className="glass border-border">
+        <Card className="glass border-border flex flex-col h-[680px]">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -727,8 +727,8 @@ export default function GitHubActivity({ activeSubItem, onSubItemHandled }: GitH
               ))}
             </div>
           </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[500px]">
+          <CardContent className="flex-1 overflow-hidden">
+            <ScrollArea className="h-full">
               {eventsLoading ? (
                 <div className="flex items-center justify-center h-32">
                   <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -826,7 +826,7 @@ export default function GitHubActivity({ activeSubItem, onSubItemHandled }: GitH
         </Card>
 
         {/* Repositories */}
-        <Card className="glass border-border">
+        <Card className="glass border-border flex flex-col h-[680px]">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -870,8 +870,8 @@ export default function GitHubActivity({ activeSubItem, onSubItemHandled }: GitH
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[500px]">
+          <CardContent className="flex-1 overflow-hidden">
+            <ScrollArea className="h-full">
               {reposLoading ? (
                 <div className="flex items-center justify-center h-32">
                   <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
