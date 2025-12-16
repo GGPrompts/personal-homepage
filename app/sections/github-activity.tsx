@@ -740,7 +740,7 @@ export default function GitHubActivity({ activeSubItem, onSubItemHandled }: GitH
                 </div>
               ) : (
                 <AnimatePresence mode="popLayout">
-                  <div className="space-y-2 pr-2">
+                  <div className="space-y-2 px-3 py-2">
                     {filteredEvents.map((event) => (
                       <motion.div
                         key={event.id}
