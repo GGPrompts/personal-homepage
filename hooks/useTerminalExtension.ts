@@ -261,9 +261,18 @@ export function useTerminalExtension() {
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Unknown error"
+        console.error("[useTerminalExtension] Spawn error:", err)
 
-        // Check if it's a network error (backend not running)
-        if (errorMessage.includes("fetch") || errorMessage.includes("network")) {
+        // Check if it's a network/CORS/Private Network Access error
+        const isNetworkError =
+          errorMessage.includes("fetch") ||
+          errorMessage.includes("network") ||
+          errorMessage.includes("Failed to fetch") ||
+          errorMessage.includes("NetworkError") ||
+          errorMessage.includes("CORS") ||
+          err instanceof TypeError // fetch throws TypeError for network issues
+
+        if (isNetworkError) {
           setState({
             available: false,
             backendRunning: false,

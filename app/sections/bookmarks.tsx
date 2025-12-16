@@ -175,7 +175,9 @@ export default function BookmarksSection({
     command: string,
     options?: { workingDir?: string; name?: string }
   ) => {
+    console.log("[Bookmarks] Launching terminal:", { command, options })
     const result = await runCommand(command, options)
+    console.log("[Bookmarks] Terminal result:", result)
     if (result.success) {
       toast.success(`Terminal launched: ${options?.name || "Terminal"}`)
     } else {
