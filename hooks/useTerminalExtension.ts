@@ -321,14 +321,41 @@ export function useTerminalExtension() {
       setStoredToken(sanitizedToken)
       setToken(sanitizedToken)
 
-      // Check if it works - skip probe from remote sites to avoid CORS errors
-      const onLocalhost = isLocalhost()
-      const newState = await checkBackend(sanitizedToken, !onLocalhost)
-      setState(newState)
+      // When user explicitly saves a token, always verify it works (don't skip probe)
+      // This is different from init where we skip probes from remote sites
+      // Now that Private Network Access header is in place, this should work from HTTPS sites
+      try {
+        const response = await fetch(`${TABZ_API_BASE}/api/health`)
+        if (!response.ok) {
+          setState({
+            available: false,
+            backendRunning: false,
+            authenticated: false,
+            error: "TabzChrome backend not responding",
+          })
+          return false
+        }
+      } catch {
+        setState({
+          available: false,
+          backendRunning: false,
+          authenticated: false,
+          error: "Cannot reach TabzChrome backend. Make sure it's running on localhost:8129",
+        })
+        return false
+      }
 
-      return newState.authenticated
+      // Backend is reachable - mark as authenticated
+      // Token will be validated on first actual spawn request
+      setState({
+        available: true,
+        backendRunning: true,
+        authenticated: true,
+        error: null,
+      })
+      return true
     },
-    [checkBackend]
+    []
   )
 
   // Clear API token
