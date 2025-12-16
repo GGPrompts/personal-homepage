@@ -302,8 +302,9 @@ export function useTerminalExtension() {
       setStoredToken(newToken.trim())
       setToken(newToken.trim())
 
-      // Check if it works
-      const newState = await checkBackend(newToken.trim())
+      // Check if it works - skip probe from remote sites to avoid CORS errors
+      const onLocalhost = isLocalhost()
+      const newState = await checkBackend(newToken.trim(), !onLocalhost)
       setState(newState)
 
       return newState.authenticated
@@ -325,7 +326,9 @@ export function useTerminalExtension() {
 
   // Refresh connection status
   const refreshStatus = useCallback(async () => {
-    // Try to fetch token from backend first
+    const onLocalhost = isLocalhost()
+
+    // Try to fetch token from backend first (only on localhost)
     let authToken = await fetchTokenFromBackend()
 
     if (!authToken) {
@@ -335,7 +338,8 @@ export function useTerminalExtension() {
     }
 
     setToken(authToken)
-    const newState = await checkBackend(authToken)
+    // Skip probe from remote sites to avoid CORS errors
+    const newState = await checkBackend(authToken, !onLocalhost)
     setState(newState)
 
     return newState.available
