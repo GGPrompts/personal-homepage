@@ -339,6 +339,7 @@ export default function QuickNotesSection({
   const [selectedFile, setSelectedFile] = React.useState<FileTreeNode | null>(null)
   const [showPreview, setShowPreview] = React.useState(true)
   const [showOnlyMarkdown, setShowOnlyMarkdown] = React.useState(false)
+  const [loadingAllDirs, setLoadingAllDirs] = React.useState(false)
   const [newFileName, setNewFileName] = React.useState("")
   const [newFileDialogOpen, setNewFileDialogOpen] = React.useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
@@ -451,6 +452,76 @@ export default function QuickNotesSection({
     }
   }
 
+  // Recursively load all directories and find which have markdown files
+  const loadAllDirectoriesAndExpand = React.useCallback(async () => {
+    if (!token || !repo || !rootFiles) return
+
+    setLoadingAllDirs(true)
+    const newContents = new Map(directoryContents)
+    const foldersWithMarkdown = new Set<string>()
+
+    // Recursive function to load a directory and its subdirectories
+    const loadDir = async (files: GitHubFile[], parentPath: string): Promise<boolean> => {
+      let hasMarkdown = false
+
+      for (const file of files) {
+        if (file.type === "dir") {
+          // Load this directory if not already loaded
+          let contents = newContents.get(file.path)
+          if (!contents) {
+            try {
+              contents = await getContents(token, repo, file.path)
+              newContents.set(file.path, contents)
+            } catch {
+              continue
+            }
+          }
+          // Recursively check subdirectory
+          const subHasMarkdown = await loadDir(contents, file.path)
+          if (subHasMarkdown) {
+            hasMarkdown = true
+            foldersWithMarkdown.add(file.path)
+          }
+        } else if (isMarkdownFile(file.name)) {
+          hasMarkdown = true
+        }
+      }
+
+      return hasMarkdown
+    }
+
+    // Start from root
+    const rootHasMarkdown = await loadDir(rootFiles, "")
+    if (rootHasMarkdown) {
+      foldersWithMarkdown.add("")
+    }
+
+    // Update state
+    setDirectoryContents(newContents)
+    // Expand all folders that have markdown files
+    setExpandedPaths(new Set(foldersWithMarkdown))
+    setLoadingAllDirs(false)
+  }, [token, repo, rootFiles, directoryContents])
+
+  // When markdown filter is toggled on, load all directories
+  React.useEffect(() => {
+    if (showOnlyMarkdown && rootFiles) {
+      loadAllDirectoriesAndExpand()
+    }
+  }, [showOnlyMarkdown]) // Only trigger when filter changes, not when loadAllDirectoriesAndExpand changes
+
+  // Check if a node or its descendants have markdown files
+  const hasMarkdownDescendants = (node: FileTreeNode): boolean => {
+    if (node.type !== "dir") {
+      return isMarkdownFile(node.name)
+    }
+    if (!node.children) {
+      // Not loaded yet - we don't know, so keep it visible
+      return !directoryContents.has(node.path)
+    }
+    return node.children.some(child => hasMarkdownDescendants(child))
+  }
+
   // Build tree structure from flat file list
   const buildTreeFromPath = (
     files: GitHubFile[],
@@ -486,20 +557,8 @@ export default function QuickNotesSection({
         return isMarkdownFile(node.name)
       }
 
-      // For directories:
-      // - If not expanded, show it (we don't know its contents yet)
-      // - If expanded but still loading/no children array, show it
-      // - If expanded with children, only show if it has visible children
-      if (!expandedPaths.has(node.path)) {
-        return true
-      }
-
-      if (!node.children) {
-        return true
-      }
-
-      // Only show folder if it has markdown files or subfolders with markdown
-      return node.children.length > 0
+      // For directories: only show if they have markdown descendants
+      return hasMarkdownDescendants(node)
     })
   }
 
@@ -784,9 +843,14 @@ export default function QuickNotesSection({
                 size="icon"
                 className={`h-7 w-7 ${showOnlyMarkdown ? "text-primary" : ""}`}
                 onClick={() => setShowOnlyMarkdown(!showOnlyMarkdown)}
-                title={showOnlyMarkdown ? "Show all files" : "Show only .md files"}
+                disabled={loadingAllDirs}
+                title={showOnlyMarkdown ? "Show all files" : "Show only .md files (loads all folders)"}
               >
-                <FileText className={`h-3.5 w-3.5 ${showOnlyMarkdown ? "text-primary" : ""}`} />
+                {loadingAllDirs ? (
+                  <RotateCw className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <FileText className={`h-3.5 w-3.5 ${showOnlyMarkdown ? "text-primary" : ""}`} />
+                )}
               </Button>
               <Button
                 variant="ghost"
