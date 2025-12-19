@@ -120,12 +120,12 @@ export function useTerminalExtension() {
           error: "API token required. Paste from TabzChrome extension Settings > API Token",
         }
       }
-      // Have a token but haven't verified - optimistically assume it works
+      // Have a token but haven't verified - show as unverified
       return {
-        available: true,
-        backendRunning: true, // assume true since we have a token
-        authenticated: true,
-        error: null,
+        available: false,
+        backendRunning: false, // unknown
+        authenticated: false,
+        error: null, // No error, just unverified
       }
     }
 
@@ -161,8 +161,37 @@ export function useTerminalExtension() {
       }
     }
 
-    // We have a token - verify it works by attempting a lightweight call
-    // The spawn endpoint will validate the token
+    // Validate the token by comparing with backend's current token
+    try {
+      const tokenResponse = await fetch(`${TABZ_API_BASE}/api/auth/token`)
+      if (tokenResponse.ok) {
+        const data = await tokenResponse.json()
+        const backendToken = data.token
+        console.log("[useTerminalExtension] checkBackend validation:", {
+          hasBackendToken: !!backendToken,
+          tokensMatch: backendToken === authToken,
+        })
+        if (!backendToken) {
+          console.warn("[useTerminalExtension] Backend token endpoint didn't return a token")
+        } else if (backendToken !== authToken) {
+          // Token mismatch - stored token is expired/outdated
+          return {
+            available: false,
+            backendRunning: true,
+            authenticated: false,
+            error: "API token expired. Copy a fresh token from TabzChrome extension Settings > API Token",
+          }
+        }
+      } else {
+        console.warn("[useTerminalExtension] Token endpoint returned non-OK:", tokenResponse.status)
+      }
+    } catch (err) {
+      console.warn("[useTerminalExtension] Could not fetch token endpoint:", err)
+      // If we can't fetch the token endpoint, fall through to optimistic auth
+      // This shouldn't happen if health check passed
+    }
+
+    // Token matches or couldn't verify - mark as authenticated
     return {
       available: true,
       backendRunning: true,
@@ -317,10 +346,6 @@ export function useTerminalExtension() {
         console.warn("[useTerminalExtension] Token contained invalid characters, sanitized")
       }
 
-      // Store the token
-      setStoredToken(sanitizedToken)
-      setToken(sanitizedToken)
-
       // When user explicitly saves a token, always verify it works (don't skip probe)
       // This is different from init where we skip probes from remote sites
       // Now that Private Network Access header is in place, this should work from HTTPS sites
@@ -345,8 +370,42 @@ export function useTerminalExtension() {
         return false
       }
 
-      // Backend is reachable - mark as authenticated
-      // Token will be validated on first actual spawn request
+      // Backend is reachable - validate the token matches
+      try {
+        const tokenResponse = await fetch(`${TABZ_API_BASE}/api/auth/token`)
+        if (tokenResponse.ok) {
+          const data = await tokenResponse.json()
+          const backendToken = data.token
+          console.log("[useTerminalExtension] Token validation:", {
+            hasBackendToken: !!backendToken,
+            tokensMatch: backendToken === sanitizedToken,
+          })
+          if (!backendToken) {
+            // Backend didn't return a token - unexpected, but allow through
+            console.warn("[useTerminalExtension] Backend token endpoint didn't return a token")
+          } else if (backendToken !== sanitizedToken) {
+            // Token mismatch - provided token doesn't match backend's current token
+            setState({
+              available: false,
+              backendRunning: true,
+              authenticated: false,
+              error: "Invalid token. Make sure you copied the current token from TabzChrome extension Settings.",
+            })
+            return false
+          }
+        } else {
+          console.warn("[useTerminalExtension] Token endpoint returned non-OK:", tokenResponse.status)
+        }
+      } catch (err) {
+        console.warn("[useTerminalExtension] Could not validate token:", err)
+        // If we can't validate, still allow it through - will fail on actual use
+      }
+
+      // Store the validated token
+      setStoredToken(sanitizedToken)
+      setToken(sanitizedToken)
+
+      // Token validated - mark as authenticated
       setState({
         available: true,
         backendRunning: true,
@@ -371,6 +430,7 @@ export function useTerminalExtension() {
   }, [])
 
   // Refresh connection status
+  // When user explicitly clicks refresh, always try to validate (don't skip probe)
   const refreshStatus = useCallback(async () => {
     const onLocalhost = isLocalhost()
 
@@ -384,8 +444,9 @@ export function useTerminalExtension() {
     }
 
     setToken(authToken)
-    // Skip probe from remote sites to avoid CORS errors
-    const newState = await checkBackend(authToken, !onLocalhost)
+    // User explicitly requested refresh - always probe to validate token
+    // Private Network Access headers allow this from HTTPS sites
+    const newState = await checkBackend(authToken, false)
     setState(newState)
 
     return newState.available
