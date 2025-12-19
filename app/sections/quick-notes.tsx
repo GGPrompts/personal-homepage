@@ -99,8 +99,23 @@ function renderMarkdown(markdown: string): string {
   // Normalize line endings (Windows \r\n -> \n)
   let html = markdown.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
 
+  // Extract code blocks first and replace with placeholders to protect from other processing
+  // Use a format that won't be matched by markdown patterns (not __ which is bold)
+  const codeBlocks: string[] = []
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+    const normalizedCode = code
+      .split('\n')
+      .map((line: string) => line.trimEnd())
+      .join('\n')
+      .replace(/\n{2,}/g, '\n')
+      .trim()
+    const placeholder = `\x00CODEBLOCK${codeBlocks.length}\x00`
+    codeBlocks.push(`<pre class="md-pre"><code class="md-code-block">${normalizedCode.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></pre>`)
+    return placeholder
+  })
+
   html = html
-    // Escape HTML
+    // Escape HTML (after code blocks extracted)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -118,11 +133,6 @@ function renderMarkdown(markdown: string): string {
     .replace(/_(.+?)_/g, '<em class="md-em">$1</em>')
     // Strikethrough
     .replace(/~~(.+?)~~/g, '<del class="md-del">$1</del>')
-    // Code blocks (normalize multiple newlines to single)
-    .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-      const normalizedCode = code.replace(/\n{2,}/g, '\n').trim()
-      return `<pre class="md-pre"><code class="md-code-block">${normalizedCode}</code></pre>`
-    })
     // Inline code
     .replace(/`([^`]+)`/g, '<code class="md-code">$1</code>')
     // Images
@@ -148,7 +158,12 @@ function renderMarkdown(markdown: string): string {
     .replace(/^---$/gm, '<hr class="md-hr" />')
     .replace(/^\*\*\*$/gm, '<hr class="md-hr" />')
     // Paragraphs (lines with content that aren't already wrapped)
-    .replace(/^(?!<[hblupid]|<li|<hr|<pre|<code)(.+)$/gm, '<p class="md-p">$1</p>')
+    .replace(/^(?!<[hblupid]|<li|<hr|<pre|<code|\x00)(.+)$/gm, '<p class="md-p">$1</p>')
+
+  // Restore code blocks from placeholders
+  codeBlocks.forEach((block, i) => {
+    html = html.replace(`\x00CODEBLOCK${i}\x00`, block)
+  })
 
   return html
 }
