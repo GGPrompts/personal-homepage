@@ -1179,7 +1179,7 @@ print(response.json())`
   }, [config])
 
   return (
-    <div className="min-h-full lg:h-full flex flex-col lg:flex-row gap-4 p-4 lg:p-6">
+    <div className="min-h-full lg:h-full flex flex-col lg:flex-row gap-4 p-4 lg:p-6" data-tabz-section="api-playground">
       {/* Sidebar - Collections & History */}
       <div className="lg:w-72 flex-shrink-0 lg:h-full">
         <div className="glass rounded-lg p-4 h-full flex flex-col">
@@ -1361,7 +1361,7 @@ print(response.json())`
               value={config.method}
               onValueChange={(v) => setConfig(prev => ({ ...prev, method: v as HttpMethod }))}
             >
-              <SelectTrigger className="w-28">
+              <SelectTrigger className="w-28" data-tabz-input="http-method">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1378,9 +1378,10 @@ print(response.json())`
               onChange={(e) => setConfig(prev => ({ ...prev, url: e.target.value }))}
               placeholder="Enter request URL..."
               className="flex-1 font-mono text-sm"
+              data-tabz-input="api-url"
             />
 
-            <Button onClick={sendRequest} disabled={loading || !config.url}>
+            <Button onClick={sendRequest} disabled={loading || !config.url} data-tabz-action="send-request">
               {loading ? (
                 <RotateCw className="h-4 w-4 animate-spin" />
               ) : (
@@ -1528,6 +1529,7 @@ print(response.json())`
                       }))}
                       placeholder={config.body.type === "json" ? '{\n  "key": "value"\n}' : "Enter body content..."}
                       className="font-mono text-sm h-40"
+                      data-tabz-input="request-body"
                     />
                     {config.body.type === "json" && (
                       <Button

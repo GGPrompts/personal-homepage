@@ -450,7 +450,7 @@ export default function StocksDashboard({ activeSubItem, onSubItemHandled, onNav
   })) || []
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tabz-section="stocks">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
@@ -658,6 +658,7 @@ export default function StocksDashboard({ activeSubItem, onSubItemHandled, onNav
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-8"
+                  data-tabz-input="stock-search"
                 />
               </div>
               <div className="mt-2 flex gap-2">
@@ -856,6 +857,7 @@ export default function StocksDashboard({ activeSubItem, onSubItemHandled, onNav
                     className={`w-full ${orderSide === "sell" ? "bg-red-600 hover:bg-red-700" : ""}`}
                     onClick={handleTrade}
                     disabled={!selectedStock}
+                    data-tabz-action={orderSide}
                   >
                     {orderSide === "buy" ? "Buy" : "Sell"} {selectedSymbol}
                   </Button>

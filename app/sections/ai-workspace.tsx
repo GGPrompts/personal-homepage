@@ -21,11 +21,13 @@ import {
   Settings, ChevronDown, Plus, X, Trash2, Code, CheckCheck,
   Sparkles, StopCircle, Clock, Cpu, FileJson, FileText, FolderOpen,
   Wrench, Loader2, ChevronRight, Search, Pencil, Gauge, AlertTriangle,
-  Download, ArrowRight,
+  Download, ArrowRight, Terminal, ExternalLink,
 } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { useSearchParams } from "next/navigation"
 import { useAllProjectsMeta } from "@/hooks/useProjectMeta"
+import { useTabzBridge } from "@/hooks/useTabzBridge"
+import { TabzConnectionStatus } from "@/components/TabzConnectionStatus"
 import { mergeProjects, type Project, type LocalProject, type GitHubRepo } from "@/lib/projects"
 import {
   type MessageRole,
@@ -250,11 +252,14 @@ interface MessageBubbleProps {
   onCopy: () => void
   onRegenerate: () => void
   onFeedback: (type: 'up' | 'down') => void
+  onSendToTerminal?: (code: string, language: string) => void
+  onSendToChat?: (code: string) => void
+  tabzConnected?: boolean
   userAvatarUrl?: string | null
   availableModels?: ModelInfo[]
 }
 
-function MessageBubble({ message, onCopy, onRegenerate, onFeedback, userAvatarUrl, availableModels }: MessageBubbleProps) {
+function MessageBubble({ message, onCopy, onRegenerate, onFeedback, onSendToTerminal, onSendToChat, tabzConnected, userAvatarUrl, availableModels }: MessageBubbleProps) {
   const [showActions, setShowActions] = React.useState(false)
   const [copied, setCopied] = React.useState(false)
 
@@ -293,18 +298,66 @@ function MessageBubble({ message, onCopy, onRegenerate, onFeedback, userAvatarUr
       // Add code block
       const language = match[1] || 'text'
       const code = match[2]
+      // Determine if this looks like a terminal command (bash, sh, shell, zsh, or no language with single line)
+      const isTerminalCode = ['bash', 'sh', 'shell', 'zsh', 'terminal', 'console'].includes(language.toLowerCase()) ||
+        (language === 'text' && code.trim().split('\n').length <= 3 && !code.includes('{'))
       parts.push(
-        <div key={`code-${match.index}`} className="my-3 rounded-lg overflow-hidden border border-border/40 max-w-full">
-          <div className="bg-muted/30 px-3 sm:px-4 py-2 flex items-center justify-between">
+        <div key={`code-${match.index}`} className="my-3 rounded-lg overflow-hidden border border-border/40 max-w-full" data-tabz-bridge="true">
+          <div className="bg-muted/30 px-3 sm:px-4 py-2 flex items-center justify-between gap-2">
             <span className="text-xs text-muted-foreground font-mono">{language}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigator.clipboard.writeText(code)}
-              className="h-6 px-2 shrink-0"
-            >
-              <Copy className="h-3 w-3" />
-            </Button>
+            <div className="flex items-center gap-1">
+              {/* Run in Terminal button - only show for terminal-like code and when TabzChrome is available */}
+              {isTerminalCode && onSendToTerminal && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onSendToTerminal(code.trim(), language)}
+                        className={`h-6 px-2 shrink-0 ${tabzConnected ? 'text-emerald-500 hover:text-emerald-400' : 'text-muted-foreground'}`}
+                        data-tabz-action="spawn-terminal"
+                      >
+                        <Terminal className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {tabzConnected ? 'Run in terminal' : 'TabzChrome not connected'}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {/* Send to TabzChrome Chat button */}
+              {onSendToChat && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onSendToChat(code.trim())}
+                        className={`h-6 px-2 shrink-0 ${tabzConnected ? 'text-blue-500 hover:text-blue-400' : 'text-muted-foreground'}`}
+                        data-tabz-action="send-chat"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {tabzConnected ? 'Send to TabzChrome chat' : 'TabzChrome not connected'}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {/* Copy button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigator.clipboard.writeText(code)}
+                className="h-6 px-2 shrink-0"
+              >
+                <Copy className="h-3 w-3" />
+              </Button>
+            </div>
           </div>
           <pre className="p-3 sm:p-4 overflow-x-auto bg-muted/20 max-w-full">
             <code className="text-xs sm:text-sm font-mono">{code}</code>
@@ -474,6 +527,15 @@ export default function AIWorkspaceSection({
   // Auth for user avatar
   const { user } = useAuth()
   const userAvatarUrl = user?.user_metadata?.avatar_url || null
+
+  // TabzChrome bridge for bi-directional communication
+  const {
+    isConnected: tabzConnected,
+    lastReceivedCommand,
+    clearLastCommand,
+    sendToChat: tabzSendToChat,
+    spawnTerminal: tabzSpawnTerminal,
+  } = useTabzBridge()
 
   // State management
   const [conversations, setConversations] = React.useState<Conversation[]>(loadConversations)
@@ -818,6 +880,16 @@ export default function AIWorkspaceSection({
       onSubItemHandled?.()
     }
   }, [activeSubItem, onSubItemHandled])
+
+  // Handle incoming commands from TabzChrome - pre-fill input and focus
+  React.useEffect(() => {
+    if (lastReceivedCommand) {
+      setInputValue(lastReceivedCommand)
+      clearLastCommand()
+      // Focus the input
+      textareaRef.current?.focus()
+    }
+  }, [lastReceivedCommand, clearLastCommand])
 
   const sendMessage = async (content: string) => {
     if (!content.trim()) return
@@ -1317,7 +1389,7 @@ export default function AIWorkspaceSection({
   // ============================================================================
 
   return (
-    <div className="h-[100dvh] flex flex-col lg:flex-row overflow-hidden">
+    <div className="h-[100dvh] flex flex-col lg:flex-row overflow-hidden" data-tabz-section="ai-workspace">
       {/* Conversations Sidebar */}
       <AnimatePresence>
         {showSidebar && (
@@ -1331,6 +1403,7 @@ export default function AIWorkspaceSection({
               <Button
                 onClick={createNewConversation}
                 className="w-full border-glow"
+                data-tabz-action="new-conversation"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 New Conversation
@@ -1338,7 +1411,7 @@ export default function AIWorkspaceSection({
             </div>
 
             <div className="flex-1 overflow-y-auto overflow-x-hidden">
-              <div className="p-4 space-y-2">
+              <div className="p-4 space-y-2" data-tabz-list="conversations">
                 {conversations.map(conv => (
                   <Card
                     key={conv.id}
@@ -1346,6 +1419,7 @@ export default function AIWorkspaceSection({
                       conv.id === activeConvId ? 'border-primary/60 border-glow' : ''
                     }`}
                     onClick={() => setActiveConvId(conv.id)}
+                    data-tabz-item={`conversation-${conv.id}`}
                   >
                     <CardContent className="p-3">
                       <div className="flex items-start justify-between gap-2">
@@ -1516,13 +1590,16 @@ export default function AIWorkspaceSection({
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            {/* TabzChrome Connection Status */}
+            <TabzConnectionStatus size="sm" className="hidden sm:flex" />
+
             {/* Project Selector */}
             {availableProjects.length > 0 && (
               <Select
                 value={selectedProjectPath || "none"}
                 onValueChange={(value) => setSelectedProjectPath(value === "none" ? null : value)}
               >
-                <SelectTrigger className="w-[140px] sm:w-[180px] h-9 glass text-xs">
+                <SelectTrigger className="w-[140px] sm:w-[180px] h-9 glass text-xs" data-tabz-input="project-selector">
                   <FolderOpen className="h-3 w-3 mr-1 shrink-0" />
                   <SelectValue placeholder="No project" />
                 </SelectTrigger>
@@ -1580,6 +1657,7 @@ export default function AIWorkspaceSection({
               variant={showSettings ? 'secondary' : 'ghost'}
               size="icon"
               onClick={() => setShowSettings(!showSettings)}
+              data-tabz-action="open-settings"
             >
               <Settings className="h-4 w-4" />
             </Button>
@@ -1701,6 +1779,9 @@ export default function AIWorkspaceSection({
                       onCopy={() => {}}
                       onRegenerate={handleRegenerate}
                       onFeedback={(type) => handleFeedback(message.id, type)}
+                      onSendToTerminal={(code, lang) => tabzSpawnTerminal(code, { name: `Run ${lang}` })}
+                      onSendToChat={tabzSendToChat}
+                      tabzConnected={tabzConnected}
                       userAvatarUrl={userAvatarUrl}
                       availableModels={availableModels}
                     />
@@ -1729,6 +1810,7 @@ export default function AIWorkspaceSection({
                   disabled={isStreaming}
                   className="resize-none min-h-[44px] sm:min-h-[52px] max-h-[100px] sm:max-h-[120px] glass text-sm sm:text-base"
                   rows={1}
+                  data-tabz-input="chat-message"
                 />
               </div>
 
@@ -1752,6 +1834,7 @@ export default function AIWorkspaceSection({
                   className="h-[44px] w-[44px] sm:h-[52px] sm:w-[52px] border-glow shrink-0"
                   onClick={handleSend}
                   disabled={!inputValue.trim() || isStreaming || isTyping}
+                  data-tabz-action="submit-message"
                 >
                   <Send className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
@@ -1808,7 +1891,7 @@ export default function AIWorkspaceSection({
                     value={settings.model}
                     onValueChange={(value) => setSettings({ ...settings, model: value })}
                   >
-                    <SelectTrigger className="glass">
+                    <SelectTrigger className="glass" data-tabz-input="model-selector">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

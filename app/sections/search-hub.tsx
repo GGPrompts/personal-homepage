@@ -25,10 +25,14 @@ import {
   Camera,
   Clipboard,
   Check,
+  ExternalLink,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useTabzBridge } from "@/hooks/useTabzBridge"
+import { TabzConnectionStatus } from "@/components/TabzConnectionStatus"
 
 // ============================================================================
 // TYPES
@@ -319,6 +323,9 @@ export default function SearchHubSection({
   const [copied, setCopied] = React.useState(false)
   const inputRef = React.useRef<HTMLInputElement>(null)
 
+  // TabzChrome bridge for sending queries to chat
+  const { isConnected: tabzConnected, sendToChat: tabzSendToChat, lastReceivedCommand, clearLastCommand } = useTabzBridge()
+
   const currentEngines = activeCategory === "search"
     ? searchEngines
     : activeCategory === "ai"
@@ -359,6 +366,15 @@ export default function SearchHubSection({
       onSubItemHandled?.()
     }
   }, [activeSubItem, onSubItemHandled])
+
+  // Handle incoming commands from TabzChrome - pre-fill query input
+  React.useEffect(() => {
+    if (lastReceivedCommand) {
+      setQuery(lastReceivedCommand)
+      clearLastCommand()
+      inputRef.current?.focus()
+    }
+  }, [lastReceivedCommand, clearLastCommand])
 
   // Keyboard shortcuts for engine selection
   React.useEffect(() => {
@@ -462,7 +478,10 @@ export default function SearchHubSection({
 
   return (
     <div className="p-4 sm:p-6">
-      <h1 className="text-2xl sm:text-3xl font-bold terminal-glow mb-1 sm:mb-2">Search Hub</h1>
+      <div className="flex items-start justify-between mb-1 sm:mb-2">
+        <h1 className="text-2xl sm:text-3xl font-bold terminal-glow">Search Hub</h1>
+        <TabzConnectionStatus size="sm" className="hidden sm:flex" />
+      </div>
       <p className="text-muted-foreground text-sm sm:text-base mb-6 sm:mb-8">Quick search across engines and AI assistants</p>
 
       {/* Search Form */}
@@ -527,24 +546,48 @@ export default function SearchHubSection({
                   />
                 </div>
               </div>
-              <Button type="submit" disabled={!query.trim()} className="h-11 sm:h-10 w-full sm:w-auto">
-                {activeCategory === "ai" ? (
-                  <>
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Ask
-                  </>
-                ) : activeCategory === "image" ? (
-                  <>
-                    <Image className="h-4 w-4 mr-2" />
-                    Generate
-                  </>
-                ) : (
-                  <>
-                    <Search className="h-4 w-4 mr-2" />
-                    Search
-                  </>
-                )}
-              </Button>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button type="submit" disabled={!query.trim()} className="h-11 sm:h-10 flex-1 sm:flex-initial">
+                  {activeCategory === "ai" ? (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Ask
+                    </>
+                  ) : activeCategory === "image" ? (
+                    <>
+                      <Image className="h-4 w-4 mr-2" />
+                      Generate
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-4 w-4 mr-2" />
+                      Search
+                    </>
+                  )}
+                </Button>
+                {/* Send to TabzChrome Chat button */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        disabled={!query.trim()}
+                        onClick={() => tabzSendToChat(query.trim())}
+                        className={`h-11 sm:h-10 w-11 sm:w-10 shrink-0 ${tabzConnected ? 'border-emerald-500/30 text-emerald-500 hover:text-emerald-400' : ''}`}
+                        data-tabz-bridge="true"
+                        data-tabz-action="send-chat"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {tabzConnected ? 'Send to TabzChrome chat' : 'TabzChrome not connected'}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
             </div>
 
             {/* Engine Selection */}

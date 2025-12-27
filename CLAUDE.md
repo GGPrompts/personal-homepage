@@ -11,6 +11,7 @@ A personal dashboard/homepage with accordion sidebar navigation. Features weathe
 | Authentication | [docs/auth.md](docs/auth.md) |
 | State management | [docs/state-management.md](docs/state-management.md) |
 | Terminal bookmarks | [docs/terminal-integration.md](docs/terminal-integration.md) |
+| TabzChrome integration | [docs/tabz-integration.md](docs/tabz-integration.md) |
 
 ## Documentation
 
@@ -24,6 +25,7 @@ A personal dashboard/homepage with accordion sidebar navigation. Features weathe
 | [docs/quick-notes.md](docs/quick-notes.md) | GitHub-synced markdown editor |
 | [docs/stocks-dashboard.md](docs/stocks-dashboard.md) | Paper trading, Finnhub/Alpha Vantage |
 | [docs/terminal-integration.md](docs/terminal-integration.md) | Chrome extension terminal bookmarks |
+| [docs/tabz-integration.md](docs/tabz-integration.md) | TabzChrome API, selectors, automation |
 | [docs/design-system.md](docs/design-system.md) | Themes, glassmorphism, backgrounds |
 | [docs/state-management.md](docs/state-management.md) | TanStack Query, caching |
 | [docs/claude-jobs.md](docs/claude-jobs.md) | Automated Claude prompts across projects |
@@ -47,6 +49,7 @@ A personal dashboard/homepage with accordion sidebar navigation. Features weathe
 | Integrations | `app/sections/integrations.tsx` | Connected services status |
 | Profile | `app/sections/profile.tsx` | Auth, sync status |
 | Settings | `app/page.tsx` (SettingsSection) | Theme, sections, API keys |
+| Setup | `app/sections/setup.tsx` | API keys wizard, TabzChrome config |
 
 ## Tech Stack
 
@@ -97,3 +100,18 @@ Sections can be hidden/shown and reordered via Settings → Sections:
 - Preferences stored in localStorage (`section-preferences`)
 - Uses `DEFAULT_SECTION_ORDER` during SSR to prevent hydration mismatch
 - Pass `prefsLoaded` flag to components that need visibility checks
+
+### TabzChrome Integration
+
+All interactive elements have `data-tabz-*` attributes for MCP automation:
+- `data-tabz-section` - Section identity
+- `data-tabz-action` - Action type (navigate, submit, refresh, etc.)
+- `data-tabz-input` - Input field purpose
+- `data-tabz-list` / `data-tabz-item` - List containers and items
+- `data-tabz-command` / `data-tabz-project` - Terminal commands
+
+Key hooks:
+- `useTerminalExtension()` - Spawn terminals, check connection
+- `useTabzBridge()` - Bi-directional messaging with TabzChrome
+
+See [docs/tabz-integration.md](docs/tabz-integration.md) for complete selector reference.

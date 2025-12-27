@@ -30,6 +30,7 @@ import {
   Bitcoin,
   Rocket,
   AlertCircle,
+  Sparkles,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -69,6 +70,7 @@ import SpaceXTracker from "./sections/spacex-tracker"
 import GitHubActivity from "./sections/github-activity"
 import DisastersMonitor from "./sections/disasters-monitor"
 import MarketPulseSection from "./sections/market-pulse"
+import SetupSection from "./sections/setup"
 import { useLoginTrigger } from "@/hooks/useLoginTrigger"
 import { StartupJobsModal } from "@/components/StartupJobsModal"
 import { useJobResults } from "@/hooks/useJobResults"
@@ -110,6 +112,7 @@ const navigationItems: NavigationItem[] = [
   { id: "jobs", label: "Jobs", icon: Play, description: "Claude batch prompts" },
   { id: "integrations", label: "Integrations", icon: Link2, description: "Connected services" },
   { id: "profile", label: "Profile", icon: User, description: "Account & sync" },
+  { id: "setup", label: "Setup Wizard", icon: Sparkles, description: "Initial configuration" },
   { id: "settings", label: "Settings", icon: Settings, description: "Theme & preferences" },
 ]
 
@@ -162,6 +165,8 @@ function SidebarContent({
           <button
             onClick={handleHomeClick}
             className={`p-4 border-b border-border/20 transition-all duration-300 w-full text-left hover:bg-primary/5 ${collapsed && !mobile ? 'px-3' : ''}`}
+            data-tabz-section="home"
+            data-tabz-action="navigate"
           >
             <div className={`flex items-center gap-3 transition-all duration-300 ${collapsed && !mobile ? 'justify-center' : ''}`}>
               <div className="h-10 w-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
@@ -229,6 +234,8 @@ function SidebarContent({
                           : 'hover:bg-primary/10 text-muted-foreground hover:text-foreground'
                         }
                       `}
+                      data-tabz-section={item.id}
+                      data-tabz-action="navigate"
                     >
                       <div className="relative flex-shrink-0">
                         <Icon className="h-5 w-5" />
@@ -407,6 +414,8 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
                 key={sectionId}
                 onClick={() => onNavigate("weather")}
                 className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+                data-tabz-section="weather"
+                data-tabz-action="navigate"
               >
                 <div className="flex items-start justify-between mb-4">
                   <Cloud className="h-8 w-8 text-primary" />
@@ -449,6 +458,8 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
                 key={sectionId}
                 onClick={() => onNavigate("feed")}
                 className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+                data-tabz-section="feed"
+                data-tabz-action="navigate"
               >
                 <div className="flex items-start justify-between mb-4">
                   <Newspaper className="h-8 w-8 text-primary" />
@@ -488,6 +499,7 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
             jobs: { icon: Play, label: "Jobs", description: "Claude batch prompts" },
             integrations: { icon: Link2, label: "Integrations", description: "Connected services" },
             profile: { icon: User, label: "Profile", description: "Account & sync status" },
+            setup: { icon: Sparkles, label: "Setup Wizard", description: "Initial configuration" },
           }
 
           const config = tileConfig[sectionId]
@@ -499,6 +511,8 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
               key={sectionId}
               onClick={() => onNavigate(sectionId)}
               className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+              data-tabz-section={sectionId}
+              data-tabz-action="navigate"
             >
               <div className="flex items-start justify-between mb-4">
                 <Icon className="h-8 w-8 text-primary" />
@@ -513,6 +527,8 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
         <button
           onClick={() => onNavigate("settings")}
           className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+          data-tabz-section="settings"
+          data-tabz-action="navigate"
         >
           <div className="flex items-start justify-between mb-4">
             <Settings className="h-8 w-8 text-primary" />
@@ -679,12 +695,12 @@ function SettingsSection({ activeSubItem, onSubItemHandled }: { activeSubItem?: 
       <p className="text-muted-foreground mb-8">Customize your dashboard</p>
 
       <div className="max-w-3xl">
-        <div id="settings-appearance" className="glass rounded-lg p-6 mb-6 scroll-mt-6">
+        <div id="settings-appearance" className="glass rounded-lg p-6 mb-6 scroll-mt-6" data-tabz-settings="appearance">
           <h3 className="font-semibold mb-6">Theme & Appearance</h3>
           <ThemeSettingsPanel />
         </div>
 
-        <div id="settings-sections" className="glass rounded-lg p-6 mb-6 scroll-mt-6">
+        <div id="settings-sections" className="glass rounded-lg p-6 mb-6 scroll-mt-6" data-tabz-settings="sections">
           <h3 className="font-semibold mb-4">Sections</h3>
           <p className="text-sm text-muted-foreground mb-4">
             Toggle sections on or off and reorder them in the sidebar
@@ -692,7 +708,7 @@ function SettingsSection({ activeSubItem, onSubItemHandled }: { activeSubItem?: 
           <SectionSettings />
         </div>
 
-        <div className="glass rounded-lg p-6 mb-6">
+        <div className="glass rounded-lg p-6 mb-6" data-tabz-settings="github">
           <div className="flex items-center gap-2 mb-4">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-primary"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
             <h3 className="font-semibold">GitHub Integration</h3>
@@ -705,7 +721,7 @@ function SettingsSection({ activeSubItem, onSubItemHandled }: { activeSubItem?: 
           </p>
         </div>
 
-        <div id="settings-feed-config" className="glass rounded-lg p-6 mb-6 scroll-mt-6">
+        <div id="settings-feed-config" className="glass rounded-lg p-6 mb-6 scroll-mt-6" data-tabz-settings="feed-config">
           <div className="flex items-center gap-2 mb-4">
             <Newspaper className="h-5 w-5 text-primary" />
             <h3 className="font-semibold">Feed Configuration</h3>
@@ -718,7 +734,7 @@ function SettingsSection({ activeSubItem, onSubItemHandled }: { activeSubItem?: 
           </p>
         </div>
 
-        <div id="settings-api-keys" className="glass rounded-lg p-6 scroll-mt-6">
+        <div id="settings-api-keys" className="glass rounded-lg p-6 scroll-mt-6" data-tabz-settings="api-keys">
           <h3 className="font-semibold mb-4">API Keys</h3>
           <ApiKeysSettings />
         </div>
@@ -837,6 +853,8 @@ export default function PersonalHomepage() {
         return <IntegrationsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSection={(section) => setActiveSection(section as Section)} />
       case "profile":
         return <ProfileSection />
+      case "setup":
+        return <SetupSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "settings":
         return <SettingsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       default:
@@ -854,11 +872,12 @@ export default function PersonalHomepage() {
               variant="ghost"
               size="icon"
               className="fixed top-4 left-4 z-50 lg:hidden glass"
+              data-tabz-action="toggle-mobile-menu"
             >
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-72 glass-dark border-r-border/20 p-0">
+          <SheetContent side="left" className="w-72 glass-dark border-r-border/20 p-0" data-tabz-container="mobile-sidebar">
             <VisuallyHidden>
               <SheetTitle>Navigation Menu</SheetTitle>
               <SheetDescription>Main navigation for the dashboard</SheetDescription>
@@ -886,6 +905,7 @@ export default function PersonalHomepage() {
               className={`h-full glass-dark border-r border-border/20 transition-[width] duration-300 ease-in-out overflow-hidden ${
                 sidebarCollapsed ? 'w-[80px]' : 'w-[280px]'
               }`}
+              data-tabz-container="sidebar"
             >
               <SidebarContent
                 activeSection={activeSection}
@@ -907,13 +927,14 @@ export default function PersonalHomepage() {
               size="icon"
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
               className="absolute -right-4 top-20 glass rounded-full h-8 w-8 z-20"
+              data-tabz-action="toggle-sidebar"
             >
               {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
             </Button>
           </div>
 
           {/* Main Content */}
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-auto" data-tabz-container="main" data-tabz-section={activeSection}>
             {/* Mobile header spacer */}
             <div className="h-16 lg:hidden" />
 

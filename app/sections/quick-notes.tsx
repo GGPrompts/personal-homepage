@@ -815,7 +815,7 @@ export default function QuickNotesSection({
   const fileTree = rootFiles ? buildTreeFromPath(rootFiles, "") : []
 
   return (
-    <div className="h-full flex flex-col lg:flex-row gap-4 p-4 lg:p-6">
+    <div className="h-full flex flex-col lg:flex-row gap-4 p-4 lg:p-6" data-tabz-section="quick-notes">
       {/* File Browser Panel */}
       <div id="notes-files" className="lg:w-72 flex-shrink-0 scroll-mt-6">
         <div className="glass rounded-lg p-4 h-full flex flex-col">
@@ -930,7 +930,7 @@ export default function QuickNotesSection({
                 Failed to load files
               </div>
             ) : (
-              <div className="space-y-0.5">
+              <div className="space-y-0.5" data-tabz-list="notes">
                 {fileTree.map((node) => (
                   <FileTreeItem
                     key={node.path}
@@ -1025,6 +1025,7 @@ export default function QuickNotesSection({
                   onClick={() => handleSave()}
                   disabled={!editor.isDirty || editor.isSaving}
                   className="h-8"
+                  data-tabz-action="save-note"
                 >
                   <Save className="h-3.5 w-3.5 mr-1.5" />
                   Save
@@ -1081,6 +1082,7 @@ export default function QuickNotesSection({
                   className="w-full h-full p-4 bg-transparent resize-none focus:outline-none font-mono text-sm"
                   placeholder="Start writing..."
                   spellCheck={false}
+                  data-tabz-input="note-editor"
                 />
               )}
             </div>

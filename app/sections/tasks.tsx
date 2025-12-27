@@ -148,6 +148,7 @@ function TaskItem({
           ? "border-border/30 bg-muted/20 opacity-60"
           : "border-border bg-background/50 hover:border-primary/30"
       }`}
+      data-tabz-item={`task-${task.id}`}
     >
       {/* Reorder buttons */}
       <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -641,8 +642,9 @@ function TasksTab() {
             value={newTaskText}
             onChange={(e) => setNewTaskText(e.target.value)}
             className="flex-1"
+            data-tabz-input="new-task"
           />
-          <Button type="submit" disabled={!newTaskText.trim()}>
+          <Button type="submit" disabled={!newTaskText.trim()} data-tabz-action="add-task">
             <Plus className="h-4 w-4 mr-2" />
             Add
           </Button>
@@ -667,7 +669,7 @@ function TasksTab() {
             <Circle className="h-4 w-4" />
             To Do ({pendingCount})
           </h3>
-          <div className="space-y-2">
+          <div className="space-y-2" data-tabz-list="tasks">
             {pendingTasks.map((task, index) => (
               <TaskItem
                 key={task.id}
@@ -793,7 +795,7 @@ export default function TasksSection({
   const notesCount = notesData?.notes?.length || 0
 
   return (
-    <div className="p-6">
+    <div className="p-6" data-tabz-section="tasks">
       <div className="flex items-center justify-between mb-2">
         <h1 className="text-3xl font-bold terminal-glow">Scratchpad</h1>
       </div>

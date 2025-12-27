@@ -1183,7 +1183,7 @@ export default function WeatherDashboard({
   })
 
   return (
-    <div className="p-3 sm:p-4 md:p-6 overflow-x-hidden">
+    <div className="p-3 sm:p-4 md:p-6 overflow-x-hidden" data-tabz-section="weather">
       {/* Header */}
       <div className="mb-4 sm:mb-6 flex flex-col gap-3 sm:gap-4 md:flex-row md:items-center md:justify-between">
         <div>
@@ -1214,6 +1214,7 @@ export default function WeatherDashboard({
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
                 className="w-40 sm:w-48 h-8 text-sm"
+                data-tabz-input="weather-location"
               />
               <Button
                 variant="outline"
@@ -1221,6 +1222,7 @@ export default function WeatherDashboard({
                 onClick={handleSearch}
                 disabled={isSearching || !searchQuery.trim()}
                 className="h-8 px-2"
+                data-tabz-action="search-location"
               >
                 {isSearching ? (
                   <motion.div
@@ -1236,13 +1238,14 @@ export default function WeatherDashboard({
             </div>
             {/* Search Results Dropdown */}
             {showSearchResults && (
-              <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-background border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
+              <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-background border border-border rounded-md shadow-lg max-h-48 overflow-y-auto" data-tabz-region="location-search-results">
                 {searchResults.length > 0 ? (
                   searchResults.map((loc, i) => (
                     <button
                       key={i}
                       onClick={() => selectLocation(loc)}
                       className="w-full px-3 py-2 text-left text-sm hover:bg-muted transition-colors border-b border-border last:border-b-0"
+                      data-tabz-action="select-location"
                     >
                       <div className="flex items-center gap-2">
                         <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
@@ -1265,7 +1268,7 @@ export default function WeatherDashboard({
             )}
           </div>
           {/* Temperature Unit Toggle */}
-          <div className="flex items-center rounded-lg border border-border overflow-hidden">
+          <div className="flex items-center rounded-lg border border-border overflow-hidden" data-tabz-control="temp-unit-toggle">
             <button
               onClick={() => setTempUnit("fahrenheit")}
               className={`px-2 py-1 text-xs font-medium transition-colors ${
@@ -1273,6 +1276,7 @@ export default function WeatherDashboard({
                   ? "bg-primary text-primary-foreground"
                   : "bg-background hover:bg-muted text-muted-foreground"
               }`}
+              data-tabz-action="set-temp-fahrenheit"
             >
               °F
             </button>
@@ -1283,6 +1287,7 @@ export default function WeatherDashboard({
                   ? "bg-primary text-primary-foreground"
                   : "bg-background hover:bg-muted text-muted-foreground"
               }`}
+              data-tabz-action="set-temp-celsius"
             >
               °C
             </button>
@@ -1292,10 +1297,21 @@ export default function WeatherDashboard({
             Updated {dataUpdatedAt ? timeAgo(new Date(dataUpdatedAt)) : "..."}
           </Badge>
           <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            className="gap-1 sm:gap-2"
+            data-tabz-action="refresh-weather"
+          >
+            <Activity className="h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Refresh</span>
+          </Button>
+          <Button
             variant={isLive ? "default" : "outline"}
             size="sm"
             onClick={() => setIsLive(!isLive)}
             className="gap-1 sm:gap-2"
+            data-tabz-action="toggle-live-updates"
           >
             {isLive ? <Pause className="h-3 w-3 sm:h-4 sm:w-4" /> : <Play className="h-3 w-3 sm:h-4 sm:w-4" />}
             {isLive ? "Live" : "Paused"}
@@ -1356,23 +1372,25 @@ export default function WeatherDashboard({
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-6 scroll-mt-6"
+          data-tabz-region="weather-alerts"
         >
           <Card className="border-amber-500/50 bg-amber-500/10">
             <CardContent className="pt-4 space-y-4">
               {weatherAlerts.map((alert) => (
-                <div key={alert.id} className="relative">
+                <div key={alert.id} className="relative" data-tabz-item="weather-alert">
                   <Button
                     variant="ghost"
                     size="icon"
                     className="absolute -top-1 -right-1 h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-background/50 z-10"
                     onClick={() => dismissAlert(alert.id)}
                     title="Dismiss alert"
+                    data-tabz-action="dismiss-alert"
                   >
                     <X className="h-4 w-4" />
                   </Button>
                   <Dialog>
                     <DialogTrigger asChild>
-                      <button className="w-full text-left flex items-start gap-3 hover:bg-amber-500/10 rounded-lg p-2 -m-2 transition-colors cursor-pointer pr-6">
+                      <button className="w-full text-left flex items-start gap-3 hover:bg-amber-500/10 rounded-lg p-2 -m-2 transition-colors cursor-pointer pr-6" data-tabz-action="view-alert-details">
                         <AlertTriangle className="h-6 w-6 text-amber-500 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
@@ -1521,7 +1539,7 @@ export default function WeatherDashboard({
       )}
 
       {/* Current Conditions - Large Display */}
-      <Card className="glass border-border mb-4 sm:mb-6 w-full">
+      <Card className="glass border-border mb-4 sm:mb-6 w-full" data-tabz-region="current-conditions">
         <CardContent className="pt-6 sm:pt-8">
           <div className="grid gap-6 lg:grid-cols-2 w-full">
             {/* Left: Main Temperature Display */}
@@ -1700,10 +1718,10 @@ export default function WeatherDashboard({
         </CardContent>
       </Card>
 
-      <div id="weather-forecast" className="grid gap-4 sm:gap-6 lg:grid-cols-3 w-full max-w-full scroll-mt-6">
+      <div id="weather-forecast" className="grid gap-4 sm:gap-6 lg:grid-cols-3 w-full max-w-full scroll-mt-6" data-tabz-region="weather-forecast">
         {/* Hourly Forecast */}
         <div className="lg:col-span-2 min-w-0">
-          <Card className="glass border-border">
+          <Card className="glass border-border" data-tabz-region="hourly-forecast">
             <CardHeader>
               <CardTitle className="text-lg">Hourly Forecast (24h)</CardTitle>
             </CardHeader>
@@ -1800,7 +1818,7 @@ export default function WeatherDashboard({
           </Card>
 
           {/* 7-Day Forecast */}
-          <Card className="glass border-border mt-6">
+          <Card className="glass border-border mt-6" data-tabz-region="daily-forecast">
             <CardHeader>
               <CardTitle className="text-lg">7-Day Forecast</CardTitle>
             </CardHeader>
@@ -1857,7 +1875,7 @@ export default function WeatherDashboard({
         {/* Right Column */}
         <div className="space-y-4 sm:space-y-6 min-w-0">
           {/* Weather Map */}
-          <Card id="weather-radar" className="glass border-border scroll-mt-6">
+          <Card id="weather-radar" className="glass border-border scroll-mt-6" data-tabz-region="weather-radar">
             <CardHeader>
               <CardTitle className="text-lg">Weather Radar</CardTitle>
               <p className="text-xs text-muted-foreground mt-1">
@@ -1929,6 +1947,7 @@ export default function WeatherDashboard({
                     size="sm"
                     onClick={() => setIsRadarPlaying(!isRadarPlaying)}
                     className="h-7 px-2"
+                    data-tabz-action="toggle-radar-animation"
                   >
                     {isRadarPlaying ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
                   </Button>
@@ -1951,7 +1970,7 @@ export default function WeatherDashboard({
           </Card>
 
           {/* Air Quality */}
-          <Card className="glass border-border">
+          <Card className="glass border-border" data-tabz-region="air-quality">
             <CardHeader>
               <CardTitle className="text-lg">Air Quality Index</CardTitle>
             </CardHeader>

@@ -48,6 +48,16 @@ interface SpawnResult {
   }
 }
 
+// Full spawn options for TabzChrome API
+export interface SpawnOptions {
+  name?: string
+  command?: string
+  workingDir?: string
+  profile?: string
+  autoExecute?: boolean
+  color?: string
+}
+
 function getStoredToken(): string | null {
   if (typeof window === "undefined") return null
   try {
@@ -325,6 +335,136 @@ export function useTerminalExtension() {
     [token, defaultWorkDir]
   )
 
+  // Spawn terminal with full options (TabzChrome API)
+  const spawnWithOptions = useCallback(
+    async (options: SpawnOptions): Promise<SpawnResult> => {
+      const currentToken = token || getStoredToken()
+
+      if (!currentToken) {
+        return {
+          success: false,
+          error: "API token required. Add your TabzChrome API token in Profile settings.",
+        }
+      }
+
+      try {
+        // Use default workDir if none provided
+        const workingDir = options.workingDir || defaultWorkDir || getDefaultWorkDir()
+
+        const response = await fetch(`${TABZ_API_BASE}/api/spawn`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Auth-Token": currentToken,
+          },
+          body: JSON.stringify({
+            name: options.name || "Terminal",
+            workingDir,
+            command: options.command,
+            profile: options.profile,
+            autoExecute: options.autoExecute !== false, // default true
+            color: options.color,
+          }),
+        })
+
+        const data = await response.json()
+
+        if (response.status === 401 || response.status === 403) {
+          setState(prev => ({
+            ...prev,
+            authenticated: false,
+            available: false,
+            error: "Invalid API token. Copy a fresh token from TabzChrome extension Settings > API Token",
+          }))
+          return {
+            success: false,
+            error: "Authentication failed. Your API token may be expired or invalid.",
+          }
+        }
+
+        if (!response.ok) {
+          return {
+            success: false,
+            error: data.error || `Request failed with status ${response.status}`,
+          }
+        }
+
+        if (data.success) {
+          return {
+            success: true,
+            terminal: data.terminal,
+          }
+        } else {
+          return {
+            success: false,
+            error: data.error || "Unknown error",
+          }
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Unknown error"
+        console.error("[useTerminalExtension] SpawnWithOptions error:", err)
+
+        const isNetworkError =
+          errorMessage.includes("fetch") ||
+          errorMessage.includes("network") ||
+          errorMessage.includes("Failed to fetch") ||
+          errorMessage.includes("NetworkError") ||
+          errorMessage.includes("CORS") ||
+          err instanceof TypeError
+
+        if (isNetworkError) {
+          setState({
+            available: false,
+            backendRunning: false,
+            authenticated: false,
+            error: "TabzChrome backend not running. Start the backend on localhost:8129",
+          })
+          return {
+            success: false,
+            error: "Cannot connect to TabzChrome backend. Make sure it's running on localhost:8129",
+          }
+        }
+
+        return {
+          success: false,
+          error: errorMessage,
+        }
+      }
+    },
+    [token, defaultWorkDir]
+  )
+
+  // Paste command to terminal without executing (autoExecute: false)
+  const pasteToTerminal = useCallback(
+    async (command: string, options?: { workingDir?: string; name?: string; profile?: string; color?: string }): Promise<SpawnResult> => {
+      return spawnWithOptions({
+        command,
+        name: options?.name,
+        workingDir: options?.workingDir,
+        profile: options?.profile,
+        color: options?.color,
+        autoExecute: false,
+      })
+    },
+    [spawnWithOptions]
+  )
+
+  // Send command to TabzChrome chat input via postMessage
+  const sendToChat = useCallback(
+    (command: string): void => {
+      if (typeof window === "undefined") return
+
+      // Broadcast message that TabzChrome content script listens for
+      window.postMessage({
+        type: "TABZ_QUEUE_COMMAND",
+        command,
+      }, "*")
+
+      console.log("[useTerminalExtension] Sent command to chat:", command)
+    },
+    []
+  )
+
   // Set default working directory
   const updateDefaultWorkDir = useCallback((dir: string) => {
     setDefaultWorkDir(dir)
@@ -464,6 +604,9 @@ export function useTerminalExtension() {
 
     // Actions
     runCommand,
+    spawnWithOptions,
+    pasteToTerminal,
+    sendToChat,
     setApiToken,
     clearApiToken,
     refreshStatus,

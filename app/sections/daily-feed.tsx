@@ -173,6 +173,7 @@ function FeedCard({
   onHide,
   onRemove,
   showRemove = false,
+  itemIndex,
 }: {
   item: FeedItem
   isSaved: boolean
@@ -180,12 +181,13 @@ function FeedCard({
   onHide: () => void
   onRemove?: () => void
   showRemove?: boolean
+  itemIndex: number
 }) {
   const config = SOURCE_CONFIG[item.source]
   const Icon = config.icon
 
   return (
-    <Card className="glass border-white/10 p-4 hover:border-primary/30 transition-colors group">
+    <Card className="glass border-white/10 p-4 hover:border-primary/30 transition-colors group" data-tabz-item={`feed-${itemIndex}`}>
       <div className="flex items-start gap-3">
         {/* Source Icon */}
         <div className={`p-2 rounded-lg ${config.bg} flex-shrink-0`}>
@@ -200,6 +202,7 @@ function FeedCard({
             target="_blank"
             rel="noopener noreferrer"
             className="font-medium text-foreground hover:text-primary transition-colors line-clamp-2 group-hover:underline"
+            data-tabz-action="open-link"
           >
             {item.title}
             <ExternalLink className="inline-block ml-1 h-3 w-3 opacity-0 group-hover:opacity-50" />
@@ -241,6 +244,7 @@ function FeedCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1 hover:text-primary transition-colors"
+                data-tabz-action="open-link"
               >
                 <MessageSquare className="h-3 w-3" />
                 {item.commentCount}
@@ -786,7 +790,7 @@ export default function DailyFeedSection({
   }, [items, hiddenItems, savedItems.size])
 
   return (
-    <div className="p-6 h-full flex flex-col">
+    <div className="p-6 h-full flex flex-col" data-tabz-section="daily-feed">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
@@ -836,6 +840,7 @@ export default function DailyFeedSection({
             onClick={() => fetchFeed()}
             disabled={loading}
             className="gap-2"
+            data-tabz-action="refresh-feed"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Refresh</span>
@@ -852,6 +857,7 @@ export default function DailyFeedSection({
             size="sm"
             onClick={showAll}
             className={`gap-1.5 ${viewMode === "all" ? "" : "opacity-70 hover:opacity-100"}`}
+            data-tabz-action="filter-all"
           >
             All
             <Badge variant="secondary" className="ml-1 text-xs bg-white/10">{sourceCounts.all || 0}</Badge>
@@ -863,6 +869,7 @@ export default function DailyFeedSection({
             size="sm"
             onClick={showSaved}
             className={`gap-1.5 ${viewMode === "saved" ? "" : "opacity-70 hover:opacity-100"}`}
+            data-tabz-action="filter-saved"
           >
             <Bookmark className={`h-3.5 w-3.5 ${viewMode === "saved" ? "" : "text-muted-foreground"}`} />
             <span className="hidden sm:inline">Saved</span>
@@ -888,6 +895,7 @@ export default function DailyFeedSection({
                 onClick={() => toggleSourceFilter(source)}
                 className={`gap-1.5 ${isSelected ? "" : "opacity-70 hover:opacity-100"}`}
                 title="Click to toggle filter"
+                data-tabz-action={`filter-${source}`}
               >
                 <Icon className={`h-3.5 w-3.5 ${isSelected ? "" : "text-muted-foreground"}`} />
                 <span className="hidden sm:inline">{config.name}</span>
@@ -954,8 +962,8 @@ export default function DailyFeedSection({
       {/* Feed List */}
       {filteredItems.length > 0 && (
         <ScrollArea className="flex-1 -mx-6 px-6">
-          <div className="space-y-3 pb-6 pr-1">
-            {filteredItems.map((item) => (
+          <div className="space-y-3 pb-6 pr-1" data-tabz-list="feed-items">
+            {filteredItems.map((item, index) => (
               <FeedCard
                 key={`${item.source}-${item.id}`}
                 item={item}
@@ -964,6 +972,7 @@ export default function DailyFeedSection({
                 onHide={() => hideItem(item.id)}
                 onRemove={() => removeFromSaved(item.id)}
                 showRemove={viewMode === "saved"}
+                itemIndex={index}
               />
             ))}
 
