@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { BackgroundProvider } from "@/components/BackgroundProvider";
+import { PageBackgroundProvider } from "@/hooks/usePageBackground";
 import { MasterBackground } from "@/components/MasterBackground";
 import { QueryProvider } from "@/components/QueryProvider";
 import { AuthProvider } from "@/components/AuthProvider";
@@ -34,21 +35,23 @@ export default function RootLayout({
         <QueryProvider>
           <AuthProvider>
             <BackgroundProvider>
-              <ThemeProvider>
-                <MasterBackground />
-                {children}
-                <Toaster
-              theme="dark"
-              position="bottom-right"
-              toastOptions={{
-                style: {
-                  background: 'hsl(var(--popover))',
-                  border: '1px solid hsl(var(--border))',
-                  color: 'hsl(var(--popover-foreground))',
-                },
-              }}
-                />
-              </ThemeProvider>
+              <PageBackgroundProvider>
+                <ThemeProvider>
+                  <MasterBackground />
+                  {children}
+                  <Toaster
+                    theme="dark"
+                    position="bottom-right"
+                    toastOptions={{
+                      style: {
+                        background: 'hsl(var(--popover))',
+                        border: '1px solid hsl(var(--border))',
+                        color: 'hsl(var(--popover-foreground))',
+                      },
+                    }}
+                  />
+                </ThemeProvider>
+              </PageBackgroundProvider>
             </BackgroundProvider>
           </AuthProvider>
         </QueryProvider>

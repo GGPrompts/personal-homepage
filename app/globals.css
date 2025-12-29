@@ -466,12 +466,24 @@
     width: 100%;
   }
   body {
-    background-color: hsl(var(--background));
+    background-color: transparent;
     color: hsl(var(--foreground));
     /* Prevent body from getting overflow: hidden when dropdowns open */
     overflow-x: hidden !important;
     width: 100%;
     position: relative;
+  }
+
+  /* Body background layer - can be faded to show custom media underneath */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-color: hsl(var(--background));
+    opacity: var(--body-bg-opacity, 1);
+    transition: opacity 0.3s ease;
   }
 
   /* ===== THEME-AWARE SCROLLBARS ===== */
@@ -536,131 +548,112 @@
 
   /* ===== BACKGROUND TONES (independent of theme) ===== */
   /* These control body background gradient, decoupled from theme accent colors */
+  /* Applied to body::before so opacity can be controlled for custom media backgrounds */
 
   /* Charcoal - Dark slate (default) */
-  :root[data-bg-tone="charcoal"] body {
+  :root[data-bg-tone="charcoal"] body::before {
     background-color: hsl(220 13% 5%);
     background-image:
       radial-gradient(circle at 20% 50%, rgba(var(--gradient-1), 0.05) 0%, transparent 50%),
       radial-gradient(circle at 80% 80%, rgba(var(--gradient-2), 0.05) 0%, transparent 50%);
-    background-attachment: fixed;
   }
 
   /* Deep Purple - Purple-blue */
-  :root[data-bg-tone="deep-purple"] body {
+  :root[data-bg-tone="deep-purple"] body::before {
     background: linear-gradient(135deg, rgba(12, 12, 20, 1) 0%, rgba(18, 12, 25, 1) 50%, rgba(15, 12, 22, 1) 100%);
-    background-attachment: fixed;
   }
 
   /* Pure Black - True black */
-  :root[data-bg-tone="pure-black"] body {
+  :root[data-bg-tone="pure-black"] body::before {
     background: #000000;
-    background-attachment: fixed;
   }
 
   /* Light - Off-white */
-  :root[data-bg-tone="light"] body {
+  :root[data-bg-tone="light"] body::before {
     background: linear-gradient(135deg, #fafbfc 0%, #f3f4f6 100%);
-    background-attachment: fixed;
   }
 
   /* Ocean - Deep blue */
-  :root[data-bg-tone="ocean"] body {
+  :root[data-bg-tone="ocean"] body::before {
     background: linear-gradient(135deg, #001a33 0%, #002b4d 50%, #003d66 100%);
-    background-attachment: fixed;
   }
 
   /* Sunset - Purple-pink */
-  :root[data-bg-tone="sunset"] body {
+  :root[data-bg-tone="sunset"] body::before {
     background: linear-gradient(135deg, #331a33 0%, #4d1a4d 50%, #661a66 100%);
-    background-attachment: fixed;
   }
 
   /* Forest - Dark green */
-  :root[data-bg-tone="forest"] body {
+  :root[data-bg-tone="forest"] body::before {
     background: linear-gradient(135deg, #0d1a0d 0%, #1a331a 50%, #264d26 100%);
-    background-attachment: fixed;
   }
 
   /* Midnight - Indigo */
-  :root[data-bg-tone="midnight"] body {
+  :root[data-bg-tone="midnight"] body::before {
     background: linear-gradient(135deg, #0a0a1a 0%, #14142b 50%, #1f1f3d 100%);
-    background-attachment: fixed;
   }
 
   /* Neon Dark - Near-black */
-  :root[data-bg-tone="neon-dark"] body {
+  :root[data-bg-tone="neon-dark"] body::before {
     background: linear-gradient(135deg, #0a0a0a 0%, #0d0d0d 50%, #141414 100%);
-    background-attachment: fixed;
   }
 
   /* Slate - Blue-gray */
-  :root[data-bg-tone="slate"] body {
+  :root[data-bg-tone="slate"] body::before {
     background: linear-gradient(135deg, #1a1f29 0%, #263241 50%, #334459 100%);
-    background-attachment: fixed;
   }
 
   /* ===== LIGHT THEME PASTEL OVERRIDES ===== */
   /* When light theme is selected, background tones become pastel versions */
 
   /* Charcoal → Silver */
-  :root[data-theme="light"][data-bg-tone="charcoal"] body {
+  :root[data-theme="light"][data-bg-tone="charcoal"] body::before {
     background: linear-gradient(135deg, #e8e8e8 0%, #f0f0f0 50%, #f5f5f5 100%);
-    background-attachment: fixed;
   }
 
   /* Deep Purple → Lavender */
-  :root[data-theme="light"][data-bg-tone="deep-purple"] body {
+  :root[data-theme="light"][data-bg-tone="deep-purple"] body::before {
     background: linear-gradient(135deg, #e8e0f0 0%, #ede4f5 50%, #f2eaf8 100%);
-    background-attachment: fixed;
   }
 
   /* Pure Black → White */
-  :root[data-theme="light"][data-bg-tone="pure-black"] body {
+  :root[data-theme="light"][data-bg-tone="pure-black"] body::before {
     background: #ffffff;
-    background-attachment: fixed;
   }
 
   /* Light stays light */
-  :root[data-theme="light"][data-bg-tone="light"] body {
+  :root[data-theme="light"][data-bg-tone="light"] body::before {
     background: linear-gradient(135deg, #fafbfc 0%, #f3f4f6 100%);
-    background-attachment: fixed;
   }
 
   /* Ocean → Sky Blue */
-  :root[data-theme="light"][data-bg-tone="ocean"] body {
+  :root[data-theme="light"][data-bg-tone="ocean"] body::before {
     background: linear-gradient(135deg, #e0f0ff 0%, #e8f4ff 50%, #f0f8ff 100%);
-    background-attachment: fixed;
   }
 
   /* Sunset → Rose/Blush */
-  :root[data-theme="light"][data-bg-tone="sunset"] body {
+  :root[data-theme="light"][data-bg-tone="sunset"] body::before {
     background: linear-gradient(135deg, #fce4ec 0%, #fdeef2 50%, #fff5f7 100%);
-    background-attachment: fixed;
   }
 
   /* Forest → Mint */
-  :root[data-theme="light"][data-bg-tone="forest"] body {
+  :root[data-theme="light"][data-bg-tone="forest"] body::before {
     background: linear-gradient(135deg, #e0f5e9 0%, #e8f8ef 50%, #f0fbf4 100%);
-    background-attachment: fixed;
   }
 
   /* Midnight → Periwinkle */
-  :root[data-theme="light"][data-bg-tone="midnight"] body {
+  :root[data-theme="light"][data-bg-tone="midnight"] body::before {
     background: linear-gradient(135deg, #e8e8f8 0%, #ededfc 50%, #f2f2ff 100%);
-    background-attachment: fixed;
   }
 
   /* Neon Dark → Soft Gray */
-  :root[data-theme="light"][data-bg-tone="neon-dark"] body {
+  :root[data-theme="light"][data-bg-tone="neon-dark"] body::before {
     background: linear-gradient(135deg, #f0f0f0 0%, #f5f5f5 50%, #fafafa 100%);
-    background-attachment: fixed;
   }
 
   /* Slate → Light Steel */
-  :root[data-theme="light"][data-bg-tone="slate"] body {
+  :root[data-theme="light"][data-bg-tone="slate"] body::before {
     background: linear-gradient(135deg, #e8ecf0 0%, #edf1f5 50%, #f2f5f8 100%);
-    background-attachment: fixed;
   }
 }
 

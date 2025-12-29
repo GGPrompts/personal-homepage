@@ -266,7 +266,7 @@ export function ThemeSettingsPanel() {
                 }
                 value={backgroundUrl}
                 onChange={(e) => setBackgroundUrl(e.target.value)}
-                className="bg-background/50 text-foreground"
+                className="bg-black/10 dark:bg-white/10 border-border text-foreground placeholder:text-muted-foreground"
               />
               {mediaError && (
                 <p className="text-xs text-destructive flex items-center gap-1 mt-1.5">

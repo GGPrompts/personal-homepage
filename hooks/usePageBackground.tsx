@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
 
 export type PageBackgroundType = 'none' | 'image' | 'video'
 
@@ -47,7 +47,25 @@ function loadSettings(): PageBackgroundSettings {
   return DEFAULT_SETTINGS
 }
 
-export function usePageBackground() {
+interface PageBackgroundContextType {
+  backgroundUrl: string
+  backgroundType: PageBackgroundType
+  backgroundOpacity: number
+  backgroundStyleOpacity: number
+  isLoaded: boolean
+  mediaError: boolean
+  showMedia: boolean
+  setBackgroundUrl: (url: string) => void
+  setBackgroundType: (type: PageBackgroundType) => void
+  setBackgroundOpacity: (opacity: number) => void
+  setBackgroundStyleOpacity: (opacity: number) => void
+  resetToDefaults: () => void
+  handleMediaError: () => void
+}
+
+const PageBackgroundContext = createContext<PageBackgroundContextType | undefined>(undefined)
+
+export function PageBackgroundProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<PageBackgroundSettings>(DEFAULT_SETTINGS)
   const [isLoaded, setIsLoaded] = useState(false)
   const [mediaError, setMediaError] = useState(false)
@@ -101,19 +119,31 @@ export function usePageBackground() {
   }, [])
 
   const showMedia = settings.backgroundType !== 'none' &&
-    settings.backgroundUrl &&
+    !!settings.backgroundUrl &&
     !mediaError
 
-  return {
-    ...settings,
-    isLoaded,
-    mediaError,
-    showMedia,
-    setBackgroundUrl,
-    setBackgroundType,
-    setBackgroundOpacity,
-    setBackgroundStyleOpacity,
-    resetToDefaults,
-    handleMediaError,
+  return (
+    <PageBackgroundContext.Provider value={{
+      ...settings,
+      isLoaded,
+      mediaError,
+      showMedia,
+      setBackgroundUrl,
+      setBackgroundType,
+      setBackgroundOpacity,
+      setBackgroundStyleOpacity,
+      resetToDefaults,
+      handleMediaError,
+    }}>
+      {children}
+    </PageBackgroundContext.Provider>
+  )
+}
+
+export function usePageBackground() {
+  const context = useContext(PageBackgroundContext)
+  if (context === undefined) {
+    throw new Error('usePageBackground must be used within a PageBackgroundProvider')
   }
+  return context
 }
