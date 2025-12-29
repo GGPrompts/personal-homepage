@@ -10,11 +10,13 @@ export function MasterBackground() {
     backgroundUrl,
     backgroundType,
     backgroundOpacity,
+    backgroundStyleOpacity,
     showMedia,
     handleMediaError,
   } = usePageBackground()
 
   const mediaOpacity = backgroundOpacity / 100
+  const styleOpacity = backgroundStyleOpacity / 100
 
   // Map background type to CSS class
   const bgClass = {
@@ -28,7 +30,13 @@ export function MasterBackground() {
   return (
     <>
       {/* Base gradient/mesh/textured background */}
-      {bgClass && <div className={bgClass} aria-hidden="true" />}
+      {bgClass && (
+        <div
+          className={bgClass}
+          style={{ opacity: styleOpacity }}
+          aria-hidden="true"
+        />
+      )}
 
       {/* Custom media background (image/video) */}
       {showMedia && backgroundType === 'image' && (

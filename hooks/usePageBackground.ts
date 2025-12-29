@@ -8,12 +8,14 @@ export interface PageBackgroundSettings {
   backgroundUrl: string
   backgroundType: PageBackgroundType
   backgroundOpacity: number // 0-100
+  backgroundStyleOpacity: number // 0-100, opacity of gradient/mesh/textured/minimal
 }
 
 const DEFAULT_SETTINGS: PageBackgroundSettings = {
   backgroundUrl: '',
   backgroundType: 'none',
   backgroundOpacity: 20,
+  backgroundStyleOpacity: 100, // Full opacity by default
 }
 
 const STORAGE_KEY = 'page-background'
@@ -33,6 +35,9 @@ function loadSettings(): PageBackgroundSettings {
         backgroundOpacity: typeof parsed.backgroundOpacity === 'number'
           ? Math.min(100, Math.max(0, parsed.backgroundOpacity))
           : 20,
+        backgroundStyleOpacity: typeof parsed.backgroundStyleOpacity === 'number'
+          ? Math.min(100, Math.max(0, parsed.backgroundStyleOpacity))
+          : 100,
       }
     }
   } catch {
@@ -80,6 +85,13 @@ export function usePageBackground() {
     }))
   }, [])
 
+  const setBackgroundStyleOpacity = useCallback((opacity: number) => {
+    setSettings((prev) => ({
+      ...prev,
+      backgroundStyleOpacity: Math.min(100, Math.max(0, opacity)),
+    }))
+  }, [])
+
   const resetToDefaults = useCallback(() => {
     setSettings(DEFAULT_SETTINGS)
   }, [])
@@ -100,6 +112,7 @@ export function usePageBackground() {
     setBackgroundUrl,
     setBackgroundType,
     setBackgroundOpacity,
+    setBackgroundStyleOpacity,
     resetToDefaults,
     handleMediaError,
   }

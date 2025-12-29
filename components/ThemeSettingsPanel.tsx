@@ -57,10 +57,12 @@ export function ThemeSettingsPanel() {
     backgroundUrl,
     backgroundType,
     backgroundOpacity,
+    backgroundStyleOpacity,
     mediaError,
     setBackgroundUrl,
     setBackgroundType,
     setBackgroundOpacity,
+    setBackgroundStyleOpacity,
   } = usePageBackground()
 
   return (
@@ -172,7 +174,7 @@ export function ThemeSettingsPanel() {
           <Layers className="h-4 w-4" />
           Background Style
         </label>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 mb-4">
           {backgroundStyles.map((style) => {
             const isSelected = background === style.value
             return (
@@ -192,6 +194,27 @@ export function ThemeSettingsPanel() {
             )
           })}
         </div>
+
+        {/* Background style opacity slider */}
+        {background !== 'none' && (
+          <div>
+            <label className="text-xs text-muted-foreground mb-1.5 flex items-center justify-between">
+              <span>Style Opacity</span>
+              <span className="font-mono">{backgroundStyleOpacity}%</span>
+            </label>
+            <Slider
+              value={[backgroundStyleOpacity]}
+              onValueChange={([value]) => setBackgroundStyleOpacity(value)}
+              min={0}
+              max={100}
+              step={5}
+              className="w-full"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Reduce opacity to reveal custom media backgrounds underneath.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Custom Background Media */}
@@ -243,7 +266,7 @@ export function ThemeSettingsPanel() {
                 }
                 value={backgroundUrl}
                 onChange={(e) => setBackgroundUrl(e.target.value)}
-                className="bg-background/50"
+                className="bg-background/50 text-foreground"
               />
               {mediaError && (
                 <p className="text-xs text-destructive flex items-center gap-1 mt-1.5">
