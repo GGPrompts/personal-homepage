@@ -1,9 +1,12 @@
 'use client'
 
-import { Check, Palette, PaintBucket, Layers } from 'lucide-react'
+import { Check, Palette, PaintBucket, Layers, Image, Video, X, AlertCircle } from 'lucide-react'
 import { useTheme } from '@/components/ThemeProvider'
 import { useBackground, type BackgroundTone } from '@/components/BackgroundProvider'
+import { usePageBackground, type PageBackgroundType } from '@/hooks/usePageBackground'
 import { cn } from '@/lib/utils'
+import { Input } from '@/components/ui/input'
+import { Slider } from '@/components/ui/slider'
 
 // Theme color previews (approximate primary colors for each theme)
 const themeColors: Record<string, { bg: string; accent: string; label: string }> = {
@@ -41,9 +44,24 @@ const backgroundStyles = [
   { value: 'none', label: 'None' },
 ] as const
 
+const backgroundTypes: { value: PageBackgroundType; label: string; icon: typeof Image }[] = [
+  { value: 'none', label: 'None', icon: X },
+  { value: 'image', label: 'Image', icon: Image },
+  { value: 'video', label: 'Video', icon: Video },
+]
+
 export function ThemeSettingsPanel() {
   const { theme, setTheme, themes } = useTheme()
   const { background, setBackground, backgroundTone, setBackgroundTone, backgroundTones } = useBackground()
+  const {
+    backgroundUrl,
+    backgroundType,
+    backgroundOpacity,
+    mediaError,
+    setBackgroundUrl,
+    setBackgroundType,
+    setBackgroundOpacity,
+  } = usePageBackground()
 
   return (
     <div className="space-y-8">
@@ -174,6 +192,87 @@ export function ThemeSettingsPanel() {
             )
           })}
         </div>
+      </div>
+
+      {/* Custom Background Media */}
+      <div>
+        <label className="text-sm font-medium text-muted-foreground flex items-center gap-2 mb-3">
+          <Image className="h-4 w-4" />
+          Custom Background Media
+        </label>
+        <p className="text-xs text-muted-foreground mb-4">
+          Add a custom image or video background that displays behind all content.
+        </p>
+
+        {/* Type selector */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {backgroundTypes.map((type) => {
+            const Icon = type.icon
+            const isSelected = backgroundType === type.value
+            return (
+              <button
+                key={type.value}
+                onClick={() => setBackgroundType(type.value)}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                  "border focus:outline-none focus:ring-2 focus:ring-primary/50",
+                  isSelected
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background/50 text-muted-foreground border-border/50 hover:bg-primary/10 hover:text-foreground hover:border-primary/30"
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {type.label}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* URL input (shown when type is not 'none') */}
+        {backgroundType !== 'none' && (
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1.5 block">
+                {backgroundType === 'image' ? 'Image' : 'Video'} URL
+              </label>
+              <Input
+                type="url"
+                placeholder={backgroundType === 'image'
+                  ? "https://example.com/background.jpg"
+                  : "https://example.com/background.mp4"
+                }
+                value={backgroundUrl}
+                onChange={(e) => setBackgroundUrl(e.target.value)}
+                className="bg-background/50"
+              />
+              {mediaError && (
+                <p className="text-xs text-destructive flex items-center gap-1 mt-1.5">
+                  <AlertCircle className="h-3 w-3" />
+                  Failed to load {backgroundType}. Check the URL.
+                </p>
+              )}
+            </div>
+
+            {/* Opacity slider */}
+            <div>
+              <label className="text-xs text-muted-foreground mb-1.5 flex items-center justify-between">
+                <span>Opacity</span>
+                <span className="font-mono">{backgroundOpacity}%</span>
+              </label>
+              <Slider
+                value={[backgroundOpacity]}
+                onValueChange={([value]) => setBackgroundOpacity(value)}
+                min={0}
+                max={100}
+                step={5}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Lower values are more subtle. Recommended: 15-30%
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
