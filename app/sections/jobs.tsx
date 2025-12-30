@@ -62,10 +62,12 @@ import {
   Bot,
   Zap,
   Sparkles,
+  Pin,
 } from "lucide-react"
 import type { Job, JobTrigger, JobBackend, PreCheck, JobStreamEvent, CreateJobRequest, JobResult, ProjectRunResult } from "@/lib/jobs/types"
 import type { LocalProject } from "@/lib/projects"
 import { useJobResults } from "@/hooks/useJobResults"
+import { useAllProjectsMeta } from "@/hooks/useProjectMeta"
 
 // ============================================================================
 // HELPERS
@@ -164,6 +166,7 @@ interface JobModalProps {
 
 function JobModal({ open, onClose, job, projects, projectsLoading }: JobModalProps) {
   const queryClient = useQueryClient()
+  const { isPinned, isConfigured: metaConfigured } = useAllProjectsMeta()
   const isEditing = !!job
 
   // Form state
@@ -176,6 +179,17 @@ function JobModal({ open, onClose, job, projects, projectsLoading }: JobModalPro
   const [preCheckCommand, setPreCheckCommand] = React.useState(job?.preCheck?.command || '')
   const [preCheckSkipIf, setPreCheckSkipIf] = React.useState<PreCheck['skipIf']>(job?.preCheck?.skipIf || 'empty')
   const [maxParallel, setMaxParallel] = React.useState(job?.maxParallel || 3)
+  const [showPinnedOnly, setShowPinnedOnly] = React.useState(false)
+
+  // Filter projects based on pinned filter
+  const filteredProjects = React.useMemo(() => {
+    if (!showPinnedOnly || !metaConfigured) return projects
+    return projects.filter((p) => {
+      // Extract slug from path (last segment)
+      const slug = p.path.split('/').pop() || p.path
+      return isPinned(slug)
+    })
+  }, [projects, showPinnedOnly, metaConfigured, isPinned])
 
   // Reset form when job changes
   React.useEffect(() => {
@@ -279,36 +293,57 @@ function JobModal({ open, onClose, job, projects, projectsLoading }: JobModalPro
 
             {/* Projects */}
             <div className="space-y-2">
-              <Label>Projects ({selectedProjects.length} selected)</Label>
+              <div className="flex items-center justify-between">
+                <Label>Projects ({selectedProjects.length} selected)</Label>
+                {metaConfigured && (
+                  <Button
+                    variant={showPinnedOnly ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-7 gap-1.5"
+                    onClick={() => setShowPinnedOnly(!showPinnedOnly)}
+                  >
+                    <Pin className={`h-3.5 w-3.5 ${showPinnedOnly ? 'text-amber-500' : ''}`} />
+                    Pinned only
+                  </Button>
+                )}
+              </div>
               <div className="border rounded-lg max-h-[200px] overflow-y-auto">
                 {projectsLoading ? (
                   <div className="p-4 text-center text-muted-foreground flex items-center justify-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Loading projects...
                   </div>
-                ) : projects.length === 0 ? (
+                ) : filteredProjects.length === 0 ? (
                   <div className="p-4 text-center text-muted-foreground">
-                    No local projects found
+                    {showPinnedOnly ? 'No pinned projects' : 'No local projects found'}
                   </div>
                 ) : (
-                  projects.map((project) => (
-                    <label
-                      key={project.path}
-                      className="flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer border-b last:border-b-0"
-                    >
-                      <Checkbox
-                        checked={selectedProjects.includes(project.path)}
-                        onCheckedChange={() => toggleProject(project.path)}
-                      />
-                      <FolderGit2 className="h-4 w-4 text-muted-foreground" />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{project.name}</div>
-                        <div className="text-xs text-muted-foreground truncate">
-                          {project.path}
+                  filteredProjects.map((project) => {
+                    const slug = project.path.split('/').pop() || project.path
+                    const pinned = metaConfigured && isPinned(slug)
+                    return (
+                      <label
+                        key={project.path}
+                        className="flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer border-b last:border-b-0"
+                      >
+                        <Checkbox
+                          checked={selectedProjects.includes(project.path)}
+                          onCheckedChange={() => toggleProject(project.path)}
+                        />
+                        {pinned ? (
+                          <Pin className="h-4 w-4 text-amber-500" />
+                        ) : (
+                          <FolderGit2 className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">{project.name}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {project.path}
+                          </div>
                         </div>
-                      </div>
-                    </label>
-                  ))
+                      </label>
+                    )
+                  })
                 )}
               </div>
             </div>

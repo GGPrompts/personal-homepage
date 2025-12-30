@@ -215,9 +215,41 @@ export default function ProjectsDashboard({
   ])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = React.useState("")
-  const [statusFilter, setStatusFilter] = React.useState<string>("all")
-  const [techFilter, setTechFilter] = React.useState<string[]>([])
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({})
+
+  // Filters - persisted in localStorage
+  const [statusFilter, setStatusFilter] = React.useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('projects-status-filter') || 'all'
+    }
+    return 'all'
+  })
+  const [techFilter, setTechFilter] = React.useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('projects-tech-filter')
+      if (saved) {
+        try {
+          return JSON.parse(saved)
+        } catch {
+          // Ignore parse errors
+        }
+      }
+    }
+    return []
+  })
+
+  // Persist filter changes
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('projects-status-filter', statusFilter)
+    }
+  }, [statusFilter])
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('projects-tech-filter', JSON.stringify(techFilter))
+    }
+  }, [techFilter])
 
   // Batch prompt modal state
   const [batchPromptOpen, setBatchPromptOpen] = React.useState(false)

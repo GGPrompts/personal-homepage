@@ -139,6 +139,28 @@ export async function POST(request: NextRequest) {
     // Also collect full response for JSONL storage
     const encoder = new TextEncoder()
     let fullResponse = ''
+    let capturedUsage: { inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheCreationTokens?: number; totalTokens: number } | undefined
+
+    // Helper to parse Claude events from stream chunks
+    const parseClaudeEvents = (chunk: string): { text: string; events: Array<{ type: string; usage?: typeof capturedUsage; sessionId?: string }> } => {
+      const events: Array<{ type: string; usage?: typeof capturedUsage; sessionId?: string }> = []
+      let text = chunk
+
+      // Extract __CLAUDE_EVENT__....__END_EVENT__ markers
+      const eventRegex = /__CLAUDE_EVENT__(.*?)__END_EVENT__/g
+      let match
+      while ((match = eventRegex.exec(chunk)) !== null) {
+        try {
+          const event = JSON.parse(match[1])
+          events.push(event)
+          text = text.replace(match[0], '')
+        } catch {
+          // Invalid JSON, skip
+        }
+      }
+
+      return { text: text.replace(/\n+/g, ''), events }
+    }
 
     const sseStream = new ReadableStream({
       async start(controller) {
@@ -161,29 +183,42 @@ export async function POST(request: NextRequest) {
                 })
               }
 
-              // Send done event with conversation metadata
+              // Send done event with conversation metadata and usage
               const doneData = JSON.stringify({
                 done: true,
                 conversationId: convId,
                 model: backend,
-                claudeSessionId: getSessionId?.() || undefined
+                claudeSessionId: getSessionId?.() || undefined,
+                usage: capturedUsage
               })
               controller.enqueue(encoder.encode(`data: ${doneData}\n\n`))
               controller.close()
               break
             }
 
-            // Accumulate response for JSONL storage
-            fullResponse += value
+            // Parse out Claude events (usage, tool use, etc.) from the stream
+            const { text, events } = parseClaudeEvents(value)
 
-            // Send content chunk
-            const data = JSON.stringify({
-              content: value,
-              done: false,
-              model: backend,
-              conversationId: convId
-            })
-            controller.enqueue(encoder.encode(`data: ${data}\n\n`))
+            // Capture usage from done events
+            for (const event of events) {
+              if (event.type === 'done' && event.usage) {
+                capturedUsage = event.usage
+              }
+            }
+
+            // Accumulate clean text for JSONL storage
+            if (text) {
+              fullResponse += text
+
+              // Send content chunk
+              const data = JSON.stringify({
+                content: text,
+                done: false,
+                model: backend,
+                conversationId: convId
+              })
+              controller.enqueue(encoder.encode(`data: ${data}\n\n`))
+            }
           }
         } catch (error) {
           // Send error event

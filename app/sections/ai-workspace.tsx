@@ -1073,13 +1073,14 @@ export default function AIWorkspaceSection({
               break
             }
 
-            // Capture claudeSessionId from done event
-            if (chunk.done && chunk.claudeSessionId) {
+            // Capture claudeSessionId and usage from done event
+            if (chunk.done) {
               setConversations(prev => prev.map(conv => {
                 if (conv.id !== activeConvId) return conv
                 return {
                   ...conv,
-                  claudeSessionId: chunk.claudeSessionId,
+                  ...(chunk.claudeSessionId && { claudeSessionId: chunk.claudeSessionId }),
+                  ...(chunk.usage && { usage: chunk.usage }),
                 }
               }))
             }
@@ -1358,26 +1359,32 @@ export default function AIWorkspaceSection({
     setContextWarningDismissed(prev => new Set(prev).add(activeConvId))
   }
 
-  // Calculate token usage (estimate: ~4 chars per token)
+  // Calculate token usage
   // Claude's context window is 200k tokens
   const CONTEXT_LIMIT = 200000
   const WARNING_THRESHOLD = 0.7 // 70% - show warning
   const DANGER_THRESHOLD = 0.9 // 90% - show danger
 
-  // Baseline overhead from system prompt, tools, MCP, agents, memory files
-  // Based on actual /context output: ~44k tokens before any messages
-  const BASELINE_TOKENS = 44000
+  // Use actual usage from Claude CLI when available, otherwise estimate
+  const hasActualUsage = activeConv.usage && activeConv.usage.totalTokens > 0
 
-  const messageTokens = activeConv.messages.reduce((sum, msg) => {
-    // Estimate tokens: ~4 chars per token for English text
-    // Add overhead for tool uses if present
-    const contentTokens = Math.ceil(msg.content.length / 4)
-    const toolTokens = msg.toolUses?.reduce((t, tool) =>
-      t + Math.ceil((tool.input?.length || 0) / 4) + 20, 0) || 0
-    return sum + contentTokens + toolTokens
-  }, 0)
+  let totalTokens: number
+  if (hasActualUsage) {
+    // Use actual token count from Claude CLI
+    totalTokens = activeConv.usage!.totalTokens
+  } else {
+    // Fallback: estimate tokens (~4 chars per token)
+    // Baseline overhead from system prompt, tools, MCP, agents, memory files
+    const BASELINE_TOKENS = 44000
+    const messageTokens = activeConv.messages.reduce((sum, msg) => {
+      const contentTokens = Math.ceil(msg.content.length / 4)
+      const toolTokens = msg.toolUses?.reduce((t, tool) =>
+        t + Math.ceil((tool.input?.length || 0) / 4) + 20, 0) || 0
+      return sum + contentTokens + toolTokens
+    }, 0)
+    totalTokens = BASELINE_TOKENS + messageTokens
+  }
 
-  const totalTokens = BASELINE_TOKENS + messageTokens
   const contextUsage = totalTokens / CONTEXT_LIMIT
   const contextPercentage = Math.min(Math.round(contextUsage * 100), 100)
   const contextStatus = contextUsage >= DANGER_THRESHOLD ? 'danger'
@@ -1562,7 +1569,16 @@ export default function AIWorkspaceSection({
                           </span>
                         </TooltipTrigger>
                         <TooltipContent side="bottom" className="max-w-xs">
-                          <p className="font-medium text-xs">Context Usage: ~{totalTokens.toLocaleString()} tokens</p>
+                          <p className="font-medium text-xs">
+                            Context: {hasActualUsage ? '' : '~'}{totalTokens.toLocaleString()} tokens
+                            <span className={`ml-1.5 text-[10px] px-1 py-0.5 rounded ${
+                              hasActualUsage
+                                ? 'bg-emerald-500/20 text-emerald-400'
+                                : 'bg-muted text-muted-foreground'
+                            }`}>
+                              {hasActualUsage ? 'actual' : 'est'}
+                            </span>
+                          </p>
                           <div className="w-32 h-1.5 bg-muted rounded-full mt-1.5 overflow-hidden">
                             <div
                               className={`h-full rounded-full transition-all ${

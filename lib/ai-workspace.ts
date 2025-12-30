@@ -41,6 +41,14 @@ export interface ClaudeStreamEvent {
   sessionId?: string
 }
 
+export interface TokenUsage {
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens?: number
+  cacheCreationTokens?: number
+  totalTokens: number
+}
+
 export interface Conversation {
   id: string
   title: string
@@ -51,6 +59,7 @@ export interface Conversation {
   projectPath?: string | null
   settings?: ConversationSettings
   claudeSessionId?: string | null
+  usage?: TokenUsage | null  // Actual token usage from Claude CLI (when available)
 }
 
 // Settings stored per-conversation

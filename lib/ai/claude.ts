@@ -35,6 +35,13 @@ interface ToolResultBlock {
 
 type ContentBlock = TextBlock | ToolUseBlock | ToolResultBlock
 
+interface ClaudeUsage {
+  input_tokens: number
+  output_tokens: number
+  cache_read_input_tokens?: number
+  cache_creation_input_tokens?: number
+}
+
 interface ClaudeStreamEvent {
   type: 'system' | 'assistant' | 'result' | 'error' | 'content_block_start' | 'content_block_delta' | 'content_block_stop' | 'message_start' | 'message_stop'
   subtype?: string
@@ -46,6 +53,7 @@ interface ClaudeStreamEvent {
   content_block?: ContentBlock
   result?: string
   is_error?: boolean
+  usage?: ClaudeUsage
   delta?: {
     type: 'text_delta' | 'input_json_delta'
     text?: string
@@ -68,6 +76,13 @@ export interface StreamChunk {
   }
   error?: string
   sessionId?: string
+  usage?: {
+    inputTokens: number
+    outputTokens: number
+    cacheReadTokens?: number
+    cacheCreationTokens?: number
+    totalTokens: number
+  }
 }
 
 export interface ClaudeStreamResult {
@@ -353,6 +368,24 @@ export async function streamClaude(
                 if (event.is_error) {
                   safeError(controller, new Error(event.result || 'Claude CLI error'))
                 } else {
+                  // Send done event with usage data if available
+                  if (event.usage) {
+                    const totalTokens = event.usage.input_tokens +
+                      event.usage.output_tokens +
+                      (event.usage.cache_read_input_tokens || 0) +
+                      (event.usage.cache_creation_input_tokens || 0)
+                    enqueueChunk(controller, {
+                      type: 'done',
+                      sessionId: capturedSessionId || undefined,
+                      usage: {
+                        inputTokens: event.usage.input_tokens,
+                        outputTokens: event.usage.output_tokens,
+                        cacheReadTokens: event.usage.cache_read_input_tokens,
+                        cacheCreationTokens: event.usage.cache_creation_input_tokens,
+                        totalTokens
+                      }
+                    })
+                  }
                   safeClose(controller)
                 }
                 break
