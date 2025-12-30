@@ -583,18 +583,16 @@ export default function ProjectsDashboard({
                   <Code className="h-4 w-4" />
                 </Button>
               )}
-              {/* Open folder - only if local */}
+              {/* Browse files with TFE - only if local */}
               {project.local && (
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
                   onClick={() => {
-                    // Try explorer.exe for WSL, then xdg-open for Linux, then open for macOS
-                    const path = project.local!.path
-                    handleLaunchTerminal(`explorer.exe "$(wslpath -w "${path}")" 2>/dev/null || xdg-open "${path}" 2>/dev/null || open "${path}"`, { name: `Open: ${project.name}` })
+                    handleLaunchTerminal("tfe", { workingDir: project.local!.path, name: `TFE: ${project.name}` })
                   }}
-                  title={terminalAvailable ? "Open Folder" : "Terminal not connected"}
+                  title={terminalAvailable ? "Browse Files (TFE)" : "Terminal not connected"}
                   disabled={!terminalAvailable}
                   data-tabz-action="open-folder"
                 >
