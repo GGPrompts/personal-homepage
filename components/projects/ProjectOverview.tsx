@@ -103,10 +103,10 @@ export default function ProjectOverview({ project }: ProjectOverviewProps) {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => runCommand(`xdg-open "${project.local!.path}" || open "${project.local!.path}"`, { name: `Open: ${project.name}` })}
+                onClick={() => runCommand("tfe", { workingDir: project.local!.path, name: `TFE: ${project.name}` })}
               >
                 <FolderOpen className="h-4 w-4 mr-2" />
-                Open Folder
+                Browse Files
               </Button>
             )}
             {project.github && (
