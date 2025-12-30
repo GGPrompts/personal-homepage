@@ -25,13 +25,10 @@ import {
   Camera,
   Clipboard,
   Check,
-  ExternalLink,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { useTerminalExtension } from "@/hooks/useTerminalExtension"
 import { TabzConnectionStatus } from "@/components/TabzConnectionStatus"
 
 // ============================================================================
@@ -323,10 +320,6 @@ export default function SearchHubSection({
   const [copied, setCopied] = React.useState(false)
   const inputRef = React.useRef<HTMLInputElement>(null)
 
-  // TabzChrome connection for sending queries to chat
-  const { backendRunning, authenticated, sendToChat } = useTerminalExtension()
-  const tabzConnected = backendRunning && authenticated
-
   const currentEngines = activeCategory === "search"
     ? searchEngines
     : activeCategory === "ai"
@@ -558,28 +551,6 @@ export default function SearchHubSection({
                     </>
                   )}
                 </Button>
-                {/* Send to TabzChrome Chat button */}
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        disabled={!query.trim()}
-                        onClick={() => sendToChat(query.trim())}
-                        className={`h-11 sm:h-10 w-11 sm:w-10 shrink-0 ${tabzConnected ? 'border-emerald-500/30 text-emerald-500 hover:text-emerald-400' : ''}`}
-                        data-tabz-bridge="true"
-                        data-tabz-action="send-chat"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {tabzConnected ? 'Send to TabzChrome chat' : 'TabzChrome not connected'}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
               </div>
             </div>
 
