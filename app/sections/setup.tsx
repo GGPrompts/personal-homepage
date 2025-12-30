@@ -63,7 +63,7 @@ import { CSS } from "@dnd-kit/utilities"
 // TYPES
 // ============================================================================
 
-type WizardStep = "api-keys" | "sections" | "tabz" | "import-export"
+type WizardStep = "api-keys" | "sections" | "tabz" | "import-export" | "complete"
 
 interface ApiKeyConfig {
   id: string
@@ -1211,6 +1211,48 @@ function ImportExportStep() {
 }
 
 // ============================================================================
+// STEP 5: COMPLETE
+// ============================================================================
+
+function CompleteStep({ onStartOver }: { onStartOver: () => void }) {
+  return (
+    <div className="space-y-6 text-center py-8" data-tabz-step="complete">
+      <div className="flex justify-center mb-6">
+        <div className="relative">
+          <div className="w-24 h-24 rounded-full bg-emerald-500/20 flex items-center justify-center">
+            <CheckCircle2 className="h-12 w-12 text-emerald-500" />
+          </div>
+          <Sparkles className="h-6 w-6 text-primary absolute -top-1 -right-1 animate-pulse" />
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-2xl font-semibold mb-2">Setup Complete!</h2>
+        <p className="text-muted-foreground max-w-md mx-auto">
+          Your personal homepage is configured and ready to use.
+          You can always return here to adjust settings.
+        </p>
+      </div>
+
+      <div className="pt-4 space-y-3">
+        <p className="text-sm text-muted-foreground">
+          Use the sidebar to navigate between sections, or click below to start fresh.
+        </p>
+        <Button
+          variant="outline"
+          onClick={onStartOver}
+          className="gap-2"
+          data-tabz-button="start-over"
+        >
+          <RotateCcw className="h-4 w-4" />
+          Review Setup Again
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
@@ -1228,6 +1270,7 @@ export default function SetupSection({
     { id: "sections", label: "Sections" },
     { id: "tabz", label: "TabzChrome" },
     { id: "import-export", label: "Import/Export" },
+    { id: "complete", label: "Done" },
   ]
 
   const currentIndex = steps.findIndex(s => s.id === currentStep)
@@ -1255,6 +1298,8 @@ export default function SetupSection({
         return <TabzChromeStep />
       case "import-export":
         return <ImportExportStep />
+      case "complete":
+        return <CompleteStep onStartOver={() => setCurrentStep("api-keys")} />
       default:
         return <ApiKeysStep />
     }
@@ -1278,31 +1323,43 @@ export default function SetupSection({
           {renderStep()}
         </div>
 
-        {/* Navigation */}
-        <div className="flex items-center justify-between">
-          <Button
-            variant="outline"
-            onClick={() => setCurrentStep(steps[currentIndex - 1].id)}
-            disabled={isFirst}
-            data-tabz-button="prev-step"
-          >
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Previous
-          </Button>
+        {/* Navigation - hidden on complete step */}
+        {currentStep !== "complete" && (
+          <div className="flex items-center justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setCurrentStep(steps[currentIndex - 1].id)}
+              disabled={isFirst}
+              data-tabz-button="prev-step"
+            >
+              <ChevronLeft className="h-4 w-4 mr-2" />
+              Previous
+            </Button>
 
-          <div className="text-sm text-muted-foreground">
-            Step {currentIndex + 1} of {steps.length}
+            <div className="text-sm text-muted-foreground">
+              Step {currentIndex + 1} of {steps.length - 1}
+            </div>
+
+            {currentStep === "import-export" ? (
+              <Button
+                onClick={() => setCurrentStep("complete")}
+                className="bg-emerald-600 hover:bg-emerald-700"
+                data-tabz-button="finish-setup"
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Finish
+              </Button>
+            ) : (
+              <Button
+                onClick={() => setCurrentStep(steps[currentIndex + 1].id)}
+                data-tabz-button="next-step"
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-2" />
+              </Button>
+            )}
           </div>
-
-          <Button
-            onClick={() => setCurrentStep(steps[currentIndex + 1].id)}
-            disabled={isLast}
-            data-tabz-button="next-step"
-          >
-            Next
-            <ChevronRight className="h-4 w-4 ml-2" />
-          </Button>
-        </div>
+        )}
       </div>
     </div>
   )
