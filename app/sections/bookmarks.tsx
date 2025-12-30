@@ -1236,37 +1236,45 @@ export default function BookmarksSection({
         <DialogContent className="glass">
           <DialogHeader>
             <DialogTitle>Add Bookmark</DialogTitle>
-            <DialogDescription>Add a new bookmark or terminal command</DialogDescription>
+            <DialogDescription>Add a web link or terminal command</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            {/* Type selector - only show Terminal option if extension available */}
-            {terminalAvailable && (
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">Type</label>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={formType === "link" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setFormType("link")}
-                    className="flex-1"
-                  >
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Link
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={formType === "terminal" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setFormType("terminal")}
-                    className="flex-1"
-                  >
-                    <Terminal className="h-4 w-4 mr-2" />
-                    Terminal
-                  </Button>
-                </div>
+            {/* Type selector - prominent toggle between Link and Terminal */}
+            <div className="mb-2">
+              <div className="flex gap-2 p-1 rounded-lg bg-muted/50">
+                <button
+                  type="button"
+                  onClick={() => setFormType("link")}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all ${
+                    formType === "link"
+                      ? "bg-background shadow-sm text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Web Link
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormType("terminal")}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all ${
+                    formType === "terminal"
+                      ? "bg-emerald-500/20 shadow-sm text-emerald-400 border border-emerald-500/30"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  disabled={!terminalAvailable}
+                  title={!terminalAvailable ? "TabzChrome extension required" : undefined}
+                >
+                  <Terminal className="h-4 w-4" />
+                  Terminal
+                </button>
               </div>
-            )}
+              <p className="text-xs text-muted-foreground mt-1.5 text-center">
+                {formType === "link"
+                  ? "Opens a URL in a new browser tab"
+                  : "Spawns a terminal with a command"}
+              </p>
+            </div>
             <div>
               <label className="text-sm font-medium mb-1.5 block">Name</label>
               <Input
@@ -1296,13 +1304,16 @@ export default function BookmarksSection({
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-1.5 block">Working Directory (optional)</label>
+                  <label className="text-sm font-medium mb-1.5 block">Working Directory</label>
                   <Input
                     value={formWorkingDir}
                     onChange={(e) => setFormWorkingDir(e.target.value)}
-                    placeholder="~/projects/my-project"
+                    placeholder={defaultWorkDir || "~/projects"}
                     className="font-mono"
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Leave blank to use page default: <code className="text-primary">{defaultWorkDir}</code>
+                  </p>
                 </div>
                 {/* TabzChrome-specific options */}
                 <div className="border-t pt-4 mt-2">
@@ -1515,34 +1526,37 @@ export default function BookmarksSection({
             </div>
             {editType === "bookmark" && (
               <>
-                {/* Type selector - only show if extension available */}
-                {terminalAvailable && (
-                  <div>
-                    <label className="text-sm font-medium mb-1.5 block">Type</label>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant={formType === "link" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setFormType("link")}
-                        className="flex-1"
-                      >
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Link
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={formType === "terminal" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setFormType("terminal")}
-                        className="flex-1"
-                      >
-                        <Terminal className="h-4 w-4 mr-2" />
-                        Terminal
-                      </Button>
-                    </div>
+                {/* Type selector - prominent toggle */}
+                <div className="mb-2">
+                  <div className="flex gap-2 p-1 rounded-lg bg-muted/50">
+                    <button
+                      type="button"
+                      onClick={() => setFormType("link")}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all ${
+                        formType === "link"
+                          ? "bg-background shadow-sm text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Web Link
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormType("terminal")}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all ${
+                        formType === "terminal"
+                          ? "bg-emerald-500/20 shadow-sm text-emerald-400 border border-emerald-500/30"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                      disabled={!terminalAvailable}
+                      title={!terminalAvailable ? "TabzChrome extension required" : undefined}
+                    >
+                      <Terminal className="h-4 w-4" />
+                      Terminal
+                    </button>
                   </div>
-                )}
+                </div>
                 {formType === "link" ? (
                   <div>
                     <label className="text-sm font-medium mb-1.5 block">URL</label>
@@ -1562,12 +1576,16 @@ export default function BookmarksSection({
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium mb-1.5 block">Working Directory (optional)</label>
+                      <label className="text-sm font-medium mb-1.5 block">Working Directory</label>
                       <Input
                         value={formWorkingDir}
                         onChange={(e) => setFormWorkingDir(e.target.value)}
+                        placeholder={defaultWorkDir || "~/projects"}
                         className="font-mono"
                       />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Leave blank to use page default: <code className="text-primary">{defaultWorkDir}</code>
+                      </p>
                     </div>
                     {/* TabzChrome-specific options */}
                     <div className="border-t pt-4 mt-2">
