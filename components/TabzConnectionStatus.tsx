@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useTabzBridge } from "@/hooks/useTabzBridge"
+import { useTerminalExtension } from "@/hooks/useTerminalExtension"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
 import { RefreshCw, Unplug, Plug2 } from "lucide-react"
@@ -16,10 +16,10 @@ interface TabzConnectionStatusProps {
 }
 
 /**
- * TabzConnectionStatus - Shows green/red indicator for TabzChrome connection
+ * TabzConnectionStatus - Shows green/red indicator for TabzChrome REST API connection
  *
  * Place this component in a header, status bar, or sidebar to show
- * real-time connection status with the TabzChrome browser extension.
+ * real-time connection status with the TabzChrome backend at localhost:8129.
  *
  * Features:
  * - Visual indicator (green = connected, red = disconnected)
@@ -35,15 +35,17 @@ export function TabzConnectionStatus({
   size = "md",
   className = "",
 }: TabzConnectionStatusProps) {
-  const { isConnected, checkConnection, lastReceivedAt } = useTabzBridge()
+  const { backendRunning, authenticated, error, isLoaded, refreshStatus } = useTerminalExtension()
   const [isChecking, setIsChecking] = React.useState(false)
+
+  // Determine connection status from terminal extension state
+  const isConnected = backendRunning && authenticated
 
   const handleRefresh = React.useCallback(async () => {
     setIsChecking(true)
-    checkConnection()
-    // Give it time to receive a response
-    setTimeout(() => setIsChecking(false), 2000)
-  }, [checkConnection])
+    await refreshStatus()
+    setIsChecking(false)
+  }, [refreshStatus])
 
   // Size classes
   const sizeClasses = {
@@ -69,10 +71,20 @@ export function TabzConnectionStatus({
 
   const classes = sizeClasses[size]
 
-  // Format last received time
-  const lastReceivedText = lastReceivedAt
-    ? `Last message: ${new Date(lastReceivedAt).toLocaleTimeString()}`
-    : "No messages received yet"
+  // Status message based on state
+  const getStatusMessage = () => {
+    if (!isLoaded) return "Checking connection..."
+    if (!backendRunning) return "Backend not running on localhost:8129"
+    if (!authenticated) return "API token not configured or invalid"
+    return "Connected to TabzChrome backend"
+  }
+
+  // Help text based on state
+  const getHelpText = () => {
+    if (!backendRunning) return "Start the TabzChrome backend server."
+    if (!authenticated) return "Add your API token in Profile or Setup settings."
+    return "Ready to spawn terminals and run commands."
+  }
 
   return (
     <TooltipProvider>
@@ -87,7 +99,7 @@ export function TabzConnectionStatus({
             data-tabz-bridge="true"
             data-tabz-action="status"
           >
-            {isChecking ? (
+            {isChecking || !isLoaded ? (
               <RefreshCw className={`${classes.icon} animate-spin text-muted-foreground`} />
             ) : isConnected ? (
               <>
@@ -127,12 +139,11 @@ export function TabzConnectionStatus({
                 </>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">{lastReceivedText}</p>
-            <p className="text-xs text-muted-foreground">
-              {isConnected
-                ? "Ready to receive commands from browser."
-                : "Install TabzChrome extension to enable browser integration."}
-            </p>
+            <p className="text-xs text-muted-foreground">{getStatusMessage()}</p>
+            <p className="text-xs text-muted-foreground">{getHelpText()}</p>
+            {error && (
+              <p className="text-xs text-red-400">{error}</p>
+            )}
             <p className="text-xs text-muted-foreground/70 italic">Click to refresh status</p>
           </div>
         </TooltipContent>

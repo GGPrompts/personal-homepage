@@ -86,7 +86,7 @@ export default function ProjectDetailPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="w-full">
       {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="glass">

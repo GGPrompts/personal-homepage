@@ -26,7 +26,7 @@ export default function ProjectsLayout({
       </header>
 
       {/* Main content */}
-      <main className="container px-4 py-6">
+      <main className="px-6 py-6 max-w-[1800px] mx-auto">
         {children}
       </main>
     </div>

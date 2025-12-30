@@ -9,8 +9,10 @@ import {
   type ProjectTask,
   type ProjectLink,
   type ProjectCommand,
+  type KanbanColumn,
   DEFAULT_PROJECT_META,
   DEFAULT_PROJECTS_META,
+  DEFAULT_KANBAN_COLUMNS,
 } from "@/lib/projects"
 
 // ============================================================================
@@ -31,6 +33,7 @@ interface UseProjectMetaReturn {
   // Data
   meta: ProjectMeta
   allMeta: ProjectsMetaFile | null
+  columns: KanbanColumn[]
 
   // Status
   isLoading: boolean
@@ -42,7 +45,13 @@ interface UseProjectMetaReturn {
   addTask: (task: Omit<ProjectTask, "id" | "createdAt" | "updatedAt">) => void
   updateTask: (taskId: string, updates: Partial<ProjectTask>) => void
   deleteTask: (taskId: string) => void
-  moveTask: (taskId: string, newStatus: ProjectTask["status"]) => void
+  moveTask: (taskId: string, newStatus: string) => void
+
+  // Column operations
+  addColumn: (column: Omit<KanbanColumn, "id" | "order">) => void
+  updateColumn: (columnId: string, updates: Partial<Omit<KanbanColumn, "id">>) => void
+  deleteColumn: (columnId: string, moveTasksTo?: string) => void
+  reorderColumns: (columnIds: string[]) => void
 
   // Link operations
   addLink: (link: Omit<ProjectLink, "id">) => void
@@ -312,10 +321,108 @@ export function useProjectMeta(projectSlug: string): UseProjectMetaReturn {
   )
 
   const moveTask = useCallback(
-    (taskId: string, newStatus: ProjectTask["status"]) => {
+    (taskId: string, newStatus: string) => {
       updateTask(taskId, { status: newStatus })
     },
     [updateTask]
+  )
+
+  // ============================================================================
+  // COLUMN OPERATIONS
+  // ============================================================================
+
+  // Get columns with fallback to defaults
+  const columns: KanbanColumn[] = currentMeta.columns?.length
+    ? [...currentMeta.columns].sort((a, b) => a.order - b.order)
+    : DEFAULT_KANBAN_COLUMNS
+
+  const addColumn = useCallback(
+    (column: Omit<KanbanColumn, "id" | "order">) => {
+      const currentColumns = currentMeta.columns?.length
+        ? currentMeta.columns
+        : DEFAULT_KANBAN_COLUMNS
+
+      const maxOrder = Math.max(...currentColumns.map((c) => c.order), -1)
+      const newColumn: KanbanColumn = {
+        ...column,
+        id: `col-${Date.now()}`,
+        order: maxOrder + 1,
+      }
+
+      updateProjectMeta((meta) => ({
+        ...meta,
+        columns: [...currentColumns, newColumn],
+      }))
+    },
+    [currentMeta.columns, updateProjectMeta]
+  )
+
+  const updateColumn = useCallback(
+    (columnId: string, updates: Partial<Omit<KanbanColumn, "id">>) => {
+      const currentColumns = currentMeta.columns?.length
+        ? currentMeta.columns
+        : DEFAULT_KANBAN_COLUMNS
+
+      updateProjectMeta((meta) => ({
+        ...meta,
+        columns: currentColumns.map((c) =>
+          c.id === columnId ? { ...c, ...updates } : c
+        ),
+      }))
+    },
+    [currentMeta.columns, updateProjectMeta]
+  )
+
+  const deleteColumn = useCallback(
+    (columnId: string, moveTasksTo?: string) => {
+      const currentColumns = currentMeta.columns?.length
+        ? currentMeta.columns
+        : DEFAULT_KANBAN_COLUMNS
+
+      // Don't allow deleting the last column
+      if (currentColumns.length <= 1) return
+
+      // Find the first remaining column to move tasks to if not specified
+      const targetColumnId = moveTasksTo || currentColumns.find((c) => c.id !== columnId)?.id
+
+      updateProjectMeta((meta) => ({
+        ...meta,
+        columns: currentColumns
+          .filter((c) => c.id !== columnId)
+          .map((c, idx) => ({ ...c, order: idx })), // Re-order
+        tasks: targetColumnId
+          ? meta.tasks.map((t) =>
+              t.status === columnId ? { ...t, status: targetColumnId, updatedAt: new Date().toISOString() } : t
+            )
+          : meta.tasks.filter((t) => t.status !== columnId), // Delete orphaned tasks if no target
+      }))
+    },
+    [currentMeta.columns, updateProjectMeta]
+  )
+
+  const reorderColumns = useCallback(
+    (columnIds: string[]) => {
+      const currentColumns = currentMeta.columns?.length
+        ? currentMeta.columns
+        : DEFAULT_KANBAN_COLUMNS
+
+      // Create a map for quick lookup
+      const columnMap = new Map(currentColumns.map((c) => [c.id, c]))
+
+      // Reorder based on the provided order
+      const reordered = columnIds
+        .map((id, idx) => {
+          const col = columnMap.get(id)
+          return col ? { ...col, order: idx } : null
+        })
+        .filter((c): c is KanbanColumn => c !== null)
+
+      updateProjectMeta((meta) => ({
+        ...meta,
+        columns: reordered,
+      }))
+    },
+    [currentMeta.columns, updateProjectMeta]
   )
 
   // ============================================================================
@@ -459,6 +566,7 @@ export function useProjectMeta(projectSlug: string): UseProjectMetaReturn {
   return {
     meta: currentMeta,
     allMeta: remoteData || null,
+    columns,
     isLoading,
     isSyncing: saveMutation.isPending,
     syncStatus,
@@ -467,6 +575,10 @@ export function useProjectMeta(projectSlug: string): UseProjectMetaReturn {
     updateTask,
     deleteTask,
     moveTask,
+    addColumn,
+    updateColumn,
+    deleteColumn,
+    reorderColumns,
     addLink,
     updateLink,
     deleteLink,

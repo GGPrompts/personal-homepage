@@ -4,12 +4,27 @@
 // TYPES
 // ============================================================================
 
+// Kanban column type
+export interface KanbanColumn {
+  id: string
+  title: string
+  color: string  // Tailwind border color class e.g. "border-t-gray-500"
+  order: number
+}
+
+// Default columns for new projects
+export const DEFAULT_KANBAN_COLUMNS: KanbanColumn[] = [
+  { id: "todo", title: "To Do", color: "border-t-gray-500", order: 0 },
+  { id: "in-progress", title: "In Progress", color: "border-t-amber-500", order: 1 },
+  { id: "done", title: "Done", color: "border-t-emerald-500", order: 2 },
+]
+
 // Task type for Kanban board
 export interface ProjectTask {
   id: string
   title: string
   description?: string
-  status: "todo" | "in-progress" | "done"
+  status: string  // Column ID - allows custom columns
   createdAt: string
   updatedAt: string
 }
@@ -35,6 +50,7 @@ export interface ProjectCommand {
 // Metadata for a single project (stored in sync repo)
 export interface ProjectMeta {
   pinned: boolean
+  columns?: KanbanColumn[]  // Optional for backwards compatibility
   tasks: ProjectTask[]
   links: ProjectLink[]
   commands: ProjectCommand[]

@@ -15,12 +15,41 @@ function getGitInfo(projectPath: string): LocalProject["git"] | null {
   if (!existsSync(gitDir)) return null
 
   try {
-    // Get current branch
-    const branch = execSync("git rev-parse --abbrev-ref HEAD", {
-      cwd: projectPath,
-      encoding: "utf-8",
-      timeout: 5000,
-    }).trim()
+    // Check if repo has any commits
+    let hasCommits = true
+    try {
+      execSync("git rev-parse HEAD", {
+        cwd: projectPath,
+        encoding: "utf-8",
+        timeout: 5000,
+        stdio: ["pipe", "pipe", "pipe"],
+      })
+    } catch {
+      hasCommits = false
+    }
+
+    // Get current branch (or default branch name for empty repos)
+    let branch = "main"
+    if (hasCommits) {
+      branch = execSync("git rev-parse --abbrev-ref HEAD", {
+        cwd: projectPath,
+        encoding: "utf-8",
+        timeout: 5000,
+      }).trim()
+    } else {
+      // For repos with no commits, try to get the default branch from config
+      try {
+        const defaultBranch = execSync("git config init.defaultBranch", {
+          cwd: projectPath,
+          encoding: "utf-8",
+          timeout: 5000,
+          stdio: ["pipe", "pipe", "pipe"],
+        }).trim()
+        if (defaultBranch) branch = defaultBranch
+      } catch {
+        // Use "main" as fallback
+      }
+    }
 
     // Get remote URL
     let remoteUrl: string | undefined
@@ -34,8 +63,8 @@ function getGitInfo(projectPath: string): LocalProject["git"] | null {
       // No remote configured
     }
 
-    // Get status (clean/dirty)
-    let status: "clean" | "dirty" | "untracked" = "clean"
+    // Get status (clean/dirty/untracked)
+    let status: "clean" | "dirty" | "untracked" = hasCommits ? "clean" : "untracked"
     try {
       const statusOutput = execSync("git status --porcelain", {
         cwd: projectPath,
@@ -52,29 +81,31 @@ function getGitInfo(projectPath: string): LocalProject["git"] | null {
       // Ignore status errors
     }
 
-    // Get ahead/behind counts
+    // Get ahead/behind counts (only if repo has commits)
     let ahead = 0
     let behind = 0
-    try {
-      const trackingBranch = execSync(`git rev-parse --abbrev-ref ${branch}@{upstream}`, {
-        cwd: projectPath,
-        encoding: "utf-8",
-        timeout: 5000,
-        stdio: ["pipe", "pipe", "pipe"],
-      }).trim()
-
-      if (trackingBranch) {
-        const countOutput = execSync(`git rev-list --left-right --count ${branch}...${trackingBranch}`, {
+    if (hasCommits) {
+      try {
+        const trackingBranch = execSync(`git rev-parse --abbrev-ref ${branch}@{upstream}`, {
           cwd: projectPath,
           encoding: "utf-8",
           timeout: 5000,
+          stdio: ["pipe", "pipe", "pipe"],
         }).trim()
-        const [a, b] = countOutput.split(/\s+/).map(Number)
-        ahead = a || 0
-        behind = b || 0
+
+        if (trackingBranch) {
+          const countOutput = execSync(`git rev-list --left-right --count ${branch}...${trackingBranch}`, {
+            cwd: projectPath,
+            encoding: "utf-8",
+            timeout: 5000,
+          }).trim()
+          const [a, b] = countOutput.split(/\s+/).map(Number)
+          ahead = a || 0
+          behind = b || 0
+        }
+      } catch {
+        // No upstream or error getting counts
       }
-    } catch {
-      // No upstream or error getting counts
     }
 
     return { branch, remoteUrl, status, ahead, behind }
