@@ -22,6 +22,20 @@ const themeColors: Record<string, { bg: string; accent: string; label: string }>
   slate: { bg: '#1a1f29', accent: '#38bdf8', label: 'Slate' },
 }
 
+// Map dark themes to their recommended background tones for auto-coupling
+// When selecting a dark theme while on 'light' background tone, auto-switch to compatible tone
+const themeToTone: Record<string, BackgroundTone> = {
+  terminal: 'charcoal',
+  amber: 'deep-purple',
+  carbon: 'pure-black',
+  ocean: 'ocean',
+  sunset: 'sunset',
+  forest: 'forest',
+  midnight: 'midnight',
+  neon: 'neon-dark',
+  slate: 'slate',
+}
+
 // Background tone color previews
 const toneColors: Record<BackgroundTone, { bg: string; label: string }> = {
   'charcoal': { bg: '#0d1117', label: 'Charcoal' },
@@ -80,7 +94,15 @@ export function ThemeSettingsPanel() {
             return (
               <button
                 key={t}
-                onClick={() => setTheme(t)}
+                onClick={() => {
+                  setTheme(t)
+                  // Auto-couple: if selecting a dark theme while on 'light' background tone,
+                  // switch to a compatible background tone to prevent contrast issues
+                  if (t !== 'light' && backgroundTone === 'light') {
+                    const compatibleTone = themeToTone[t] || 'charcoal'
+                    setBackgroundTone(compatibleTone)
+                  }
+                }}
                 className={cn(
                   "group relative flex flex-col items-center gap-1.5 p-2 rounded-lg transition-all",
                   "hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/50",
@@ -130,7 +152,14 @@ export function ThemeSettingsPanel() {
             return (
               <button
                 key={tone}
-                onClick={() => setBackgroundTone(tone)}
+                onClick={() => {
+                  setBackgroundTone(tone)
+                  // Auto-couple: if selecting 'light' background tone while on a dark theme,
+                  // switch to Light theme to prevent contrast issues
+                  if (tone === 'light' && theme !== 'light') {
+                    setTheme('light')
+                  }
+                }}
                 className={cn(
                   "group relative flex flex-col items-center gap-1.5 p-2 rounded-lg transition-all",
                   "hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/50",
