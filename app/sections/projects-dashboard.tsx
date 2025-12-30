@@ -13,6 +13,7 @@ import {
   type SortingState,
   type ColumnFiltersState,
   type RowSelectionState,
+  type VisibilityState,
 } from "@tanstack/react-table"
 import {
   FolderGit2,
@@ -44,6 +45,9 @@ import {
   Save,
   FileText,
   MessageSquare,
+  Columns,
+  Eye,
+  EyeOff,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -169,6 +173,41 @@ export default function ProjectsDashboard({
   const [showAuthModal, setShowAuthModal] = React.useState(false)
 
   const queryClient = useQueryClient()
+
+  // Column visibility - persisted in localStorage
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('projects-column-visibility')
+      if (saved) {
+        try {
+          return JSON.parse(saved)
+        } catch {
+          // Ignore parse errors
+        }
+      }
+    }
+    // Default: show all columns
+    return {}
+  })
+
+  // Persist column visibility changes
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('projects-column-visibility', JSON.stringify(columnVisibility))
+    }
+  }, [columnVisibility])
+
+  // Column labels for the visibility dropdown
+  const columnLabels: Record<string, string> = {
+    select: "Select",
+    name: "Name",
+    branch: "Branch",
+    techStack: "Tech Stack",
+    stars: "Stars",
+    issues: "Issues",
+    pushed_at: "Updated",
+    actions: "Actions",
+  }
 
   // Table state
   const [sorting, setSorting] = React.useState<SortingState>([
@@ -307,6 +346,7 @@ export default function ProjectsDashboard({
             }
             onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
             aria-label="Select all"
+            data-tabz-action="select-all"
           />
         ),
         cell: ({ row }) => {
@@ -319,6 +359,7 @@ export default function ProjectsDashboard({
               disabled={!hasLocal}
               aria-label="Select row"
               className={!hasLocal ? "opacity-30" : ""}
+              data-tabz-action="select"
             />
           )
         },
@@ -498,6 +539,7 @@ export default function ProjectsDashboard({
                         className="h-8 w-8"
                         onClick={() => togglePinned(project.slug)}
                         disabled={metaSyncing}
+                        data-tabz-action={pinned ? "unpin" : "pin"}
                       >
                         {pinned ? (
                           <PinOff className="h-4 w-4 text-amber-500" />
@@ -521,6 +563,8 @@ export default function ProjectsDashboard({
                   onClick={() => handleLaunchTerminal("", { workingDir: project.local!.path, name: project.name })}
                   title={terminalAvailable ? "Open Terminal" : "Terminal not connected"}
                   disabled={!terminalAvailable}
+                  data-tabz-action="open-terminal"
+                  data-tabz-project={project.local.path}
                 >
                   <Terminal className="h-4 w-4" />
                 </Button>
@@ -534,6 +578,7 @@ export default function ProjectsDashboard({
                   onClick={() => handleLaunchTerminal(`code "${project.local!.path}"`, { name: `VS Code: ${project.name}` })}
                   title={terminalAvailable ? "Open in VS Code" : "Terminal not connected"}
                   disabled={!terminalAvailable}
+                  data-tabz-action="open-vscode"
                 >
                   <Code className="h-4 w-4" />
                 </Button>
@@ -551,6 +596,7 @@ export default function ProjectsDashboard({
                   }}
                   title={terminalAvailable ? "Open Folder" : "Terminal not connected"}
                   disabled={!terminalAvailable}
+                  data-tabz-action="open-folder"
                 >
                   <FolderOpen className="h-4 w-4" />
                 </Button>
@@ -565,6 +611,7 @@ export default function ProjectsDashboard({
                         size="icon"
                         className="h-8 w-8"
                         onClick={() => onNavigateToSection("ai-workspace", project.local!.path)}
+                        data-tabz-action="open-chat"
                       >
                         <MessageSquare className="h-4 w-4" />
                       </Button>
@@ -587,6 +634,7 @@ export default function ProjectsDashboard({
                           localStorage.setItem("github-notes-repo", project.github!.full_name)
                           onNavigateToSection("notes")
                         }}
+                        data-tabz-action="open-docs"
                       >
                         <FileText className="h-4 w-4" />
                       </Button>
@@ -602,6 +650,7 @@ export default function ProjectsDashboard({
                   size="icon"
                   className="h-8 w-8"
                   asChild
+                  data-tabz-action="open-github"
                 >
                   <a
                     href={project.github.html_url}
@@ -619,6 +668,7 @@ export default function ProjectsDashboard({
                 size="icon"
                 className="h-8 w-8"
                 asChild
+                data-tabz-action="view-details"
               >
                 <Link href={`/projects/${project.slug}`} title="View Details">
                   <Info className="h-4 w-4" />
@@ -641,11 +691,13 @@ export default function ProjectsDashboard({
       columnFilters,
       globalFilter,
       rowSelection,
+      columnVisibility,
     },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
     onRowSelectionChange: setRowSelection,
+    onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -689,7 +741,7 @@ export default function ProjectsDashboard({
   }
 
   return (
-    <div className="h-full flex flex-col p-4 lg:p-6">
+    <div className="h-full flex flex-col p-4 lg:p-6" data-tabz-section="projects">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <div>
@@ -720,6 +772,8 @@ export default function ProjectsDashboard({
                 setSaveAsJob(false)
                 setJobName("")
               }}
+              data-tabz-action="open-batch-prompt"
+              data-tabz-count={selectedProjects.length}
             >
               <Play className="h-4 w-4 mr-2" />
               Batch Prompt ({selectedProjects.length})
@@ -735,6 +789,7 @@ export default function ProjectsDashboard({
               refetchLocal()
             }}
             disabled={isLoading}
+            data-tabz-action="refresh-projects"
           >
             <RotateCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
             Refresh
@@ -752,6 +807,7 @@ export default function ProjectsDashboard({
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
             className="pl-9 h-9"
+            data-tabz-input="project-search"
           />
           {globalFilter && (
             <Button
@@ -759,6 +815,7 @@ export default function ProjectsDashboard({
               size="icon"
               className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
               onClick={() => setGlobalFilter("")}
+              data-tabz-action="clear-search"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -767,24 +824,24 @@ export default function ProjectsDashboard({
 
         {/* Status filter */}
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[130px] h-9">
+          <SelectTrigger className="w-[130px] h-9" data-tabz-input="status-filter">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="pinned">Pinned</SelectItem>
-            <SelectItem value="cloned">Cloned</SelectItem>
-            <SelectItem value="remote">Remote Only</SelectItem>
-            <SelectItem value="local">Local Only</SelectItem>
-            <SelectItem value="dirty">Modified</SelectItem>
-            <SelectItem value="archived">Archived</SelectItem>
+            <SelectItem value="all" data-tabz-action="filter-status-all">All Status</SelectItem>
+            <SelectItem value="pinned" data-tabz-action="filter-status-pinned">Pinned</SelectItem>
+            <SelectItem value="cloned" data-tabz-action="filter-status-cloned">Cloned</SelectItem>
+            <SelectItem value="remote" data-tabz-action="filter-status-remote">Remote Only</SelectItem>
+            <SelectItem value="local" data-tabz-action="filter-status-local">Local Only</SelectItem>
+            <SelectItem value="dirty" data-tabz-action="filter-status-dirty">Modified</SelectItem>
+            <SelectItem value="archived" data-tabz-action="filter-status-archived">Archived</SelectItem>
           </SelectContent>
         </Select>
 
         {/* Tech filter */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-9">
+            <Button variant="outline" size="sm" className="h-9" data-tabz-action="open-tech-filter">
               <Filter className="h-4 w-4 mr-2" />
               Tech
               {techFilter.length > 0 && (
@@ -794,7 +851,7 @@ export default function ProjectsDashboard({
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48">
+          <DropdownMenuContent align="start" className="w-48" data-tabz-list="tech-filters">
             <DropdownMenuLabel>Filter by Tech</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {allTechStacks.map((tech) => (
@@ -808,6 +865,7 @@ export default function ProjectsDashboard({
                       : techFilter.filter((t) => t !== tech)
                   )
                 }}
+                data-tabz-action={`filter-tech-${tech.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
               >
                 {tech}
               </DropdownMenuCheckboxItem>
@@ -815,11 +873,44 @@ export default function ProjectsDashboard({
             {techFilter.length > 0 && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setTechFilter([])}>
+                <DropdownMenuItem onClick={() => setTechFilter([])} data-tabz-action="clear-tech-filter">
                   Clear all
                 </DropdownMenuItem>
               </>
             )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Column visibility */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-9" data-tabz-action="open-columns">
+              <Columns className="h-4 w-4 mr-2" />
+              Columns
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-48" data-tabz-list="column-visibility">
+            <DropdownMenuLabel>Toggle Columns</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {table.getAllColumns()
+              .filter((column) => column.getCanHide())
+              .map((column) => (
+                <DropdownMenuCheckboxItem
+                  key={column.id}
+                  checked={column.getIsVisible()}
+                  onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                  data-tabz-action={`toggle-column-${column.id}`}
+                >
+                  {columnLabels[column.id] || column.id}
+                </DropdownMenuCheckboxItem>
+              ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => setColumnVisibility({})}
+              data-tabz-action="show-all-columns"
+            >
+              Show all
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -834,6 +925,7 @@ export default function ProjectsDashboard({
               setGlobalFilter("")
             }}
             className="h-9 text-muted-foreground"
+            data-tabz-action="clear-all-filters"
           >
             Clear filters
           </Button>
@@ -851,7 +943,7 @@ export default function ProjectsDashboard({
       )}
 
       {/* Table */}
-      <div className="flex-1 overflow-auto glass rounded-lg">
+      <div className="flex-1 overflow-auto glass rounded-lg" data-tabz-list="projects">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -898,7 +990,12 @@ export default function ProjectsDashboard({
               </TableRow>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow
+                  key={row.id}
+                  data-tabz-item={`project-${row.original.slug}`}
+                  data-tabz-selected={row.getIsSelected() ? "true" : undefined}
+                  data-tabz-source={row.original.source}
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -1162,7 +1259,7 @@ function BatchPromptModal({
 
   return (
     <Dialog open={open} onOpenChange={(open) => !open && !isRunning && onClose()}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col" data-tabz-region="batch-prompt-modal">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {isRunning && !isDone && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -1206,6 +1303,7 @@ function BatchPromptModal({
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder="Enter the prompt to run on all selected projects..."
                   className="min-h-[150px]"
+                  data-tabz-input="batch-prompt"
                 />
               </div>
 
@@ -1216,6 +1314,7 @@ function BatchPromptModal({
                     id="save-as-job"
                     checked={saveAsJob}
                     onCheckedChange={(checked) => setSaveAsJob(!!checked)}
+                    data-tabz-action="toggle-save-job"
                   />
                   <Label htmlFor="save-as-job" className="cursor-pointer">
                     Save as job for later
@@ -1230,13 +1329,14 @@ function BatchPromptModal({
                       value={jobName}
                       onChange={(e) => setJobName(e.target.value)}
                       placeholder="e.g., Weekly Code Review"
+                      data-tabz-input="job-name"
                     />
                   </div>
                 )}
               </div>
             </div>
           ) : (
-            <div className="space-y-2 py-4">
+            <div className="space-y-2 py-4" data-tabz-list="batch-progress">
               {progress.map((project) => (
                 <Card
                   key={project.path}
@@ -1248,6 +1348,8 @@ function BatchPromptModal({
                       expandedProject === project.path ? null : project.path
                     )
                   }
+                  data-tabz-item={`batch-${project.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
+                  data-tabz-status={project.status}
                 >
                   <CardContent className="p-3 flex items-center gap-3">
                     {project.status === 'pending' && (
@@ -1298,21 +1400,22 @@ function BatchPromptModal({
         <DialogFooter>
           {!isRunning ? (
             <>
-              <Button variant="outline" onClick={onClose}>
+              <Button variant="outline" onClick={onClose} data-tabz-action="cancel-batch">
                 Cancel
               </Button>
               <Button
                 onClick={handleRun}
                 disabled={!prompt.trim() || (saveAsJob && !jobName.trim())}
+                data-tabz-action="run-batch"
               >
                 <Play className="h-4 w-4 mr-2" />
                 Run Now
               </Button>
             </>
           ) : isDone ? (
-            <Button onClick={onClose}>Close</Button>
+            <Button onClick={onClose} data-tabz-action="close-batch">Close</Button>
           ) : (
-            <Button variant="destructive" onClick={handleCancel}>
+            <Button variant="destructive" onClick={handleCancel} data-tabz-action="abort-batch">
               Cancel
             </Button>
           )}
