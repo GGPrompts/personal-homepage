@@ -1224,12 +1224,13 @@ export default function JobsSection({
   })
 
   // Fetch local projects for job creation
-  const { data: projectsData, isLoading: projectsLoading } = useQuery({
+  const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ['local-projects'],
     queryFn: async () => {
       const res = await fetch('/api/projects/local')
-      if (!res.ok) return { projects: [] }
-      return res.json() as Promise<{ projects: LocalProject[] }>
+      if (!res.ok) return []
+      const data = await res.json()
+      return (data.projects || []) as LocalProject[]
     },
     staleTime: 5 * 60 * 1000,
   })
@@ -1247,7 +1248,6 @@ export default function JobsSection({
   })
 
   const jobs = jobsData?.jobs || []
-  const projects = projectsData?.projects || []
 
   return (
     <>

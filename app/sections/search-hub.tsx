@@ -31,7 +31,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { useTabzBridge } from "@/hooks/useTabzBridge"
+import { useTerminalExtension } from "@/hooks/useTerminalExtension"
 import { TabzConnectionStatus } from "@/components/TabzConnectionStatus"
 
 // ============================================================================
@@ -323,8 +323,9 @@ export default function SearchHubSection({
   const [copied, setCopied] = React.useState(false)
   const inputRef = React.useRef<HTMLInputElement>(null)
 
-  // TabzChrome bridge for sending queries to chat
-  const { isConnected: tabzConnected, sendToChat: tabzSendToChat, lastReceivedCommand, clearLastCommand } = useTabzBridge()
+  // TabzChrome connection for sending queries to chat
+  const { backendRunning, authenticated, sendToChat } = useTerminalExtension()
+  const tabzConnected = backendRunning && authenticated
 
   const currentEngines = activeCategory === "search"
     ? searchEngines
@@ -367,14 +368,6 @@ export default function SearchHubSection({
     }
   }, [activeSubItem, onSubItemHandled])
 
-  // Handle incoming commands from TabzChrome - pre-fill query input
-  React.useEffect(() => {
-    if (lastReceivedCommand) {
-      setQuery(lastReceivedCommand)
-      clearLastCommand()
-      inputRef.current?.focus()
-    }
-  }, [lastReceivedCommand, clearLastCommand])
 
   // Keyboard shortcuts for engine selection
   React.useEffect(() => {
@@ -574,7 +567,7 @@ export default function SearchHubSection({
                         variant="outline"
                         size="icon"
                         disabled={!query.trim()}
-                        onClick={() => tabzSendToChat(query.trim())}
+                        onClick={() => sendToChat(query.trim())}
                         className={`h-11 sm:h-10 w-11 sm:w-10 shrink-0 ${tabzConnected ? 'border-emerald-500/30 text-emerald-500 hover:text-emerald-400' : ''}`}
                         data-tabz-bridge="true"
                         data-tabz-action="send-chat"

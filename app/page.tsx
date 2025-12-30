@@ -172,7 +172,7 @@ function SidebarContent({
               <div className="h-10 w-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
                 <Home className="h-5 w-5 text-primary" />
               </div>
-              <div className={`flex-1 transition-all duration-300 overflow-hidden ${collapsed && !mobile ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>
+              <div className={`flex-1 transition-[max-width,opacity] duration-300 overflow-hidden ${collapsed && !mobile ? 'max-w-0 opacity-0' : 'max-w-[200px] opacity-100'}`}>
                 <div className="flex items-center gap-2">
                   <p className="font-semibold text-foreground">Personal Home</p>
                   <EnvironmentBadge isLocal={isLocal} collapsed={collapsed && !mobile} />
@@ -246,8 +246,8 @@ function SidebarContent({
                           </span>
                         )}
                       </div>
-                      <span className={`flex-1 text-left transition-all duration-300 overflow-hidden whitespace-nowrap ${
-                        collapsed && !mobile ? 'w-0 opacity-0' : 'w-auto opacity-100'
+                      <span className={`flex-1 text-left transition-[max-width,opacity] duration-300 overflow-hidden whitespace-nowrap ${
+                        collapsed && !mobile ? 'max-w-0 opacity-0' : 'max-w-[180px] opacity-100'
                       }`}>{item.label}</span>
                       {/* Local-only badge for sections requiring localhost */}
                       {!isLocal && requiresLocalhost(item.id) && !(collapsed && !mobile) && (

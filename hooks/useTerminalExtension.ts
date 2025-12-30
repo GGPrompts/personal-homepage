@@ -449,18 +449,62 @@ export function useTerminalExtension() {
     [spawnWithOptions]
   )
 
-  // Send command to TabzChrome chat input via postMessage
+  // Send command to TabzChrome chat input via WebSocket (requires auth token)
   const sendToChat = useCallback(
-    (command: string): void => {
-      if (typeof window === "undefined") return
+    async (command: string): Promise<boolean> => {
+      if (typeof window === "undefined") return false
 
-      // Broadcast message that TabzChrome content script listens for
-      window.postMessage({
-        type: "TABZ_QUEUE_COMMAND",
-        command,
-      }, "*")
+      try {
+        // Fetch auth token from backend
+        const tokenResponse = await fetch(`${TABZ_API_BASE}/api/auth/token`, {
+          signal: AbortSignal.timeout(2000),
+        })
+        if (!tokenResponse.ok) {
+          console.error("[useTerminalExtension] Failed to fetch auth token")
+          return false
+        }
+        const { token: wsToken } = await tokenResponse.json()
+        if (!wsToken) {
+          console.error("[useTerminalExtension] No token returned from backend")
+          return false
+        }
 
-      console.log("[useTerminalExtension] Sent command to chat:", command)
+        // Sanitize token to remove non-ASCII characters
+        const cleanToken = wsToken.replace(/[^\x00-\xFF]/g, '')
+        const wsUrl = `ws://localhost:8129?token=${cleanToken}`
+
+        // Connect via WebSocket and send command
+        return new Promise((resolve) => {
+          try {
+            const ws = new WebSocket(wsUrl)
+            const timeout = setTimeout(() => {
+              ws.close()
+              console.error("[useTerminalExtension] WebSocket connection timeout")
+              resolve(false)
+            }, 3000)
+
+            ws.onopen = () => {
+              ws.send(JSON.stringify({ type: "QUEUE_COMMAND", command }))
+              clearTimeout(timeout)
+              ws.close()
+              console.log("[useTerminalExtension] Sent command to chat via WebSocket:", command)
+              resolve(true)
+            }
+
+            ws.onerror = (err) => {
+              clearTimeout(timeout)
+              console.error("[useTerminalExtension] WebSocket error:", err)
+              resolve(false)
+            }
+          } catch (err) {
+            console.error("[useTerminalExtension] WebSocket exception:", err)
+            resolve(false)
+          }
+        })
+      } catch (err) {
+        console.error("[useTerminalExtension] sendToChat error:", err)
+        return false
+      }
     },
     []
   )
