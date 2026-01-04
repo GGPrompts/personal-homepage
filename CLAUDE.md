@@ -29,6 +29,7 @@ A personal dashboard/homepage with accordion sidebar navigation. Features weathe
 | [docs/design-system.md](docs/design-system.md) | Themes, glassmorphism, backgrounds |
 | [docs/state-management.md](docs/state-management.md) | TanStack Query, caching |
 | [docs/claude-jobs.md](docs/claude-jobs.md) | Automated Claude prompts across projects |
+| [docs/ai-workspace-patterns.md](docs/ai-workspace-patterns.md) | Claude non-interactive mode, streaming, tokens |
 | [docs/roadmap.md](docs/roadmap.md) | Planned features |
 
 ## Sections
