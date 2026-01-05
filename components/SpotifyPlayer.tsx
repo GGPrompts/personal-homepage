@@ -15,6 +15,7 @@ import {
   Volume1,
   Heart,
   ListMusic,
+  ListPlus,
   Search,
   LogOut,
   Loader2,
@@ -54,6 +55,7 @@ import {
   removeTracks,
   checkSavedTracks,
   getRecentlyPlayed,
+  addToQueue,
   type SpotifyTrack,
   type SpotifyPlaylist,
   type SpotifySearchResults,
@@ -443,9 +445,17 @@ export function SpotifyPlayer() {
             </div>
           </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={logout}>
-          <LogOut className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <DeviceSelector
+            devices={devices}
+            currentDeviceId={deviceId}
+            onRefresh={refreshDevices}
+            onSelect={switchDevice}
+          />
+          <Button variant="ghost" size="sm" onClick={logout}>
+            <LogOut className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Error display */}
@@ -500,12 +510,12 @@ export function SpotifyPlayer() {
                     {searchResults.tracks.items.map((track) => (
                       <div
                         key={track.id}
-                        className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-primary/5 transition-colors ${
+                        className={`group flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-primary/5 transition-colors ${
                           currentTrack?.id === track.id ? "bg-primary/10" : ""
                         }`}
                         onClick={() => playTrack(track.uri)}
                       >
-                        {track.album.images[0] ? (
+                        {track.album.images?.[0] ? (
                           <Image
                             src={track.album.images[0].url}
                             alt={track.album.name}
@@ -526,6 +536,18 @@ export function SpotifyPlayer() {
                             {track.artists.map((a) => a.name).join(", ")}
                           </p>
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            addToQueue(track.uri).catch(console.error)
+                          }}
+                          title="Add to queue"
+                        >
+                          <ListPlus className="h-4 w-4" />
+                        </Button>
                         <span className="text-xs text-muted-foreground">
                           {formatTime(track.duration_ms)}
                         </span>
@@ -551,7 +573,7 @@ export function SpotifyPlayer() {
                     Back to Playlists
                   </Button>
                   <div className="flex items-center gap-4 mb-4">
-                    {selectedPlaylist.images[0] ? (
+                    {selectedPlaylist.images?.[0] ? (
                       <Image
                         src={selectedPlaylist.images[0].url}
                         alt={selectedPlaylist.name}
@@ -583,13 +605,13 @@ export function SpotifyPlayer() {
                     {playlistTracks.map((track, idx) => (
                       <div
                         key={`${track.id}-${idx}`}
-                        className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-primary/5 transition-colors ${
+                        className={`group flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-primary/5 transition-colors ${
                           currentTrack?.id === track.id ? "bg-primary/10" : ""
                         }`}
                         onClick={() => playTrack(track.uri)}
                       >
                         <span className="text-xs text-muted-foreground w-5">{idx + 1}</span>
-                        {track.album.images[0] ? (
+                        {track.album.images?.[0] ? (
                           <Image
                             src={track.album.images[0].url}
                             alt={track.album.name}
@@ -610,6 +632,18 @@ export function SpotifyPlayer() {
                             {track.artists.map((a) => a.name).join(", ")}
                           </p>
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            addToQueue(track.uri).catch(console.error)
+                          }}
+                          title="Add to queue"
+                        >
+                          <ListPlus className="h-4 w-4" />
+                        </Button>
                         <span className="text-xs text-muted-foreground">
                           {formatTime(track.duration_ms)}
                         </span>
@@ -618,28 +652,28 @@ export function SpotifyPlayer() {
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-4 gap-2">
                   {playlists.map((playlist) => (
                     <Card
                       key={playlist.id}
-                      className="glass border-border/30 p-3 cursor-pointer hover:bg-primary/5 transition-colors"
+                      className="glass border-border/30 p-1.5 cursor-pointer hover:bg-primary/5 transition-colors"
                       onClick={() => loadPlaylistTracks(playlist)}
                     >
-                      {playlist.images[0] ? (
+                      {playlist.images?.[0] ? (
                         <Image
                           src={playlist.images[0].url}
                           alt={playlist.name}
-                          width={100}
-                          height={100}
-                          className="w-full aspect-square object-cover rounded-md mb-2"
+                          width={128}
+                          height={128}
+                          className="w-full aspect-square object-cover rounded mb-1"
                         />
                       ) : (
-                        <div className="w-full aspect-square bg-muted rounded-md mb-2 flex items-center justify-center">
-                          <ListMusic className="h-8 w-8 text-muted-foreground" />
+                        <div className="w-full aspect-square bg-muted rounded mb-1 flex items-center justify-center">
+                          <ListMusic className="h-6 w-6 text-muted-foreground" />
                         </div>
                       )}
-                      <p className="text-sm font-medium truncate">{playlist.name}</p>
-                      <p className="text-xs text-muted-foreground">{playlist.tracks.total} tracks</p>
+                      <p className="text-xs font-medium truncate">{playlist.name}</p>
+                      <p className="text-[10px] text-muted-foreground">{playlist.tracks.total} tracks</p>
                     </Card>
                   ))}
                 </div>
@@ -654,12 +688,12 @@ export function SpotifyPlayer() {
                 {savedTracks.map((track, idx) => (
                   <div
                     key={`${track.id}-${idx}`}
-                    className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-primary/5 transition-colors ${
+                    className={`group flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-primary/5 transition-colors ${
                       currentTrack?.id === track.id ? "bg-primary/10" : ""
                     }`}
                     onClick={() => playTrack(track.uri)}
                   >
-                    {track.album.images[0] ? (
+                    {track.album.images?.[0] ? (
                       <Image
                         src={track.album.images[0].url}
                         alt={track.album.name}
@@ -680,6 +714,18 @@ export function SpotifyPlayer() {
                         {track.artists.map((a) => a.name).join(", ")}
                       </p>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        addToQueue(track.uri).catch(console.error)
+                      }}
+                      title="Add to queue"
+                    >
+                      <ListPlus className="h-4 w-4" />
+                    </Button>
                     <span className="text-xs text-muted-foreground">
                       {formatTime(track.duration_ms)}
                     </span>
@@ -696,12 +742,12 @@ export function SpotifyPlayer() {
                 {recentTracks.map((track, idx) => (
                   <div
                     key={`${track.id}-${idx}`}
-                    className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-primary/5 transition-colors ${
+                    className={`group flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-primary/5 transition-colors ${
                       currentTrack?.id === track.id ? "bg-primary/10" : ""
                     }`}
                     onClick={() => playTrack(track.uri)}
                   >
-                    {track.album.images[0] ? (
+                    {track.album.images?.[0] ? (
                       <Image
                         src={track.album.images[0].url}
                         alt={track.album.name}
@@ -722,6 +768,18 @@ export function SpotifyPlayer() {
                         {track.artists.map((a) => a.name).join(", ")}
                       </p>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        addToQueue(track.uri).catch(console.error)
+                      }}
+                      title="Add to queue"
+                    >
+                      <ListPlus className="h-4 w-4" />
+                    </Button>
                     <span className="text-xs text-muted-foreground">
                       {formatTime(track.duration_ms)}
                     </span>
@@ -739,7 +797,7 @@ export function SpotifyPlayer() {
           <div className="flex items-center gap-4">
             {/* Track info */}
             <div className="flex items-center gap-3 min-w-0 flex-1">
-              {currentTrack.album.images[0] ? (
+              {currentTrack.album.images?.[0] ? (
                 <motion.div
                   animate={{ rotate: isPlaying ? 360 : 0 }}
                   transition={{ duration: 3, repeat: isPlaying ? Infinity : 0, ease: "linear" }}

@@ -20,6 +20,22 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'placehold.co',
       },
+      {
+        protocol: 'https',
+        hostname: 'i.scdn.co', // Spotify CDN for album art
+      },
+      {
+        protocol: 'https',
+        hostname: 'mosaic.scdn.co', // Spotify CDN for playlist mosaics
+      },
+      {
+        protocol: 'https',
+        hostname: 'image-cdn-ak.spotifycdn.com', // Spotify CDN for user images
+      },
+      {
+        protocol: 'https',
+        hostname: '*.spotifycdn.com', // Wildcard for other Spotify CDNs
+      },
     ],
     dangerouslyAllowSVG: true,
     contentDispositionType: 'attachment',

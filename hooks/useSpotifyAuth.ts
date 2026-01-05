@@ -135,9 +135,9 @@ export function useSpotifyAuth(): UseSpotifyAuthReturn {
       const state = sessionStorage.getItem("spotify-auth-state")
 
       if (code && state) {
-        // Clear stored values immediately
+        // Clear code immediately to prevent re-execution on re-render
+        // Note: Don't remove state yet - exchangeCodeForTokens needs it for CSRF verification
         sessionStorage.removeItem("spotify-auth-code")
-        sessionStorage.removeItem("spotify-auth-state")
 
         setIsLoading(true)
         setError(null)

@@ -12,16 +12,28 @@ const SPOTIFY_API_BASE = 'https://api.spotify.com/v1'
 
 // Required scopes for full playback control
 export const SPOTIFY_SCOPES = [
+  // Playback control
   'streaming',
-  'user-read-email',
-  'user-read-private',
   'user-modify-playback-state',
   'user-read-playback-state',
   'user-read-currently-playing',
+  // User profile
+  'user-read-email',
+  'user-read-private',
+  // Listening history
+  'user-read-recently-played',
+  'user-top-read',
+  // Library
   'user-library-read',
   'user-library-modify',
+  // Following
+  'user-follow-read',
+  'user-follow-modify',
+  // Playlists
   'playlist-read-private',
   'playlist-read-collaborative',
+  'playlist-modify-private',
+  'playlist-modify-public',
 ].join(' ')
 
 // Token storage keys
@@ -439,6 +451,17 @@ export async function spotifyFetch<T>(
     }
   }
 
+  if (response.status === 403) {
+    // Insufficient scope - token doesn't have required permissions
+    // Clear tokens so user can re-authenticate with correct scopes
+    const error = await response.json().catch(() => ({ error: { message: 'Forbidden' } }))
+    if (error.error?.message?.includes('scope') || error.error?.message?.includes('Insufficient')) {
+      clearTokens()
+      throw new Error('Insufficient permissions - please reconnect to Spotify')
+    }
+    throw new Error(error.error?.message || 'Forbidden')
+  }
+
   if (response.status === 204) {
     return {} as T
   }
@@ -532,6 +555,15 @@ export async function seek(positionMs: number, deviceId?: string): Promise<void>
   const params = new URLSearchParams({ position_ms: positionMs.toString() })
   if (deviceId) params.set('device_id', deviceId)
   await spotifyFetch(`/me/player/seek?${params}`, { method: 'PUT' })
+}
+
+/**
+ * Add item to playback queue
+ */
+export async function addToQueue(uri: string, deviceId?: string): Promise<void> {
+  const params = new URLSearchParams({ uri })
+  if (deviceId) params.set('device_id', deviceId)
+  await spotifyFetch(`/me/player/queue?${params}`, { method: 'POST' })
 }
 
 /**

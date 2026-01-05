@@ -372,6 +372,16 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
     }
   }, [isPlaying, isActive, duration])
 
+  // Device management (defined early so play functions can use it)
+  const refreshDevices = useCallback(async () => {
+    try {
+      const deviceList = await getDevices()
+      setDevices(deviceList)
+    } catch (err) {
+      console.error("Failed to fetch devices:", err)
+    }
+  }, [])
+
   // Player controls
   const togglePlay = useCallback(async () => {
     if (!playerRef.current) return
@@ -379,9 +389,21 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
   }, [])
 
   const playTrack = useCallback(async (uri: string) => {
-    if (!deviceId) return
-    await play({ deviceId, uris: [uri] })
-  }, [deviceId])
+    if (!deviceId) {
+      setError("No device selected. Please select a device to play on.")
+      return
+    }
+    try {
+      await play({ deviceId, uris: [uri] })
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("not found")) {
+        setError("Device not found. Please select an active device.")
+        refreshDevices()
+      } else {
+        throw err
+      }
+    }
+  }, [deviceId, refreshDevices])
 
   const playTracks = useCallback(async (uris: string[], offset = 0) => {
     if (!deviceId) return
@@ -397,13 +419,25 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
   }, [deviceId])
 
   const playContext = useCallback(async (uri: string, offset = 0) => {
-    if (!deviceId) return
-    await play({
-      deviceId,
-      contextUri: uri,
-      positionMs: 0,
-    })
-  }, [deviceId])
+    if (!deviceId) {
+      setError("No device selected. Please select a device to play on.")
+      return
+    }
+    try {
+      await play({
+        deviceId,
+        contextUri: uri,
+        positionMs: 0,
+      })
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("not found")) {
+        setError("Device not found. Please select an active device.")
+        refreshDevices()
+      } else {
+        throw err
+      }
+    }
+  }, [deviceId, refreshDevices])
 
   const handleSkipNext = useCallback(async () => {
     if (!playerRef.current) return
@@ -438,15 +472,6 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
     await setSpotifyRepeat(nextState, deviceId)
   }, [deviceId, repeatMode])
 
-  const refreshDevices = useCallback(async () => {
-    try {
-      const deviceList = await getDevices()
-      setDevices(deviceList)
-    } catch (err) {
-      console.error("Failed to fetch devices:", err)
-    }
-  }, [])
-
   const switchDevice = useCallback(async (targetDeviceId: string) => {
     try {
       await transferPlayback(targetDeviceId, true)
@@ -456,12 +481,12 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
     }
   }, [refreshDevices])
 
-  // Initial device fetch
+  // Device fetch - initial and when SDK becomes ready
   useEffect(() => {
     if (isAuthenticated && isPremium) {
       refreshDevices()
     }
-  }, [isAuthenticated, isPremium, refreshDevices])
+  }, [isAuthenticated, isPremium, isReady, refreshDevices])
 
   return {
     // SDK status
