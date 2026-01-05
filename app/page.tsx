@@ -304,21 +304,28 @@ function SidebarContent({
                     open={openCategoryFlyout === category.id}
                     onOpenChange={(open) => setOpenCategoryFlyout(open ? category.id : null)}
                   >
-                    <PopoverTrigger asChild>
-                      <button
-                        className={`
-                          w-full flex items-center justify-center p-2.5 rounded-lg transition-colors
-                          ${hasActiveSection
-                            ? 'glass text-primary border-glow'
-                            : 'hover:bg-primary/10 text-muted-foreground hover:text-foreground'
-                          }
-                        `}
-                        data-tabz-category={category.id}
-                        data-tabz-action="open-category-flyout"
-                      >
-                        <CategoryIcon className="h-4 w-4" />
-                      </button>
-                    </PopoverTrigger>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <PopoverTrigger asChild>
+                          <button
+                            className={`
+                              w-full flex items-center justify-center p-2.5 rounded-lg transition-colors
+                              ${hasActiveSection
+                                ? 'glass text-primary border-glow'
+                                : 'hover:bg-primary/10 text-muted-foreground hover:text-foreground'
+                              }
+                            `}
+                            data-tabz-category={category.id}
+                            data-tabz-action="open-category-flyout"
+                          >
+                            <CategoryIcon className="h-4 w-4" />
+                          </button>
+                        </PopoverTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        <p>{category.label}</p>
+                      </TooltipContent>
+                    </Tooltip>
                     <PopoverContent side="right" align="start" className="w-56 p-2" sideOffset={8}>
                       <div className="mb-2 px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         {category.label}
