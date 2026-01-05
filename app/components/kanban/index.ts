@@ -47,3 +47,6 @@ export {
   type UseGraphMetricsOptions,
   type UseGraphMetricsReturn,
 } from './hooks/useGraphMetrics'
+
+// Re-export visualization components
+export * from './visualization'
