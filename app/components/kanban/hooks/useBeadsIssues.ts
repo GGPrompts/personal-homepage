@@ -16,9 +16,10 @@ import {
 } from '../lib/beads/mappers'
 
 // API wrappers for beads operations (replaces direct client import)
-async function fetchBeadsStatus(): Promise<{ available: boolean }> {
+async function fetchBeadsStatus(workspace?: string): Promise<{ available: boolean }> {
   try {
-    const res = await fetch('/api/beads/health')
+    const params = workspace ? `?workspace=${encodeURIComponent(workspace)}` : ''
+    const res = await fetch(`/api/beads/health${params}`)
     if (!res.ok) return { available: false }
     return res.json()
   } catch {
@@ -26,8 +27,9 @@ async function fetchBeadsStatus(): Promise<{ available: boolean }> {
   }
 }
 
-async function fetchBeadsIssues(): Promise<BeadsListResponse> {
-  const res = await fetch('/api/beads/issues')
+async function fetchBeadsIssues(workspace?: string): Promise<BeadsListResponse> {
+  const params = workspace ? `?workspace=${encodeURIComponent(workspace)}` : ''
+  const res = await fetch(`/api/beads/issues${params}`)
   if (!res.ok) {
     const error = await res.json()
     throw new Error(error.error || 'Failed to fetch issues')
@@ -35,11 +37,11 @@ async function fetchBeadsIssues(): Promise<BeadsListResponse> {
   return res.json()
 }
 
-async function updateBeadsIssue(id: string, updates: BeadsUpdatePayload): Promise<BeadsShowResponse> {
+async function updateBeadsIssue(id: string, updates: BeadsUpdatePayload, workspace?: string): Promise<BeadsShowResponse> {
   const res = await fetch(`/api/beads/issues/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updates),
+    body: JSON.stringify({ ...updates, workspace }),
   })
   if (!res.ok) {
     const error = await res.json()
@@ -51,6 +53,8 @@ async function updateBeadsIssue(id: string, updates: BeadsUpdatePayload): Promis
 export interface UseBeadsIssuesOptions {
   /** Columns to map issues to */
   columns: Column[]
+  /** Workspace path (project directory with .beads) */
+  workspace?: string
   /** Custom status to column mapping */
   statusColumnMap?: Record<BeadsStatus, string>
   /** Auto-refresh interval in ms (0 to disable) */
@@ -85,6 +89,7 @@ export interface UseBeadsIssuesResult {
  */
 export function useBeadsIssues({
   columns,
+  workspace,
   statusColumnMap,
   refreshInterval = 0,
   enabled = true,
@@ -111,8 +116,8 @@ export function useBeadsIssues({
       return
     }
 
-    fetchBeadsStatus().then(({ available }) => setIsAvailable(available))
-  }, [enabled])
+    fetchBeadsStatus(workspace).then(({ available }) => setIsAvailable(available))
+  }, [enabled, workspace])
 
   // Fetch issues from beads
   const refresh = useCallback(async () => {
@@ -122,7 +127,7 @@ export function useBeadsIssues({
     setError(null)
 
     try {
-      const result = await fetchBeadsIssues()
+      const result = await fetchBeadsIssues(workspace)
       const issues = result.issues
       setRawIssues(issues)
 
@@ -138,7 +143,7 @@ export function useBeadsIssues({
     }
 
     setIsLoading(false)
-  }, [enabled, isAvailable, statusColumnMap])
+  }, [enabled, isAvailable, statusColumnMap, workspace])
 
   // Initial fetch and refresh interval
   useEffect(() => {
@@ -175,7 +180,7 @@ export function useBeadsIssues({
       const newStatus = mapColumnToBeadsStatus(newColumn)
 
       try {
-        await updateBeadsIssue(taskId, { status: newStatus })
+        await updateBeadsIssue(taskId, { status: newStatus }, workspace)
         // Optimistically update local state
         await refresh()
         return true
@@ -184,7 +189,7 @@ export function useBeadsIssues({
         return false
       }
     },
-    [tasksByColumn, refresh]
+    [tasksByColumn, refresh, workspace]
   )
 
   // Sync task details (title, description, priority, etc.) to beads
@@ -223,7 +228,7 @@ export function useBeadsIssues({
       }
 
       try {
-        await updateBeadsIssue(taskId, payload)
+        await updateBeadsIssue(taskId, payload, workspace)
         // Don't refresh here as it would cause flicker during typing
         // The local state is already updated by the store
         return true
@@ -232,7 +237,7 @@ export function useBeadsIssues({
         return false
       }
     },
-    []
+    [workspace]
   )
 
   // Compute flat list of all tasks

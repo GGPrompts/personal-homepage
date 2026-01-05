@@ -1,7 +1,37 @@
 import { NextRequest, NextResponse } from "next/server"
 import { execFileSync } from "child_process"
+import { existsSync } from "fs"
+import path from "path"
 
 export const dynamic = "force-dynamic"
+
+/**
+ * Validate and resolve workspace path
+ * Ensures the path exists and contains a .beads directory
+ */
+function validateWorkspace(workspace: string | null): string | undefined {
+  if (!workspace) return undefined
+
+  // Resolve ~ to home directory
+  const resolved = workspace.startsWith("~")
+    ? path.join(process.env.HOME || "/home", workspace.slice(1))
+    : workspace
+
+  // Security: ensure it's an absolute path and exists
+  const absolute = path.resolve(resolved)
+
+  if (!existsSync(absolute)) {
+    throw new Error(`Workspace path does not exist: ${workspace}`)
+  }
+
+  // Check for .beads directory
+  const beadsDir = path.join(absolute, ".beads")
+  if (!existsSync(beadsDir)) {
+    throw new Error(`No .beads directory found in: ${workspace}`)
+  }
+
+  return absolute
+}
 
 /**
  * Raw issue from bd list --json
@@ -93,17 +123,22 @@ function transformIssue(raw: RawBeadsIssue) {
  * List all beads issues
  *
  * Query params:
+ *   - workspace: Project path containing .beads directory
  *   - status: Filter by status (open, in_progress, closed, blocked)
  *   - priority: Filter by priority (1-4)
  *   - limit: Max number of issues (default 100)
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
+  const workspace = searchParams.get("workspace")
   const status = searchParams.get("status")
   const priority = searchParams.get("priority")
   const limit = searchParams.get("limit") || "100"
 
   try {
+    // Validate workspace if provided
+    const cwd = validateWorkspace(workspace)
+
     // Build bd list command with filters using execFileSync for security
     const args = ["list", "--json"]
 
@@ -119,6 +154,7 @@ export async function GET(request: NextRequest) {
       encoding: "utf-8",
       timeout: 30000,
       maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large issue lists
+      cwd, // Use workspace directory if provided
     })
 
     const rawIssues: RawBeadsIssue[] = JSON.parse(output)
@@ -151,11 +187,16 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/beads/issues
  * Create a new beads issue
+ *
+ * Body params:
+ *   - workspace: Project path containing .beads directory
+ *   - title: Issue title (required)
+ *   - description, priority, type, labels, assignee, estimate
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { title, description, priority, type, labels, assignee, estimate } = body
+    const { workspace, title, description, priority, type, labels, assignee, estimate } = body
 
     if (!title) {
       return NextResponse.json(
@@ -163,6 +204,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Validate workspace if provided
+    const cwd = validateWorkspace(workspace)
 
     // Build bd create command using execFileSync for security
     const args = ["create", "--json", title]
@@ -191,6 +235,7 @@ export async function POST(request: NextRequest) {
     const output = execFileSync("bd", args, {
       encoding: "utf-8",
       timeout: 10000,
+      cwd, // Use workspace directory if provided
     })
 
     // Parse the created issue

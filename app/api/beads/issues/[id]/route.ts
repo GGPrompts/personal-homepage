@@ -1,7 +1,33 @@
 import { NextRequest, NextResponse } from "next/server"
 import { execFileSync } from "child_process"
+import { existsSync } from "fs"
+import path from "path"
 
 export const dynamic = "force-dynamic"
+
+/**
+ * Validate and resolve workspace path
+ */
+function validateWorkspace(workspace: string | null): string | undefined {
+  if (!workspace) return undefined
+
+  const resolved = workspace.startsWith("~")
+    ? path.join(process.env.HOME || "/home", workspace.slice(1))
+    : workspace
+
+  const absolute = path.resolve(resolved)
+
+  if (!existsSync(absolute)) {
+    throw new Error(`Workspace path does not exist: ${workspace}`)
+  }
+
+  const beadsDir = path.join(absolute, ".beads")
+  if (!existsSync(beadsDir)) {
+    throw new Error(`No .beads directory found in: ${workspace}`)
+  }
+
+  return absolute
+}
 
 /**
  * Raw issue from bd show --json
@@ -89,18 +115,25 @@ interface RouteContext {
 /**
  * GET /api/beads/issues/[id]
  * Get detailed info for a single issue
+ *
+ * Query params:
+ *   - workspace: Project path containing .beads directory
  */
 export async function GET(
   request: NextRequest,
   context: RouteContext
 ) {
   const { id } = await context.params
+  const workspace = request.nextUrl.searchParams.get("workspace")
 
   try {
+    const cwd = validateWorkspace(workspace)
+
     // Use execFileSync with argument array to prevent command injection
     const output = execFileSync("bd", ["show", id, "--json"], {
       encoding: "utf-8",
       timeout: 10000,
+      cwd,
     })
 
     // bd show returns an array with one item
@@ -139,6 +172,7 @@ export async function GET(
  * Update an existing issue
  *
  * Body fields (all optional):
+ *   - workspace: Project path containing .beads directory
  *   - status: New status (open, in_progress, closed, blocked)
  *   - priority: Priority level (1-4)
  *   - title: New title
@@ -155,7 +189,9 @@ export async function PATCH(
 
   try {
     const body = await request.json()
-    const { status, priority, title, description, labels, assignee, estimate } = body
+    const { workspace, status, priority, title, description, labels, assignee, estimate } = body
+
+    const cwd = validateWorkspace(workspace)
 
     // Build bd update command using execFileSync for security
     const args = ["update", id]
@@ -189,12 +225,14 @@ export async function PATCH(
     execFileSync("bd", args, {
       encoding: "utf-8",
       timeout: 10000,
+      cwd,
     })
 
     // Fetch the updated issue
     const showOutput = execFileSync("bd", ["show", id, "--json"], {
       encoding: "utf-8",
       timeout: 10000,
+      cwd,
     })
 
     const rawIssues: RawBeadsIssue[] = JSON.parse(showOutput)
@@ -213,18 +251,25 @@ export async function PATCH(
 /**
  * DELETE /api/beads/issues/[id]
  * Close an issue (beads doesn't support hard delete)
+ *
+ * Query params:
+ *   - workspace: Project path containing .beads directory
  */
 export async function DELETE(
   request: NextRequest,
   context: RouteContext
 ) {
   const { id } = await context.params
+  const workspace = request.nextUrl.searchParams.get("workspace")
 
   try {
+    const cwd = validateWorkspace(workspace)
+
     // Use execFileSync with argument array to prevent command injection
     execFileSync("bd", ["close", id, "--json"], {
       encoding: "utf-8",
       timeout: 10000,
+      cwd,
     })
 
     return NextResponse.json({ success: true })

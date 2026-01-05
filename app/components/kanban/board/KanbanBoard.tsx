@@ -36,6 +36,8 @@ import { getColumnBeadsStatus } from '../lib/beads/mappers'
 export interface KanbanBoardProps {
   /** Use beads as data source instead of local state */
   useBeadsSource?: boolean
+  /** Workspace path for beads (project directory with .beads) */
+  workspace?: string
   /** Callback when beads mode changes */
   onBeadsModeChange?: (enabled: boolean) => void
 }
@@ -56,7 +58,7 @@ function getStoredBoolean(key: string, fallback: boolean): boolean {
   }
 }
 
-export function KanbanBoard({ useBeadsSource = false, onBeadsModeChange }: KanbanBoardProps) {
+export function KanbanBoard({ useBeadsSource = false, workspace, onBeadsModeChange }: KanbanBoardProps) {
   const { getCurrentBoard, tasks: localTasks, moveTask, reorderTasks, reorderColumns, getTasksByColumn } = useBoardStore()
   const board = getCurrentBoard()
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -103,6 +105,7 @@ export function KanbanBoard({ useBeadsSource = false, onBeadsModeChange }: Kanba
     syncTaskColumn,
   } = useBeadsIssues({
     columns: board?.columns ?? [],
+    workspace,
     enabled: beadsMode && beadsAvailable,
     refreshInterval: 30000, // Refresh every 30 seconds
   })
