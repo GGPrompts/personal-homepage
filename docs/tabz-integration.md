@@ -65,6 +65,42 @@ Set a default working directory that applies to all terminal commands without an
 - Also editable inline in the **Bookmarks** section header
 - Stored in `localStorage` as `tabz-default-workdir`
 
+### Import/Export (TabzChrome Sync)
+
+Bookmarks can be imported from and exported to TabzChrome-compatible JSON files.
+
+**Accessing Import/Export:**
+1. Go to **Bookmarks** section
+2. Click the **Sync** button in the header toolbar
+3. Choose from the dropdown menu
+
+**Export Options:**
+
+- **Export Bookmarks** - Exports all bookmarks and folders as a hierarchical JSON file (`tabz-bookmarks-YYYY-MM-DD.json`)
+  - Includes all regular bookmarks and terminal commands
+  - Terminal commands are encoded with their settings (workingDir, profile, color, etc.)
+
+- **Export as TabzChrome Profiles** - Exports terminal commands as TabzChrome profile format (`tabz-profiles-YYYY-MM-DD.json`)
+  - Only exports terminal-type bookmarks
+  - Folders become categories in the profile export
+  - Compatible with TabzChrome's profile import feature
+
+**Import Options:**
+
+- **Import Bookmarks** - Import from a TabzChrome bookmark export or Chrome bookmark export
+  - Supports hierarchical folder structure
+  - Detects and parses `terminal://` URLs with their settings
+
+- **Import TabzChrome Profiles** - Import TabzChrome profile exports as terminal commands
+  - Converts profiles with commands to terminal bookmarks
+  - Creates folders from profile categories
+  - Preserves category colors
+
+**Import Modes:**
+
+- **Merge** (default) - Add new items, skip duplicates by ID
+- **Replace** - Replace all existing bookmarks/terminal commands with imported data
+
 ## API Reference
 
 ### useTerminalExtension Hook
