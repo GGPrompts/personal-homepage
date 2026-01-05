@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useRef, useEffect, useCallback } from "react"
+import React, { useState, useRef, useEffect, useCallback, ChangeEvent } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Play,
@@ -39,7 +39,12 @@ import {
   Twitter,
   Facebook,
   Send,
+  Link,
+  Upload,
+  Youtube,
+  FileVideo,
 } from "lucide-react"
+import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -355,6 +360,38 @@ const playlist: PlaylistItem[] = [
   },
 ]
 
+// Video Source Types
+type VideoSourceType = 'none' | 'url' | 'file' | 'youtube'
+
+interface VideoSource {
+  type: VideoSourceType
+  url: string
+  youtubeId?: string
+  fileName?: string
+}
+
+// Extract YouTube video ID from various URL formats
+const extractYoutubeId = (url: string): string | null => {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+    /^([a-zA-Z0-9_-]{11})$/
+  ]
+  for (const pattern of patterns) {
+    const match = url.match(pattern)
+    if (match) return match[1]
+  }
+  return null
+}
+
+// Check if URL is a valid video URL
+const isVideoUrl = (url: string): boolean => {
+  const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.m4v']
+  const lowerUrl = url.toLowerCase()
+  return videoExtensions.some(ext => lowerUrl.includes(ext)) ||
+         lowerUrl.includes('blob:') ||
+         lowerUrl.includes('video')
+}
+
 // Helper Functions
 const formatTime = (seconds: number): string => {
   const hrs = Math.floor(seconds / 3600)
@@ -396,7 +433,7 @@ export default function VideoPlayerSection({
   // Player State
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
-  const [duration] = useState(currentVideo.duration)
+  const [duration, setDuration] = useState(currentVideo.duration)
   const [volume, setVolume] = useState(80)
   const [isMuted, setIsMuted] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -407,6 +444,16 @@ export default function VideoPlayerSection({
   const [selectedCaption, setSelectedCaption] = useState<string | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [settingsTab, setSettingsTab] = useState<"quality" | "speed" | "captions">("quality")
+  const [buffered, setBuffered] = useState(0)
+  const [isPiPActive, setIsPiPActive] = useState(false)
+
+  // Video Source State
+  const [videoSource, setVideoSource] = useState<VideoSource>({ type: 'none', url: '' })
+  const [urlInput, setUrlInput] = useState('')
+  const [sourceInputTab, setSourceInputTab] = useState<'url' | 'youtube' | 'file'>('url')
+  const [showSourceInput, setShowSourceInput] = useState(true)
+  const [videoError, setVideoError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
 
   // UI State
   const [isSubscribed, setIsSubscribed] = useState(currentVideo.channel.isSubscribed)
@@ -425,6 +472,8 @@ export default function VideoPlayerSection({
 
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null)
   const playerRef = useRef<HTMLDivElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Get current chapter
   const getCurrentChapter = useCallback(() => {
@@ -436,24 +485,90 @@ export default function VideoPlayerSection({
     return currentVideo.chapters[0]
   }, [currentTime])
 
-  // Simulate video progress
+  // Video event handlers
+  const handleLoadStart = useCallback(() => {
+    setIsLoading(true)
+    setVideoError(null)
+  }, [])
+
+  const handleLoadedMetadata = useCallback(() => {
+    if (videoRef.current) {
+      setDuration(videoRef.current.duration)
+      setIsLoading(false)
+      setShowSourceInput(false)
+    }
+  }, [])
+
+  const handleTimeUpdate = useCallback(() => {
+    if (videoRef.current) {
+      setCurrentTime(videoRef.current.currentTime)
+      // Update buffered progress
+      if (videoRef.current.buffered.length > 0) {
+        const bufferedEnd = videoRef.current.buffered.end(videoRef.current.buffered.length - 1)
+        setBuffered((bufferedEnd / videoRef.current.duration) * 100)
+      }
+    }
+  }, [])
+
+  const handleEnded = useCallback(() => {
+    setIsPlaying(false)
+    if (autoplay && playlist.length > 0) {
+      // Auto-play next video logic would go here
+    }
+  }, [autoplay])
+
+  const handleError = useCallback((e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+    const video = e.currentTarget
+    setIsLoading(false)
+    if (video.error) {
+      switch (video.error.code) {
+        case MediaError.MEDIA_ERR_ABORTED:
+          setVideoError('Video playback aborted')
+          break
+        case MediaError.MEDIA_ERR_NETWORK:
+          setVideoError('Network error while loading video')
+          break
+        case MediaError.MEDIA_ERR_DECODE:
+          setVideoError('Video decoding error')
+          break
+        case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+          setVideoError('Video format not supported')
+          break
+        default:
+          setVideoError('Unknown error occurred')
+      }
+    }
+  }, [])
+
+  const handleCanPlay = useCallback(() => {
+    setIsLoading(false)
+  }, [])
+
+  // Sync video playback state
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null
+    const video = videoRef.current
+    if (!video || videoSource.type === 'none' || videoSource.type === 'youtube') return
+
     if (isPlaying) {
-      interval = setInterval(() => {
-        setCurrentTime((prev) => {
-          if (prev >= duration) {
-            setIsPlaying(false)
-            return duration
-          }
-          return prev + 1
-        })
-      }, 1000 / playbackSpeed)
+      video.play().catch(() => setIsPlaying(false))
+    } else {
+      video.pause()
     }
-    return () => {
-      if (interval) clearInterval(interval)
-    }
-  }, [isPlaying, duration, playbackSpeed])
+  }, [isPlaying, videoSource.type])
+
+  // Sync volume with video element
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    video.volume = isMuted ? 0 : volume / 100
+  }, [volume, isMuted])
+
+  // Sync playback speed with video element
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    video.playbackRate = playbackSpeed
+  }, [playbackSpeed])
 
   // Hide controls after inactivity
   useEffect(() => {
@@ -499,15 +614,196 @@ export default function VideoPlayerSection({
     }
   }
 
-  const seekTo = (time: number) => {
-    setCurrentTime(Math.min(Math.max(0, time), duration))
-  }
+  const seekTo = useCallback((time: number) => {
+    const clampedTime = Math.min(Math.max(0, time), duration)
+    setCurrentTime(clampedTime)
+    if (videoRef.current && videoSource.type !== 'youtube') {
+      videoRef.current.currentTime = clampedTime
+    }
+  }, [duration, videoSource.type])
 
-  const skip = (seconds: number) => {
+  const skip = useCallback((seconds: number) => {
     seekTo(currentTime + seconds)
-  }
+  }, [currentTime, seekTo])
 
-  const progress = (currentTime / duration) * 100
+  // Handle video URL submission
+  const handleUrlSubmit = useCallback(() => {
+    if (!urlInput.trim()) return
+
+    const youtubeId = extractYoutubeId(urlInput)
+    if (youtubeId) {
+      setVideoSource({ type: 'youtube', url: urlInput, youtubeId })
+      setVideoError(null)
+      setShowSourceInput(false)
+    } else if (isVideoUrl(urlInput) || urlInput.startsWith('http')) {
+      setVideoSource({ type: 'url', url: urlInput })
+      setVideoError(null)
+    } else {
+      setVideoError('Please enter a valid video URL or YouTube link')
+    }
+  }, [urlInput])
+
+  // Handle file selection
+  const handleFileSelect = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('video/')) {
+      setVideoError('Please select a video file')
+      return
+    }
+
+    const objectUrl = URL.createObjectURL(file)
+    setVideoSource({ type: 'file', url: objectUrl, fileName: file.name })
+    setVideoError(null)
+  }, [])
+
+  // Clear video source
+  const clearVideoSource = useCallback(() => {
+    if (videoSource.type === 'file' && videoSource.url) {
+      URL.revokeObjectURL(videoSource.url)
+    }
+    setVideoSource({ type: 'none', url: '' })
+    setShowSourceInput(true)
+    setUrlInput('')
+    setCurrentTime(0)
+    setDuration(0)
+    setIsPlaying(false)
+    setVideoError(null)
+  }, [videoSource])
+
+  // Toggle fullscreen
+  const toggleFullscreen = useCallback(async () => {
+    if (!playerRef.current) return
+
+    try {
+      if (!document.fullscreenElement) {
+        await playerRef.current.requestFullscreen()
+        setIsFullscreen(true)
+      } else {
+        await document.exitFullscreen()
+        setIsFullscreen(false)
+      }
+    } catch (err) {
+      console.error('Fullscreen error:', err)
+    }
+  }, [])
+
+  // Toggle Picture-in-Picture
+  const togglePiP = useCallback(async () => {
+    if (!videoRef.current || videoSource.type === 'youtube') return
+
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture()
+        setIsPiPActive(false)
+      } else if (document.pictureInPictureEnabled) {
+        await videoRef.current.requestPictureInPicture()
+        setIsPiPActive(true)
+      }
+    } catch (err) {
+      console.error('PiP error:', err)
+    }
+  }, [videoSource.type])
+
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
+
+  // Keyboard shortcuts for video control
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle if video is loaded and not typing in an input
+      if (videoSource.type === 'none' || videoSource.type === 'youtube') return
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+
+      switch (e.key) {
+        case ' ':
+        case 'k':
+          e.preventDefault()
+          setIsPlaying(prev => !prev)
+          break
+        case 'ArrowLeft':
+          e.preventDefault()
+          skip(-5)
+          break
+        case 'ArrowRight':
+          e.preventDefault()
+          skip(5)
+          break
+        case 'ArrowUp':
+          e.preventDefault()
+          setVolume(prev => Math.min(100, prev + 10))
+          setIsMuted(false)
+          break
+        case 'ArrowDown':
+          e.preventDefault()
+          setVolume(prev => Math.max(0, prev - 10))
+          break
+        case 'm':
+          e.preventDefault()
+          setIsMuted(prev => !prev)
+          break
+        case 'f':
+          e.preventDefault()
+          toggleFullscreen()
+          break
+        case 'p':
+          e.preventDefault()
+          togglePiP()
+          break
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+          e.preventDefault()
+          const percentage = parseInt(e.key) / 10
+          seekTo(duration * percentage)
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [videoSource.type, skip, toggleFullscreen, togglePiP, seekTo, duration])
+
+  // Listen for PiP changes
+  useEffect(() => {
+    const handlePiPEnter = () => setIsPiPActive(true)
+    const handlePiPLeave = () => setIsPiPActive(false)
+
+    const video = videoRef.current
+    if (video) {
+      video.addEventListener('enterpictureinpicture', handlePiPEnter)
+      video.addEventListener('leavepictureinpicture', handlePiPLeave)
+      return () => {
+        video.removeEventListener('enterpictureinpicture', handlePiPEnter)
+        video.removeEventListener('leavepictureinpicture', handlePiPLeave)
+      }
+    }
+  }, [])
+
+  // Cleanup object URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (videoSource.type === 'file' && videoSource.url) {
+        URL.revokeObjectURL(videoSource.url)
+      }
+    }
+  }, [videoSource])
+
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0
 
   return (
     <div className={`p-4 md:p-6 ${isTheaterMode ? "bg-black" : ""}`} data-tabz-section="video-player">
@@ -524,19 +820,234 @@ export default function VideoPlayerSection({
               className={`relative bg-black rounded-xl overflow-hidden ${
                 isTheaterMode ? "aspect-video max-h-[85vh]" : "aspect-video"
               }`}
-              onDoubleClick={() => setIsFullscreen(!isFullscreen)}
+              onDoubleClick={toggleFullscreen}
             >
-              {/* Video Placeholder */}
-              <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-black flex items-center justify-center">
-                <div className="text-center">
-                  <MonitorPlay className="h-24 w-24 text-muted-foreground/30 mx-auto mb-4" />
-                  <p className="text-muted-foreground/50 text-sm">Video Player Simulation</p>
-                </div>
-              </div>
+              {/* Video Element */}
+              {videoSource.type === 'youtube' && videoSource.youtubeId ? (
+                <iframe
+                  className="absolute inset-0 w-full h-full border-0"
+                  src={`https://www.youtube.com/embed/${videoSource.youtubeId}?autoplay=0&rel=0&modestbranding=1&enablejsapi=1`}
+                  title="YouTube video player"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              ) : videoSource.type !== 'none' ? (
+                <video
+                  ref={videoRef}
+                  className="absolute inset-0 w-full h-full object-contain bg-black"
+                  src={videoSource.url}
+                  onLoadStart={handleLoadStart}
+                  onLoadedMetadata={handleLoadedMetadata}
+                  onTimeUpdate={handleTimeUpdate}
+                  onEnded={handleEnded}
+                  onError={handleError}
+                  onCanPlay={handleCanPlay}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  playsInline
+                  data-tabz-element="video"
+                />
+              ) : (
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-black" />
+              )}
 
-              {/* Chapter Marker */}
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/*"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+
+              {/* Source Input Overlay */}
               <AnimatePresence>
-                {showControls && (
+                {showSourceInput && videoSource.type === 'none' && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 flex items-center justify-center bg-black/90 p-6"
+                  >
+                    <div className="w-full max-w-lg space-y-4">
+                      <div className="text-center mb-6">
+                        <FileVideo className="h-16 w-16 text-primary/50 mx-auto mb-3" />
+                        <h3 className="text-lg font-semibold text-foreground">Load a Video</h3>
+                        <p className="text-sm text-muted-foreground">Enter a URL, paste a YouTube link, or select a local file</p>
+                      </div>
+
+                      {/* Source Type Tabs */}
+                      <div className="flex gap-1 p-1 glass-dark rounded-lg">
+                        <button
+                          onClick={() => setSourceInputTab('url')}
+                          className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm transition-colors ${
+                            sourceInputTab === 'url' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          <Link className="h-4 w-4" />
+                          URL
+                        </button>
+                        <button
+                          onClick={() => setSourceInputTab('youtube')}
+                          className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm transition-colors ${
+                            sourceInputTab === 'youtube' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          <Youtube className="h-4 w-4" />
+                          YouTube
+                        </button>
+                        <button
+                          onClick={() => setSourceInputTab('file')}
+                          className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm transition-colors ${
+                            sourceInputTab === 'file' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          <Upload className="h-4 w-4" />
+                          File
+                        </button>
+                      </div>
+
+                      {/* URL/YouTube Input */}
+                      {(sourceInputTab === 'url' || sourceInputTab === 'youtube') && (
+                        <div className="space-y-3">
+                          <div className="flex gap-2">
+                            <Input
+                              value={urlInput}
+                              onChange={(e) => setUrlInput(e.target.value)}
+                              placeholder={sourceInputTab === 'youtube' ? 'Paste YouTube URL...' : 'Enter video URL (.mp4, .webm, etc.)'}
+                              className="glass border-border text-foreground placeholder:text-muted-foreground"
+                              onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()}
+                              data-tabz-input="video-url"
+                            />
+                            <Button onClick={handleUrlSubmit} data-tabz-action="load-video">
+                              Load
+                            </Button>
+                          </div>
+                          {sourceInputTab === 'youtube' && (
+                            <p className="text-xs text-muted-foreground">
+                              Supports youtube.com/watch?v=, youtu.be/, and embed URLs
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* File Picker */}
+                      {sourceInputTab === 'file' && (
+                        <Button
+                          variant="outline"
+                          className="w-full h-24 border-dashed border-2 text-muted-foreground hover:text-foreground hover:border-primary"
+                          onClick={() => fileInputRef.current?.click()}
+                          data-tabz-action="select-file"
+                        >
+                          <div className="text-center">
+                            <Upload className="h-8 w-8 mx-auto mb-2" />
+                            <span>Click to select a video file</span>
+                          </div>
+                        </Button>
+                      )}
+
+                      {/* Error Display */}
+                      {videoError && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="p-3 rounded-lg bg-destructive/20 border border-destructive/30"
+                        >
+                          <p className="text-destructive text-sm">{videoError}</p>
+                        </motion.div>
+                      )}
+
+                      {/* Sample Videos */}
+                      <div className="pt-4 border-t border-border">
+                        <p className="text-xs text-muted-foreground mb-2">Try a sample video:</p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs"
+                            onClick={() => {
+                              setUrlInput('https://www.w3schools.com/html/mov_bbb.mp4')
+                              setSourceInputTab('url')
+                            }}
+                          >
+                            Big Buck Bunny
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs"
+                            onClick={() => {
+                              setUrlInput('https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4')
+                              setSourceInputTab('url')
+                            }}
+                          >
+                            Test Video (10s)
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Loading Overlay */}
+              <AnimatePresence>
+                {isLoading && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 flex items-center justify-center bg-black/80"
+                  >
+                    <div className="text-center">
+                      <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-3" />
+                      <p className="text-muted-foreground text-sm">Loading video...</p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Video Error Overlay */}
+              <AnimatePresence>
+                {videoError && videoSource.type !== 'none' && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 flex items-center justify-center bg-black/90"
+                  >
+                    <div className="text-center p-6">
+                      <X className="h-12 w-12 text-destructive mx-auto mb-3" />
+                      <p className="text-destructive font-medium mb-2">{videoError}</p>
+                      <Button variant="outline" onClick={clearVideoSource}>
+                        Try Another Video
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Source Info Badge */}
+              {videoSource.type !== 'none' && !showSourceInput && (
+                <div className="absolute top-4 right-4 flex items-center gap-2">
+                  <Badge variant="secondary" className="glass text-xs">
+                    {videoSource.type === 'youtube' ? 'YouTube' : videoSource.type === 'file' ? videoSource.fileName : 'URL'}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 glass"
+                    onClick={clearVideoSource}
+                    title="Change video"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+
+              {/* Chapter Marker - only show when video is loaded and chapters exist */}
+              <AnimatePresence>
+                {showControls && videoSource.type !== 'none' && videoSource.type !== 'youtube' && duration > 0 && (
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -544,21 +1055,21 @@ export default function VideoPlayerSection({
                     className="absolute top-4 left-4 glass rounded-lg px-3 py-1.5"
                   >
                     <p className="text-foreground text-sm font-medium">
-                      {getCurrentChapter()?.title}
+                      {getCurrentChapter()?.title || 'Playing'}
                     </p>
                   </motion.div>
                 )}
               </AnimatePresence>
 
-              {/* Center Play Button */}
+              {/* Center Play Button - only show when video is loaded */}
               <AnimatePresence>
-                {!isPlaying && showControls && (
+                {!isPlaying && showControls && videoSource.type !== 'none' && videoSource.type !== 'youtube' && !isLoading && !videoError && (
                   <motion.button
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.8 }}
                     onClick={() => setIsPlaying(true)}
-                    className="absolute inset-0 flex items-center justify-center"
+                    className="absolute inset-0 flex items-center justify-center z-10"
                   >
                     <div className="w-20 h-20 rounded-full bg-primary/80 flex items-center justify-center hover:bg-primary transition-colors">
                       <Play className="h-10 w-10 text-primary-foreground ml-1" fill="currentColor" />
@@ -567,9 +1078,9 @@ export default function VideoPlayerSection({
                 )}
               </AnimatePresence>
 
-              {/* Controls Overlay */}
+              {/* Controls Overlay - hide for YouTube (uses its own controls) */}
               <AnimatePresence>
-                {showControls && (
+                {showControls && videoSource.type !== 'youtube' && videoSource.type !== 'none' && (
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -588,7 +1099,7 @@ export default function VideoPlayerSection({
                           />
                         ))}
                         {/* Buffered */}
-                        <div className="absolute h-full bg-muted-foreground/40 rounded-full" style={{ width: `${Math.min(progress + 20, 100)}%` }} />
+                        <div className="absolute h-full bg-muted-foreground/40 rounded-full" style={{ width: `${buffered}%` }} />
                         {/* Progress */}
                         <div
                           className="absolute h-full bg-primary rounded-full"
@@ -795,7 +1306,10 @@ export default function VideoPlayerSection({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="text-foreground hover:bg-muted/20 hidden sm:flex"
+                          className={`text-foreground hover:bg-muted/20 hidden sm:flex ${isPiPActive ? "text-primary" : ""}`}
+                          onClick={togglePiP}
+                          title="Picture-in-Picture"
+                          data-tabz-action="toggle-pip"
                         >
                           <PictureInPicture2 className="h-5 w-5" />
                         </Button>
@@ -806,6 +1320,8 @@ export default function VideoPlayerSection({
                           size="icon"
                           className={`text-foreground hover:bg-muted/20 hidden md:flex ${isTheaterMode ? "text-primary" : ""}`}
                           onClick={() => setIsTheaterMode(!isTheaterMode)}
+                          title="Theater mode"
+                          data-tabz-action="toggle-theater"
                         >
                           <MonitorPlay className="h-5 w-5" />
                         </Button>
@@ -815,7 +1331,9 @@ export default function VideoPlayerSection({
                           variant="ghost"
                           size="icon"
                           className="text-foreground hover:bg-muted/20"
-                          onClick={() => setIsFullscreen(!isFullscreen)}
+                          onClick={toggleFullscreen}
+                          title="Fullscreen"
+                          data-tabz-action="toggle-fullscreen"
                         >
                           {isFullscreen ? (
                             <Minimize className="h-5 w-5" />
