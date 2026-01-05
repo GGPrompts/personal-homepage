@@ -23,7 +23,6 @@ import {
   Search,
   TrendingUp,
   User,
-  Link2,
   FolderGit2,
   Github,
   MessageSquare,
@@ -31,7 +30,6 @@ import {
   Bitcoin,
   Rocket,
   AlertCircle,
-  Sparkles,
   LayoutGrid,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -44,8 +42,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { ThemeCustomizer } from "@/components/ThemeCustomizer"
-import { ThemeSettingsPanel } from "@/components/ThemeSettingsPanel"
-import { SectionSettings } from "@/components/SectionSettings"
 import { useAuth } from "@/components/AuthProvider"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -77,14 +73,13 @@ import ProfileSection from "./sections/profile"
 import TasksSection from "./sections/tasks"
 import ProjectsDashboard from "./sections/projects-dashboard"
 import JobsSection from "./sections/jobs"
-import IntegrationsSection from "./sections/integrations"
 import CryptoDashboard from "./sections/crypto-dashboard"
 import SpaceXTracker from "./sections/spacex-tracker"
 import GitHubActivity from "./sections/github-activity"
 import DisastersMonitor from "./sections/disasters-monitor"
 import MarketPulseSection from "./sections/market-pulse"
-import SetupSection from "./sections/setup"
 import KanbanSection from "./sections/kanban"
+import SettingsSection from "./sections/settings"
 import { useLoginTrigger } from "@/hooks/useLoginTrigger"
 import { StartupJobsModal } from "@/components/StartupJobsModal"
 import { useJobResults } from "@/hooks/useJobResults"
@@ -125,9 +120,7 @@ const navigationItems: NavigationItem[] = [
   { id: "projects", label: "Projects", icon: FolderGit2, description: "GitHub & local repos" },
   { id: "kanban", label: "Kanban", icon: LayoutGrid, description: "Visual task board" },
   { id: "jobs", label: "Jobs", icon: Play, description: "Claude batch prompts" },
-  { id: "integrations", label: "Integrations", icon: Link2, description: "Connected services" },
   { id: "profile", label: "Profile", icon: User, description: "Account & sync" },
-  { id: "setup", label: "Setup Wizard", icon: Sparkles, description: "Initial configuration" },
   { id: "settings", label: "Settings", icon: Settings, description: "Theme & preferences" },
 ]
 
@@ -619,9 +612,7 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
             projects: { icon: FolderGit2, label: "Projects", description: "GitHub & local repos" },
             kanban: { icon: LayoutGrid, label: "Kanban", description: "Visual task board" },
             jobs: { icon: Play, label: "Jobs", description: "Claude batch prompts" },
-            integrations: { icon: Link2, label: "Integrations", description: "Connected services" },
             profile: { icon: User, label: "Profile", description: "Account & sync status" },
-            setup: { icon: Sparkles, label: "Setup Wizard", description: "Initial configuration" },
           }
 
           const config = tileConfig[sectionId]
@@ -663,207 +654,6 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
   )
 }
 
-
-// ============================================================================
-// SETTINGS SECTION
-// ============================================================================
-
-function ApiKeysSettings() {
-  const [copied, setCopied] = React.useState<string | null>(null)
-  const { data: apiStatus, isLoading } = useQuery<{ apis: { finnhub: boolean; alphaVantage: boolean; github: boolean } }>({
-    queryKey: ["api-status"],
-    queryFn: async () => {
-      const res = await fetch("/api/status")
-      if (!res.ok) throw new Error("Failed to fetch status")
-      return res.json()
-    },
-    staleTime: 30000,
-  })
-
-  const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard.writeText(text)
-    setCopied(key)
-    setTimeout(() => setCopied(null), 2000)
-  }
-
-  const apis = [
-    {
-      id: "finnhub",
-      name: "Finnhub",
-      description: "Real-time stock quotes for Paper Trading",
-      envVar: "FINNHUB_API_KEY",
-      docsUrl: "https://finnhub.io/register",
-      configured: apiStatus?.apis.finnhub ?? false,
-      note: "Free tier: 60 requests/min",
-    },
-    {
-      id: "alphaVantage",
-      name: "Alpha Vantage",
-      description: "Historical chart data for Paper Trading",
-      envVar: "ALPHA_VANTAGE_API_KEY",
-      docsUrl: "https://www.alphavantage.co/support/#api-key",
-      configured: apiStatus?.apis.alphaVantage ?? false,
-      note: "Free tier: 25 requests/day, 5/min",
-    },
-    {
-      id: "github",
-      name: "GitHub (Server)",
-      description: "Optional server-side GitHub access",
-      envVar: "GITHUB_TOKEN",
-      docsUrl: "https://github.com/settings/tokens/new",
-      configured: apiStatus?.apis.github ?? false,
-      note: "Client-side GitHub is configured separately above",
-    },
-  ]
-
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        These API keys are configured via environment variables in <code className="px-1 py-0.5 bg-muted rounded text-xs">.env.local</code>
-      </p>
-
-      <div className="space-y-3">
-        {apis.map((api) => (
-          <div
-            key={api.id}
-            className={`rounded-lg border p-4 ${
-              api.configured
-                ? "border-emerald-500/30 bg-emerald-500/5"
-                : "border-border"
-            }`}
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-medium">{api.name}</h4>
-                  {isLoading ? (
-                    <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground" />
-                  ) : api.configured ? (
-                    <span className="text-xs bg-emerald-500/20 text-emerald-500 px-2 py-0.5 rounded-full">
-                      Configured
-                    </span>
-                  ) : (
-                    <span className="text-xs bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded-full">
-                      Not Set
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">{api.description}</p>
-                {api.note && (
-                  <p className="text-xs text-muted-foreground mt-1 italic">{api.note}</p>
-                )}
-              </div>
-            </div>
-
-            {!api.configured && (
-              <div className="mt-3 pt-3 border-t border-border space-y-2">
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 bg-muted/50 px-3 py-1.5 rounded text-xs font-mono">
-                    {api.envVar}=your_key_here
-                  </code>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => copyToClipboard(`${api.envVar}=`, api.id)}
-                    className="h-8"
-                  >
-                    {copied === api.id ? (
-                      <CheckCircle2 className="h-3 w-3" />
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                    )}
-                  </Button>
-                </div>
-                <a
-                  href={api.docsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline inline-flex items-center gap-1"
-                >
-                  Get API key <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                </a>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div className="pt-2 text-xs text-muted-foreground">
-        After adding keys to <code className="px-1 py-0.5 bg-muted rounded">.env.local</code>, restart your dev server with <code className="px-1 py-0.5 bg-muted rounded">npm run dev</code>
-      </div>
-    </div>
-  )
-}
-
-function SettingsSection({ activeSubItem, onSubItemHandled }: { activeSubItem?: string | null; onSubItemHandled?: () => void }) {
-  // Scroll to sub-item when activeSubItem changes
-  React.useEffect(() => {
-    if (activeSubItem) {
-      // Small delay to ensure DOM is ready after section switch
-      const timer = setTimeout(() => {
-        const element = document.getElementById(`settings-${activeSubItem}`)
-        if (element) {
-          element.scrollIntoView({ behavior: "smooth", block: "start" })
-        }
-        onSubItemHandled?.()
-      }, 100)
-      return () => clearTimeout(timer)
-    }
-  }, [activeSubItem, onSubItemHandled])
-
-  return (
-    <div className="p-6">
-      <h1 className="text-3xl font-bold font-mono gradient-text-theme terminal-glow mb-2">Settings</h1>
-      <p className="text-muted-foreground mb-8">Customize your dashboard</p>
-
-      <div className="max-w-3xl">
-        <div id="settings-appearance" className="glass rounded-lg p-6 mb-6 scroll-mt-6" data-tabz-settings="appearance">
-          <h3 className="font-semibold mb-6">Theme & Appearance</h3>
-          <ThemeSettingsPanel />
-        </div>
-
-        <div id="settings-sections" className="glass rounded-lg p-6 mb-6 scroll-mt-6" data-tabz-settings="sections">
-          <h3 className="font-semibold mb-4">Sections</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            Toggle sections on or off and reorder them in the sidebar
-          </p>
-          <SectionSettings />
-        </div>
-
-        <div className="glass rounded-lg p-6 mb-6" data-tabz-settings="github">
-          <div className="flex items-center gap-2 mb-4">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-primary"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-            <h3 className="font-semibold">GitHub Integration</h3>
-          </div>
-          <p className="text-sm text-muted-foreground mb-4">
-            GitHub sync is now managed through the Profile section. Sign in with GitHub to sync Quick Notes and Bookmarks.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Go to <span className="text-primary">Profile</span> in the sidebar to sign in and configure your repository.
-          </p>
-        </div>
-
-        <div id="settings-feed-config" className="glass rounded-lg p-6 mb-6 scroll-mt-6" data-tabz-settings="feed-config">
-          <div className="flex items-center gap-2 mb-4">
-            <Newspaper className="h-5 w-5 text-primary" />
-            <h3 className="font-semibold">Feed Configuration</h3>
-          </div>
-          <p className="text-sm text-muted-foreground mb-4">
-            Feed sources and subreddits are configured directly in the Daily Feed section using the Sources and Subreddits buttons in the toolbar.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Go to <span className="text-primary">Daily Feed</span> in the sidebar to configure your content sources.
-          </p>
-        </div>
-
-        <div id="settings-api-keys" className="glass rounded-lg p-6 scroll-mt-6" data-tabz-settings="api-keys">
-          <h3 className="font-semibold mb-4">API Keys</h3>
-          <ApiKeysSettings />
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ============================================================================
 // MAIN COMPONENT
@@ -989,12 +779,8 @@ export default function PersonalHomepage() {
         return <JobsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "kanban":
         return <KanbanSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
-      case "integrations":
-        return <IntegrationsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSection={(section) => setActiveSection(section as Section)} />
       case "profile":
         return <ProfileSection />
-      case "setup":
-        return <SetupSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "settings":
         return <SettingsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       default:

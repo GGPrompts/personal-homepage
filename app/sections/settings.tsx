@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import {
   CheckCircle2,
   XCircle,
@@ -9,62 +9,43 @@ import {
   TrendingUp,
   Github,
   Terminal,
-  Settings2,
   Eye,
   EyeOff,
-  GripVertical,
   Download,
   Upload,
   RotateCcw,
-  ChevronRight,
-  ChevronLeft,
   Loader2,
   ExternalLink,
   Bot,
   Key,
   Server,
-  Folder,
-  Sparkles,
   RefreshCw,
+  Link2,
+  Rss,
+  Rocket,
+  Settings,
+  Palette,
   LayoutGrid,
+  Blocks,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from "@/components/AuthProvider"
 import { useTerminalExtension } from "@/hooks/useTerminalExtension"
+import { ThemeSettingsPanel } from "@/components/ThemeSettingsPanel"
+import { SectionSettings } from "@/components/SectionSettings"
 import {
-  useSectionPreferences,
-  ToggleableSection,
   DEFAULT_SECTION_ORDER,
   DEFAULT_VISIBILITY,
 } from "@/hooks/useSectionPreferences"
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from "@dnd-kit/core"
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
 
 // ============================================================================
 // TYPES
 // ============================================================================
-
-type WizardStep = "api-keys" | "sections" | "tabz" | "import-export" | "complete"
 
 interface ApiKeyConfig {
   id: string
@@ -79,33 +60,16 @@ interface ApiKeyConfig {
   testable?: boolean
 }
 
-// Section metadata for setup display
-const sectionMeta: Record<ToggleableSection, {
-  label: string
-  icon: React.ElementType
+interface Integration {
+  id: string
+  name: string
   description: string
-  requiredApis?: string[]
-}> = {
-  weather: { label: "Weather", icon: Cloud, description: "Live weather monitoring", requiredApis: [] },
-  feed: { label: "Daily Feed", icon: Cloud, description: "Aggregated content" },
-  "market-pulse": { label: "Market Pulse", icon: TrendingUp, description: "Tech salary & job trends" },
-  "api-playground": { label: "API Playground", icon: Settings2, description: "Test & debug APIs" },
-  notes: { label: "Docs Editor", icon: Cloud, description: "GitHub-synced documentation", requiredApis: ["github"] },
-  bookmarks: { label: "Bookmarks", icon: Cloud, description: "Quick links", requiredApis: ["github"] },
-  search: { label: "Search Hub", icon: Cloud, description: "Search, AI & Image" },
-  "ai-workspace": { label: "AI Workspace", icon: Bot, description: "Chat with AI models", requiredApis: ["anthropic", "openai", "google-ai"] },
-  stocks: { label: "Paper Trading", icon: TrendingUp, description: "Practice stock trading", requiredApis: ["finnhub", "alpha-vantage"] },
-  crypto: { label: "Crypto", icon: Cloud, description: "Live cryptocurrency prices" },
-  spacex: { label: "SpaceX Launches", icon: Cloud, description: "Track rocket launches" },
-  "github-activity": { label: "GitHub Activity", icon: Github, description: "GitHub events & repos", requiredApis: ["github"] },
-  disasters: { label: "Disasters", icon: Cloud, description: "Earthquakes & alerts" },
-  tasks: { label: "Scratchpad", icon: Cloud, description: "Quick notes and todos" },
-  projects: { label: "Projects", icon: Folder, description: "GitHub & local repos" },
-  jobs: { label: "Jobs", icon: Cloud, description: "Claude batch prompts", requiredApis: ["anthropic"] },
-  integrations: { label: "Integrations", icon: Cloud, description: "Connected services" },
-  profile: { label: "Profile", icon: Cloud, description: "Account & sync" },
-  setup: { label: "Setup Wizard", icon: Sparkles, description: "Initial configuration" },
-  kanban: { label: "Kanban", icon: LayoutGrid, description: "Visual task board" },
+  icon: React.ElementType
+  category: "auth" | "api" | "data"
+  status: "connected" | "disconnected" | "partial"
+  statusMessage?: string
+  docsUrl?: string
+  configLocation?: string
 }
 
 // ============================================================================
@@ -124,65 +88,6 @@ function setStoredApiKey(key: string, value: string): void {
   } else {
     localStorage.removeItem(key)
   }
-}
-
-// ============================================================================
-// STEP INDICATOR COMPONENT
-// ============================================================================
-
-function StepIndicator({
-  steps,
-  currentStep,
-  onStepClick
-}: {
-  steps: { id: WizardStep; label: string }[]
-  currentStep: WizardStep
-  onStepClick: (step: WizardStep) => void
-}) {
-  const currentIndex = steps.findIndex(s => s.id === currentStep)
-
-  return (
-    <div className="flex items-center justify-center gap-2 mb-8" data-tabz-section="step-indicator">
-      {steps.map((step, index) => {
-        const isActive = step.id === currentStep
-        const isPast = index < currentIndex
-
-        return (
-          <React.Fragment key={step.id}>
-            <button
-              onClick={() => onStepClick(step.id)}
-              className={`
-                flex items-center gap-2 px-4 py-2 rounded-lg transition-all
-                ${isActive
-                  ? "glass border-primary text-primary"
-                  : isPast
-                    ? "glass-dark text-muted-foreground hover:text-foreground"
-                    : "text-muted-foreground/50 hover:text-muted-foreground"
-                }
-              `}
-              data-tabz-button={`step-${step.id}`}
-            >
-              <span className={`
-                w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium
-                ${isActive
-                  ? "bg-primary text-primary-foreground"
-                  : isPast
-                    ? "bg-emerald-500/20 text-emerald-500"
-                    : "bg-muted/50 text-muted-foreground"
-                }
-              `}>
-                {isPast ? <CheckCircle2 className="h-3.5 w-3.5" /> : index + 1}
-              </span>
-              <span className="hidden sm:inline">{step.label}</span>
-            </button>
-            {index < steps.length - 1 && (
-              <ChevronRight className="h-4 w-4 text-muted-foreground/30" />
-            )}
-          </React.Fragment>
-        )
-      })}
-    </div>
-  )
 }
 
 // ============================================================================
@@ -306,101 +211,161 @@ function ApiKeyInput({
 }
 
 // ============================================================================
-// SORTABLE SECTION ITEM
+// INTEGRATION CARD COMPONENT
 // ============================================================================
 
-function SortableSectionItem({
-  sectionId,
-  isEnabled,
-  onToggleVisibility,
+function IntegrationCard({
+  integration,
+  onNavigate,
 }: {
-  sectionId: ToggleableSection
-  isEnabled: boolean
-  onToggleVisibility: () => void
+  integration: Integration
+  onNavigate?: (tab: string) => void
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: sectionId })
+  const Icon = integration.icon
 
-  const meta = sectionMeta[sectionId]
-  const Icon = meta?.icon || Cloud
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
+  const statusConfig = {
+    connected: {
+      icon: CheckCircle2,
+      color: "text-emerald-500",
+      bg: "bg-emerald-500/10",
+      border: "border-emerald-500/30",
+      label: "Connected",
+    },
+    disconnected: {
+      icon: XCircle,
+      color: "text-muted-foreground",
+      bg: "bg-muted/10",
+      border: "border-border",
+      label: "Not Connected",
+    },
+    partial: {
+      icon: RefreshCw,
+      color: "text-amber-500",
+      bg: "bg-amber-500/10",
+      border: "border-amber-500/30",
+      label: "Partially Configured",
+    },
   }
 
+  const config = statusConfig[integration.status]
+  const StatusIcon = config.icon
+
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-        isEnabled
-          ? "border-border bg-background/50"
-          : "border-border/50 bg-muted/10 opacity-60"
-      } ${isDragging ? "opacity-30" : ""}`}
-      data-tabz-section-item={sectionId}
-    >
-      <button
-        className="touch-none cursor-grab active:cursor-grabbing p-1 -m-1 rounded hover:bg-muted/50 transition-colors"
-        {...attributes}
-        {...listeners}
-        data-tabz-drag-handle={sectionId}
-      >
-        <GripVertical className="h-4 w-4 text-muted-foreground" />
-      </button>
+    <Card className={`glass p-5 ${config.border} transition-colors`}>
+      <div className="flex items-start gap-4">
+        <div className={`p-3 rounded-lg ${config.bg} flex-shrink-0`}>
+          <Icon className={`h-6 w-6 ${config.color}`} />
+        </div>
 
-      <div className={`h-8 w-8 rounded flex items-center justify-center flex-shrink-0 ${
-        isEnabled ? "bg-primary/20" : "bg-muted/20"
-      }`}>
-        <Icon className={`h-4 w-4 ${isEnabled ? "text-primary" : "text-muted-foreground"}`} />
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <p className={`font-medium text-sm ${!isEnabled && "text-muted-foreground"}`}>
-          {meta?.label || sectionId}
-        </p>
-        <p className="text-xs text-muted-foreground truncate">
-          {meta?.description}
-        </p>
-        {meta?.requiredApis && meta.requiredApis.length > 0 && (
-          <p className="text-xs text-amber-500 mt-0.5">
-            Requires: {meta.requiredApis.join(", ")}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="font-semibold">{integration.name}</h3>
+            <Badge
+              variant="outline"
+              className={`${config.color} border-current/30 text-xs py-0`}
+            >
+              <StatusIcon className="h-3 w-3 mr-1" />
+              {config.label}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground mb-3">
+            {integration.description}
           </p>
-        )}
-      </div>
 
-      <div className="flex items-center gap-2">
-        {isEnabled ? (
-          <Eye className="h-4 w-4 text-muted-foreground" />
-        ) : (
-          <EyeOff className="h-4 w-4 text-muted-foreground" />
-        )}
-        <Switch
-          checked={isEnabled}
-          onCheckedChange={onToggleVisibility}
-          data-tabz-switch={`section-${sectionId}`}
-        />
+          {integration.statusMessage && (
+            <p className="text-xs text-muted-foreground mb-3 italic">
+              {integration.statusMessage}
+            </p>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            {integration.configLocation && onNavigate && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onNavigate(integration.configLocation!)}
+                className="gap-1"
+              >
+                <Settings className="h-3 w-3" />
+                Configure
+              </Button>
+            )}
+            {integration.docsUrl && (
+              <Button
+                variant="ghost"
+                size="sm"
+                asChild
+                className="gap-1"
+              >
+                <a
+                  href={integration.docsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Docs
+                </a>
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+// ============================================================================
+// GENERAL TAB (Theme & Appearance)
+// ============================================================================
+
+function GeneralTab() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <Palette className="h-5 w-5 text-primary" />
+          Theme & Appearance
+        </h3>
+        <div className="glass rounded-lg p-6">
+          <ThemeSettingsPanel />
+        </div>
       </div>
     </div>
   )
 }
 
 // ============================================================================
-// STEP 1: API KEYS
+// SECTIONS TAB
 // ============================================================================
 
-function ApiKeysStep() {
+function SectionsTab() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <LayoutGrid className="h-5 w-5 text-primary" />
+          Sidebar Sections
+        </h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Toggle sections on or off and reorder them in the sidebar
+        </p>
+        <div className="glass rounded-lg p-6">
+          <SectionSettings />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// API KEYS TAB
+// ============================================================================
+
+function ApiKeysTab() {
   const { user } = useAuth()
-  const queryClient = useQueryClient()
 
   // Fetch server-side API status
-  const { data: apiStatus, isLoading, refetch } = useQuery<{
+  const { data: apiStatus, isLoading } = useQuery<{
     apis: { finnhub: boolean; alphaVantage: boolean; github: boolean }
   }>({
     queryKey: ["api-status"],
@@ -564,10 +529,13 @@ function ApiKeysStep() {
   }
 
   return (
-    <div className="space-y-6" data-tabz-step="api-keys">
-      <div className="text-center mb-6">
-        <h2 className="text-xl font-semibold mb-2">Configure API Keys</h2>
-        <p className="text-muted-foreground">
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+          <Key className="h-5 w-5 text-primary" />
+          API Keys
+        </h3>
+        <p className="text-muted-foreground mb-6">
           Add API keys to unlock features. Most features work without any keys.
         </p>
       </div>
@@ -629,118 +597,223 @@ function ApiKeysStep() {
         ))}
       </div>
 
-      <div className="text-center text-sm text-muted-foreground pt-4">
-        <p>
-          Environment variable API keys (from .env.local) take precedence over stored keys.
-        </p>
-      </div>
-    </div>
-  )
-}
-
-// ============================================================================
-// STEP 2: SECTIONS
-// ============================================================================
-
-function SectionsStep() {
-  const {
-    visibility,
-    order,
-    isLoaded,
-    toggleVisibility,
-    reorder,
-    resetToDefaults,
-  } = useSectionPreferences()
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  )
-
-  if (!isLoaded) {
-    return (
-      <div className="animate-pulse space-y-3">
-        {[...Array(8)].map((_, i) => (
-          <div key={i} className="h-14 bg-muted/20 rounded-lg" />
-        ))}
-      </div>
-    )
-  }
-
-  const visibleCount = Object.values(visibility).filter(Boolean).length
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    if (over && active.id !== over.id) {
-      const oldIndex = order.indexOf(active.id as ToggleableSection)
-      const newIndex = order.indexOf(over.id as ToggleableSection)
-      const newOrder = arrayMove(order, oldIndex, newIndex)
-      reorder(newOrder)
-    }
-  }
-
-  return (
-    <div className="space-y-6" data-tabz-step="sections">
-      <div className="text-center mb-6">
-        <h2 className="text-xl font-semibold mb-2">Choose Your Sections</h2>
-        <p className="text-muted-foreground">
-          Toggle sections on/off and drag to reorder. Changes save automatically.
-        </p>
-      </div>
-
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-muted-foreground">
-          {visibleCount} of {order.length} sections visible
-        </p>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={resetToDefaults}
-          className="text-xs h-7 gap-1"
-          data-tabz-button="reset-sections"
-        >
-          <RotateCcw className="h-3 w-3" />
-          Reset
-        </Button>
-      </div>
-
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext items={order} strategy={verticalListSortingStrategy}>
-          <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-            {order.map((sectionId) => (
-              <SortableSectionItem
-                key={sectionId}
-                sectionId={sectionId}
-                isEnabled={visibility[sectionId]}
-                onToggleVisibility={() => toggleVisibility(sectionId)}
-              />
-            ))}
-          </div>
-        </SortableContext>
-      </DndContext>
-
-      <p className="text-xs text-muted-foreground text-center pt-2">
-        Home and Settings are always visible. Hidden sections won&apos;t appear in the sidebar.
+      <p className="text-sm text-muted-foreground pt-4">
+        Environment variable API keys (from .env.local) take precedence over stored keys.
       </p>
     </div>
   )
 }
 
 // ============================================================================
-// STEP 3: TABZCHROME
+// INTEGRATIONS TAB
 // ============================================================================
 
-function TabzChromeStep() {
+function IntegrationsTab({ onSwitchTab }: { onSwitchTab: (tab: string) => void }) {
+  const { user } = useAuth()
+
+  // Fetch API status
+  const { data: apiStatus, isLoading } = useQuery<{
+    apis: { finnhub: boolean; alphaVantage: boolean; github: boolean }
+  }>({
+    queryKey: ["api-status"],
+    queryFn: async () => {
+      const res = await fetch("/api/status")
+      if (!res.ok) throw new Error("Failed to fetch status")
+      return res.json()
+    },
+    staleTime: 30000,
+  })
+
+  // Build integrations list based on current status
+  const integrations: Integration[] = [
+    {
+      id: "github-oauth",
+      name: "GitHub (OAuth)",
+      description: "Sign in with GitHub to sync Quick Notes and Bookmarks across devices",
+      icon: Github,
+      category: "auth",
+      status: user ? "connected" : "disconnected",
+      statusMessage: user
+        ? `Signed in as ${user.user_metadata?.user_name || user.email}`
+        : "Sign in to enable cloud sync features",
+      docsUrl: "https://docs.github.com/en/apps/oauth-apps",
+    },
+    {
+      id: "github-api",
+      name: "GitHub API (Server)",
+      description: "Server-side GitHub access for enhanced features",
+      icon: Github,
+      category: "api",
+      status: apiStatus?.apis.github ? "connected" : "disconnected",
+      statusMessage: apiStatus?.apis.github
+        ? "GITHUB_TOKEN configured in environment"
+        : "Optional: Set GITHUB_TOKEN in .env.local",
+      configLocation: "api-keys",
+      docsUrl: "https://github.com/settings/tokens/new",
+    },
+    {
+      id: "finnhub",
+      name: "Finnhub",
+      description: "Real-time stock quotes for Paper Trading (60 requests/min free tier)",
+      icon: TrendingUp,
+      category: "api",
+      status: apiStatus?.apis.finnhub ? "connected" : "disconnected",
+      statusMessage: apiStatus?.apis.finnhub
+        ? "API key configured"
+        : "Set FINNHUB_API_KEY in .env.local",
+      configLocation: "api-keys",
+      docsUrl: "https://finnhub.io/register",
+    },
+    {
+      id: "alpha-vantage",
+      name: "Alpha Vantage",
+      description: "Historical stock data and charts (25 requests/day free tier)",
+      icon: TrendingUp,
+      category: "api",
+      status: apiStatus?.apis.alphaVantage ? "connected" : "disconnected",
+      statusMessage: apiStatus?.apis.alphaVantage
+        ? "API key configured"
+        : "Set ALPHA_VANTAGE_API_KEY in .env.local",
+      configLocation: "api-keys",
+      docsUrl: "https://www.alphavantage.co/support/#api-key",
+    },
+    {
+      id: "open-meteo",
+      name: "Open-Meteo",
+      description: "Weather data including forecasts, radar, and alerts",
+      icon: Cloud,
+      category: "data",
+      status: "connected",
+      statusMessage: "Free API, no configuration required",
+      docsUrl: "https://open-meteo.com/",
+    },
+    {
+      id: "feeds",
+      name: "Content Feeds",
+      description: "HN, GitHub Trending, Reddit, Lobsters, Dev.to aggregation",
+      icon: Rss,
+      category: "data",
+      status: "connected",
+      statusMessage: "Public APIs, no configuration required",
+    },
+    {
+      id: "spacex",
+      name: "SpaceX API",
+      description: "Launch schedules, rocket data, and mission tracking",
+      icon: Rocket,
+      category: "data",
+      status: "connected",
+      statusMessage: "Free public API, no configuration required",
+      docsUrl: "https://github.com/r-spacex/SpaceX-API",
+    },
+    {
+      id: "claude-cli",
+      name: "Claude CLI",
+      description: "AI Workspace and Claude Jobs powered by Claude Code CLI",
+      icon: Terminal,
+      category: "api",
+      status: "connected",
+      statusMessage: "Uses local Claude CLI installation",
+      docsUrl: "https://docs.anthropic.com/en/docs/claude-code",
+    },
+  ]
+
+  // Group by category
+  const authIntegrations = integrations.filter((i) => i.category === "auth")
+  const apiIntegrations = integrations.filter((i) => i.category === "api")
+  const dataIntegrations = integrations.filter((i) => i.category === "data")
+
+  // Stats
+  const connectedCount = integrations.filter((i) => i.status === "connected").length
+  const totalCount = integrations.length
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-32 bg-muted/20 rounded-lg animate-pulse" />
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Blocks className="h-5 w-5 text-primary" />
+            Integrations
+          </h3>
+          <Badge variant="outline" className="text-primary border-primary/30">
+            {connectedCount}/{totalCount} connected
+          </Badge>
+        </div>
+        <p className="text-muted-foreground">
+          Connect external services to enhance your dashboard
+        </p>
+      </div>
+
+      {/* Authentication */}
+      <div>
+        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 text-muted-foreground uppercase tracking-wider">
+          <Key className="h-4 w-4" />
+          Authentication
+        </h4>
+        <div className="space-y-4">
+          {authIntegrations.map((integration) => (
+            <IntegrationCard
+              key={integration.id}
+              integration={integration}
+              onNavigate={onSwitchTab}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* API Services */}
+      <div>
+        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 text-muted-foreground uppercase tracking-wider">
+          <Link2 className="h-4 w-4" />
+          API Services
+        </h4>
+        <div className="space-y-4">
+          {apiIntegrations.map((integration) => (
+            <IntegrationCard
+              key={integration.id}
+              integration={integration}
+              onNavigate={onSwitchTab}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Data Sources */}
+      <div>
+        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 text-muted-foreground uppercase tracking-wider">
+          <Rss className="h-4 w-4" />
+          Data Sources
+        </h4>
+        <div className="space-y-4">
+          {dataIntegrations.map((integration) => (
+            <IntegrationCard
+              key={integration.id}
+              integration={integration}
+              onNavigate={onSwitchTab}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// TABZCHROME TAB
+// ============================================================================
+
+function TabzChromeTab() {
   const {
-    available,
     backendRunning,
     authenticated,
     error,
@@ -788,8 +861,8 @@ function TabzChromeStep() {
     setTestingSpawn(true)
     setSpawnResult(null)
     try {
-      const result = await runCommand("echo 'Setup wizard test - TabzChrome is working!'", {
-        name: "Setup Test",
+      const result = await runCommand("echo 'TabzChrome test - connection working!'", {
+        name: "Connection Test",
         workingDir: workDirInput || defaultWorkDir,
       })
       if (result.success) {
@@ -805,9 +878,12 @@ function TabzChromeStep() {
   }
 
   return (
-    <div className="space-y-6" data-tabz-step="tabz">
-      <div className="text-center mb-6">
-        <h2 className="text-xl font-semibold mb-2">TabzChrome Integration</h2>
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+          <Terminal className="h-5 w-5 text-primary" />
+          TabzChrome Integration
+        </h3>
         <p className="text-muted-foreground">
           Connect TabzChrome to launch terminals from bookmarks and control browser tabs.
         </p>
@@ -936,7 +1012,7 @@ function TabzChromeStep() {
             <p className="text-xs text-destructive mt-2">{tokenError}</p>
           )}
           <p className="text-xs text-muted-foreground mt-2">
-            Get your API token from TabzChrome extension: <strong>Settings &rarr; API Token &rarr; Copy</strong>
+            Get your API token from TabzChrome extension: <strong>Settings → API Token → Copy</strong>
           </p>
         </Card>
       )}
@@ -1023,11 +1099,10 @@ function TabzChromeStep() {
 }
 
 // ============================================================================
-// STEP 4: IMPORT/EXPORT
+// IMPORT/EXPORT TAB
 // ============================================================================
 
-function ImportExportStep() {
-  const { visibility, order, reorder } = useSectionPreferences()
+function ImportExportTab() {
   const { defaultWorkDir, updateDefaultWorkDir } = useTerminalExtension()
 
   const [importError, setImportError] = React.useState<string | null>(null)
@@ -1035,6 +1110,20 @@ function ImportExportStep() {
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   const exportConfig = () => {
+    // Get current preferences from localStorage
+    let visibility = DEFAULT_VISIBILITY
+    let order = DEFAULT_SECTION_ORDER
+    try {
+      const saved = localStorage.getItem("section-preferences")
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        visibility = parsed.visibility || DEFAULT_VISIBILITY
+        order = parsed.order || DEFAULT_SECTION_ORDER
+      }
+    } catch {
+      // Use defaults
+    }
+
     const config = {
       version: 1,
       exportedAt: new Date().toISOString(),
@@ -1087,7 +1176,7 @@ function ImportExportStep() {
           if (config.sections.visibility) {
             localStorage.setItem("section-preferences", JSON.stringify({
               visibility: config.sections.visibility,
-              order: config.sections.order || order,
+              order: config.sections.order || DEFAULT_SECTION_ORDER,
             }))
           }
         }
@@ -1121,9 +1210,12 @@ function ImportExportStep() {
   }
 
   return (
-    <div className="space-y-6" data-tabz-step="import-export">
-      <div className="text-center mb-6">
-        <h2 className="text-xl font-semibold mb-2">Import / Export Settings</h2>
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+          <Download className="h-5 w-5 text-primary" />
+          Import / Export
+        </h3>
         <p className="text-muted-foreground">
           Backup your configuration or restore from a previous export.
         </p>
@@ -1136,7 +1228,7 @@ function ImportExportStep() {
             <Download className="h-6 w-6 text-primary" />
           </div>
           <div className="flex-1">
-            <h3 className="font-medium mb-1">Export Configuration</h3>
+            <h4 className="font-medium mb-1">Export Configuration</h4>
             <p className="text-sm text-muted-foreground mb-4">
               Download your current settings as a JSON file. API keys are not exported for security.
             </p>
@@ -1155,7 +1247,7 @@ function ImportExportStep() {
             <Upload className="h-6 w-6 text-primary" />
           </div>
           <div className="flex-1">
-            <h3 className="font-medium mb-1">Import Configuration</h3>
+            <h4 className="font-medium mb-1">Import Configuration</h4>
             <p className="text-sm text-muted-foreground mb-4">
               Restore settings from a previously exported JSON file.
             </p>
@@ -1193,7 +1285,7 @@ function ImportExportStep() {
             <RotateCcw className="h-6 w-6 text-destructive" />
           </div>
           <div className="flex-1">
-            <h3 className="font-medium mb-1">Reset to Defaults</h3>
+            <h4 className="font-medium mb-1">Reset to Defaults</h4>
             <p className="text-sm text-muted-foreground mb-4">
               Reset section visibility and order to defaults. API keys will be preserved.
             </p>
@@ -1213,155 +1305,87 @@ function ImportExportStep() {
 }
 
 // ============================================================================
-// STEP 5: COMPLETE
-// ============================================================================
-
-function CompleteStep({ onStartOver }: { onStartOver: () => void }) {
-  return (
-    <div className="space-y-6 text-center py-8" data-tabz-step="complete">
-      <div className="flex justify-center mb-6">
-        <div className="relative">
-          <div className="w-24 h-24 rounded-full bg-emerald-500/20 flex items-center justify-center">
-            <CheckCircle2 className="h-12 w-12 text-emerald-500" />
-          </div>
-          <Sparkles className="h-6 w-6 text-primary absolute -top-1 -right-1 animate-pulse" />
-        </div>
-      </div>
-
-      <div>
-        <h2 className="text-2xl font-semibold mb-2">Setup Complete!</h2>
-        <p className="text-muted-foreground max-w-md mx-auto">
-          Your personal homepage is configured and ready to use.
-          You can always return here to adjust settings.
-        </p>
-      </div>
-
-      <div className="pt-4 space-y-3">
-        <p className="text-sm text-muted-foreground">
-          Use the sidebar to navigate between sections, or click below to start fresh.
-        </p>
-        <Button
-          variant="outline"
-          onClick={onStartOver}
-          className="gap-2"
-          data-tabz-button="start-over"
-        >
-          <RotateCcw className="h-4 w-4" />
-          Review Setup Again
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
-export default function SetupSection({
+export default function SettingsSection({
   activeSubItem,
   onSubItemHandled,
 }: {
   activeSubItem?: string | null
   onSubItemHandled?: () => void
 }) {
-  const [currentStep, setCurrentStep] = React.useState<WizardStep>("api-keys")
+  const [activeTab, setActiveTab] = React.useState("general")
 
-  const steps: { id: WizardStep; label: string }[] = [
-    { id: "api-keys", label: "API Keys" },
-    { id: "sections", label: "Sections" },
-    { id: "tabz", label: "TabzChrome" },
-    { id: "import-export", label: "Import/Export" },
-    { id: "complete", label: "Done" },
-  ]
-
-  const currentIndex = steps.findIndex(s => s.id === currentStep)
-  const isFirst = currentIndex === 0
-  const isLast = currentIndex === steps.length - 1
-
-  // Handle sub-item navigation
+  // Handle sub-item navigation (e.g., deep links to specific tabs)
   React.useEffect(() => {
     if (activeSubItem) {
-      const step = steps.find(s => s.id === activeSubItem)
-      if (step) {
-        setCurrentStep(step.id)
+      const validTabs = ["general", "sections", "api-keys", "integrations", "tabzchrome", "import-export"]
+      if (validTabs.includes(activeSubItem)) {
+        setActiveTab(activeSubItem)
       }
       onSubItemHandled?.()
     }
   }, [activeSubItem, onSubItemHandled])
 
-  const renderStep = () => {
-    switch (currentStep) {
-      case "api-keys":
-        return <ApiKeysStep />
-      case "sections":
-        return <SectionsStep />
-      case "tabz":
-        return <TabzChromeStep />
-      case "import-export":
-        return <ImportExportStep />
-      case "complete":
-        return <CompleteStep onStartOver={() => setCurrentStep("api-keys")} />
-      default:
-        return <ApiKeysStep />
-    }
-  }
-
   return (
-    <div className="p-6" data-tabz-section="setup">
-      <h1 className="text-3xl font-bold font-mono gradient-text-theme terminal-glow mb-2">Setup Wizard</h1>
-      <p className="text-muted-foreground mb-8">
-        Configure your personal homepage in a few easy steps
-      </p>
+    <div className="p-6" data-tabz-section="settings">
+      <h1 className="text-3xl font-bold font-mono gradient-text-theme terminal-glow mb-2">Settings</h1>
+      <p className="text-muted-foreground mb-8">Customize your dashboard</p>
 
-      <div className="max-w-3xl mx-auto">
-        <StepIndicator
-          steps={steps}
-          currentStep={currentStep}
-          onStepClick={setCurrentStep}
-        />
+      <div className="max-w-4xl">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="w-full justify-start flex-wrap h-auto gap-1 p-1 mb-6">
+            <TabsTrigger value="general" className="gap-2">
+              <Palette className="h-4 w-4" />
+              General
+            </TabsTrigger>
+            <TabsTrigger value="sections" className="gap-2">
+              <LayoutGrid className="h-4 w-4" />
+              Sections
+            </TabsTrigger>
+            <TabsTrigger value="api-keys" className="gap-2">
+              <Key className="h-4 w-4" />
+              API Keys
+            </TabsTrigger>
+            <TabsTrigger value="integrations" className="gap-2">
+              <Blocks className="h-4 w-4" />
+              Integrations
+            </TabsTrigger>
+            <TabsTrigger value="tabzchrome" className="gap-2">
+              <Terminal className="h-4 w-4" />
+              TabzChrome
+            </TabsTrigger>
+            <TabsTrigger value="import-export" className="gap-2">
+              <Download className="h-4 w-4" />
+              Import/Export
+            </TabsTrigger>
+          </TabsList>
 
-        <div className="glass rounded-xl p-6 mb-6">
-          {renderStep()}
-        </div>
+          <TabsContent value="general">
+            <GeneralTab />
+          </TabsContent>
 
-        {/* Navigation - hidden on complete step */}
-        {currentStep !== "complete" && (
-          <div className="flex items-center justify-between">
-            <Button
-              variant="outline"
-              onClick={() => setCurrentStep(steps[currentIndex - 1].id)}
-              disabled={isFirst}
-              data-tabz-button="prev-step"
-            >
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              Previous
-            </Button>
+          <TabsContent value="sections">
+            <SectionsTab />
+          </TabsContent>
 
-            <div className="text-sm text-muted-foreground">
-              Step {currentIndex + 1} of {steps.length - 1}
-            </div>
+          <TabsContent value="api-keys">
+            <ApiKeysTab />
+          </TabsContent>
 
-            {currentStep === "import-export" ? (
-              <Button
-                onClick={() => setCurrentStep("complete")}
-                className="bg-emerald-600 hover:bg-emerald-700"
-                data-tabz-button="finish-setup"
-              >
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                Finish
-              </Button>
-            ) : (
-              <Button
-                onClick={() => setCurrentStep(steps[currentIndex + 1].id)}
-                data-tabz-button="next-step"
-              >
-                Next
-                <ChevronRight className="h-4 w-4 ml-2" />
-              </Button>
-            )}
-          </div>
-        )}
+          <TabsContent value="integrations">
+            <IntegrationsTab onSwitchTab={setActiveTab} />
+          </TabsContent>
+
+          <TabsContent value="tabzchrome">
+            <TabzChromeTab />
+          </TabsContent>
+
+          <TabsContent value="import-export">
+            <ImportExportTab />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   )

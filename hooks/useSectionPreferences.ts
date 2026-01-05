@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 
 // Section IDs that can be toggled (excluding home and settings which are always visible)
-export type ToggleableSection = "weather" | "feed" | "api-playground" | "notes" | "bookmarks" | "search" | "stocks" | "crypto" | "spacex" | "github-activity" | "disasters" | "tasks" | "projects" | "jobs" | "integrations" | "profile" | "ai-workspace" | "market-pulse" | "setup" | "kanban"
+export type ToggleableSection = "weather" | "feed" | "api-playground" | "notes" | "bookmarks" | "search" | "stocks" | "crypto" | "spacex" | "github-activity" | "disasters" | "tasks" | "projects" | "jobs" | "profile" | "ai-workspace" | "market-pulse" | "kanban"
 
 // All sections including non-toggleable ones
 export type Section = "home" | ToggleableSection | "settings"
@@ -46,9 +46,7 @@ export const DEFAULT_CATEGORY_ASSIGNMENTS: Record<ToggleableSection, CategoryId>
   tasks: "productivity",
   projects: "development",
   jobs: "development",
-  integrations: "personal",
   profile: "personal",
-  setup: "personal",
   kanban: "productivity",
 }
 
@@ -80,9 +78,7 @@ export const DEFAULT_SECTION_ORDER: ToggleableSection[] = [
   "tasks",
   "projects",
   "jobs",
-  "integrations",
   "profile",
-  "setup",
   "kanban",
 ]
 
@@ -104,9 +100,7 @@ export const DEFAULT_VISIBILITY: Record<ToggleableSection, boolean> = {
   tasks: true,
   projects: true,
   jobs: true,
-  integrations: true,
   profile: true,
-  setup: true,
   kanban: true,
 }
 
