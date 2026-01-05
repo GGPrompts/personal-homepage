@@ -31,6 +31,7 @@ import {
   Rocket,
   AlertCircle,
   LayoutGrid,
+  Music,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -80,6 +81,7 @@ import DisastersMonitor from "./sections/disasters-monitor"
 import MarketPulseSection from "./sections/market-pulse"
 import KanbanSection from "./sections/kanban"
 import SettingsSection from "./sections/settings"
+import { MusicPlayerSection } from "./sections/music-player"
 import { useLoginTrigger } from "@/hooks/useLoginTrigger"
 import { StartupJobsModal } from "@/components/StartupJobsModal"
 import { useJobResults } from "@/hooks/useJobResults"
@@ -120,6 +122,7 @@ const navigationItems: NavigationItem[] = [
   { id: "projects", label: "Projects", icon: FolderGit2, description: "GitHub & local repos" },
   { id: "kanban", label: "Kanban", icon: LayoutGrid, description: "Visual task board" },
   { id: "jobs", label: "Jobs", icon: Play, description: "Claude batch prompts" },
+  { id: "music-player", label: "Music Player", icon: Music, description: "Synthwave music player" },
   { id: "profile", label: "Profile", icon: User, description: "Account & sync" },
   { id: "settings", label: "Settings", icon: Settings, description: "Theme & preferences" },
 ]
@@ -612,6 +615,7 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
             projects: { icon: FolderGit2, label: "Projects", description: "GitHub & local repos" },
             kanban: { icon: LayoutGrid, label: "Kanban", description: "Visual task board" },
             jobs: { icon: Play, label: "Jobs", description: "Claude batch prompts" },
+            "music-player": { icon: Music, label: "Music Player", description: "Synthwave music player" },
             profile: { icon: User, label: "Profile", description: "Account & sync status" },
           }
 
@@ -779,6 +783,8 @@ export default function PersonalHomepage() {
         return <JobsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "kanban":
         return <KanbanSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "music-player":
+        return <MusicPlayerSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "profile":
         return <ProfileSection />
       case "settings":
