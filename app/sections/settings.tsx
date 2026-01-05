@@ -43,6 +43,7 @@ import { useAuth } from "@/components/AuthProvider"
 import { useTerminalExtension } from "@/hooks/useTerminalExtension"
 import { ThemeSettingsPanel } from "@/components/ThemeSettingsPanel"
 import { SectionSettings } from "@/components/SectionSettings"
+import { CategorySettings } from "@/components/CategorySettings"
 import {
   DEFAULT_SECTION_ORDER,
   DEFAULT_VISIBILITY,
@@ -345,19 +346,50 @@ function GeneralTab() {
 // ============================================================================
 
 function SectionsTab() {
+  const [activeSubTab, setActiveSubTab] = React.useState<"sections" | "categories">("sections")
+
   return (
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <LayoutGrid className="h-5 w-5 text-primary" />
-          Sidebar Sections
+          Sidebar Organization
         </h3>
         <p className="text-sm text-muted-foreground mb-4">
-          Toggle sections on or off and reorder them in the sidebar
+          Organize sections into categories and customize how they appear in the sidebar
         </p>
-        <div className="glass rounded-lg p-6">
-          <SectionSettings />
+
+        {/* Sub-tabs for Sections vs Categories */}
+        <div className="flex gap-2 mb-4">
+          <Button
+            variant={activeSubTab === "sections" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveSubTab("sections")}
+            className="gap-1"
+          >
+            <LayoutGrid className="h-4 w-4" />
+            Sections
+          </Button>
+          <Button
+            variant={activeSubTab === "categories" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveSubTab("categories")}
+            className="gap-1"
+          >
+            <Blocks className="h-4 w-4" />
+            Categories
+          </Button>
         </div>
+
+        {activeSubTab === "sections" ? (
+          <div className="glass rounded-lg p-6">
+            <SectionSettings />
+          </div>
+        ) : (
+          <div className="glass rounded-lg p-6">
+            <CategorySettings />
+          </div>
+        )}
       </div>
     </div>
   )

@@ -58,7 +58,7 @@ import {
   DEFAULT_SECTION_ORDER,
   DEFAULT_VISIBILITY,
   CategoryId,
-  CATEGORIES,
+  CategoryMeta,
   DEFAULT_CATEGORY_ASSIGNMENTS,
   DEFAULT_COLLAPSED_CATEGORIES,
 } from "@/hooks/useSectionPreferences"
@@ -168,6 +168,7 @@ function SidebarContent({
   recentDirs,
   removeFromRecentDirs,
   clearWorkingDir,
+  categories,
 }: {
   activeSection: Section
   setActiveSection: (section: Section) => void
@@ -189,6 +190,7 @@ function SidebarContent({
   recentDirs: string[]
   removeFromRecentDirs: (dir: string) => void
   clearWorkingDir: () => void
+  categories: CategoryMeta[]
 }) {
   const handleSectionClick = (id: Section) => {
     setActiveSection(id)
@@ -206,13 +208,10 @@ function SidebarContent({
     const effectiveVisibility = prefsLoaded ? sectionVisibility : DEFAULT_VISIBILITY
     const effectiveAssignments = prefsLoaded ? categoryAssignments : DEFAULT_CATEGORY_ASSIGNMENTS
 
-    const result: Record<CategoryId, NavigationItem[]> = {
-      information: [],
-      productivity: [],
-      development: [],
-      finance: [],
-      entertainment: [],
-      personal: [],
+    // Initialize result with all categories (dynamic)
+    const result: Record<CategoryId, NavigationItem[]> = {}
+    for (const category of categories) {
+      result[category.id] = []
     }
 
     for (const id of effectiveOrder) {
@@ -220,13 +219,16 @@ function SidebarContent({
         const item = navigationItems.find((i) => i.id === id)
         if (item) {
           const category = effectiveAssignments[id]
+          if (!result[category]) {
+            result[category] = []
+          }
           result[category].push(item)
         }
       }
     }
 
     return result
-  }, [prefsLoaded, sectionOrder, sectionVisibility, categoryAssignments])
+  }, [prefsLoaded, sectionOrder, sectionVisibility, categoryAssignments, categories])
 
   const sectionsByCategory = getSectionsByCategory()
   const effectiveCollapsedCategories = prefsLoaded ? collapsedCategories : DEFAULT_COLLAPSED_CATEGORIES
@@ -289,7 +291,7 @@ function SidebarContent({
           {/* Collapsed sidebar: show category icons with flyout popovers */}
           {collapsed && !mobile ? (
             <div className="space-y-1">
-              {CATEGORIES.map((category) => {
+              {categories.map((category) => {
                 const sections = sectionsByCategory[category.id]
                 if (sections.length === 0) return null
 
@@ -367,7 +369,7 @@ function SidebarContent({
             </div>
           ) : (
             /* Expanded sidebar: show full category headers with collapsible sections */
-            CATEGORIES.map((category) => {
+            categories.map((category) => {
               const sections = sectionsByCategory[category.id]
               if (sections.length === 0) return null
 
@@ -760,7 +762,11 @@ export default function PersonalHomepage() {
     categoryAssignments,
     collapsedCategories,
     toggleCategoryCollapsed,
+    getAllCategories,
   } = useSectionPreferences()
+
+  // Get dynamic categories (default + custom)
+  const categories = getAllCategories()
   const { isLocal } = useEnvironment()
   const {
     workingDir,
@@ -921,6 +927,7 @@ export default function PersonalHomepage() {
               prefsLoaded={isLoaded}
               isLocal={isLocal}
               workingDir={workingDir}
+              categories={categories}
               setWorkingDir={setWorkingDir}
               recentDirs={recentDirs}
               removeFromRecentDirs={removeFromRecentDirs}
@@ -957,6 +964,7 @@ export default function PersonalHomepage() {
                 recentDirs={recentDirs}
                 removeFromRecentDirs={removeFromRecentDirs}
                 clearWorkingDir={clearWorkingDir}
+                categories={categories}
               />
             </aside>
 
