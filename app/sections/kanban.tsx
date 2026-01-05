@@ -10,7 +10,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { FolderOpen, ChevronDown, X, Check, Pencil } from "lucide-react"
+import { FolderOpen, ChevronDown, X, Check, Pencil, Globe } from "lucide-react"
+import { useWorkingDirectory } from "@/hooks/useWorkingDirectory"
 
 const STORAGE_KEY_WORKSPACE = "kanban-workspace"
 const STORAGE_KEY_WORKSPACE_HISTORY = "kanban-workspace-history"
@@ -26,6 +27,10 @@ export default function KanbanSection({ activeSubItem, onSubItemHandled }: Kanba
   const [workspaceHistory, setWorkspaceHistory] = React.useState<string[]>([])
   const [isEditing, setIsEditing] = React.useState(false)
   const [inputValue, setInputValue] = React.useState("")
+  const { workingDir: globalWorkingDir } = useWorkingDirectory()
+
+  // Compute effective workspace: local override > global working dir > empty
+  const effectiveWorkspace = workspace || (globalWorkingDir !== "~" ? globalWorkingDir : "")
 
   // Load persisted workspace on mount
   React.useEffect(() => {
@@ -129,8 +134,14 @@ export default function KanbanSection({ activeSubItem, onSubItemHandled }: Kanba
                     className="h-8 gap-2 font-mono text-xs"
                     title="Project workspace for beads issues"
                   >
-                    <FolderOpen className="h-3 w-3" />
-                    {workspace || "Current project"}
+                    {workspace ? (
+                      <FolderOpen className="h-3 w-3" />
+                    ) : globalWorkingDir !== "~" ? (
+                      <Globe className="h-3 w-3 text-primary" />
+                    ) : (
+                      <FolderOpen className="h-3 w-3" />
+                    )}
+                    {workspace || (globalWorkingDir !== "~" ? `Global: ${globalWorkingDir}` : "Current project")}
                     <ChevronDown className="h-3 w-3" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -148,8 +159,14 @@ export default function KanbanSection({ activeSubItem, onSubItemHandled }: Kanba
                       className="gap-2 text-muted-foreground"
                     >
                       <X className="h-4 w-4" />
-                      Clear (use current project)
+                      {globalWorkingDir !== "~" ? "Use global working dir" : "Clear (use current project)"}
                     </DropdownMenuItem>
+                  )}
+                  {globalWorkingDir !== "~" && !workspace && (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground border-t mt-1 pt-2">
+                      <Globe className="h-3 w-3 inline mr-1" />
+                      Using global: {globalWorkingDir}
+                    </div>
                   )}
                   {workspaceHistory.length > 0 && (
                     <>
@@ -184,7 +201,7 @@ export default function KanbanSection({ activeSubItem, onSubItemHandled }: Kanba
         <p className="text-muted-foreground mb-4">Visual task board for project management</p>
       </div>
       <div className="flex-1 min-h-0">
-        <KanbanBoard workspace={workspace || undefined} />
+        <KanbanBoard workspace={effectiveWorkspace || undefined} />
       </div>
     </div>
   )

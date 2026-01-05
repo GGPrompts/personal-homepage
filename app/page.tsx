@@ -49,6 +49,8 @@ import { useAuth } from "@/components/AuthProvider"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useSectionPreferences, ToggleableSection, DEFAULT_SECTION_ORDER, DEFAULT_VISIBILITY } from "@/hooks/useSectionPreferences"
 import { useEnvironment, requiresLocalhost } from "@/hooks/useEnvironment"
+import { useWorkingDirectory } from "@/hooks/useWorkingDirectory"
+import { WorkingDirSelector } from "@/components/WorkingDirSelector"
 import { WorldClocks } from "@/components/WorldClocks"
 import { LocalOnlyOverlay, LocalOnlyBadge, EnvironmentBadge } from "@/components/LocalOnlyOverlay"
 
@@ -136,6 +138,11 @@ function SidebarContent({
   sectionVisibility,
   prefsLoaded = false,
   isLocal = false,
+  workingDir,
+  setWorkingDir,
+  recentDirs,
+  removeFromRecentDirs,
+  clearWorkingDir,
 }: {
   activeSection: Section
   setActiveSection: (section: Section) => void
@@ -149,6 +156,11 @@ function SidebarContent({
   sectionVisibility: Record<ToggleableSection, boolean>
   prefsLoaded?: boolean
   isLocal?: boolean
+  workingDir: string
+  setWorkingDir: (dir: string) => void
+  recentDirs: string[]
+  removeFromRecentDirs: (dir: string) => void
+  clearWorkingDir: () => void
 }) {
   const handleSectionClick = (id: Section) => {
     setActiveSection(id)
@@ -197,6 +209,17 @@ function SidebarContent({
           </TooltipContent>
         )}
       </Tooltip>
+
+      {/* Working Directory Selector */}
+      <WorkingDirSelector
+        workingDir={workingDir}
+        setWorkingDir={setWorkingDir}
+        recentDirs={recentDirs}
+        removeFromRecentDirs={removeFromRecentDirs}
+        clearWorkingDir={clearWorkingDir}
+        collapsed={collapsed}
+        mobile={mobile}
+      />
 
       {/* Navigation */}
       <nav className="flex-1 p-4 overflow-y-auto">
@@ -755,6 +778,14 @@ export default function PersonalHomepage() {
   const { user } = useAuth()
   const { visibility, order, isVisible, isLoaded } = useSectionPreferences()
   const { isLocal } = useEnvironment()
+  const {
+    workingDir,
+    setWorkingDir,
+    recentDirs,
+    removeFromRecentDirs,
+    clearWorkingDir,
+    isLoaded: workingDirLoaded,
+  } = useWorkingDirectory()
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
   const [activeSection, setActiveSection] = React.useState<Section>("home")
@@ -900,6 +931,11 @@ export default function PersonalHomepage() {
               sectionVisibility={visibility}
               prefsLoaded={isLoaded}
               isLocal={isLocal}
+              workingDir={workingDir}
+              setWorkingDir={setWorkingDir}
+              recentDirs={recentDirs}
+              removeFromRecentDirs={removeFromRecentDirs}
+              clearWorkingDir={clearWorkingDir}
             />
           </SheetContent>
         </Sheet>
@@ -924,6 +960,11 @@ export default function PersonalHomepage() {
                 sectionVisibility={visibility}
                 prefsLoaded={isLoaded}
                 isLocal={isLocal}
+                workingDir={workingDir}
+                setWorkingDir={setWorkingDir}
+                recentDirs={recentDirs}
+                removeFromRecentDirs={removeFromRecentDirs}
+                clearWorkingDir={clearWorkingDir}
               />
             </aside>
 

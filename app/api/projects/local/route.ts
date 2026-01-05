@@ -1,14 +1,36 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { execSync } from "child_process"
 import { readdirSync, statSync, existsSync, readFileSync } from "fs"
-import { join } from "path"
+import { join, resolve } from "path"
 import { homedir } from "os"
 import type { LocalProject } from "@/lib/projects"
 import { detectTechStack } from "@/lib/projects"
 
 export const dynamic = "force-dynamic"
 
-const PROJECTS_DIR = join(homedir(), "projects")
+const DEFAULT_PROJECTS_DIR = join(homedir(), "projects")
+
+// Expand ~ to home directory
+function expandTilde(path: string): string {
+  if (path.startsWith("~")) {
+    return path.replace(/^~/, homedir())
+  }
+  return path
+}
+
+// Get the scan directory based on workingDir parameter
+function getScanDirectory(workingDir?: string): string {
+  if (!workingDir || workingDir === "~") {
+    return DEFAULT_PROJECTS_DIR
+  }
+
+  const expanded = expandTilde(workingDir)
+  const resolved = resolve(expanded)
+
+  // If the working dir itself is a project (has .git etc), scan just it
+  // Otherwise scan its subdirectories
+  return resolved
+}
 
 function getGitInfo(projectPath: string): LocalProject["git"] | null {
   const gitDir = join(projectPath, ".git")
@@ -206,24 +228,39 @@ function scanProject(projectPath: string, name: string): LocalProject | null {
   }
 }
 
-export async function GET() {
-  // Check if projects directory exists
-  if (!existsSync(PROJECTS_DIR)) {
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams
+  const workingDir = searchParams.get("workingDir") || undefined
+
+  const scanDir = getScanDirectory(workingDir)
+
+  // Check if scan directory exists
+  if (!existsSync(scanDir)) {
     return NextResponse.json({
       projects: [],
-      error: `Projects directory not found: ${PROJECTS_DIR}`,
+      count: 0,
+      scanDir,
+      error: `Directory not found: ${scanDir}`,
     })
   }
 
   try {
-    const entries = readdirSync(PROJECTS_DIR)
     const projects: LocalProject[] = []
 
+    // Check if the scanDir itself is a project
+    const scanDirProject = scanProject(scanDir, scanDir.split("/").pop() || "project")
+    if (scanDirProject) {
+      // The working dir itself is a project, include it
+      projects.push(scanDirProject)
+    }
+
+    // Scan subdirectories
+    const entries = readdirSync(scanDir)
     for (const entry of entries) {
       // Skip hidden directories
       if (entry.startsWith(".")) continue
 
-      const projectPath = join(PROJECTS_DIR, entry)
+      const projectPath = join(scanDir, entry)
       const project = scanProject(projectPath, entry)
 
       if (project) {
@@ -236,12 +273,17 @@ export async function GET() {
       new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
     )
 
-    return NextResponse.json({ projects, count: projects.length })
+    return NextResponse.json({
+      projects,
+      count: projects.length,
+      scanDir,
+      workingDir: workingDir || "~",
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to scan projects"
     console.error("Local scan error:", message)
     return NextResponse.json(
-      { error: message, projects: [] },
+      { error: message, projects: [], scanDir },
       { status: 500 }
     )
   }
