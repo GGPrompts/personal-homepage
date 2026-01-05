@@ -3,11 +3,14 @@
 import React, { useState, useEffect, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
+  AlertCircle,
   Camera,
+  Check,
   ChevronLeft,
   ChevronRight,
   Clock,
   Download,
+  ExternalLink,
   Filter,
   Folder,
   Grid3x3,
@@ -16,6 +19,7 @@ import {
   Info,
   Layers,
   Link2,
+  Loader2,
   Map,
   MapPin,
   Maximize2,
@@ -53,6 +57,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+
+// LocalStorage keys
+const STORAGE_KEY_PHOTOS = "photo-gallery-custom-photos"
+const STORAGE_KEY_USE_DEMO = "photo-gallery-use-demo"
 
 // TypeScript Interfaces
 interface ExifData {
@@ -89,6 +99,8 @@ interface Photo {
   tags: string[]
   exif?: ExifData
   location?: { lat: number; lng: number; name: string }
+  isCustom?: boolean // Flag for user-added photos
+  sourceType?: "url" | "file" // How the photo was added
 }
 
 // Mock Data
@@ -446,6 +458,120 @@ const formatDate = (dateString: string): string => {
   })
 }
 
+// Generate unique ID
+const generateId = () => `photo-custom-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+
+// Custom hook for persisting photos to localStorage
+function useCustomPhotos() {
+  const [customPhotos, setCustomPhotos] = useState<Photo[]>([])
+  const [useDemo, setUseDemo] = useState(true)
+  const [isLoaded, setIsLoaded] = useState(false)
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedPhotos = localStorage.getItem(STORAGE_KEY_PHOTOS)
+      const savedUseDemo = localStorage.getItem(STORAGE_KEY_USE_DEMO)
+
+      if (savedPhotos) {
+        setCustomPhotos(JSON.parse(savedPhotos))
+      }
+      if (savedUseDemo !== null) {
+        setUseDemo(JSON.parse(savedUseDemo))
+      }
+    } catch (error) {
+      console.error("Failed to load photos from localStorage:", error)
+    }
+    setIsLoaded(true)
+  }, [])
+
+  // Save to localStorage whenever customPhotos changes
+  useEffect(() => {
+    if (!isLoaded) return
+    try {
+      localStorage.setItem(STORAGE_KEY_PHOTOS, JSON.stringify(customPhotos))
+    } catch (error) {
+      console.error("Failed to save photos to localStorage:", error)
+    }
+  }, [customPhotos, isLoaded])
+
+  // Save useDemo preference
+  useEffect(() => {
+    if (!isLoaded) return
+    try {
+      localStorage.setItem(STORAGE_KEY_USE_DEMO, JSON.stringify(useDemo))
+    } catch (error) {
+      console.error("Failed to save demo preference:", error)
+    }
+  }, [useDemo, isLoaded])
+
+  const addPhoto = useCallback((photo: Omit<Photo, "id" | "uploadDate" | "isCustom">) => {
+    const newPhoto: Photo = {
+      ...photo,
+      id: generateId(),
+      uploadDate: new Date().toISOString().split("T")[0],
+      isCustom: true,
+    }
+    setCustomPhotos((prev) => [newPhoto, ...prev])
+    return newPhoto
+  }, [])
+
+  const removePhoto = useCallback((photoId: string) => {
+    setCustomPhotos((prev) => prev.filter((p) => p.id !== photoId))
+  }, [])
+
+  const updatePhoto = useCallback((photoId: string, updates: Partial<Photo>) => {
+    setCustomPhotos((prev) =>
+      prev.map((p) => (p.id === photoId ? { ...p, ...updates } : p))
+    )
+  }, [])
+
+  const clearAllCustom = useCallback(() => {
+    setCustomPhotos([])
+  }, [])
+
+  return {
+    customPhotos,
+    useDemo,
+    setUseDemo,
+    addPhoto,
+    removePhoto,
+    updatePhoto,
+    clearAllCustom,
+    isLoaded,
+  }
+}
+
+// Image loading and validation utilities
+async function validateImageUrl(url: string): Promise<{ valid: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve({ valid: true })
+    img.onerror = () => resolve({ valid: false, error: "Failed to load image. Check the URL." })
+    img.src = url
+    // Timeout after 10 seconds
+    setTimeout(() => resolve({ valid: false, error: "Image load timeout." }), 10000)
+  })
+}
+
+async function getImageDimensions(url: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight })
+    img.onerror = () => resolve({ width: 0, height: 0 })
+    img.src = url
+  })
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
 export default function PhotoGallerySection({
   activeSubItem,
   onSubItemHandled,
@@ -453,8 +579,19 @@ export default function PhotoGallerySection({
   activeSubItem?: string | null
   onSubItemHandled?: () => void
 }) {
+  // Custom photos persistence
+  const {
+    customPhotos,
+    useDemo,
+    setUseDemo,
+    addPhoto,
+    removePhoto,
+    updatePhoto: updateCustomPhoto,
+    clearAllCustom,
+    isLoaded: customPhotosLoaded,
+  } = useCustomPhotos()
+
   // State
-  const [photos, setPhotos] = useState<Photo[]>(mockPhotos)
   const [albums] = useState<Album[]>(mockAlbums)
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null)
   const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -469,6 +606,25 @@ export default function PhotoGallerySection({
   const [activeTab, setActiveTab] = useState("gallery")
   const [viewMode, setViewMode] = useState<"grid" | "masonry">("masonry")
   const slideshowIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Add photo modal state
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [addMethod, setAddMethod] = useState<"url" | "file">("url")
+  const [urlInput, setUrlInput] = useState("")
+  const [urlPreview, setUrlPreview] = useState<string | null>(null)
+  const [urlLoading, setUrlLoading] = useState(false)
+  const [urlError, setUrlError] = useState<string | null>(null)
+  const [pendingFiles, setPendingFiles] = useState<{ file: File; preview: string }[]>([])
+  const [photoTitle, setPhotoTitle] = useState("")
+  const [photoTags, setPhotoTags] = useState("")
+  const [photoDescription, setPhotoDescription] = useState("")
+  const [isAddingPhoto, setIsAddingPhoto] = useState(false)
+
+  // Combine custom photos with demo photos
+  const photos = customPhotosLoaded
+    ? [...customPhotos, ...(useDemo ? mockPhotos : [])]
+    : mockPhotos
 
   // Filter photos
   const filteredPhotos = photos.filter((photo) => {
@@ -568,9 +724,15 @@ export default function PhotoGallerySection({
 
   // Toggle favorite
   const toggleFavorite = (photoId: string) => {
-    setPhotos((prev) =>
-      prev.map((p) => (p.id === photoId ? { ...p, isFavorite: !p.isFavorite } : p))
-    )
+    // Check if it's a custom photo
+    const isCustom = customPhotos.some((p) => p.id === photoId)
+    if (isCustom) {
+      const photo = customPhotos.find((p) => p.id === photoId)
+      if (photo) {
+        updateCustomPhoto(photoId, { isFavorite: !photo.isFavorite })
+      }
+    }
+    // Update selected photo state
     if (selectedPhoto?.id === photoId) {
       setSelectedPhoto((prev) => (prev ? { ...prev, isFavorite: !prev.isFavorite } : null))
     }
@@ -583,7 +745,147 @@ export default function PhotoGallerySection({
     setZoomLevel(1)
   }
 
-  // Drag and drop upload simulation
+  // Reset modal state
+  const resetAddModal = () => {
+    setUrlInput("")
+    setUrlPreview(null)
+    setUrlError(null)
+    setUrlLoading(false)
+    setPendingFiles([])
+    setPhotoTitle("")
+    setPhotoTags("")
+    setPhotoDescription("")
+    setIsAddingPhoto(false)
+  }
+
+  // Close add modal
+  const closeAddModal = () => {
+    setShowAddModal(false)
+    resetAddModal()
+  }
+
+  // Validate and preview URL
+  const handleUrlPreview = async () => {
+    if (!urlInput.trim()) {
+      setUrlError("Please enter a URL")
+      return
+    }
+
+    setUrlLoading(true)
+    setUrlError(null)
+    setUrlPreview(null)
+
+    try {
+      const result = await validateImageUrl(urlInput.trim())
+      if (result.valid) {
+        setUrlPreview(urlInput.trim())
+      } else {
+        setUrlError(result.error || "Invalid image URL")
+      }
+    } catch {
+      setUrlError("Failed to validate URL")
+    } finally {
+      setUrlLoading(false)
+    }
+  }
+
+  // Handle file selection
+  const handleFileSelect = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files)
+    const imageFiles = fileArray.filter((f) => f.type.startsWith("image/"))
+
+    if (imageFiles.length === 0) {
+      setUrlError("Please select image files (JPG, PNG, WEBP, GIF)")
+      return
+    }
+
+    const previews: { file: File; preview: string }[] = []
+    for (const file of imageFiles) {
+      try {
+        const dataUrl = await fileToDataUrl(file)
+        previews.push({ file, preview: dataUrl })
+      } catch {
+        console.error(`Failed to read file: ${file.name}`)
+      }
+    }
+
+    setPendingFiles((prev) => [...prev, ...previews])
+    setUrlError(null)
+  }
+
+  // Remove pending file
+  const removePendingFile = (index: number) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  // Add photo from URL
+  const handleAddFromUrl = async () => {
+    if (!urlPreview) return
+
+    setIsAddingPhoto(true)
+    try {
+      const dimensions = await getImageDimensions(urlPreview)
+      addPhoto({
+        url: urlPreview,
+        thumbnail: urlPreview,
+        title: photoTitle.trim() || undefined,
+        description: photoDescription.trim() || undefined,
+        width: dimensions.width || 1920,
+        height: dimensions.height || 1080,
+        size: 0,
+        isFavorite: false,
+        tags: photoTags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
+        sourceType: "url",
+      })
+      closeAddModal()
+      setActiveTab("gallery")
+    } catch {
+      setUrlError("Failed to add photo")
+    } finally {
+      setIsAddingPhoto(false)
+    }
+  }
+
+  // Add photos from files
+  const handleAddFromFiles = async () => {
+    if (pendingFiles.length === 0) return
+
+    setIsAddingPhoto(true)
+    try {
+      for (const { file, preview } of pendingFiles) {
+        const dimensions = await getImageDimensions(preview)
+        addPhoto({
+          url: preview,
+          thumbnail: preview,
+          title: pendingFiles.length === 1 ? photoTitle.trim() || file.name : file.name,
+          description: pendingFiles.length === 1 ? photoDescription.trim() || undefined : undefined,
+          width: dimensions.width || 1920,
+          height: dimensions.height || 1080,
+          size: file.size,
+          isFavorite: false,
+          tags:
+            pendingFiles.length === 1
+              ? photoTags
+                  .split(",")
+                  .map((t) => t.trim())
+                  .filter(Boolean)
+              : [],
+          sourceType: "file",
+        })
+      }
+      closeAddModal()
+      setActiveTab("gallery")
+    } catch {
+      setUrlError("Failed to add photos")
+    } finally {
+      setIsAddingPhoto(false)
+    }
+  }
+
+  // Drag and drop handlers
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(true)
@@ -593,24 +895,26 @@ export default function PhotoGallerySection({
     setIsDragging(false)
   }
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
-    simulateUpload()
+
+    const files = e.dataTransfer.files
+    if (files.length > 0) {
+      // Open modal and populate with dropped files
+      setShowAddModal(true)
+      setAddMethod("file")
+      await handleFileSelect(files)
+    }
   }
 
-  const simulateUpload = () => {
-    setUploadProgress(0)
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev === null || prev >= 100) {
-          clearInterval(interval)
-          setTimeout(() => setUploadProgress(null), 1000)
-          return 100
-        }
-        return prev + 10
-      })
-    }, 200)
+  // Delete custom photo
+  const handleDeletePhoto = (photoId: string) => {
+    removePhoto(photoId)
+    if (selectedPhoto?.id === photoId) {
+      setLightboxOpen(false)
+      setSelectedPhoto(null)
+    }
   }
 
   // Get album for photo
@@ -641,9 +945,24 @@ export default function PhotoGallerySection({
             <Badge className="bg-primary/20 text-primary border-primary/30 text-sm px-3 py-1">
               {totalPhotos} Photos
             </Badge>
+            {customPhotos.length > 0 && (
+              <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-sm px-3 py-1">
+                {customPhotos.length} Custom
+              </Badge>
+            )}
             <Badge className="bg-secondary/20 text-secondary border-secondary/30 text-sm px-3 py-1">
               {formatFileSize(totalSize)}
             </Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-primary/30 text-primary hover:bg-primary/10"
+              onClick={() => setShowAddModal(true)}
+              data-tabz-action="add-photo"
+            >
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Photo</span>
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -1037,11 +1356,44 @@ export default function PhotoGallerySection({
             {/* Upload Tab */}
             <TabsContent value="upload" className="space-y-6">
               <Card className="glass border-primary/30 p-6">
-                <h3 className="text-lg font-semibold text-primary mb-6">Upload Photos</h3>
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-lg font-semibold text-primary">Upload Photos</h3>
+                    <p className="text-muted-foreground text-sm mt-1">
+                      Add photos from files or URLs
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-primary/30 text-primary hover:bg-primary/10"
+                    onClick={() => setShowAddModal(true)}
+                    data-tabz-action="open-add-modal"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Photo
+                  </Button>
+                </div>
+
+                {/* Hidden file input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      setShowAddModal(true)
+                      setAddMethod("file")
+                      handleFileSelect(e.target.files)
+                    }
+                  }}
+                />
 
                 {/* Drag Drop Zone */}
                 <div
-                  className={`glass-dark border-2 border-dashed rounded-lg p-12 text-center transition-colors ${
+                  className={`glass-dark border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer ${
                     isDragging
                       ? "border-primary bg-primary/10"
                       : "border-primary/30 hover:border-primary/50"
@@ -1049,6 +1401,7 @@ export default function PhotoGallerySection({
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
                 >
                   <Upload
                     className={`h-16 w-16 mx-auto mb-4 ${
@@ -1061,16 +1414,33 @@ export default function PhotoGallerySection({
                   <p className="text-muted-foreground text-sm mb-4">
                     or click to browse files
                   </p>
-                  <Button
-                    variant="outline"
-                    className="border-primary/30 text-primary hover:bg-primary/10"
-                    onClick={simulateUpload}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Select Files
-                  </Button>
+                  <div className="flex gap-3 justify-center">
+                    <Button
+                      variant="outline"
+                      className="border-primary/30 text-primary hover:bg-primary/10"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        fileInputRef.current?.click()
+                      }}
+                    >
+                      <ImageIcon className="h-4 w-4 mr-2" />
+                      Browse Files
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="border-secondary/30 text-secondary hover:bg-secondary/10"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setShowAddModal(true)
+                        setAddMethod("url")
+                      }}
+                    >
+                      <Link2 className="h-4 w-4 mr-2" />
+                      Add from URL
+                    </Button>
+                  </div>
                   <p className="text-muted-foreground text-xs mt-4">
-                    Supports: JPG, PNG, WEBP, HEIC • Max 50MB per file
+                    Supports: JPG, PNG, WEBP, GIF • Images stored locally in browser
                   </p>
                 </div>
 
@@ -1096,32 +1466,120 @@ export default function PhotoGallerySection({
                   </motion.div>
                 )}
 
-                {/* Upload Settings */}
-                <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="glass-dark border-primary/20 rounded-lg p-4">
-                    <h4 className="text-foreground font-medium mb-3">Upload to Album</h4>
-                    <Select defaultValue="none">
-                      <SelectTrigger className="glass border-primary/30">
-                        <SelectValue placeholder="Select album" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No Album</SelectItem>
-                        {albums.map((album) => (
-                          <SelectItem key={album.id} value={album.id}>
-                            {album.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="glass-dark border-primary/20 rounded-lg p-4">
-                    <h4 className="text-foreground font-medium mb-3">Default Tags</h4>
-                    <Input
-                      placeholder="Add tags separated by commas..."
-                      className="glass border-primary/30 text-foreground"
-                    />
+                {/* Gallery Management */}
+                <div className="mt-6">
+                  <h4 className="text-foreground font-medium mb-4">Gallery Management</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="glass-dark border-primary/20 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h5 className="text-foreground font-medium">Demo Images</h5>
+                          <p className="text-muted-foreground text-xs mt-1">
+                            Show demo Unsplash images in gallery
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={`border-primary/30 ${
+                            useDemo ? "bg-primary/20 text-primary" : ""
+                          }`}
+                          onClick={() => setUseDemo(!useDemo)}
+                        >
+                          {useDemo ? (
+                            <>
+                              <Check className="h-4 w-4 mr-2" />
+                              Enabled
+                            </>
+                          ) : (
+                            "Disabled"
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-muted-foreground text-xs">
+                        {useDemo ? `${mockPhotos.length} demo photos shown` : "Demo photos hidden"}
+                      </p>
+                    </div>
+                    <div className="glass-dark border-primary/20 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h5 className="text-foreground font-medium">Custom Photos</h5>
+                          <p className="text-muted-foreground text-xs mt-1">
+                            Your uploaded images ({customPhotos.length})
+                          </p>
+                        </div>
+                        {customPhotos.length > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                            onClick={() => {
+                              if (confirm("Clear all custom photos? This cannot be undone.")) {
+                                clearAllCustom()
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Clear All
+                          </Button>
+                        )}
+                      </div>
+                      <p className="text-muted-foreground text-xs">
+                        Stored in browser localStorage
+                      </p>
+                    </div>
                   </div>
                 </div>
+
+                {/* Custom Photos List */}
+                {customPhotos.length > 0 && (
+                  <div className="mt-6">
+                    <h4 className="text-foreground font-medium mb-4">Your Custom Photos</h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                      {customPhotos.map((photo) => (
+                        <div
+                          key={photo.id}
+                          className="relative group rounded-lg overflow-hidden border border-primary/20"
+                        >
+                          <img
+                            src={photo.thumbnail}
+                            alt={photo.title || "Custom photo"}
+                            className="w-full aspect-square object-cover"
+                          />
+                          <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 border-primary/30"
+                              onClick={() => openLightbox(photo)}
+                            >
+                              <Maximize2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 border-red-500/30 text-red-400 hover:bg-red-500/10"
+                              onClick={() => handleDeletePhoto(photo.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          {photo.sourceType && (
+                            <div className="absolute top-1 left-1">
+                              <Badge className="bg-background/80 text-xs px-1.5 py-0.5">
+                                {photo.sourceType === "url" ? (
+                                  <ExternalLink className="h-3 w-3" />
+                                ) : (
+                                  <ImageIcon className="h-3 w-3" />
+                                )}
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </Card>
             </TabsContent>
           </Tabs>
@@ -1442,6 +1900,9 @@ export default function PhotoGallerySection({
                             <Button
                               variant="outline"
                               className="w-full justify-start border-primary/30 hover:bg-primary/10"
+                              onClick={() => {
+                                navigator.clipboard.writeText(selectedPhoto.url)
+                              }}
                             >
                               <Link2 className="h-4 w-4 mr-2" />
                               Copy Link
@@ -1449,17 +1910,30 @@ export default function PhotoGallerySection({
                             <Button
                               variant="outline"
                               className="w-full justify-start border-primary/30 hover:bg-primary/10"
+                              onClick={() => {
+                                const a = document.createElement("a")
+                                a.href = selectedPhoto.url
+                                a.download = selectedPhoto.title || "photo"
+                                a.click()
+                              }}
                             >
                               <Download className="h-4 w-4 mr-2" />
                               Download Original
                             </Button>
-                            <Button
-                              variant="outline"
-                              className="w-full justify-start border-red-500/30 text-red-400 hover:bg-red-500/10"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete Photo
-                            </Button>
+                            {selectedPhoto.isCustom && (
+                              <Button
+                                variant="outline"
+                                className="w-full justify-start border-red-500/30 text-red-400 hover:bg-red-500/10"
+                                onClick={() => {
+                                  if (confirm("Delete this photo?")) {
+                                    handleDeletePhoto(selectedPhoto.id)
+                                  }
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete Photo
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </ScrollArea>
@@ -1468,6 +1942,271 @@ export default function PhotoGallerySection({
                 </AnimatePresence>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Photo Modal */}
+        <Dialog open={showAddModal} onOpenChange={(open) => !open && closeAddModal()}>
+          <DialogContent className="max-w-2xl glass border-primary/30">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-primary">Add Photo</h2>
+                  <p className="text-muted-foreground text-sm mt-1">
+                    Add images from URL or local files
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={closeAddModal}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+
+              {/* Method Selector */}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className={`flex-1 ${
+                    addMethod === "url"
+                      ? "bg-primary/20 text-primary border-primary/50"
+                      : "border-primary/30"
+                  }`}
+                  onClick={() => setAddMethod("url")}
+                >
+                  <Link2 className="h-4 w-4 mr-2" />
+                  From URL
+                </Button>
+                <Button
+                  variant="outline"
+                  className={`flex-1 ${
+                    addMethod === "file"
+                      ? "bg-primary/20 text-primary border-primary/50"
+                      : "border-primary/30"
+                  }`}
+                  onClick={() => setAddMethod("file")}
+                >
+                  <ImageIcon className="h-4 w-4 mr-2" />
+                  From Files
+                </Button>
+              </div>
+
+              {/* URL Input */}
+              {addMethod === "url" && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="image-url">Image URL</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="image-url"
+                        placeholder="https://example.com/image.jpg"
+                        value={urlInput}
+                        onChange={(e) => {
+                          setUrlInput(e.target.value)
+                          setUrlError(null)
+                          setUrlPreview(null)
+                        }}
+                        className="glass border-primary/30"
+                        data-tabz-input="photo-url"
+                      />
+                      <Button
+                        variant="outline"
+                        className="border-primary/30 text-primary hover:bg-primary/10"
+                        onClick={handleUrlPreview}
+                        disabled={urlLoading || !urlInput.trim()}
+                      >
+                        {urlLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          "Preview"
+                        )}
+                      </Button>
+                    </div>
+                    {urlError && (
+                      <div className="flex items-center gap-2 text-red-400 text-sm">
+                        <AlertCircle className="h-4 w-4" />
+                        {urlError}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* URL Preview */}
+                  {urlPreview && (
+                    <div className="space-y-4">
+                      <div className="relative rounded-lg overflow-hidden border border-primary/30 max-h-64">
+                        <img
+                          src={urlPreview}
+                          alt="Preview"
+                          className="w-full h-full object-contain bg-background/50"
+                        />
+                        <div className="absolute top-2 right-2">
+                          <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                            <Check className="h-3 w-3 mr-1" />
+                            Valid
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* File Input */}
+              {addMethod === "file" && (
+                <div className="space-y-4">
+                  <div
+                    className={`glass-dark border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                      isDragging
+                        ? "border-primary bg-primary/10"
+                        : "border-primary/30 hover:border-primary/50"
+                    }`}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={async (e) => {
+                      e.preventDefault()
+                      setIsDragging(false)
+                      if (e.dataTransfer.files.length > 0) {
+                        await handleFileSelect(e.dataTransfer.files)
+                      }
+                    }}
+                    onClick={() => {
+                      const input = document.createElement("input")
+                      input.type = "file"
+                      input.accept = "image/*"
+                      input.multiple = true
+                      input.onchange = (e) => {
+                        const files = (e.target as HTMLInputElement).files
+                        if (files) handleFileSelect(files)
+                      }
+                      input.click()
+                    }}
+                  >
+                    <Upload className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-foreground font-medium mb-1">
+                      Drop images here or click to browse
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      JPG, PNG, WEBP, GIF supported
+                    </p>
+                  </div>
+
+                  {/* File Previews */}
+                  {pendingFiles.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>Selected Files ({pendingFiles.length})</Label>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+                        {pendingFiles.map((item, idx) => (
+                          <div
+                            key={idx}
+                            className="relative group rounded-lg overflow-hidden border border-primary/20"
+                          >
+                            <img
+                              src={item.preview}
+                              alt={item.file.name}
+                              className="w-full aspect-square object-cover"
+                            />
+                            <button
+                              className="absolute top-1 right-1 p-1 rounded-full bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => removePendingFile(idx)}
+                            >
+                              <X className="h-3 w-3 text-red-400" />
+                            </button>
+                            <div className="absolute bottom-0 left-0 right-0 p-1 bg-background/80 text-[10px] text-muted-foreground truncate">
+                              {item.file.name}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Metadata Form - Only show if we have something to add */}
+              {(urlPreview || pendingFiles.length === 1) && (
+                <div className="space-y-4 pt-4 border-t border-primary/20">
+                  <div className="space-y-2">
+                    <Label htmlFor="photo-title">Title (optional)</Label>
+                    <Input
+                      id="photo-title"
+                      placeholder="Enter a title for this photo"
+                      value={photoTitle}
+                      onChange={(e) => setPhotoTitle(e.target.value)}
+                      className="glass border-primary/30"
+                      data-tabz-input="photo-title"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="photo-tags">Tags (optional)</Label>
+                    <Input
+                      id="photo-tags"
+                      placeholder="nature, landscape, sunset (comma separated)"
+                      value={photoTags}
+                      onChange={(e) => setPhotoTags(e.target.value)}
+                      className="glass border-primary/30"
+                      data-tabz-input="photo-tags"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="photo-description">Description (optional)</Label>
+                    <Textarea
+                      id="photo-description"
+                      placeholder="Add a description..."
+                      value={photoDescription}
+                      onChange={(e) => setPhotoDescription(e.target.value)}
+                      className="glass border-primary/30 min-h-[80px]"
+                      data-tabz-input="photo-description"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Error Display */}
+              {urlError && addMethod === "file" && (
+                <div className="flex items-center gap-2 text-red-400 text-sm">
+                  <AlertCircle className="h-4 w-4" />
+                  {urlError}
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-primary/20">
+                <Button
+                  variant="outline"
+                  className="border-primary/30"
+                  onClick={closeAddModal}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  onClick={addMethod === "url" ? handleAddFromUrl : handleAddFromFiles}
+                  disabled={
+                    isAddingPhoto ||
+                    (addMethod === "url" && !urlPreview) ||
+                    (addMethod === "file" && pendingFiles.length === 0)
+                  }
+                  data-tabz-action="add-photo-confirm"
+                >
+                  {isAddingPhoto ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Adding...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add {addMethod === "file" && pendingFiles.length > 1
+                        ? `${pendingFiles.length} Photos`
+                        : "Photo"}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
     </div>
