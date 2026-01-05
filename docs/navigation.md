@@ -1,6 +1,6 @@
 # Navigation System
 
-The sidebar uses an accordion-style navigation pattern with expandable sections and contextual sub-items.
+The sidebar uses a categorized navigation pattern with collapsible category groups.
 
 ## Layout Structure
 
@@ -8,23 +8,47 @@ The sidebar uses an accordion-style navigation pattern with expandable sections 
 ┌──────────────────────┬─────────────────────────────────┐
 │ [Home Button]        │                                 │
 │ ──────────────────── │                                 │
-│ ▸ Weather            │                                 │
-│ ▼ Daily Feed         │        Section Content          │
-│   • Sources          │                                 │
-│   • Saved Items      │                                 │
-│   • Refresh          │                                 │
-│ ▸ API Playground     │                                 │
-│ ▸ Quick Notes        │                                 │
-│ ▸ Settings           │                                 │
+│ ▼ INFORMATION        │                                 │
+│   • Weather          │                                 │
+│   • Search Hub       │        Section Content          │
+│   • Disasters        │                                 │
+│ ▼ PRODUCTIVITY       │                                 │
+│   • Docs Editor      │                                 │
+│   • Scratchpad       │                                 │
+│   • Bookmarks        │                                 │
+│ ▸ DEVELOPMENT        │  (collapsed)                    │
+│ ──────────────────── │                                 │
+│ Settings             │                                 │
 └──────────────────────┴─────────────────────────────────┘
 ```
 
-## Accordion Behavior
+## Category System
 
-- **Click section header**: Navigates to section AND toggles expand/collapse
-- **Click sub-item**: Navigates to section (closes mobile menu)
-- **Auto-collapse**: Only one section expanded at a time
+Sections are organized into collapsible categories:
+
+| Category | Default Sections |
+|----------|------------------|
+| **Information** | Weather, Search Hub, Disasters |
+| **Productivity** | Docs Editor, Scratchpad, Bookmarks, Tasks, Kanban |
+| **Development** | API Playground, AI Workspace, GitHub Activity, Projects, Jobs |
+| **Finance** | Market Pulse, Paper Trading, Crypto |
+| **Entertainment** | Daily Feed, SpaceX Launches |
+| **Personal** | Integrations, Profile, Setup Wizard |
+
+## Category Behavior
+
+- **Click category header**: Toggles expand/collapse for that category
 - **Chevron rotation**: Indicates expanded (▾) or collapsed (▸) state
+- **Section count**: Shows number of sections on hover
+- **Empty categories**: Automatically hidden when all sections in category are disabled
+- **Collapsed state**: Persisted to localStorage
+
+## Customization
+
+Users can customize categories via Settings → Sections:
+- Change a section's category using the dropdown
+- Categories with sections will display in the sidebar
+- Category order is fixed (Information → Productivity → Development → Finance → Entertainment → Personal)
 
 ## Desktop vs Mobile
 
@@ -71,14 +95,20 @@ interface NavigationItem {
 | **Profile** | User | Account, Sync Status |
 | **Settings** | Settings | Appearance, Sections, Feed Config, API Keys |
 
-## Section Visibility & Order
+## Section Visibility, Order & Categories
 
-Users can customize which sections appear and their order:
+Users can customize which sections appear, their order, and their category:
 
-- **Settings → Sections**: Toggle visibility, reorder with up/down buttons
+- **Settings → Sections**: Toggle visibility, reorder with drag-and-drop, change category via dropdown
 - **Hook**: `useSectionPreferences()` from `hooks/useSectionPreferences.ts`
 - **Storage**: localStorage key `section-preferences`
-- **Hydration**: Uses `DEFAULT_SECTION_ORDER` during SSR, switches to user prefs after load
+- **Hydration**: Uses defaults during SSR, switches to user prefs after load
+
+### Category Types
+
+```typescript
+type CategoryId = "information" | "productivity" | "development" | "finance" | "entertainment" | "personal"
+```
 
 ## Adding a New Section
 
@@ -86,7 +116,7 @@ Users can customize which sections appear and their order:
    ```typescript
    type ToggleableSection = "weather" | ... | "new-section"
    ```
-   Also add to `DEFAULT_SECTION_ORDER` and `DEFAULT_VISIBILITY`.
+   Also add to `DEFAULT_SECTION_ORDER`, `DEFAULT_VISIBILITY`, and `DEFAULT_CATEGORY_ASSIGNMENTS`.
 
 2. **Add to navigationItems array** in `app/page.tsx`:
    ```typescript
