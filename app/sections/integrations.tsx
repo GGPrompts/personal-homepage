@@ -296,7 +296,7 @@ export default function IntegrationsSection({
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-2">
-        <h1 className="text-3xl font-bold terminal-glow">Integrations</h1>
+        <h1 className="text-3xl font-bold font-mono gradient-text-theme terminal-glow">Integrations</h1>
         <Badge variant="outline" className="text-primary border-primary/30">
           {connectedCount}/{totalCount} connected
         </Badge>

@@ -1286,11 +1286,11 @@ export default function JobsSection({
 
   return (
     <>
-      <div className="h-full flex flex-col p-4 lg:p-6">
+      <div className="h-full flex flex-col p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold terminal-glow">Jobs</h1>
+            <h1 className="text-3xl font-bold font-mono gradient-text-theme terminal-glow">Jobs</h1>
             <p className="text-muted-foreground mt-1">
               Run Claude prompts across multiple projects
             </p>

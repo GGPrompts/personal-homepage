@@ -815,7 +815,7 @@ export default function QuickNotesSection({
   const fileTree = rootFiles ? buildTreeFromPath(rootFiles, "") : []
 
   return (
-    <div className="h-full flex flex-col lg:flex-row gap-4 p-4 lg:p-6" data-tabz-section="quick-notes">
+    <div className="h-full flex flex-col lg:flex-row gap-4 p-6" data-tabz-section="quick-notes">
       {/* File Browser Panel */}
       <div id="notes-files" className="lg:w-72 flex-shrink-0 scroll-mt-6">
         <div className="glass rounded-lg p-4 h-full flex flex-col">

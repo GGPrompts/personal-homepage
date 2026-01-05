@@ -794,7 +794,7 @@ export default function DailyFeedSection({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold terminal-glow mb-1">Daily Feed</h1>
+          <h1 className="text-3xl font-bold font-mono gradient-text-theme terminal-glow mb-1">Daily Feed</h1>
           <p className="text-muted-foreground text-sm">
             {fetchedAt ? (
               <>Updated {timeAgo(fetchedAt)} &middot; {items.length} items{currentPage > 1 && ` (page ${currentPage})`}</>

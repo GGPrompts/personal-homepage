@@ -450,11 +450,11 @@ export default function StocksDashboard({ activeSubItem, onSubItemHandled, onNav
   })) || []
 
   return (
-    <div className="space-y-6" data-tabz-section="stocks">
+    <div className="p-6 space-y-6" data-tabz-section="stocks">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground terminal-glow">Paper Trading</h1>
+          <h1 className="text-3xl font-bold font-mono gradient-text-theme terminal-glow">Paper Trading</h1>
           <p className="mt-1 text-sm text-muted-foreground">Practice trading with $100K virtual money</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">

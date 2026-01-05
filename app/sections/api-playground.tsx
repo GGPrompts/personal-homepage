@@ -1179,7 +1179,7 @@ print(response.json())`
   }, [config])
 
   return (
-    <div className="min-h-full lg:h-full flex flex-col lg:flex-row gap-4 p-4 lg:p-6" data-tabz-section="api-playground">
+    <div className="min-h-full lg:h-full flex flex-col lg:flex-row gap-4 p-6" data-tabz-section="api-playground">
       {/* Sidebar - Collections & History */}
       <div className="lg:w-72 flex-shrink-0 lg:h-full">
         <div className="glass rounded-lg p-4 h-full flex flex-col">

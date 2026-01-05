@@ -1183,11 +1183,11 @@ export default function WeatherDashboard({
   })
 
   return (
-    <div className="p-3 sm:p-4 md:p-6 overflow-x-hidden" data-tabz-section="weather">
+    <div className="p-6 overflow-x-hidden" data-tabz-section="weather">
       {/* Header */}
       <div className="mb-4 sm:mb-6 flex flex-col gap-3 sm:gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground terminal-glow">Live Weather Monitoring</h1>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold font-mono gradient-text-theme terminal-glow">Live Weather Monitoring</h1>
           <div className="mt-1 flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
             <MapPin className="h-3 w-3 sm:h-4 sm:w-4" />
             {geoLocation.name}{isDetectingLocation && " (updating...)"}

@@ -1307,7 +1307,7 @@ export default function SetupSection({
 
   return (
     <div className="p-6" data-tabz-section="setup">
-      <h1 className="text-3xl font-bold terminal-glow mb-2">Setup Wizard</h1>
+      <h1 className="text-3xl font-bold font-mono gradient-text-theme terminal-glow mb-2">Setup Wizard</h1>
       <p className="text-muted-foreground mb-8">
         Configure your personal homepage in a few easy steps
       </p>

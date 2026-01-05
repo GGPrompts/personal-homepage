@@ -463,9 +463,9 @@ export default function SearchHubSection({
   }
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="p-6">
       <div className="flex items-start justify-between mb-1 sm:mb-2">
-        <h1 className="text-2xl sm:text-3xl font-bold terminal-glow">Search Hub</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold font-mono gradient-text-theme terminal-glow">Search Hub</h1>
         <TabzConnectionStatus size="sm" className="hidden sm:flex" />
       </div>
       <p className="text-muted-foreground text-sm sm:text-base mb-6 sm:mb-8">Quick search across engines and AI assistants</p>

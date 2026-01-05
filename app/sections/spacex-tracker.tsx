@@ -565,11 +565,11 @@ export default function SpaceXTracker({ activeSubItem, onSubItemHandled }: Space
   const isLoading = nextLoading || upcomingLoading || pastLoading
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground terminal-glow">SpaceX Launch Tracker</h1>
+          <h1 className="text-3xl font-bold font-mono gradient-text-theme terminal-glow">SpaceX Launch Tracker</h1>
           <p className="mt-1 text-sm text-muted-foreground">Real-time launch data from SpaceX</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">

@@ -229,11 +229,11 @@ export default function MarketPulseSection({ activeSubItem, onSubItemHandled }: 
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground terminal-glow mb-1">Market Pulse</h1>
+          <h1 className="text-3xl font-bold font-mono gradient-text-theme terminal-glow mb-1">Market Pulse</h1>
           <p className="text-secondary/70">Tech salary trends from Bureau of Labor Statistics</p>
         </div>
         <div className="flex items-center gap-3">

@@ -180,7 +180,7 @@ export default function ProfileSection() {
   // Loading state
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="p-6 flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     )
@@ -189,7 +189,7 @@ export default function ProfileSection() {
   // Supabase not configured
   if (!isConfigured) {
     return (
-      <div className="space-y-6">
+      <div className="p-6 space-y-6">
         <div className="glass rounded-xl p-8 text-center">
           <div className="w-20 h-20 rounded-full glass-dark mx-auto mb-6 flex items-center justify-center">
             <AlertCircle className="h-10 w-10 text-amber-400" />
@@ -213,7 +213,7 @@ export default function ProfileSection() {
   // Not logged in
   if (!user) {
     return (
-      <div className="space-y-6">
+      <div className="p-6 space-y-6">
         <div className="glass rounded-xl p-8 text-center">
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
@@ -248,7 +248,7 @@ export default function ProfileSection() {
   const fullName = user.user_metadata?.full_name || user.user_metadata?.name || githubUsername
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       {/* Profile Header */}
       <div className="glass rounded-xl p-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">

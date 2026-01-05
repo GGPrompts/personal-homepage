@@ -1694,7 +1694,7 @@ export default function AIWorkspaceSection({
                     <div className="inline-flex p-2 sm:p-4 rounded-full glass border-glow">
                       <Sparkles className="h-6 w-6 sm:h-12 sm:w-12 text-primary terminal-glow" />
                     </div>
-                    <h3 className="text-lg sm:text-2xl font-bold terminal-glow">
+                    <h3 className="text-lg sm:text-2xl font-bold font-mono gradient-text-theme terminal-glow">
                       How can I help you today?
                     </h3>
                     <p className="text-xs sm:text-base text-muted-foreground max-w-md mx-auto px-2">

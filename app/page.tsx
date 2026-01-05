@@ -392,7 +392,7 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
 
   return (
     <div className="p-6">
-      <h1 className="text-3xl font-bold terminal-glow mb-2">
+      <h1 className="text-3xl font-bold font-mono gradient-text-theme terminal-glow mb-2">
         Welcome Home{userName ? `, ${userName.split(' ')[0]}` : ''}
       </h1>
       <p className="text-muted-foreground mb-6">Your personal dashboard overview</p>
@@ -691,7 +691,7 @@ function SettingsSection({ activeSubItem, onSubItemHandled }: { activeSubItem?: 
 
   return (
     <div className="p-6">
-      <h1 className="text-3xl font-bold terminal-glow mb-2">Settings</h1>
+      <h1 className="text-3xl font-bold font-mono gradient-text-theme terminal-glow mb-2">Settings</h1>
       <p className="text-muted-foreground mb-8">Customize your dashboard</p>
 
       <div className="max-w-3xl">
