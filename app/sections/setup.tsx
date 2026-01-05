@@ -264,7 +264,7 @@ function ApiKeyInput({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground"
+                    className="absolute right-0 top-0 h-full px-3 z-10 text-muted-foreground hover:text-foreground"
                     onClick={() => setShowKey(!showKey)}
                     data-tabz-button={`toggle-${config.id}-visibility`}
                   >
@@ -915,7 +915,7 @@ function TabzChromeStep() {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground"
+                className="absolute right-0 top-0 h-full px-3 z-10 text-muted-foreground hover:text-foreground"
                 onClick={() => setShowToken(!showToken)}
                 data-tabz-button="toggle-token-visibility"
               >
