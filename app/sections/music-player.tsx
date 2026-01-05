@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Play,
@@ -34,15 +34,27 @@ import {
   PlayCircle,
   Maximize2,
   Minimize2,
+  Link,
+  FileAudio,
+  Upload,
+  Loader2,
 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Table,
   TableBody,
@@ -79,6 +91,7 @@ interface Track {
   isLiked: boolean
   isExplicit: boolean
   plays: number
+  url?: string // Audio source URL (remote or blob URL for local files)
 }
 
 interface Playlist {
@@ -184,10 +197,117 @@ export function MusicPlayerSection({
   // Mobile state
   const [showMobilePlayer, setShowMobilePlayer] = useState(false)
 
-  // Simulate progress
+  // Audio element ref
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  // Add track modal state
+  const [showAddTrackModal, setShowAddTrackModal] = useState(false)
+  const [newTrackUrl, setNewTrackUrl] = useState("")
+  const [newTrackTitle, setNewTrackTitle] = useState("")
+  const [newTrackArtist, setNewTrackArtist] = useState("")
+  const [isLoadingTrack, setIsLoadingTrack] = useState(false)
+
+  // User-added tracks (with audio URLs)
+  const [userTracks, setUserTracks] = useState<Track[]>([])
+
+  // Audio error state
+  const [audioError, setAudioError] = useState<string | null>(null)
+
+  // Audio event handlers - timeupdate syncs progress bar
+  const handleTimeUpdate = useCallback(() => {
+    const audio = audioRef.current
+    if (audio && audio.duration && !isNaN(audio.duration)) {
+      const progress = (audio.currentTime / audio.duration) * 100
+      setNowPlaying((prev) => ({ ...prev, progress }))
+    }
+  }, [])
+
+  // Handle audio ended event
+  const handleAudioEnded = useCallback(() => {
+    if (nowPlaying.repeat === "one") {
+      // Repeat single track
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0
+        audioRef.current.play()
+      }
+    } else if (queue.length > 0) {
+      // Auto advance to next track
+      const nextTrack = queue[0]
+      setQueue((q) => q.slice(1))
+      setNowPlaying((prev) => ({ ...prev, track: nextTrack, progress: 0 }))
+    } else if (nowPlaying.repeat === "all") {
+      // Repeat all - restart queue (for now just reset progress)
+      setNowPlaying((prev) => ({ ...prev, progress: 0 }))
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0
+        audioRef.current.play()
+      }
+    } else {
+      // Stop playback
+      setNowPlaying((prev) => ({ ...prev, isPlaying: false, progress: 0 }))
+    }
+  }, [nowPlaying.repeat, queue])
+
+  // Handle metadata loaded (get actual duration)
+  const handleLoadedMetadata = useCallback(() => {
+    const audio = audioRef.current
+    if (audio && audio.duration && !isNaN(audio.duration)) {
+      setAudioError(null) // Clear any previous error
+      // Update track duration if it's a user-added track
+      if (nowPlaying.track.url) {
+        setNowPlaying((prev) => ({
+          ...prev,
+          track: { ...prev.track, duration: Math.floor(audio.duration) },
+        }))
+      }
+    }
+  }, [nowPlaying.track.url])
+
+  // Handle audio error
+  const handleAudioError = useCallback(() => {
+    setAudioError("Failed to load audio")
+    setNowPlaying((prev) => ({ ...prev, isPlaying: false }))
+  }, [])
+
+  // Effect to load audio when track changes
+  useEffect(() => {
+    const audio = audioRef.current
+    setAudioError(null) // Clear error when loading new track
+    if (audio && nowPlaying.track.url) {
+      audio.src = nowPlaying.track.url
+      audio.load()
+      if (nowPlaying.isPlaying) {
+        audio.play().catch(console.error)
+      }
+    }
+  }, [nowPlaying.track.id, nowPlaying.track.url])
+
+  // Effect to handle play/pause state changes
+  useEffect(() => {
+    const audio = audioRef.current
+    if (audio && nowPlaying.track.url) {
+      if (nowPlaying.isPlaying) {
+        audio.play().catch(console.error)
+      } else {
+        audio.pause()
+      }
+    }
+  }, [nowPlaying.isPlaying, nowPlaying.track.url])
+
+  // Effect to handle volume changes
+  useEffect(() => {
+    const audio = audioRef.current
+    if (audio) {
+      audio.volume = nowPlaying.isMuted ? 0 : nowPlaying.volume / 100
+    }
+  }, [nowPlaying.volume, nowPlaying.isMuted])
+
+  // Fallback simulation for tracks without audio URLs (mock tracks)
   useEffect(() => {
     let interval: NodeJS.Timeout
-    if (nowPlaying.isPlaying) {
+    // Only simulate progress for tracks without actual audio URLs
+    if (nowPlaying.isPlaying && !nowPlaying.track.url) {
       interval = setInterval(() => {
         setNowPlaying((prev) => {
           const newProgress = prev.progress + (100 / prev.track.duration)
@@ -205,7 +325,7 @@ export function MusicPlayerSection({
       }, 1000)
     }
     return () => clearInterval(interval)
-  }, [nowPlaying.isPlaying, queue])
+  }, [nowPlaying.isPlaying, nowPlaying.track.url, queue])
 
   // Search functionality
   useEffect(() => {
@@ -274,7 +394,115 @@ export function MusicPlayerSection({
   const skipPrevious = () => {
     if (nowPlaying.progress > 10) {
       setNowPlaying((prev) => ({ ...prev, progress: 0 }))
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0
+      }
     }
+  }
+
+  // Seek to position (percentage 0-100)
+  const seekTo = (percentage: number) => {
+    setNowPlaying((prev) => ({ ...prev, progress: percentage }))
+    if (audioRef.current && nowPlaying.track.url) {
+      const duration = audioRef.current.duration
+      if (duration && !isNaN(duration)) {
+        audioRef.current.currentTime = (percentage / 100) * duration
+      }
+    }
+  }
+
+  // Create a default artist and album for user-added tracks
+  const createUserTrackArtist = (name: string): Artist => ({
+    id: `user-artist-${Date.now()}`,
+    name: name || "Unknown Artist",
+    image: "/api/placeholder/200/200",
+    followers: 0,
+    monthlyListeners: 0,
+  })
+
+  const createUserTrackAlbum = (title: string, artist: Artist): Album => ({
+    id: `user-album-${Date.now()}`,
+    title: title || "Custom Track",
+    artist,
+    cover: "/api/placeholder/300/300",
+    releaseDate: new Date().toISOString().split("T")[0],
+    type: "single",
+  })
+
+  // Add track from URL
+  const addTrackFromUrl = () => {
+    if (!newTrackUrl.trim()) return
+
+    setIsLoadingTrack(true)
+
+    const artist = createUserTrackArtist(newTrackArtist)
+    const album = createUserTrackAlbum(newTrackTitle, artist)
+
+    const newTrack: Track = {
+      id: `user-track-${Date.now()}`,
+      title: newTrackTitle || "Untitled Track",
+      artist,
+      album,
+      duration: 0, // Will be updated when metadata loads
+      isLiked: false,
+      isExplicit: false,
+      plays: 0,
+      url: newTrackUrl,
+    }
+
+    setUserTracks((prev) => [...prev, newTrack])
+
+    // Play the new track immediately
+    setNowPlaying((prev) => ({ ...prev, track: newTrack, isPlaying: true, progress: 0 }))
+
+    // Reset modal state
+    setNewTrackUrl("")
+    setNewTrackTitle("")
+    setNewTrackArtist("")
+    setShowAddTrackModal(false)
+    setIsLoadingTrack(false)
+  }
+
+  // Add track from local file
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Create blob URL for the file
+    const blobUrl = URL.createObjectURL(file)
+
+    // Extract filename without extension as title
+    const fileName = file.name.replace(/\.[^/.]+$/, "")
+
+    const artist = createUserTrackArtist("Local File")
+    const album = createUserTrackAlbum(fileName, artist)
+
+    const newTrack: Track = {
+      id: `user-track-${Date.now()}`,
+      title: fileName,
+      artist,
+      album,
+      duration: 0, // Will be updated when metadata loads
+      isLiked: false,
+      isExplicit: false,
+      plays: 0,
+      url: blobUrl,
+    }
+
+    setUserTracks((prev) => [...prev, newTrack])
+
+    // Play the new track immediately
+    setNowPlaying((prev) => ({ ...prev, track: newTrack, isPlaying: true, progress: 0 }))
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
+  // Open file picker
+  const openFilePicker = () => {
+    fileInputRef.current?.click()
   }
 
   // Get volume icon
@@ -332,6 +560,21 @@ export function MusicPlayerSection({
           {!sidebarCollapsed && "Your Library"}
         </Button>
       </nav>
+
+      <Separator className="bg-border/30 mx-4" />
+
+      {/* Add Audio */}
+      <div className="px-2 py-2">
+        <Button
+          variant="outline"
+          className={`w-full gap-2 ${sidebarCollapsed ? "px-3" : "justify-start"}`}
+          onClick={() => setShowAddTrackModal(true)}
+          data-tabz-action="open-add-track"
+        >
+          <FileAudio className="h-5 w-5" />
+          {!sidebarCollapsed && "Add Audio"}
+        </Button>
+      </div>
 
       <Separator className="bg-border/30 mx-4" />
 
@@ -410,6 +653,97 @@ export function MusicPlayerSection({
           </div>
         </div>
       </div>
+
+      {/* Your Audio - User Added Tracks */}
+      {userTracks.length > 0 && (
+        <section>
+          <h3 className="text-xl font-bold text-foreground mb-4">Your Audio</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {userTracks.map((track, idx) => (
+              <motion.div
+                key={track.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: idx * 0.1 }}
+              >
+                <Card
+                  className={`glass border-border/30 p-4 cursor-pointer group hover:bg-primary/5 transition-colors ${
+                    nowPlaying.track.id === track.id ? "ring-2 ring-primary" : ""
+                  }`}
+                  onClick={() => playTrack(track)}
+                >
+                  <div className="relative mb-3">
+                    <div className="aspect-square rounded-lg bg-gradient-to-br from-green-500/30 to-blue-500/30 flex items-center justify-center">
+                      <FileAudio className="h-12 w-12 text-green-500/50" />
+                    </div>
+                    <motion.button
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      whileHover={{ scale: 1.1 }}
+                      className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-primary-foreground rounded-full p-3 shadow-lg"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        playTrack(track)
+                      }}
+                    >
+                      {nowPlaying.track.id === track.id && nowPlaying.isPlaying ? (
+                        <Pause className="h-5 w-5" />
+                      ) : (
+                        <Play className="h-5 w-5" />
+                      )}
+                    </motion.button>
+                  </div>
+                  <h4 className="font-semibold text-foreground truncate">{track.title}</h4>
+                  <p className="text-sm text-muted-foreground truncate">{track.artist.name}</p>
+                  {track.duration > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">{formatTime(track.duration)}</p>
+                  )}
+                </Card>
+              </motion.div>
+            ))}
+            {/* Add More Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: userTracks.length * 0.1 }}
+            >
+              <Card
+                className="glass border-border/30 border-dashed p-4 cursor-pointer hover:bg-primary/5 transition-colors aspect-square flex flex-col items-center justify-center gap-3"
+                onClick={() => setShowAddTrackModal(true)}
+              >
+                <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center">
+                  <Plus className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <span className="text-sm text-muted-foreground">Add Audio</span>
+              </Card>
+            </motion.div>
+          </div>
+        </section>
+      )}
+
+      {/* Add Audio Quick Start (when no user tracks) */}
+      {userTracks.length === 0 && (
+        <section>
+          <Card
+            className="glass border-border/30 border-dashed p-8 cursor-pointer hover:bg-primary/5 transition-colors flex flex-col items-center justify-center gap-4"
+            onClick={() => setShowAddTrackModal(true)}
+            data-tabz-action="quick-add-audio"
+          >
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
+              <FileAudio className="h-10 w-10 text-primary" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-foreground mb-2">Play Your Own Audio</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Add audio files from URLs or upload from your device
+              </p>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add Audio
+              </Button>
+            </div>
+          </Card>
+        </section>
+      )}
 
       {/* Featured Playlists */}
       <section>
@@ -1097,8 +1431,18 @@ export function MusicPlayerSection({
           <Disc3 className="h-7 w-7 text-primary/50" />
         </motion.div>
         <div className="min-w-0">
-          <p className="font-medium text-foreground truncate">{nowPlaying.track.title}</p>
+          <div className="flex items-center gap-2">
+            <p className="font-medium text-foreground truncate">{nowPlaying.track.title}</p>
+            {nowPlaying.track.url && (
+              <Badge variant="outline" className="text-xs px-1.5 py-0 text-green-500 border-green-500/30">
+                Audio
+              </Badge>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground truncate">{nowPlaying.track.artist.name}</p>
+          {audioError && (
+            <p className="text-xs text-red-500">{audioError}</p>
+          )}
         </div>
         <Button
           variant="ghost"
@@ -1154,7 +1498,7 @@ export function MusicPlayerSection({
             value={[nowPlaying.progress]}
             max={100}
             step={0.1}
-            onValueChange={([value]) => setNowPlaying((prev) => ({ ...prev, progress: value }))}
+            onValueChange={([value]) => seekTo(value)}
             className="flex-1"
           />
           <span className="text-xs text-muted-foreground w-10">
@@ -1264,7 +1608,7 @@ export function MusicPlayerSection({
                   value={[nowPlaying.progress]}
                   max={100}
                   step={0.1}
-                  onValueChange={([value]) => setNowPlaying((prev) => ({ ...prev, progress: value }))}
+                  onValueChange={([value]) => seekTo(value)}
                 />
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>{formatTime((nowPlaying.progress / 100) * nowPlaying.track.duration)}</span>
@@ -1345,6 +1689,118 @@ export function MusicPlayerSection({
 
   return (
     <div className="flex h-full" data-tabz-section="music-player">
+      {/* Hidden audio element for playback */}
+      <audio
+        ref={audioRef}
+        onTimeUpdate={handleTimeUpdate}
+        onEnded={handleAudioEnded}
+        onLoadedMetadata={handleLoadedMetadata}
+        onError={handleAudioError}
+        preload="metadata"
+      />
+
+      {/* Hidden file input for local audio files */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="audio/*"
+        onChange={handleFileSelect}
+        className="hidden"
+        data-tabz-input="audio-file"
+      />
+
+      {/* Add Track Modal */}
+      <Dialog open={showAddTrackModal} onOpenChange={setShowAddTrackModal}>
+        <DialogContent className="glass border-border/30">
+          <DialogHeader>
+            <DialogTitle>Add Audio Track</DialogTitle>
+            <DialogDescription>
+              Add a track from a URL or upload a local audio file.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* URL Input Section */}
+            <div className="space-y-3">
+              <Label htmlFor="track-url" className="text-sm font-medium">
+                Audio URL
+              </Label>
+              <Input
+                id="track-url"
+                placeholder="https://example.com/audio.mp3"
+                value={newTrackUrl}
+                onChange={(e) => setNewTrackUrl(e.target.value)}
+                className="glass border-border/30"
+                data-tabz-input="track-url"
+              />
+            </div>
+            <div className="space-y-3">
+              <Label htmlFor="track-title" className="text-sm font-medium">
+                Track Title (optional)
+              </Label>
+              <Input
+                id="track-title"
+                placeholder="My Track"
+                value={newTrackTitle}
+                onChange={(e) => setNewTrackTitle(e.target.value)}
+                className="glass border-border/30"
+                data-tabz-input="track-title"
+              />
+            </div>
+            <div className="space-y-3">
+              <Label htmlFor="track-artist" className="text-sm font-medium">
+                Artist Name (optional)
+              </Label>
+              <Input
+                id="track-artist"
+                placeholder="Artist"
+                value={newTrackArtist}
+                onChange={(e) => setNewTrackArtist(e.target.value)}
+                className="glass border-border/30"
+                data-tabz-input="track-artist"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                onClick={addTrackFromUrl}
+                disabled={!newTrackUrl.trim() || isLoadingTrack}
+                className="flex-1 gap-2"
+                data-tabz-action="add-track-url"
+              >
+                {isLoadingTrack ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Link className="h-4 w-4" />
+                )}
+                Add from URL
+              </Button>
+            </div>
+
+            <Separator className="my-4" />
+
+            {/* Local File Section */}
+            <div className="text-center space-y-3">
+              <p className="text-sm text-muted-foreground">Or upload a local audio file</p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowAddTrackModal(false)
+                  openFilePicker()
+                }}
+                className="gap-2"
+                data-tabz-action="upload-file"
+              >
+                <Upload className="h-4 w-4" />
+                Choose Audio File
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Supports MP3, WAV, OGG, FLAC, and more
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Sidebar - Desktop */}
       {renderSidebar()}
 
