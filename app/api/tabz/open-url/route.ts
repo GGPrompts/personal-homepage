@@ -32,8 +32,8 @@ export async function POST(request: NextRequest) {
     })
 
     const { stdout } = await execFileAsync(
-      "mcp-cli",
-      ["call", "tabz/tabz_open_url", jsonArgs],
+      "/home/matt/.local/bin/claude",
+      ["--mcp-cli", "call", "tabz/tabz_open_url", jsonArgs],
       { encoding: "utf-8", timeout: 10000 }
     )
 

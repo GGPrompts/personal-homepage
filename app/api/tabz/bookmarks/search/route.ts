@@ -32,8 +32,8 @@ export async function GET(request: NextRequest) {
     })
 
     const { stdout } = await execFileAsync(
-      "mcp-cli",
-      ["call", "tabz/tabz_search_bookmarks", jsonArgs],
+      "/home/matt/.local/bin/claude",
+      ["--mcp-cli", "call", "tabz/tabz_search_bookmarks", jsonArgs],
       { encoding: "utf-8", timeout: 10000 }
     )
 

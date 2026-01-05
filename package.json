@@ -4,7 +4,7 @@
   "description": "Personal dashboard with weather, curated feeds, and more",
   "main": "index.js",
   "scripts": {
-    "dev": "next dev -p 3001",
+    "dev": "next dev -p 3001 -H localhost",
     "build": "next build",
     "start": "next start -p 3001",
     "lint": "next lint",
