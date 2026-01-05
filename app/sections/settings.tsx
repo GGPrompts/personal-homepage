@@ -32,6 +32,7 @@ import {
   Music,
   Video,
   HardDrive,
+  Headphones,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -421,6 +422,7 @@ function ApiKeysTab() {
   const [anthropicKey, setAnthropicKey] = React.useState(() => getStoredApiKey("anthropic-api-key"))
   const [openaiKey, setOpenaiKey] = React.useState(() => getStoredApiKey("openai-api-key"))
   const [googleAiKey, setGoogleAiKey] = React.useState(() => getStoredApiKey("google-ai-key"))
+  const [spotifyClientId, setSpotifyClientId] = React.useState(() => getStoredApiKey("spotify-client-id"))
 
   // Test states
   const [testingFinnhub, setTestingFinnhub] = React.useState(false)
@@ -446,6 +448,10 @@ function ApiKeysTab() {
   React.useEffect(() => {
     setStoredApiKey("google-ai-key", googleAiKey)
   }, [googleAiKey])
+
+  React.useEffect(() => {
+    setStoredApiKey("spotify-client-id", spotifyClientId)
+  }, [spotifyClientId])
 
   // Test Finnhub API key
   const testFinnhub = async () => {
@@ -528,6 +534,15 @@ function ApiKeysTab() {
       docsUrl: "https://aistudio.google.com/app/apikey",
       note: "Optional, enables Gemini models in AI Workspace",
     },
+    {
+      id: "spotify",
+      name: "Spotify",
+      description: "Stream music with Web Playback SDK (requires Premium)",
+      storageKey: "spotify-client-id",
+      icon: Headphones,
+      docsUrl: "https://developer.spotify.com/dashboard",
+      note: "Get Client ID from Spotify Developer Dashboard. Add redirect URI: [origin]/api/spotify/callback",
+    },
   ]
 
   const getKeyValue = (id: string): string => {
@@ -537,6 +552,7 @@ function ApiKeysTab() {
       case "anthropic": return anthropicKey
       case "openai": return openaiKey
       case "google-ai": return googleAiKey
+      case "spotify": return spotifyClientId
       default: return ""
     }
   }
@@ -548,6 +564,7 @@ function ApiKeysTab() {
       case "anthropic": setAnthropicKey(value); break
       case "openai": setOpenaiKey(value); break
       case "google-ai": setGoogleAiKey(value); break
+      case "spotify": setSpotifyClientId(value); break
     }
   }
 
