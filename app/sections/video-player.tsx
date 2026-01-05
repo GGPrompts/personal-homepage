@@ -815,10 +815,13 @@ export default function VideoPlayerSection({
 
   // Handle playing a local video file
   const handlePlayLocalVideo = (file: MediaFile) => {
-    setLocalVideoUrl(getMediaUrl(file.path))
+    const mediaUrl = getMediaUrl(file.path)
+    setVideoSource({ type: 'url', url: mediaUrl, fileName: file.name })
+    setLocalVideoUrl(mediaUrl)
     setLocalVideoName(file.name.replace(/\.[^/.]+$/, ""))
     setViewMode("player")
-    setIsPlaying(true)
+    setVideoError(null)
+    setShowSourceInput(false)
   }
 
   return (
@@ -1087,8 +1090,8 @@ export default function VideoPlayerSection({
               {/* Source Info Badge */}
               {videoSource.type !== 'none' && !showSourceInput && (
                 <div className="absolute top-4 right-4 flex items-center gap-2">
-                  <Badge variant="secondary" className="glass text-xs">
-                    {videoSource.type === 'youtube' ? 'YouTube' : videoSource.type === 'file' ? videoSource.fileName : 'URL'}
+                  <Badge variant="secondary" className="glass text-xs max-w-[200px] truncate">
+                    {videoSource.type === 'youtube' ? 'YouTube' : videoSource.fileName || 'URL'}
                   </Badge>
                   <Button
                     variant="ghost"
