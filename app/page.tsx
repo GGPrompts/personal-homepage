@@ -31,6 +31,7 @@ import {
   Rocket,
   AlertCircle,
   LayoutGrid,
+  Image,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -75,6 +76,7 @@ import ProjectsDashboard from "./sections/projects-dashboard"
 import JobsSection from "./sections/jobs"
 import CryptoDashboard from "./sections/crypto-dashboard"
 import SpaceXTracker from "./sections/spacex-tracker"
+import PhotoGallerySection from "./sections/photo-gallery"
 import GitHubActivity from "./sections/github-activity"
 import DisastersMonitor from "./sections/disasters-monitor"
 import MarketPulseSection from "./sections/market-pulse"
@@ -114,6 +116,7 @@ const navigationItems: NavigationItem[] = [
   { id: "stocks", label: "Paper Trading", icon: TrendingUp, description: "Practice stock trading" },
   { id: "crypto", label: "Crypto", icon: Bitcoin, description: "Live cryptocurrency prices" },
   { id: "spacex", label: "SpaceX Launches", icon: Rocket, description: "Track rocket launches" },
+  { id: "photo-gallery", label: "Photo Gallery", icon: Image, description: "Photography portfolio" },
   { id: "github-activity", label: "GitHub Activity", icon: Github, description: "GitHub events & repos" },
   { id: "disasters", label: "Disasters", icon: AlertCircle, description: "Earthquakes & alerts" },
   { id: "tasks", label: "Scratchpad", icon: CheckCircle2, description: "Quick notes and todos" },
@@ -606,6 +609,7 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
             stocks: { icon: TrendingUp, label: "Paper Trading", description: "Practice stock trading" },
             crypto: { icon: Bitcoin, label: "Crypto", description: "Live cryptocurrency prices" },
             spacex: { icon: Rocket, label: "SpaceX Launches", description: "Track rocket launches" },
+            "photo-gallery": { icon: Image, label: "Photo Gallery", description: "Photography portfolio" },
             "github-activity": { icon: Github, label: "GitHub Activity", description: "GitHub events & repos" },
             disasters: { icon: AlertCircle, label: "Disasters", description: "Earthquakes & alerts" },
             tasks: { icon: CheckCircle2, label: "Scratchpad", description: "Quick notes and todos" },
@@ -756,6 +760,8 @@ export default function PersonalHomepage() {
         return <CryptoDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "spacex":
         return <SpaceXTracker activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "photo-gallery":
+        return <PhotoGallerySection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "github-activity":
         return <GitHubActivity activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "disasters":

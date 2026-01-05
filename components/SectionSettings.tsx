@@ -44,6 +44,7 @@ import {
   AlertCircle,
   LayoutGrid,
   ChevronDown,
+  Image,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -75,6 +76,7 @@ const sectionMeta: Record<ToggleableSection, { label: string; icon: React.Elemen
   stocks: { label: "Paper Trading", icon: TrendingUp, description: "Practice stock trading" },
   crypto: { label: "Crypto", icon: Bitcoin, description: "Live cryptocurrency prices" },
   spacex: { label: "SpaceX Launches", icon: Rocket, description: "Track rocket launches" },
+  "photo-gallery": { label: "Photo Gallery", icon: Image, description: "Photography portfolio" },
   "github-activity": { label: "GitHub Activity", icon: Github, description: "GitHub events & repos" },
   disasters: { label: "Disasters", icon: AlertCircle, description: "Earthquakes & alerts" },
   tasks: { label: "Scratchpad", icon: CheckCircle2, description: "Quick notes and todos" },

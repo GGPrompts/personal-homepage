@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 
 // Section IDs that can be toggled (excluding home and settings which are always visible)
-export type ToggleableSection = "weather" | "feed" | "api-playground" | "notes" | "bookmarks" | "search" | "stocks" | "crypto" | "spacex" | "github-activity" | "disasters" | "tasks" | "projects" | "jobs" | "profile" | "ai-workspace" | "market-pulse" | "kanban"
+export type ToggleableSection = "weather" | "feed" | "api-playground" | "notes" | "bookmarks" | "search" | "stocks" | "crypto" | "spacex" | "github-activity" | "disasters" | "tasks" | "projects" | "jobs" | "profile" | "ai-workspace" | "market-pulse" | "kanban" | "photo-gallery"
 
 // All sections including non-toggleable ones
 export type Section = "home" | ToggleableSection | "settings"
@@ -48,6 +48,7 @@ export const DEFAULT_CATEGORY_ASSIGNMENTS: Record<ToggleableSection, CategoryId>
   jobs: "development",
   profile: "personal",
   kanban: "productivity",
+  "photo-gallery": "entertainment",
 }
 
 // Default collapsed state (all expanded)
@@ -80,9 +81,10 @@ export const DEFAULT_SECTION_ORDER: ToggleableSection[] = [
   "jobs",
   "profile",
   "kanban",
+  "photo-gallery",
 ]
 
-// Default visibility (all visible)
+// Default visibility (all visible except photo-gallery which is opt-in)
 export const DEFAULT_VISIBILITY: Record<ToggleableSection, boolean> = {
   weather: true,
   feed: true,
@@ -102,6 +104,7 @@ export const DEFAULT_VISIBILITY: Record<ToggleableSection, boolean> = {
   jobs: true,
   profile: true,
   kanban: true,
+  "photo-gallery": false,
 }
 
 const STORAGE_KEY = "section-preferences"

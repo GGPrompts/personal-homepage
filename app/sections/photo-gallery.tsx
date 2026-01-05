@@ -446,7 +446,13 @@ const formatDate = (dateString: string): string => {
   })
 }
 
-export default function PhotoGallery() {
+export default function PhotoGallerySection({
+  activeSubItem,
+  onSubItemHandled,
+}: {
+  activeSubItem?: string | null
+  onSubItemHandled?: () => void
+}) {
   // State
   const [photos, setPhotos] = useState<Photo[]>(mockPhotos)
   const [albums] = useState<Album[]>(mockAlbums)
@@ -529,6 +535,13 @@ export default function PhotoGallery() {
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [lightboxOpen, goToPrevPhoto, goToNextPhoto])
+
+  // Handle sub-item navigation
+  useEffect(() => {
+    if (activeSubItem) {
+      onSubItemHandled?.()
+    }
+  }, [activeSubItem, onSubItemHandled])
 
   // Slideshow
   useEffect(() => {
@@ -613,23 +626,17 @@ export default function PhotoGallery() {
   const totalSize = photos.reduce((sum, p) => sum + p.size, 0)
 
   return (
-    <div className="min-h-screen p-4 md:p-8">
-      <div className="max-w-[1800px] mx-auto space-y-6">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="flex flex-col md:flex-row md:items-center md:justify-between gap-4"
-        >
-          <div>
-            <h1 className="text-3xl md:text-4xl font-mono font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent terminal-glow">
-              Photo Gallery
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              Photography portfolio and image management
-            </p>
-          </div>
+    <div className="p-6 h-full flex flex-col" data-tabz-section="photo-gallery">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-3xl font-bold font-mono gradient-text-theme terminal-glow mb-1">
+            Photo Gallery
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Photography portfolio and image management
+          </p>
+        </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <Badge className="bg-primary/20 text-primary border-primary/30 text-sm px-3 py-1">
               {totalPhotos} Photos
@@ -642,20 +649,16 @@ export default function PhotoGallery() {
               size="sm"
               className="border-secondary/30 text-secondary hover:bg-secondary/10"
               onClick={() => setActiveTab("upload")}
+              data-tabz-action="upload-photos"
             >
               <Upload className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Upload</span>
             </Button>
           </div>
-        </motion.div>
+        </div>
 
         {/* Stats Cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="grid grid-cols-2 md:grid-cols-4 gap-4"
-        >
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <Card className="glass border-primary/30 p-5">
             <div className="flex items-center justify-between mb-2">
               <p className="text-muted-foreground text-sm">Total Photos</p>
@@ -697,35 +700,31 @@ export default function PhotoGallery() {
             </p>
             <p className="text-muted-foreground text-xs mt-1">geotagged photos</p>
           </Card>
-        </motion.div>
+        </div>
 
         {/* Main Content */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
+        <div className="flex-1 overflow-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-                <TabsList className="glass border-primary/30 w-max md:w-auto">
-                  <TabsTrigger value="gallery" className="text-xs sm:text-sm whitespace-nowrap">
+                <TabsList className="glass border-primary/30 w-max md:w-auto" data-tabz-list="photo-tabs">
+                  <TabsTrigger value="gallery" className="text-xs sm:text-sm whitespace-nowrap" data-tabz-action="tab-gallery">
                     <Grid3x3 className="h-4 w-4 mr-2" />
                     Gallery
                   </TabsTrigger>
-                  <TabsTrigger value="albums" className="text-xs sm:text-sm whitespace-nowrap">
+                  <TabsTrigger value="albums" className="text-xs sm:text-sm whitespace-nowrap" data-tabz-action="tab-albums">
                     <Folder className="h-4 w-4 mr-2" />
                     Albums
                   </TabsTrigger>
-                  <TabsTrigger value="favorites" className="text-xs sm:text-sm whitespace-nowrap">
+                  <TabsTrigger value="favorites" className="text-xs sm:text-sm whitespace-nowrap" data-tabz-action="tab-favorites">
                     <Heart className="h-4 w-4 mr-2" />
                     Favorites
                   </TabsTrigger>
-                  <TabsTrigger value="map" className="text-xs sm:text-sm whitespace-nowrap">
+                  <TabsTrigger value="map" className="text-xs sm:text-sm whitespace-nowrap" data-tabz-action="tab-map">
                     <Map className="h-4 w-4 mr-2" />
                     Map
                   </TabsTrigger>
-                  <TabsTrigger value="upload" className="text-xs sm:text-sm whitespace-nowrap">
+                  <TabsTrigger value="upload" className="text-xs sm:text-sm whitespace-nowrap" data-tabz-action="tab-upload">
                     <Upload className="h-4 w-4 mr-2" />
                     Upload
                   </TabsTrigger>
@@ -742,6 +741,7 @@ export default function PhotoGallery() {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9 glass border-primary/30 text-foreground"
+                      data-tabz-input="search-photos"
                     />
                   </div>
                   <Select value={filterAlbum} onValueChange={setFilterAlbum}>
@@ -764,6 +764,7 @@ export default function PhotoGallery() {
                       viewMode === "masonry" ? "bg-primary/20 text-primary" : ""
                     }`}
                     onClick={() => setViewMode("masonry")}
+                    data-tabz-action="view-masonry"
                   >
                     <SlidersHorizontal className="h-4 w-4" />
                   </Button>
@@ -774,6 +775,7 @@ export default function PhotoGallery() {
                       viewMode === "grid" ? "bg-primary/20 text-primary" : ""
                     }`}
                     onClick={() => setViewMode("grid")}
+                    data-tabz-action="view-grid"
                   >
                     <Grid3x3 className="h-4 w-4" />
                   </Button>
@@ -789,6 +791,7 @@ export default function PhotoGallery() {
                     ? "columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 space-y-4"
                     : "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
                 }
+                data-tabz-list="photo-gallery"
               >
                 {filteredPhotos.map((photo, idx) => (
                   <motion.div
@@ -801,6 +804,7 @@ export default function PhotoGallery() {
                     <Card
                       className="glass border-primary/30 overflow-hidden cursor-pointer group"
                       onClick={() => openLightbox(photo)}
+                      data-tabz-item={`photo-${idx}`}
                     >
                       <div className="relative">
                         <img
@@ -1121,7 +1125,7 @@ export default function PhotoGallery() {
               </Card>
             </TabsContent>
           </Tabs>
-        </motion.div>
+        </div>
 
         {/* Lightbox */}
         <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
@@ -1466,19 +1470,6 @@ export default function PhotoGallery() {
             )}
           </DialogContent>
         </Dialog>
-
-        {/* Keyboard Shortcuts Help */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="fixed bottom-8 right-8 glass border-primary/30 rounded-full px-4 py-2"
-        >
-          <span className="text-muted-foreground text-sm font-mono">
-            Press <kbd className="px-1 py-0.5 rounded bg-primary/20 text-primary mx-1">?</kbd>{" "}
-            for shortcuts
-          </span>
-        </motion.div>
-      </div>
     </div>
   )
 }
