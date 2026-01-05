@@ -33,6 +33,7 @@ import {
   LayoutGrid,
   Image,
   Music,
+  Video,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -84,7 +85,13 @@ import MarketPulseSection from "./sections/market-pulse"
 import KanbanSection from "./sections/kanban"
 import SettingsSection from "./sections/settings"
 import { MusicPlayerSection } from "./sections/music-player"
+import dynamic from "next/dynamic"
 import { useLoginTrigger } from "@/hooks/useLoginTrigger"
+
+// Lazy-loaded sections
+const VideoPlayerSection = dynamic(() => import("./sections/video-player"), {
+  loading: () => <div className="p-6 text-muted-foreground">Loading video player...</div>,
+})
 import { StartupJobsModal } from "@/components/StartupJobsModal"
 import { useJobResults } from "@/hooks/useJobResults"
 
@@ -126,6 +133,7 @@ const navigationItems: NavigationItem[] = [
   { id: "kanban", label: "Kanban", icon: LayoutGrid, description: "Visual task board" },
   { id: "jobs", label: "Jobs", icon: Play, description: "Claude batch prompts" },
   { id: "music-player", label: "Music Player", icon: Music, description: "Synthwave music player" },
+  { id: "video-player", label: "Video Player", icon: Video, description: "Media playback" },
   { id: "profile", label: "Profile", icon: User, description: "Account & sync" },
   { id: "settings", label: "Settings", icon: Settings, description: "Theme & preferences" },
 ]
@@ -620,6 +628,7 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
             kanban: { icon: LayoutGrid, label: "Kanban", description: "Visual task board" },
             jobs: { icon: Play, label: "Jobs", description: "Claude batch prompts" },
             "music-player": { icon: Music, label: "Music Player", description: "Synthwave music player" },
+            "video-player": { icon: Video, label: "Video Player", description: "Media playback" },
             profile: { icon: User, label: "Profile", description: "Account & sync status" },
           }
 
@@ -791,6 +800,8 @@ export default function PersonalHomepage() {
         return <KanbanSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "music-player":
         return <MusicPlayerSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "video-player":
+        return <VideoPlayerSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "profile":
         return <ProfileSection />
       case "settings":

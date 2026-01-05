@@ -46,6 +46,7 @@ import {
   ChevronDown,
   Image,
   Music,
+  Video,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -83,6 +84,7 @@ const sectionMeta: Record<ToggleableSection, { label: string; icon: React.Elemen
   tasks: { label: "Scratchpad", icon: CheckCircle2, description: "Quick notes and todos" },
   projects: { label: "Projects", icon: FolderGit2, description: "GitHub & local repos" },
   jobs: { label: "Jobs", icon: Play, description: "Claude batch prompts" },
+  "video-player": { label: "Video Player", icon: Video, description: "Media playback" },
   profile: { label: "Profile", icon: User, description: "Account & sync" },
   kanban: { label: "Kanban", icon: LayoutGrid, description: "Visual task board" },
   "music-player": { label: "Music Player", icon: Music, description: "Synthwave music player" },
