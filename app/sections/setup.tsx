@@ -26,6 +26,7 @@ import {
   Folder,
   Sparkles,
   RefreshCw,
+  LayoutGrid,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -104,6 +105,7 @@ const sectionMeta: Record<ToggleableSection, {
   integrations: { label: "Integrations", icon: Cloud, description: "Connected services" },
   profile: { label: "Profile", icon: Cloud, description: "Account & sync" },
   setup: { label: "Setup Wizard", icon: Sparkles, description: "Initial configuration" },
+  kanban: { label: "Kanban", icon: LayoutGrid, description: "Visual task board" },
 }
 
 // ============================================================================

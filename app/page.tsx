@@ -31,6 +31,7 @@ import {
   Rocket,
   AlertCircle,
   Sparkles,
+  LayoutGrid,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -71,6 +72,7 @@ import GitHubActivity from "./sections/github-activity"
 import DisastersMonitor from "./sections/disasters-monitor"
 import MarketPulseSection from "./sections/market-pulse"
 import SetupSection from "./sections/setup"
+import KanbanSection from "./sections/kanban"
 import { useLoginTrigger } from "@/hooks/useLoginTrigger"
 import { StartupJobsModal } from "@/components/StartupJobsModal"
 import { useJobResults } from "@/hooks/useJobResults"
@@ -109,6 +111,7 @@ const navigationItems: NavigationItem[] = [
   { id: "disasters", label: "Disasters", icon: AlertCircle, description: "Earthquakes & alerts" },
   { id: "tasks", label: "Scratchpad", icon: CheckCircle2, description: "Quick notes and todos" },
   { id: "projects", label: "Projects", icon: FolderGit2, description: "GitHub & local repos" },
+  { id: "kanban", label: "Kanban", icon: LayoutGrid, description: "Visual task board" },
   { id: "jobs", label: "Jobs", icon: Play, description: "Claude batch prompts" },
   { id: "integrations", label: "Integrations", icon: Link2, description: "Connected services" },
   { id: "profile", label: "Profile", icon: User, description: "Account & sync" },
@@ -496,6 +499,7 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
             disasters: { icon: AlertCircle, label: "Disasters", description: "Earthquakes & alerts" },
             tasks: { icon: CheckCircle2, label: "Scratchpad", description: "Quick notes and todos" },
             projects: { icon: FolderGit2, label: "Projects", description: "GitHub & local repos" },
+            kanban: { icon: LayoutGrid, label: "Kanban", description: "Visual task board" },
             jobs: { icon: Play, label: "Jobs", description: "Claude batch prompts" },
             integrations: { icon: Link2, label: "Integrations", description: "Connected services" },
             profile: { icon: User, label: "Profile", description: "Account & sync status" },
@@ -849,6 +853,8 @@ export default function PersonalHomepage() {
           return <LocalOnlyOverlay sectionName="Jobs" description="This feature executes Claude CLI commands against local projects and requires localhost to run." />
         }
         return <JobsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "kanban":
+        return <KanbanSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "integrations":
         return <IntegrationsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSection={(section) => setActiveSection(section as Section)} />
       case "profile":
