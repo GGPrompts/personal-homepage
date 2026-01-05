@@ -27,6 +27,7 @@ import { useBeadsIssues, useBeadsAvailable } from '../hooks/useBeadsIssues'
 import { GraphMetricsProvider } from '../contexts/GraphMetricsContext'
 import { KanbanColumn } from './KanbanColumn'
 import { AddColumnButton } from './AddColumnButton'
+import { TaskModal } from '../task/TaskModal'
 import { Task, Column, BeadsStatusType } from '../types'
 import { cn } from '@/lib/utils'
 import { compileQuery, filterItems } from '../lib/bql'
@@ -600,6 +601,9 @@ export function KanbanBoard({ useBeadsSource = false, onBeadsModeChange }: Kanba
             </DragOverlay>
           </DndContext>
         </GraphMetricsProvider>
+
+        {/* Task Detail Modal */}
+        <TaskModal />
       </div>
       </div>
     </motion.div>
