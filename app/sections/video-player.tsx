@@ -386,7 +386,13 @@ const formatSubscribers = (subs: number): string => {
   return subs.toString()
 }
 
-export default function VideoPlayer() {
+export default function VideoPlayerSection({
+  activeSubItem,
+  onSubItemHandled,
+}: {
+  activeSubItem?: string | null
+  onSubItemHandled?: () => void
+}) {
   // Player State
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
@@ -504,9 +510,9 @@ export default function VideoPlayer() {
   const progress = (currentTime / duration) * 100
 
   return (
-    <div className={`min-h-screen ${isTheaterMode ? "bg-black" : ""}`}>
+    <div className={`p-4 md:p-6 ${isTheaterMode ? "bg-black" : ""}`} data-tabz-section="video-player">
       <div className={`${isTheaterMode ? "max-w-full" : "max-w-[1800px]"} mx-auto`}>
-        <div className={`flex flex-col ${isTheaterMode ? "" : "lg:flex-row"} gap-6 p-4 md:p-6`}>
+        <div className={`flex flex-col ${isTheaterMode ? "" : "lg:flex-row"} gap-6`}>
           {/* Main Content */}
           <div className={`flex-1 ${isTheaterMode ? "w-full" : ""}`}>
             {/* Video Player */}
@@ -619,6 +625,7 @@ export default function VideoPlayer() {
                           size="icon"
                           className="text-foreground hover:bg-muted/20"
                           onClick={() => setIsPlaying(!isPlaying)}
+                          data-tabz-action="play-pause"
                         >
                           {isPlaying ? (
                             <Pause className="h-5 w-5" fill="currentColor" />
@@ -652,6 +659,7 @@ export default function VideoPlayer() {
                             size="icon"
                             className="text-foreground hover:bg-muted/20"
                             onClick={() => setIsMuted(!isMuted)}
+                            data-tabz-action="toggle-mute"
                           >
                             {isMuted || volume === 0 ? (
                               <VolumeX className="h-5 w-5" />
@@ -851,6 +859,7 @@ export default function VideoPlayer() {
                       size="sm"
                       className={`rounded-l-full rounded-r-none px-4 ${isLiked ? "text-primary" : "text-foreground"}`}
                       onClick={handleLike}
+                      data-tabz-action="like"
                     >
                       <ThumbsUp className={`h-4 w-4 mr-2 ${isLiked ? "fill-current" : ""}`} />
                       {formatViews(likes)}
@@ -861,6 +870,7 @@ export default function VideoPlayer() {
                       size="sm"
                       className={`rounded-r-full rounded-l-none px-4 ${isDisliked ? "text-primary" : "text-foreground"}`}
                       onClick={handleDislike}
+                      data-tabz-action="dislike"
                     >
                       <ThumbsDown className={`h-4 w-4 ${isDisliked ? "fill-current" : ""}`} />
                     </Button>
@@ -871,6 +881,7 @@ export default function VideoPlayer() {
                     size="sm"
                     className="glass rounded-full text-foreground"
                     onClick={() => setShowShareModal(true)}
+                    data-tabz-action="share"
                   >
                     <Share2 className="h-4 w-4 mr-2" />
                     Share
@@ -941,6 +952,7 @@ export default function VideoPlayer() {
                       variant={isSubscribed ? "outline" : "default"}
                       className={isSubscribed ? "border-border text-foreground" : ""}
                       onClick={() => setIsSubscribed(!isSubscribed)}
+                      data-tabz-action="subscribe"
                     >
                       {isSubscribed ? "Subscribed" : "Subscribe"}
                     </Button>
@@ -1050,6 +1062,7 @@ export default function VideoPlayer() {
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     className="glass border-border min-h-[80px] text-foreground placeholder:text-muted-foreground"
+                    data-tabz-input="comment"
                   />
                   {commentText && (
                     <div className="flex justify-end gap-2 mt-2">
@@ -1191,11 +1204,12 @@ export default function VideoPlayer() {
               {/* Recommendations */}
               <div>
                 <h3 className="font-semibold text-foreground mb-4">Up Next</h3>
-                <div className="space-y-3">
+                <div className="space-y-3" data-tabz-list="recommendations">
                   {recommendations.map((video) => (
                     <div
                       key={video.id}
                       className="flex gap-3 cursor-pointer group"
+                      data-tabz-item={video.id}
                     >
                       <div className="relative w-[168px] aspect-video rounded-lg overflow-hidden bg-muted flex-shrink-0">
                         <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900 group-hover:opacity-80 transition-opacity" />
