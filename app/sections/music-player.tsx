@@ -84,6 +84,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import type { RadioStation as PyradioStation } from "@/lib/radio-utils"
 
 // TypeScript Interfaces
 interface Artist {
@@ -249,7 +250,7 @@ export function MusicPlayerSection({
   // Audio error state
   const [audioError, setAudioError] = useState<string | null>(null)
 
-  // Radio state
+  // Radio state (Radio Browser API)
   const [radioSearchQuery, setRadioSearchQuery] = useState("")
   const [selectedGenre, setSelectedGenre] = useState<string>("")
   const [selectedCountry, setSelectedCountry] = useState<string>("")
@@ -268,6 +269,11 @@ export function MusicPlayerSection({
   const { data: popularStations, isLoading: isLoadingPopular } = usePopularStations(20, activeView === "radio" && !radioSearchQuery && !selectedGenre && !selectedCountry)
   const { favorites, toggleFavorite, isFavorite } = useRadioFavorites()
   const recordClick = useRecordStationClick()
+
+  // Pyradio stations state (My Stations)
+  const [pyradioStations, setPyradioStations] = useState<PyradioStation[]>([])
+  const [pyradioLoading, setPyradioLoading] = useState(false)
+  const [pyradioError, setPyradioError] = useState<string | null>(null)
 
   // Audio event handlers - timeupdate syncs progress bar
   const handleTimeUpdate = useCallback(() => {
@@ -397,6 +403,30 @@ export function MusicPlayerSection({
     }
   }, [searchQuery])
 
+  // Fetch pyradio stations when radio view is active
+  useEffect(() => {
+    if (activeView === "radio" && pyradioStations.length === 0 && !pyradioLoading) {
+      setPyradioLoading(true)
+      setPyradioError(null)
+      fetch("/api/radio/pyradio?resolve=true")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.stations) {
+            setPyradioStations(data.stations)
+          }
+          if (data.error) {
+            setPyradioError(data.error)
+          }
+        })
+        .catch((err) => {
+          setPyradioError(err.message || "Failed to load pyradio stations")
+        })
+        .finally(() => {
+          setPyradioLoading(false)
+        })
+    }
+  }, [activeView, pyradioStations.length, pyradioLoading])
+
   // Format time
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -438,7 +468,7 @@ export function MusicPlayerSection({
     setQueue((prev) => [...prev, track])
   }
 
-  // Play a radio station
+  // Play a radio station (Radio Browser API)
   const playRadioStation = useCallback((station: RadioStation) => {
     // Stop any current track playback
     setNowPlaying((prev) => ({ ...prev, isPlaying: false }))
@@ -473,6 +503,28 @@ export function MusicPlayerSection({
       audio.src = ""
     }
   }, [])
+
+  // Play a pyradio station (My Stations)
+  const playPyradioStation = (station: PyradioStation) => {
+    const radioArtist = createUserTrackArtist("Radio")
+    const radioAlbum = createUserTrackAlbum(station.name, radioArtist)
+
+    const radioTrack: Track = {
+      id: station.id,
+      title: station.name,
+      artist: radioArtist,
+      album: radioAlbum,
+      duration: 0, // Live stream, no duration
+      isLiked: false,
+      isExplicit: false,
+      plays: 0,
+      url: station.url,
+    }
+
+    setNowPlaying((prev) => ({ ...prev, track: radioTrack, isPlaying: true, progress: 0 }))
+    // Clear queue when playing radio - it's a live stream
+    setQueue([])
+  }
 
   const skipNext = () => {
     if (queue.length > 0) {
