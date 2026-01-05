@@ -38,6 +38,7 @@ import {
   FileAudio,
   Upload,
   Loader2,
+  HardDrive,
 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -63,6 +64,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { LocalMediaBrowser } from "@/components/LocalMediaBrowser"
+import { getMediaUrl, type MediaFile } from "@/hooks/useMediaLibrary"
 
 // TypeScript Interfaces
 interface Artist {
@@ -169,7 +172,7 @@ export function MusicPlayerSection({
   onSubItemHandled?: () => void
 }) {
   // Navigation state
-  const [activeView, setActiveView] = useState<"home" | "search" | "library" | "playlist" | "album" | "artist">("home")
+  const [activeView, setActiveView] = useState<"home" | "search" | "library" | "localfiles" | "playlist" | "album" | "artist">("home")
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null)
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -558,6 +561,14 @@ export function MusicPlayerSection({
         >
           <Library className="h-5 w-5" />
           {!sidebarCollapsed && "Your Library"}
+        </Button>
+        <Button
+          variant={activeView === "localfiles" ? "secondary" : "ghost"}
+          className={`w-full justify-start gap-3 ${sidebarCollapsed ? "px-3" : ""}`}
+          onClick={() => setActiveView("localfiles")}
+        >
+          <HardDrive className="h-5 w-5" />
+          {!sidebarCollapsed && "Local Files"}
         </Button>
       </nav>
 
@@ -1082,6 +1093,74 @@ export function MusicPlayerSection({
       </section>
     </div>
   )
+
+  // Render local files view
+  const renderLocalFiles = () => {
+    // Create mock artist and album for local files
+    const localArtist: Artist = {
+      id: "local-artist",
+      name: "Local File",
+      image: "",
+      followers: 0,
+      monthlyListeners: 0,
+    }
+
+    const localAlbum: Album = {
+      id: "local-album",
+      title: "Local Files",
+      artist: localArtist,
+      cover: "",
+      releaseDate: "",
+      type: "album",
+    }
+
+    const handlePlayLocalFile = (file: MediaFile, allFiles: MediaFile[]) => {
+      // Convert local file to Track format and play
+      const localTrack: Track = {
+        id: `local-${file.path}`,
+        title: file.name.replace(/\.[^/.]+$/, ""), // Remove extension
+        artist: localArtist,
+        album: localAlbum,
+        duration: 0, // Will be determined when played
+        isLiked: false,
+        isExplicit: false,
+        plays: 0,
+      }
+      playTrack(localTrack)
+
+      // Build queue from all files
+      const localQueue: Track[] = allFiles.map((f) => ({
+        id: `local-${f.path}`,
+        title: f.name.replace(/\.[^/.]+$/, ""),
+        artist: localArtist,
+        album: localAlbum,
+        duration: 0,
+        isLiked: false,
+        isExplicit: false,
+        plays: 0,
+      }))
+      setQueue(localQueue)
+    }
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-foreground">Local Files</h2>
+          <Badge variant="outline" className="text-muted-foreground">
+            <HardDrive className="h-4 w-4 mr-2" />
+            Browse your music
+          </Badge>
+        </div>
+
+        <Card className="glass border-border/30 p-6">
+          <LocalMediaBrowser
+            mediaType="audio"
+            onPlayFile={handlePlayLocalFile}
+          />
+        </Card>
+      </div>
+    )
+  }
 
   // Render playlist view
   const renderPlaylist = () => {
@@ -1678,6 +1757,8 @@ export function MusicPlayerSection({
         return renderSearch()
       case "library":
         return renderLibrary()
+      case "localfiles":
+        return renderLocalFiles()
       case "playlist":
         return renderPlaylist()
       case "album":
@@ -1848,6 +1929,14 @@ export function MusicPlayerSection({
           >
             <Library className="h-5 w-5" />
             <span className="text-xs">Library</span>
+          </Button>
+          <Button
+            variant="ghost"
+            className={`flex flex-col items-center gap-1 h-auto py-2 ${activeView === "localfiles" ? "text-primary" : "text-muted-foreground"}`}
+            onClick={() => setActiveView("localfiles")}
+          >
+            <HardDrive className="h-5 w-5" />
+            <span className="text-xs">Local</span>
           </Button>
         </div>
 
