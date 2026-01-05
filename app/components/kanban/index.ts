@@ -69,9 +69,20 @@ export {
   TimeEstimate,
   AgentBadge,
   AgentCard,
+  AgentSelector,
   ContextIndicator,
   ContextIndicatorCompact,
 } from './shared'
+
+// Re-export task modal components
+export {
+  TaskModal,
+  TaskChat,
+  TaskDetailsForm,
+  TaskLabels,
+  ChatInput,
+  ChatMessage,
+} from './task'
 
 // Re-export board components
 export {
