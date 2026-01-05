@@ -1,56 +1,14 @@
 # Personal Homepage
 
-A personal dashboard/homepage with accordion sidebar navigation. Features weather, feeds, notes, bookmarks, stock trading, tasks, world clocks, and more. Sections can be toggled on/off and reordered via Settings.
+Next.js 15 personal dashboard with accordion sidebar navigation. Features weather, feeds, notes, bookmarks, stock trading, AI chat, media players, and more. Sections can be toggled/reordered via Settings.
 
-## Quick Reference
+## Commands
 
-| Task | Documentation |
-|------|---------------|
-| Add new section | [docs/navigation.md](docs/navigation.md) |
-| Styling/themes | [docs/design-system.md](docs/design-system.md) |
-| Authentication | [docs/auth.md](docs/auth.md) |
-| State management | [docs/state-management.md](docs/state-management.md) |
-| Terminal bookmarks | [docs/terminal-integration.md](docs/terminal-integration.md) |
-| TabzChrome integration | [docs/tabz-integration.md](docs/tabz-integration.md) |
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [docs/navigation.md](docs/navigation.md) | Sidebar system, adding sections |
-| [docs/auth.md](docs/auth.md) | GitHub OAuth via Supabase |
-| [docs/weather.md](docs/weather.md) | Weather APIs and features |
-| [docs/daily-feed.md](docs/daily-feed.md) | Feed sources and schema |
-| [docs/api-playground.md](docs/api-playground.md) | HTTP client features |
-| [docs/quick-notes.md](docs/quick-notes.md) | GitHub-synced markdown editor |
-| [docs/stocks-dashboard.md](docs/stocks-dashboard.md) | Paper trading, Finnhub/Alpha Vantage |
-| [docs/terminal-integration.md](docs/terminal-integration.md) | Chrome extension terminal bookmarks |
-| [docs/tabz-integration.md](docs/tabz-integration.md) | TabzChrome API, selectors, automation |
-| [docs/design-system.md](docs/design-system.md) | Themes, glassmorphism, backgrounds |
-| [docs/state-management.md](docs/state-management.md) | TanStack Query, caching |
-| [docs/claude-jobs.md](docs/claude-jobs.md) | Automated Claude prompts across projects |
-| [docs/ai-workspace-patterns.md](docs/ai-workspace-patterns.md) | Claude non-interactive mode, streaming, tokens |
-| [docs/roadmap.md](docs/roadmap.md) | Planned features |
-
-## Sections
-
-| Section | File | Description |
-|---------|------|-------------|
-| Home | `app/page.tsx` | Dashboard overview + World Clocks widget |
-| Weather | `app/sections/weather.tsx` | Weather + radar + alerts |
-| Daily Feed | `app/sections/daily-feed.tsx` | HN, GitHub, Reddit, etc. |
-| API Playground | `app/sections/api-playground.tsx` | HTTP request builder |
-| Quick Notes | `app/sections/quick-notes.tsx` | Markdown editor (GitHub sync) |
-| Bookmarks | `app/sections/bookmarks.tsx` | Links + terminal commands (GitHub sync) |
-| Search Hub | `app/sections/search-hub.tsx` | Search + AI chat |
-| Paper Trading | `app/sections/stocks-dashboard.tsx` | Stock trading practice |
-| Tasks | `app/sections/tasks.tsx` | Quick todo list (localStorage) |
-| Jobs | `app/sections/jobs.tsx` | Claude batch prompts + results inbox |
-| AI Workspace | `app/sections/ai-workspace.tsx` | Claude Code chat interface |
-| Integrations | `app/sections/integrations.tsx` | Connected services status |
-| Profile | `app/sections/profile.tsx` | Auth, sync status |
-| Settings | `app/page.tsx` (SettingsSection) | Theme, sections, API keys |
-| Setup | `app/sections/setup.tsx` | API keys wizard, TabzChrome config |
+| Task | Command |
+|------|---------|
+| Dev server | `npm run dev` (port 3001) |
+| Build | `npm run build` |
+| Lint | `npm run lint` |
 
 ## Tech Stack
 
@@ -58,61 +16,88 @@ A personal dashboard/homepage with accordion sidebar navigation. Features weathe
 - **Styling**: Tailwind CSS + shadcn/ui
 - **State**: TanStack Query + localStorage
 - **Auth**: Supabase (GitHub OAuth)
-- **APIs**: Open-Meteo, Finnhub, Alpha Vantage, GitHub
 
-## Development
+## Sections
 
-```bash
-npm run dev    # http://localhost:3001
-npm run build
-```
+| Section | File | Docs |
+|---------|------|------|
+| Weather | `app/sections/weather.tsx` | [docs/sections/weather.md](docs/sections/weather.md) |
+| Daily Feed | `app/sections/daily-feed.tsx` | [docs/sections/daily-feed.md](docs/sections/daily-feed.md) |
+| API Playground | `app/sections/api-playground.tsx` | [docs/sections/api-playground.md](docs/sections/api-playground.md) |
+| Quick Notes | `app/sections/quick-notes.tsx` | [docs/sections/quick-notes.md](docs/sections/quick-notes.md) |
+| Bookmarks | `app/sections/bookmarks.tsx` | [docs/sections/bookmarks.md](docs/sections/bookmarks.md) |
+| Search Hub | `app/sections/search-hub.tsx` | [docs/sections/search-hub.md](docs/sections/search-hub.md) |
+| Stocks | `app/sections/stocks-dashboard.tsx` | [docs/sections/stocks-dashboard.md](docs/sections/stocks-dashboard.md) |
+| Crypto | `app/sections/crypto-dashboard.tsx` | [docs/sections/crypto-dashboard.md](docs/sections/crypto-dashboard.md) |
+| Market Pulse | `app/sections/market-pulse.tsx` | [docs/sections/market-pulse.md](docs/sections/market-pulse.md) |
+| SpaceX | `app/sections/spacex-tracker.tsx` | [docs/sections/spacex-tracker.md](docs/sections/spacex-tracker.md) |
+| Disasters | `app/sections/disasters-monitor.tsx` | [docs/sections/disasters-monitor.md](docs/sections/disasters-monitor.md) |
+| GitHub Activity | `app/sections/github-activity.tsx` | [docs/sections/github-activity.md](docs/sections/github-activity.md) |
+| Tasks | `app/sections/tasks.tsx` | [docs/sections/tasks.md](docs/sections/tasks.md) |
+| Kanban | `app/sections/kanban.tsx` | [docs/sections/kanban.md](docs/sections/kanban.md) |
+| Projects | `app/sections/projects-dashboard.tsx` | [docs/sections/projects-dashboard.md](docs/sections/projects-dashboard.md) |
+| Jobs | `app/sections/jobs.tsx` | [docs/sections/jobs.md](docs/sections/jobs.md) |
+| AI Workspace | `app/sections/ai-workspace.tsx` | [docs/sections/ai-workspace.md](docs/sections/ai-workspace.md) |
+| Music Player | `app/sections/music-player.tsx` | [docs/sections/music-player.md](docs/sections/music-player.md) |
+| Video Player | `app/sections/video-player.tsx` | [docs/sections/video-player.md](docs/sections/video-player.md) |
+| Photo Gallery | `app/sections/photo-gallery.tsx` | [docs/sections/photo-gallery.md](docs/sections/photo-gallery.md) |
+| Profile | `app/sections/profile.tsx` | [docs/sections/profile.md](docs/sections/profile.md) |
+| Settings | `app/sections/settings.tsx` | [docs/sections/settings.md](docs/sections/settings.md) |
 
 ## Key Patterns
 
-### Adding a Section
+| Topic | Documentation |
+|-------|---------------|
+| Adding sections | [docs/navigation.md](docs/navigation.md) |
+| Styling/themes | [docs/design-system.md](docs/design-system.md) |
+| Authentication | [docs/auth.md](docs/auth.md) |
+| State management | [docs/state-management.md](docs/state-management.md) |
+| Terminal integration | [docs/terminal-integration.md](docs/terminal-integration.md) |
+| TabzChrome | [docs/tabz-integration.md](docs/tabz-integration.md) |
+| AI patterns | [docs/ai-workspace-patterns.md](docs/ai-workspace-patterns.md) |
+| Claude Jobs | [docs/claude-jobs.md](docs/claude-jobs.md) |
+
+## Adding a Section
 
 1. Add to `Section` type in `app/page.tsx`
 2. Add to `navigationItems` array
 3. Create `app/sections/[name].tsx`
 4. Add case to `renderContent()` switch
 
-See [docs/navigation.md](docs/navigation.md) for details.
+See [docs/navigation.md](docs/navigation.md) for complete guide.
 
-### Styling
-
-- Use `glass` / `glass-dark` for panels
-- Use `terminal-glow` for headings
-- See [docs/design-system.md](docs/design-system.md)
-
-### Auth
-
-- `useAuth()` hook from `components/AuthProvider.tsx`
-- `getGitHubToken()` for GitHub API calls
-- See [docs/auth.md](docs/auth.md)
-
-### Hydration
-
-Add `suppressHydrationWarning` for dynamic time displays.
-
-### Section Preferences
-
-Sections can be hidden/shown and reordered via Settings → Sections:
-- `useSectionPreferences` hook in `hooks/useSectionPreferences.ts`
-- Preferences stored in localStorage (`section-preferences`)
-- Uses `DEFAULT_SECTION_ORDER` during SSR to prevent hydration mismatch
-- Pass `prefsLoaded` flag to components that need visibility checks
-
-### TabzChrome Integration
+## TabzChrome Integration
 
 All interactive elements have `data-tabz-*` attributes for MCP automation:
 - `data-tabz-section` - Section identity
 - `data-tabz-action` - Action type (navigate, submit, refresh, etc.)
 - `data-tabz-input` - Input field purpose
 - `data-tabz-list` / `data-tabz-item` - List containers and items
+- `data-tabz-region` - Named regions within sections
 - `data-tabz-command` / `data-tabz-project` - Terminal commands
 
-Key hooks:
-- `useTerminalExtension()` - Spawn terminals, check connection
-- `useTabzBridge()` - Bi-directional messaging with TabzChrome
+See [docs/tabz-integration.md](docs/tabz-integration.md) for adding connectors and full selector reference.
 
-See [docs/tabz-integration.md](docs/tabz-integration.md) for complete selector reference.
+## Issue Tracking (Beads)
+
+This project uses `bd` (beads) for issue tracking:
+
+```bash
+bd prime              # Get workflow context (run at session start)
+bd ready              # Find available work
+bd show <id>          # View issue details
+bd update <id> --status in_progress  # Claim work
+bd close <id>         # Complete work
+bd sync               # Sync with git (run at session end)
+```
+
+See AGENTS.md for session completion workflow.
+
+## Quick Reference
+
+- **Auth hook**: `useAuth()` from `components/AuthProvider.tsx`
+- **GitHub token**: `getGitHubToken()` from auth hook
+- **Terminal commands**: `useTerminalExtension()` from `hooks/useTerminalExtension.ts`
+- **Section preferences**: `useSectionPreferences()` from `hooks/useSectionPreferences.ts`
+- **Styling**: Use `glass` / `glass-dark` for panels, `terminal-glow` for headings
+- **Hydration**: Add `suppressHydrationWarning` for dynamic time displays
