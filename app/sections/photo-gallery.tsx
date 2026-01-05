@@ -36,6 +36,7 @@ import {
   Focus,
   Timer,
   Gauge,
+  HardDrive,
 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -53,6 +54,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { LocalMediaBrowser } from "@/components/LocalMediaBrowser"
+import { getMediaUrl, type MediaFile } from "@/hooks/useMediaLibrary"
 
 // TypeScript Interfaces
 interface ExifData {
@@ -728,6 +731,10 @@ export default function PhotoGallerySection({
                     <Upload className="h-4 w-4 mr-2" />
                     Upload
                   </TabsTrigger>
+                  <TabsTrigger value="local" className="text-xs sm:text-sm whitespace-nowrap" data-tabz-action="tab-local">
+                    <HardDrive className="h-4 w-4 mr-2" />
+                    Browse Local
+                  </TabsTrigger>
                 </TabsList>
               </div>
 
@@ -1122,6 +1129,33 @@ export default function PhotoGallerySection({
                     />
                   </div>
                 </div>
+              </Card>
+            </TabsContent>
+
+            {/* Browse Local Tab */}
+            <TabsContent value="local" className="space-y-6">
+              <Card className="glass border-primary/30 p-6">
+                <h3 className="text-lg font-semibold text-primary mb-6">Browse Local Photos</h3>
+                <LocalMediaBrowser
+                  mediaType="image"
+                  onFileSelect={(file) => {
+                    // Convert local file to Photo format for lightbox
+                    const localPhoto: Photo = {
+                      id: `local-${file.path}`,
+                      url: getMediaUrl(file.path),
+                      thumbnail: getMediaUrl(file.path),
+                      title: file.name,
+                      uploadDate: file.modified,
+                      width: 0,
+                      height: 0,
+                      size: file.size,
+                      isFavorite: false,
+                      tags: [],
+                    }
+                    setSelectedPhoto(localPhoto)
+                    setLightboxOpen(true)
+                  }}
+                />
               </Card>
             </TabsContent>
           </Tabs>

@@ -27,6 +27,11 @@ import {
   Palette,
   LayoutGrid,
   Blocks,
+  FolderOpen,
+  Image as ImageIcon,
+  Music,
+  Video,
+  HardDrive,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -42,6 +47,7 @@ import {
   DEFAULT_SECTION_ORDER,
   DEFAULT_VISIBILITY,
 } from "@/hooks/useSectionPreferences"
+import { useMediaDirectories, useDirectoryExists } from "@/hooks/useMediaLibrary"
 
 // ============================================================================
 // TYPES
@@ -1099,6 +1105,167 @@ function TabzChromeTab() {
 }
 
 // ============================================================================
+// MEDIA DIRECTORIES TAB
+// ============================================================================
+
+function MediaDirectoryInput({
+  label,
+  icon: Icon,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string
+  icon: React.ElementType
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+}) {
+  const { data: existsData } = useDirectoryExists(value)
+  const exists = existsData?.exists
+
+  return (
+    <Card
+      className={`glass p-4 transition-colors ${
+        value && exists ? "border-emerald-500/30" : value ? "border-amber-500/30" : "border-border"
+      }`}
+    >
+      <div className="flex items-start gap-4">
+        <div className={`p-2 rounded-lg ${
+          value && exists ? "bg-emerald-500/10" : value ? "bg-amber-500/10" : "bg-muted/10"
+        } flex-shrink-0`}>
+          <Icon className={`h-5 w-5 ${
+            value && exists ? "text-emerald-500" : value ? "text-amber-500" : "text-muted-foreground"
+          }`} />
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <h4 className="font-medium">{label}</h4>
+            {value && (
+              <Badge
+                variant="outline"
+                className={`${
+                  exists ? "text-emerald-500" : "text-amber-500"
+                } border-current/30 text-xs py-0`}
+              >
+                {exists ? (
+                  <>
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Found
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-3 w-3 mr-1" />
+                    Not Found
+                  </>
+                )}
+              </Badge>
+            )}
+          </div>
+          <div className="flex gap-2 mt-2">
+            <Input
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={placeholder}
+              className="font-mono text-sm"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Use ~ for home directory (e.g., ~/Pictures)
+          </p>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+function MediaDirectoriesTab() {
+  const { directories, setDirectories, resetToDefaults, loaded } = useMediaDirectories()
+
+  if (!loaded) {
+    return (
+      <div className="space-y-4">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="h-28 bg-muted/20 rounded-lg animate-pulse" />
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+          <HardDrive className="h-5 w-5 text-primary" />
+          Media Directories
+        </h3>
+        <p className="text-muted-foreground">
+          Configure local directories for browsing photos, music, and videos.
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        <MediaDirectoryInput
+          label="Photos Directory"
+          icon={ImageIcon}
+          value={directories.photos}
+          onChange={(value) => setDirectories({ photos: value })}
+          placeholder="~/Pictures"
+        />
+
+        <MediaDirectoryInput
+          label="Music Directory"
+          icon={Music}
+          value={directories.music}
+          onChange={(value) => setDirectories({ music: value })}
+          placeholder="~/Music"
+        />
+
+        <MediaDirectoryInput
+          label="Videos Directory"
+          icon={Video}
+          value={directories.videos}
+          onChange={(value) => setDirectories({ videos: value })}
+          placeholder="~/Videos"
+        />
+      </div>
+
+      <Card className="glass p-4 border-border">
+        <div className="flex items-start gap-4">
+          <div className="p-2 rounded-lg bg-muted/10 flex-shrink-0">
+            <FolderOpen className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <div className="flex-1">
+            <h4 className="font-medium mb-1">About Local Media Browsing</h4>
+            <p className="text-sm text-muted-foreground mb-3">
+              Browse and play media files directly from your local filesystem.
+              Media sections will show a "Browse Local" tab when a directory is configured.
+            </p>
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p><strong>Photos:</strong> JPG, PNG, GIF, WebP, HEIC, AVIF, SVG, BMP</p>
+              <p><strong>Music:</strong> MP3, WAV, FLAC, AAC, OGG, M4A, OPUS</p>
+              <p><strong>Videos:</strong> MP4, MKV, AVI, MOV, WebM, WMV, FLV</p>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          onClick={resetToDefaults}
+          className="gap-2"
+        >
+          <RotateCcw className="h-4 w-4" />
+          Reset to Defaults
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
 // IMPORT/EXPORT TAB
 // ============================================================================
 
@@ -1320,7 +1487,7 @@ export default function SettingsSection({
   // Handle sub-item navigation (e.g., deep links to specific tabs)
   React.useEffect(() => {
     if (activeSubItem) {
-      const validTabs = ["general", "sections", "api-keys", "integrations", "tabzchrome", "import-export"]
+      const validTabs = ["general", "sections", "api-keys", "integrations", "tabzchrome", "media", "import-export"]
       if (validTabs.includes(activeSubItem)) {
         setActiveTab(activeSubItem)
       }
@@ -1356,6 +1523,10 @@ export default function SettingsSection({
               <Terminal className="h-4 w-4" />
               TabzChrome
             </TabsTrigger>
+            <TabsTrigger value="media" className="gap-2">
+              <HardDrive className="h-4 w-4" />
+              Media
+            </TabsTrigger>
             <TabsTrigger value="import-export" className="gap-2">
               <Download className="h-4 w-4" />
               Import/Export
@@ -1380,6 +1551,10 @@ export default function SettingsSection({
 
           <TabsContent value="tabzchrome">
             <TabzChromeTab />
+          </TabsContent>
+
+          <TabsContent value="media">
+            <MediaDirectoriesTab />
           </TabsContent>
 
           <TabsContent value="import-export">

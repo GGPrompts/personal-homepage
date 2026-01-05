@@ -39,6 +39,8 @@ import {
   Twitter,
   Facebook,
   Send,
+  HardDrive,
+  FolderOpen,
 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -58,6 +60,9 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { Textarea } from "@/components/ui/textarea"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { LocalMediaBrowser } from "@/components/LocalMediaBrowser"
+import { getMediaUrl, type MediaFile } from "@/hooks/useMediaLibrary"
 
 // TypeScript Interfaces
 interface Channel {
@@ -422,6 +427,9 @@ export default function VideoPlayerSection({
   const [autoplay, setAutoplay] = useState(true)
   const [loopPlaylist, setLoopPlaylist] = useState(false)
   const [shufflePlaylist, setShufflePlaylist] = useState(false)
+  const [viewMode, setViewMode] = useState<"player" | "browse">("player")
+  const [localVideoUrl, setLocalVideoUrl] = useState<string | null>(null)
+  const [localVideoName, setLocalVideoName] = useState<string | null>(null)
 
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null)
   const playerRef = useRef<HTMLDivElement>(null)
@@ -509,8 +517,57 @@ export default function VideoPlayerSection({
 
   const progress = (currentTime / duration) * 100
 
+  // Handle playing a local video file
+  const handlePlayLocalVideo = (file: MediaFile) => {
+    setLocalVideoUrl(getMediaUrl(file.path))
+    setLocalVideoName(file.name.replace(/\.[^/.]+$/, ""))
+    setViewMode("player")
+    setIsPlaying(true)
+  }
+
   return (
     <div className={`p-4 md:p-6 ${isTheaterMode ? "bg-black" : ""}`} data-tabz-section="video-player">
+      {/* View Mode Header */}
+      {!isTheaterMode && !isFullscreen && (
+        <div className="max-w-[1800px] mx-auto mb-4">
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "player" | "browse")}>
+            <TabsList className="glass">
+              <TabsTrigger value="player" className="gap-2">
+                <MonitorPlay className="h-4 w-4" />
+                Watch
+              </TabsTrigger>
+              <TabsTrigger value="browse" className="gap-2">
+                <HardDrive className="h-4 w-4" />
+                Browse Local
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      )}
+
+      {viewMode === "browse" ? (
+        <div className="max-w-[1800px] mx-auto">
+          <Card className="glass border-border/30 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-foreground">Browse Local Videos</h2>
+                <p className="text-muted-foreground text-sm mt-1">
+                  Select a video to play from your local files
+                </p>
+              </div>
+              <Badge variant="outline" className="gap-2">
+                <FolderOpen className="h-4 w-4" />
+                Local Library
+              </Badge>
+            </div>
+            <LocalMediaBrowser
+              mediaType="video"
+              onFileSelect={handlePlayLocalVideo}
+            />
+          </Card>
+        </div>
+      ) : (
+      <>
       <div className={`${isTheaterMode ? "max-w-full" : "max-w-[1800px]"} mx-auto`}>
         <div className={`flex flex-col ${isTheaterMode ? "" : "lg:flex-row"} gap-6`}>
           {/* Main Content */}
@@ -1316,6 +1373,8 @@ export default function VideoPlayerSection({
           </motion.div>
         )}
       </AnimatePresence>
+      </>
+      )}
     </div>
   )
 }
