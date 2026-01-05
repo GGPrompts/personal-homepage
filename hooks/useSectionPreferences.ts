@@ -8,6 +8,20 @@ import {
   TrendingUp,
   Play,
   User,
+  Folder,
+  Star,
+  Heart,
+  Zap,
+  Coffee,
+  Home,
+  Settings,
+  Layers,
+  Grid,
+  Box,
+  Circle,
+  Square,
+  Triangle,
+  Hexagon,
   type LucideIcon,
 } from "lucide-react"
 
@@ -17,26 +31,95 @@ export type ToggleableSection = "weather" | "feed" | "api-playground" | "notes" 
 // All sections including non-toggleable ones
 export type Section = "home" | ToggleableSection | "settings"
 
-// Category IDs for organizing sections in sidebar
-export type CategoryId = "information" | "productivity" | "development" | "finance" | "entertainment" | "personal"
+// Category IDs - now supports custom string IDs
+export type CategoryId = string
 
-// Category metadata
+// Icon name type for serialization
+export type IconName = "Globe" | "CheckSquare" | "Code" | "TrendingUp" | "Play" | "User" | "Folder" | "Star" | "Heart" | "Zap" | "Coffee" | "Home" | "Settings" | "Layers" | "Grid" | "Box" | "Circle" | "Square" | "Triangle" | "Hexagon"
+
+// Map of icon names to components for serialization
+export const ICON_MAP: Record<IconName, LucideIcon> = {
+  Globe,
+  CheckSquare,
+  Code,
+  TrendingUp,
+  Play,
+  User,
+  Folder,
+  Star,
+  Heart,
+  Zap,
+  Coffee,
+  Home,
+  Settings,
+  Layers,
+  Grid,
+  Box,
+  Circle,
+  Square,
+  Triangle,
+  Hexagon,
+}
+
+// Available icons for category customization
+export const AVAILABLE_ICONS: IconName[] = Object.keys(ICON_MAP) as IconName[]
+
+// Category metadata (runtime)
 export interface CategoryMeta {
   id: CategoryId
   label: string
   description: string
   icon: LucideIcon
+  isCustom?: boolean
 }
 
-// Category definitions (in display order)
-export const CATEGORIES: CategoryMeta[] = [
-  { id: "information", label: "Information", description: "Weather, news, and alerts", icon: Globe },
-  { id: "productivity", label: "Productivity", description: "Notes, tasks, and bookmarks", icon: CheckSquare },
-  { id: "development", label: "Development", description: "API tools and code", icon: Code },
-  { id: "finance", label: "Finance", description: "Stocks and crypto", icon: TrendingUp },
-  { id: "entertainment", label: "Entertainment", description: "Feeds and media", icon: Play },
-  { id: "personal", label: "Personal", description: "Profile and settings", icon: User },
+// Category data for storage (serializable)
+export interface CategoryData {
+  id: CategoryId
+  label: string
+  description: string
+  iconName: IconName
+  isCustom?: boolean
+}
+
+// Default category IDs
+export const DEFAULT_CATEGORY_IDS = ["information", "productivity", "development", "finance", "entertainment", "personal"] as const
+export type DefaultCategoryId = typeof DEFAULT_CATEGORY_IDS[number]
+
+// Default category definitions (in display order)
+export const DEFAULT_CATEGORIES: CategoryData[] = [
+  { id: "information", label: "Information", description: "Weather, news, and alerts", iconName: "Globe" },
+  { id: "productivity", label: "Productivity", description: "Notes, tasks, and bookmarks", iconName: "CheckSquare" },
+  { id: "development", label: "Development", description: "API tools and code", iconName: "Code" },
+  { id: "finance", label: "Finance", description: "Stocks and crypto", iconName: "TrendingUp" },
+  { id: "entertainment", label: "Entertainment", description: "Feeds and media", iconName: "Play" },
+  { id: "personal", label: "Personal", description: "Profile and settings", iconName: "User" },
 ]
+
+// Convert CategoryData to CategoryMeta (add icon component)
+export function categoryDataToMeta(data: CategoryData): CategoryMeta {
+  return {
+    id: data.id,
+    label: data.label,
+    description: data.description,
+    icon: ICON_MAP[data.iconName] || Folder,
+    isCustom: data.isCustom,
+  }
+}
+
+// Convert CategoryMeta to CategoryData (for storage)
+export function categoryMetaToData(meta: CategoryMeta, iconName: IconName): CategoryData {
+  return {
+    id: meta.id,
+    label: meta.label,
+    description: meta.description,
+    iconName,
+    isCustom: meta.isCustom,
+  }
+}
+
+// Legacy CATEGORIES export for backward compatibility
+export const CATEGORIES: CategoryMeta[] = DEFAULT_CATEGORIES.map(categoryDataToMeta)
 
 // Default category assignments for each section
 export const DEFAULT_CATEGORY_ASSIGNMENTS: Record<ToggleableSection, CategoryId> = {
@@ -125,11 +208,17 @@ export const DEFAULT_VISIBILITY: Record<ToggleableSection, boolean> = {
 
 const STORAGE_KEY = "section-preferences"
 
+// Default category order
+export const DEFAULT_CATEGORY_ORDER: CategoryId[] = DEFAULT_CATEGORY_IDS.slice()
+
 interface SectionPreferences {
   visibility: Record<ToggleableSection, boolean>
   order: ToggleableSection[]
   categoryAssignments: Record<ToggleableSection, CategoryId>
   collapsedCategories: Record<CategoryId, boolean>
+  // New: custom categories and category order
+  customCategories: CategoryData[]
+  categoryOrder: CategoryId[]
 }
 
 function loadPreferences(): SectionPreferences {
@@ -139,6 +228,8 @@ function loadPreferences(): SectionPreferences {
       order: DEFAULT_SECTION_ORDER,
       categoryAssignments: DEFAULT_CATEGORY_ASSIGNMENTS,
       collapsedCategories: DEFAULT_COLLAPSED_CATEGORIES,
+      customCategories: [],
+      categoryOrder: DEFAULT_CATEGORY_ORDER,
     }
   }
 
@@ -171,7 +262,30 @@ function loadPreferences(): SectionPreferences {
       // Merge collapsed categories with defaults (new categories start expanded)
       const collapsedCategories = { ...DEFAULT_COLLAPSED_CATEGORIES, ...parsed.collapsedCategories }
 
-      return { visibility, order, categoryAssignments, collapsedCategories }
+      // Load custom categories (new feature)
+      const customCategories: CategoryData[] = parsed.customCategories || []
+
+      // Load category order, ensuring all default categories are included
+      let categoryOrder: CategoryId[] = []
+      if (parsed.categoryOrder?.length) {
+        categoryOrder = [...parsed.categoryOrder]
+        // Ensure all default categories are in the order
+        for (const catId of DEFAULT_CATEGORY_ORDER) {
+          if (!categoryOrder.includes(catId)) {
+            categoryOrder.push(catId)
+          }
+        }
+        // Ensure all custom categories are in the order
+        for (const cat of customCategories) {
+          if (!categoryOrder.includes(cat.id)) {
+            categoryOrder.push(cat.id)
+          }
+        }
+      } else {
+        categoryOrder = [...DEFAULT_CATEGORY_ORDER, ...customCategories.map(c => c.id)]
+      }
+
+      return { visibility, order, categoryAssignments, collapsedCategories, customCategories, categoryOrder }
     }
   } catch {
     // Invalid JSON, use defaults
@@ -182,6 +296,8 @@ function loadPreferences(): SectionPreferences {
     order: DEFAULT_SECTION_ORDER,
     categoryAssignments: DEFAULT_CATEGORY_ASSIGNMENTS,
     collapsedCategories: DEFAULT_COLLAPSED_CATEGORIES,
+    customCategories: [],
+    categoryOrder: DEFAULT_CATEGORY_ORDER,
   }
 }
 
@@ -260,6 +376,8 @@ export function useSectionPreferences() {
       order: DEFAULT_SECTION_ORDER,
       categoryAssignments: DEFAULT_CATEGORY_ASSIGNMENTS,
       collapsedCategories: DEFAULT_COLLAPSED_CATEGORIES,
+      customCategories: [],
+      categoryOrder: DEFAULT_CATEGORY_ORDER,
     })
   }, [])
 
@@ -308,19 +426,20 @@ export function useSectionPreferences() {
 
   // Get sections grouped by category (respecting visibility and order)
   const getSectionsByCategory = useCallback(() => {
-    const result: Record<CategoryId, ToggleableSection[]> = {
-      information: [],
-      productivity: [],
-      development: [],
-      finance: [],
-      entertainment: [],
-      personal: [],
+    const result: Record<CategoryId, ToggleableSection[]> = {}
+
+    // Initialize all categories (default + custom)
+    for (const catId of preferences.categoryOrder) {
+      result[catId] = []
     }
 
     // Use the order array to maintain section order within categories
     for (const section of preferences.order) {
       if (preferences.visibility[section]) {
         const category = preferences.categoryAssignments[section]
+        if (!result[category]) {
+          result[category] = []
+        }
         result[category].push(section)
       }
     }
@@ -338,11 +457,170 @@ export function useSectionPreferences() {
     return preferences.categoryAssignments[section]
   }, [preferences.categoryAssignments])
 
+  // =====================================================
+  // CATEGORY MANAGEMENT FUNCTIONS
+  // =====================================================
+
+  // Get all categories (default + custom) as CategoryMeta, respecting order
+  const getAllCategories = useCallback((): CategoryMeta[] => {
+    const categoryMap = new Map<CategoryId, CategoryMeta>()
+
+    // Add default categories
+    for (const cat of DEFAULT_CATEGORIES) {
+      categoryMap.set(cat.id, categoryDataToMeta(cat))
+    }
+
+    // Add/override with custom categories
+    for (const cat of preferences.customCategories) {
+      categoryMap.set(cat.id, categoryDataToMeta(cat))
+    }
+
+    // Return in order
+    return preferences.categoryOrder
+      .filter(id => categoryMap.has(id))
+      .map(id => categoryMap.get(id)!)
+  }, [preferences.customCategories, preferences.categoryOrder])
+
+  // Get a category by ID
+  const getCategory = useCallback((categoryId: CategoryId): CategoryMeta | undefined => {
+    // Check custom categories first
+    const custom = preferences.customCategories.find(c => c.id === categoryId)
+    if (custom) {
+      return categoryDataToMeta(custom)
+    }
+    // Fall back to default
+    const defaultCat = DEFAULT_CATEGORIES.find(c => c.id === categoryId)
+    if (defaultCat) {
+      return categoryDataToMeta(defaultCat)
+    }
+    return undefined
+  }, [preferences.customCategories])
+
+  // Add a new custom category
+  const addCategory = useCallback((label: string, description: string, iconName: IconName): CategoryId => {
+    const id = `custom-${Date.now()}`
+    const newCategory: CategoryData = {
+      id,
+      label,
+      description,
+      iconName,
+      isCustom: true,
+    }
+    setPreferences((prev) => ({
+      ...prev,
+      customCategories: [...prev.customCategories, newCategory],
+      categoryOrder: [...prev.categoryOrder, id],
+      collapsedCategories: { ...prev.collapsedCategories, [id]: false },
+    }))
+    return id
+  }, [])
+
+  // Update an existing category (works for both default and custom)
+  const updateCategory = useCallback((categoryId: CategoryId, updates: { label?: string; description?: string; iconName?: IconName }) => {
+    setPreferences((prev) => {
+      // Check if it's a custom category
+      const customIndex = prev.customCategories.findIndex(c => c.id === categoryId)
+      if (customIndex >= 0) {
+        const updatedCustom = [...prev.customCategories]
+        updatedCustom[customIndex] = {
+          ...updatedCustom[customIndex],
+          ...updates,
+        }
+        return { ...prev, customCategories: updatedCustom }
+      }
+
+      // It's a default category - create a custom override
+      const defaultCat = DEFAULT_CATEGORIES.find(c => c.id === categoryId)
+      if (defaultCat) {
+        const customOverride: CategoryData = {
+          ...defaultCat,
+          ...updates,
+          isCustom: false, // Mark as modified default, not fully custom
+        }
+        return {
+          ...prev,
+          customCategories: [...prev.customCategories, customOverride],
+        }
+      }
+
+      return prev
+    })
+  }, [])
+
+  // Delete a custom category (only works for custom categories, not defaults)
+  const deleteCategory = useCallback((categoryId: CategoryId): boolean => {
+    // Check if any sections are assigned to this category
+    const sectionsInCategory = Object.entries(preferences.categoryAssignments)
+      .filter(([_, catId]) => catId === categoryId)
+      .map(([section]) => section as ToggleableSection)
+
+    if (sectionsInCategory.length > 0) {
+      // Cannot delete - has sections
+      return false
+    }
+
+    // Check if it's a fully custom category (not a modified default)
+    const customCat = preferences.customCategories.find(c => c.id === categoryId)
+    if (!customCat?.isCustom) {
+      // Cannot delete default categories (even if modified)
+      return false
+    }
+
+    setPreferences((prev) => ({
+      ...prev,
+      customCategories: prev.customCategories.filter(c => c.id !== categoryId),
+      categoryOrder: prev.categoryOrder.filter(id => id !== categoryId),
+    }))
+    return true
+  }, [preferences.categoryAssignments, preferences.customCategories])
+
+  // Reorder categories
+  const reorderCategories = useCallback((newOrder: CategoryId[]) => {
+    setPreferences((prev) => ({ ...prev, categoryOrder: newOrder }))
+  }, [])
+
+  // Get section count for a category
+  const getSectionCountForCategory = useCallback((categoryId: CategoryId): number => {
+    return Object.values(preferences.categoryAssignments).filter(id => id === categoryId).length
+  }, [preferences.categoryAssignments])
+
+  // Check if a category can be deleted (is custom and has no sections)
+  const canDeleteCategory = useCallback((categoryId: CategoryId): boolean => {
+    const customCat = preferences.customCategories.find(c => c.id === categoryId)
+    if (!customCat?.isCustom) {
+      return false // Can't delete default categories
+    }
+    const sectionCount = Object.values(preferences.categoryAssignments).filter(id => id === categoryId).length
+    return sectionCount === 0
+  }, [preferences.customCategories, preferences.categoryAssignments])
+
+  // Check if a category is a default category
+  const isDefaultCategory = useCallback((categoryId: CategoryId): boolean => {
+    return DEFAULT_CATEGORY_IDS.includes(categoryId as DefaultCategoryId)
+  }, [])
+
+  // Get the icon name for a category (for the icon picker)
+  const getCategoryIconName = useCallback((categoryId: CategoryId): IconName => {
+    // Check custom categories first
+    const custom = preferences.customCategories.find(c => c.id === categoryId)
+    if (custom) {
+      return custom.iconName
+    }
+    // Fall back to default
+    const defaultCat = DEFAULT_CATEGORIES.find(c => c.id === categoryId)
+    if (defaultCat) {
+      return defaultCat.iconName
+    }
+    return "Folder"
+  }, [preferences.customCategories])
+
   return {
     visibility: preferences.visibility,
     order: preferences.order,
     categoryAssignments: preferences.categoryAssignments,
     collapsedCategories: preferences.collapsedCategories,
+    customCategories: preferences.customCategories,
+    categoryOrder: preferences.categoryOrder,
     isLoaded,
     toggleVisibility,
     setVisibility,
@@ -358,5 +636,16 @@ export function useSectionPreferences() {
     getSectionsByCategory,
     isCategoryCollapsed,
     getSectionCategory,
+    // Category management
+    getAllCategories,
+    getCategory,
+    addCategory,
+    updateCategory,
+    deleteCategory,
+    reorderCategories,
+    getSectionCountForCategory,
+    canDeleteCategory,
+    isDefaultCategory,
+    getCategoryIconName,
   }
 }

@@ -62,7 +62,7 @@ import {
   DEFAULT_SECTION_ORDER,
   DEFAULT_CATEGORY_ASSIGNMENTS,
   CategoryId,
-  CATEGORIES,
+  CategoryMeta,
 } from "@/hooks/useSectionPreferences"
 
 // Section metadata for display
@@ -95,6 +95,7 @@ function SortableItem({
   sectionId,
   isEnabled,
   categoryId,
+  categories,
   onToggleVisibility,
   onCategoryChange,
   isOverlay = false,
@@ -102,6 +103,7 @@ function SortableItem({
   sectionId: ToggleableSection
   isEnabled: boolean
   categoryId: CategoryId
+  categories: CategoryMeta[]
   onToggleVisibility: () => void
   onCategoryChange: (categoryId: CategoryId) => void
   isOverlay?: boolean
@@ -119,7 +121,7 @@ function SortableItem({
   // Skip sections that don't have metadata (e.g., removed sections still in localStorage)
   if (!meta) return null
   const Icon = meta.icon
-  const currentCategory = CATEGORIES.find(c => c.id === categoryId)
+  const currentCategory = categories.find(c => c.id === categoryId)
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -176,7 +178,7 @@ function SortableItem({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-40">
-          {CATEGORIES.map((category) => (
+          {categories.map((category) => (
             <DropdownMenuItem
               key={category.id}
               onClick={() => onCategoryChange(category.id)}
@@ -221,7 +223,10 @@ export function SectionSettings() {
     reorder,
     resetToDefaults,
     setSectionCategory,
+    getAllCategories,
   } = useSectionPreferences()
+
+  const categories = getAllCategories()
 
   const [activeId, setActiveId] = useState<ToggleableSection | null>(null)
   const [overId, setOverId] = useState<ToggleableSection | null>(null)
@@ -333,6 +338,7 @@ export function SectionSettings() {
                     sectionId={sectionId}
                     isEnabled={isEnabled}
                     categoryId={categoryAssignments[sectionId]}
+                    categories={categories}
                     onToggleVisibility={() => toggleVisibility(sectionId)}
                     onCategoryChange={(categoryId) => setSectionCategory(sectionId, categoryId)}
                   />
@@ -349,6 +355,7 @@ export function SectionSettings() {
               sectionId={activeId}
               isEnabled={visibility[activeId]}
               categoryId={categoryAssignments[activeId]}
+              categories={categories}
               onToggleVisibility={() => {}}
               onCategoryChange={() => {}}
               isOverlay
