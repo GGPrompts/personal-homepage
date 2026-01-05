@@ -1,13 +1,15 @@
 # Music Player
 
-Audio player with Spotify integration and local file support.
+Audio player with Spotify integration, local file support, and internet radio.
 
 ## Files
 - `app/sections/music-player.tsx` - Main component
 - `components/SpotifyPlayer.tsx` - Spotify Web Playback
 - `components/LocalMediaBrowser.tsx` - Local file browser
 - `hooks/useMediaLibrary.ts` - Media file handling
+- `hooks/useRadioStations.ts` - Radio Browser API integration
 - `app/api/spotify/` - Spotify OAuth routes
+- `app/api/radio/search/route.ts` - Radio Browser API proxy
 
 ## Features
 - **Local Audio**:
@@ -22,6 +24,13 @@ Audio player with Spotify integration and local file support.
   - Search tracks/albums/artists
   - Play Spotify content
   - Premium account required
+- **Internet Radio** (NEW):
+  - 30K+ free internet radio stations
+  - Search by name, genre, or country
+  - Popular stations discovery
+  - Favorites stored in localStorage
+  - Native audio playback (no SDK needed)
+  - Uses Radio Browser API (no auth required)
 - Unified playback controls
 - Volume control
 - Shuffle/repeat modes
@@ -36,6 +45,7 @@ Audio player with Spotify integration and local file support.
 - `data-tabz-input="search"` - Track search
 - `data-tabz-input="track-url"` - URL input
 - `data-tabz-input="audio-file"` - File upload
+- `data-tabz-input="radio-search"` - Radio station search
 - `data-tabz-action="toggle-play"` - Play/pause
 - `data-tabz-action="skip-next"` - Next track
 - `data-tabz-action="skip-previous"` - Previous track

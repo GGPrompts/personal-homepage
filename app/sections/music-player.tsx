@@ -68,6 +68,22 @@ import { LocalMediaBrowser } from "@/components/LocalMediaBrowser"
 import { getMediaUrl, type MediaFile } from "@/hooks/useMediaLibrary"
 import { SpotifyPlayer } from "@/components/SpotifyPlayer"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  useRadioSearch,
+  usePopularStations,
+  useRadioFavorites,
+  useRecordStationClick,
+  POPULAR_GENRES,
+  POPULAR_COUNTRIES,
+  type RadioStation,
+} from "@/hooks/useRadioStations"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 // TypeScript Interfaces
 interface Artist {
@@ -188,7 +204,7 @@ export function MusicPlayerSection({
   }, [playerMode])
 
   // Navigation state
-  const [activeView, setActiveView] = useState<"home" | "search" | "library" | "localfiles" | "playlist" | "album" | "artist">("home")
+  const [activeView, setActiveView] = useState<"home" | "search" | "library" | "localfiles" | "radio" | "playlist" | "album" | "artist">("home")
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null)
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -232,6 +248,26 @@ export function MusicPlayerSection({
 
   // Audio error state
   const [audioError, setAudioError] = useState<string | null>(null)
+
+  // Radio state
+  const [radioSearchQuery, setRadioSearchQuery] = useState("")
+  const [selectedGenre, setSelectedGenre] = useState<string>("")
+  const [selectedCountry, setSelectedCountry] = useState<string>("")
+  const [currentRadioStation, setCurrentRadioStation] = useState<RadioStation | null>(null)
+  const [isRadioPlaying, setIsRadioPlaying] = useState(false)
+
+  // Radio hooks
+  const {
+    data: radioSearchResults,
+    isLoading: isRadioSearching,
+  } = useRadioSearch(radioSearchQuery, {
+    tag: selectedGenre || undefined,
+    country: selectedCountry || undefined,
+    enabled: activeView === "radio" && (!!radioSearchQuery || !!selectedGenre || !!selectedCountry),
+  })
+  const { data: popularStations, isLoading: isLoadingPopular } = usePopularStations(20, activeView === "radio" && !radioSearchQuery && !selectedGenre && !selectedCountry)
+  const { favorites, toggleFavorite, isFavorite } = useRadioFavorites()
+  const recordClick = useRecordStationClick()
 
   // Audio event handlers - timeupdate syncs progress bar
   const handleTimeUpdate = useCallback(() => {
@@ -401,6 +437,42 @@ export function MusicPlayerSection({
   const addToQueue = (track: Track) => {
     setQueue((prev) => [...prev, track])
   }
+
+  // Play a radio station
+  const playRadioStation = useCallback((station: RadioStation) => {
+    // Stop any current track playback
+    setNowPlaying((prev) => ({ ...prev, isPlaying: false }))
+
+    // Set the radio station
+    setCurrentRadioStation(station)
+    setIsRadioPlaying(true)
+
+    // Record the click for popularity tracking
+    recordClick.mutate(station.stationuuid)
+
+    // Play the station
+    const audio = audioRef.current
+    if (audio) {
+      audio.src = station.url_resolved
+      audio.load()
+      audio.play().catch((err) => {
+        console.error("Failed to play radio station:", err)
+        setAudioError("Failed to play radio station")
+        setIsRadioPlaying(false)
+      })
+    }
+  }, [recordClick])
+
+  // Stop radio playback
+  const stopRadio = useCallback(() => {
+    setIsRadioPlaying(false)
+    setCurrentRadioStation(null)
+    const audio = audioRef.current
+    if (audio) {
+      audio.pause()
+      audio.src = ""
+    }
+  }, [])
 
   const skipNext = () => {
     if (queue.length > 0) {
@@ -605,6 +677,14 @@ export function MusicPlayerSection({
         >
           <HardDrive className="h-5 w-5" />
           {!sidebarCollapsed && "Local Files"}
+        </Button>
+        <Button
+          variant={activeView === "radio" ? "secondary" : "ghost"}
+          className={`w-full justify-start gap-3 ${sidebarCollapsed ? "px-3" : ""}`}
+          onClick={() => setActiveView("radio")}
+        >
+          <Radio className="h-5 w-5" />
+          {!sidebarCollapsed && "Radio"}
         </Button>
       </nav>
 
@@ -1194,6 +1274,306 @@ export function MusicPlayerSection({
             onPlayFile={handlePlayLocalFile}
           />
         </Card>
+      </div>
+    )
+  }
+
+  // Render radio view
+  const renderRadio = () => {
+    const stations: RadioStation[] = radioSearchResults?.stations || popularStations?.stations || []
+    const isLoading = isRadioSearching || isLoadingPopular
+    const showingFavorites = !radioSearchQuery && !selectedGenre && !selectedCountry && favorites.length > 0
+
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-foreground">Internet Radio</h2>
+          <Badge variant="outline" className="text-muted-foreground">
+            <Radio className="h-4 w-4 mr-2" />
+            30K+ stations
+          </Badge>
+        </div>
+
+        {/* Search & Filters */}
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search radio stations..."
+              value={radioSearchQuery}
+              onChange={(e) => setRadioSearchQuery(e.target.value)}
+              className="pl-10 glass border-border/30"
+              data-tabz-input="radio-search"
+            />
+          </div>
+          <Select value={selectedGenre} onValueChange={setSelectedGenre}>
+            <SelectTrigger className="w-full md:w-40 glass border-border/30">
+              <SelectValue placeholder="Genre" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Genres</SelectItem>
+              {POPULAR_GENRES.map((genre) => (
+                <SelectItem key={genre.name} value={genre.name}>
+                  {genre.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={selectedCountry} onValueChange={setSelectedCountry}>
+            <SelectTrigger className="w-full md:w-40 glass border-border/30">
+              <SelectValue placeholder="Country" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Countries</SelectItem>
+              {POPULAR_COUNTRIES.map((country) => (
+                <SelectItem key={country.code} value={country.code}>
+                  {country.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Now Playing Radio */}
+        {currentRadioStation && (
+          <Card className="glass border-border/30 border-primary/50 p-4">
+            <div className="flex items-center gap-4">
+              <motion.div
+                animate={{ scale: isRadioPlaying ? [1, 1.1, 1] : 1 }}
+                transition={{ duration: 1, repeat: isRadioPlaying ? Infinity : 0 }}
+                className="w-16 h-16 rounded-lg bg-gradient-to-br from-primary/30 to-secondary/30 flex items-center justify-center flex-shrink-0"
+              >
+                {currentRadioStation.favicon ? (
+                  <img
+                    src={currentRadioStation.favicon}
+                    alt={currentRadioStation.name}
+                    className="w-12 h-12 rounded object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none"
+                    }}
+                  />
+                ) : (
+                  <Radio className="h-8 w-8 text-primary" />
+                )}
+              </motion.div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-primary uppercase tracking-wider">Now Playing</p>
+                <h3 className="font-semibold text-foreground truncate">{currentRadioStation.name}</h3>
+                <p className="text-sm text-muted-foreground truncate">
+                  {currentRadioStation.country}
+                  {currentRadioStation.tags && ` • ${currentRadioStation.tags.split(",")[0]}`}
+                  {currentRadioStation.bitrate > 0 && ` • ${currentRadioStation.bitrate}kbps`}
+                </p>
+              </div>
+              <Button
+                size="icon"
+                variant={isRadioPlaying ? "default" : "outline"}
+                onClick={() => {
+                  if (isRadioPlaying) {
+                    audioRef.current?.pause()
+                    setIsRadioPlaying(false)
+                  } else {
+                    audioRef.current?.play()
+                    setIsRadioPlaying(true)
+                  }
+                }}
+              >
+                {isRadioPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => toggleFavorite(currentRadioStation)}
+              >
+                <Heart className={`h-5 w-5 ${isFavorite(currentRadioStation.stationuuid) ? "fill-primary text-primary" : ""}`} />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={stopRadio}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+          </Card>
+        )}
+
+        {/* Favorites Section */}
+        {showingFavorites && (
+          <section>
+            <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+              <Heart className="h-5 w-5 text-primary" />
+              Your Favorites
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {favorites.map((station) => (
+                <Card
+                  key={station.stationuuid}
+                  className={`glass border-border/30 p-4 cursor-pointer group hover:bg-primary/5 transition-colors ${
+                    currentRadioStation?.stationuuid === station.stationuuid ? "ring-2 ring-primary" : ""
+                  }`}
+                  onClick={() => playRadioStation(station)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center flex-shrink-0 relative">
+                      {station.favicon ? (
+                        <img
+                          src={station.favicon}
+                          alt={station.name}
+                          className="w-10 h-10 rounded object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = "none"
+                          }}
+                        />
+                      ) : (
+                        <Radio className="h-6 w-6 text-primary/50" />
+                      )}
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        {currentRadioStation?.stationuuid === station.stationuuid && isRadioPlaying ? (
+                          <Pause className="h-5 w-5 text-white" />
+                        ) : (
+                          <Play className="h-5 w-5 text-white" />
+                        )}
+                      </motion.div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground truncate">{station.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {station.country}
+                        {station.bitrate > 0 && ` • ${station.bitrate}kbps`}
+                      </p>
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 flex-shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleFavorite(station)
+                      }}
+                    >
+                      <Heart className="h-4 w-4 fill-primary text-primary" />
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Popular/Search Results Section */}
+        <section>
+          <h3 className="text-lg font-semibold text-foreground mb-4">
+            {radioSearchQuery || selectedGenre || selectedCountry ? "Search Results" : "Popular Stations"}
+          </h3>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : stations.length === 0 ? (
+            <Card className="glass border-border/30 p-8 text-center">
+              <Radio className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">
+                {radioSearchQuery || selectedGenre || selectedCountry
+                  ? "No stations found. Try a different search."
+                  : "Loading popular stations..."}
+              </p>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {stations.map((station) => (
+                <Card
+                  key={station.stationuuid}
+                  className={`glass border-border/30 p-4 cursor-pointer group hover:bg-primary/5 transition-colors ${
+                    currentRadioStation?.stationuuid === station.stationuuid ? "ring-2 ring-primary" : ""
+                  }`}
+                  onClick={() => playRadioStation(station)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center flex-shrink-0 relative overflow-hidden">
+                      {station.favicon ? (
+                        <img
+                          src={station.favicon}
+                          alt={station.name}
+                          className="w-10 h-10 rounded object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = "none"
+                          }}
+                        />
+                      ) : (
+                        <Radio className="h-6 w-6 text-primary/50" />
+                      )}
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        {currentRadioStation?.stationuuid === station.stationuuid && isRadioPlaying ? (
+                          <Pause className="h-5 w-5 text-white" />
+                        ) : (
+                          <Play className="h-5 w-5 text-white" />
+                        )}
+                      </motion.div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground truncate">{station.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {station.country}
+                        {station.tags && ` • ${station.tags.split(",")[0]}`}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        {station.bitrate > 0 && (
+                          <Badge variant="outline" className="text-xs py-0 px-1">
+                            {station.bitrate}kbps
+                          </Badge>
+                        )}
+                        {station.codec && (
+                          <Badge variant="outline" className="text-xs py-0 px-1">
+                            {station.codec}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 flex-shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleFavorite(station)
+                      }}
+                    >
+                      <Heart className={`h-4 w-4 ${isFavorite(station.stationuuid) ? "fill-primary text-primary" : ""}`} />
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Quick Genre Browsing */}
+        {!radioSearchQuery && !selectedGenre && !selectedCountry && (
+          <section>
+            <h3 className="text-lg font-semibold text-foreground mb-4">Browse by Genre</h3>
+            <div className="flex flex-wrap gap-2">
+              {POPULAR_GENRES.map((genre) => (
+                <Button
+                  key={genre.name}
+                  variant="outline"
+                  size="sm"
+                  className="glass border-border/30"
+                  onClick={() => setSelectedGenre(genre.name)}
+                >
+                  {genre.label}
+                </Button>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     )
   }
@@ -1795,6 +2175,8 @@ export function MusicPlayerSection({
         return renderLibrary()
       case "localfiles":
         return renderLocalFiles()
+      case "radio":
+        return renderRadio()
       case "playlist":
         return renderPlaylist()
       case "album":
@@ -2003,6 +2385,14 @@ export function MusicPlayerSection({
           >
             <HardDrive className="h-5 w-5" />
             <span className="text-xs">Local</span>
+          </Button>
+          <Button
+            variant="ghost"
+            className={`flex flex-col items-center gap-1 h-auto py-2 ${activeView === "radio" ? "text-primary" : "text-muted-foreground"}`}
+            onClick={() => setActiveView("radio")}
+          >
+            <Radio className="h-5 w-5" />
+            <span className="text-xs">Radio</span>
           </Button>
         </div>
 
