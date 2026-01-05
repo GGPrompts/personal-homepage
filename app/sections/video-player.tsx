@@ -77,7 +77,9 @@ import {
   extractPlaylistId,
   type SearchFilters,
 } from "@/hooks/useYouTube"
-import { Search, Filter, ListPlus, Loader2 as LoaderIcon } from "lucide-react"
+import { Search, Filter, ListPlus, Loader2 as LoaderIcon, Download } from "lucide-react"
+import { VideoDownloadModal, DownloadProgressIndicator } from "@/components/VideoDownloadModal"
+import { useVideoDownload, type DownloadOptions } from "@/hooks/useVideoDownload"
 
 // TypeScript Interfaces
 interface Channel {
@@ -458,6 +460,17 @@ export default function VideoPlayerSection({
   const [playlistInput, setPlaylistInput] = useState("")
   const [loadedPlaylistId, setLoadedPlaylistId] = useState<string | null>(null)
 
+  // Download State
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false)
+  const [downloadVideo, setDownloadVideo] = useState<{
+    videoId: string
+    title: string
+    thumbnail: string
+    channelTitle?: string
+    duration?: string
+  } | null>(null)
+  const { startDownload, cancelDownload, activeDownloads } = useVideoDownload()
+
   // YouTube API
   const { hasApiKey } = useYouTubeApiStatus()
   const { data: searchResults, isLoading: searchLoading, error: searchError } = useEnrichedSearch(
@@ -816,6 +829,23 @@ export default function VideoPlayerSection({
     setShowSourceInput(false)
   }
 
+  // Handle opening download modal
+  const handleOpenDownload = useCallback((video: {
+    videoId: string
+    title: string
+    thumbnail: string
+    channelTitle?: string
+    duration?: string
+  }) => {
+    setDownloadVideo(video)
+    setDownloadModalOpen(true)
+  }, [])
+
+  // Handle starting download
+  const handleStartDownload = useCallback(async (options: DownloadOptions) => {
+    await startDownload(options)
+  }, [startDownload])
+
   return (
     <div className={`p-4 md:p-6 ${isTheaterMode ? "bg-black" : ""}`} data-tabz-section="video-player">
       {/* View Mode Header */}
@@ -1015,6 +1045,24 @@ export default function VideoPlayerSection({
                               <Play className="h-6 w-6 text-primary-foreground ml-0.5" fill="currentColor" />
                             </div>
                           </div>
+                          {/* Download button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleOpenDownload({
+                                videoId: result.videoId,
+                                title: result.title,
+                                thumbnail: result.thumbnail,
+                                channelTitle: result.channelTitle,
+                                duration: result.durationFormatted,
+                              })
+                            }}
+                            className="absolute top-2 right-2 p-1.5 rounded-full bg-black/70 text-white opacity-0 group-hover:opacity-100 hover:bg-primary transition-all"
+                            title="Download video"
+                            data-tabz-action="download-video"
+                          >
+                            <Download className="h-4 w-4" />
+                          </button>
                         </div>
                         <h4 className="text-sm font-medium line-clamp-2 group-hover:text-primary transition-colors">
                           {result.title}
@@ -1185,6 +1233,24 @@ export default function VideoPlayerSection({
                               </p>
                             )}
                           </div>
+                          {/* Download button for playlist item */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleOpenDownload({
+                                videoId: item.videoId,
+                                title: item.title,
+                                thumbnail: item.thumbnail,
+                                channelTitle: item.channelTitle,
+                                duration: item.durationFormatted,
+                              })
+                            }}
+                            className="flex-shrink-0 p-2 rounded-lg hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors"
+                            title="Download video"
+                            data-tabz-action="download-video"
+                          >
+                            <Download className="h-4 w-4" />
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -1432,6 +1498,23 @@ export default function VideoPlayerSection({
                   <Badge variant="secondary" className="glass text-xs max-w-[200px] truncate">
                     {videoSource.type === 'youtube' ? 'YouTube' : videoSource.fileName || 'URL'}
                   </Badge>
+                  {/* Download button for current YouTube video */}
+                  {videoSource.type === 'youtube' && videoSource.youtubeId && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 glass"
+                      onClick={() => handleOpenDownload({
+                        videoId: videoSource.youtubeId!,
+                        title: localVideoName || 'YouTube Video',
+                        thumbnail: `https://i.ytimg.com/vi/${videoSource.youtubeId}/mqdefault.jpg`,
+                      })}
+                      title="Download video"
+                      data-tabz-action="download-current-video"
+                    >
+                      <Download className="h-3 w-3" />
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -2248,6 +2331,20 @@ export default function VideoPlayerSection({
       </AnimatePresence>
       </>
       )}
+
+      {/* Download Modal */}
+      <VideoDownloadModal
+        open={downloadModalOpen}
+        onOpenChange={setDownloadModalOpen}
+        video={downloadVideo}
+        onDownload={handleStartDownload}
+      />
+
+      {/* Download Progress Indicator */}
+      <DownloadProgressIndicator
+        downloads={activeDownloads}
+        onCancel={cancelDownload}
+      />
     </div>
   )
 }
