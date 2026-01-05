@@ -84,3 +84,6 @@ export {
   AddColumnButton,
   AddTaskButton,
 } from './board'
+
+// Re-export visualization components
+export * from './visualization'
