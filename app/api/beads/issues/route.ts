@@ -124,6 +124,7 @@ function transformIssue(raw: RawBeadsIssue) {
  *
  * Query params:
  *   - workspace: Project path containing .beads directory
+ *   - all: Include closed issues (default true for kanban)
  *   - status: Filter by status (open, in_progress, closed, blocked)
  *   - priority: Filter by priority (1-4)
  *   - limit: Max number of issues (default 100)
@@ -131,6 +132,7 @@ function transformIssue(raw: RawBeadsIssue) {
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const workspace = searchParams.get("workspace")
+  const includeAll = searchParams.get("all") !== "false" // Default to true
   const status = searchParams.get("status")
   const priority = searchParams.get("priority")
   const limit = searchParams.get("limit") || "100"
@@ -141,6 +143,11 @@ export async function GET(request: NextRequest) {
 
     // Build bd list command with filters using execFileSync for security
     const args = ["list", "--json"]
+
+    // Include all issues (including closed) by default for kanban
+    if (includeAll && !status) {
+      args.push("--all")
+    }
 
     if (status) {
       args.push("--status", status)
