@@ -497,7 +497,7 @@ export default function ProjectsDashboard({
                     {isRelative && (
                       <span className="text-[10px] text-primary/70">./</span>
                     )}
-                    <span className="truncate">{truncatedPath}</span>
+                    <span>{truncatedPath}</span>
                     <Copy className="h-3 w-3 opacity-0 group-hover:opacity-50 flex-shrink-0" />
                   </button>
                 </TooltipTrigger>
