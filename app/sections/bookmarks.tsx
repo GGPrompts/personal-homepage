@@ -66,6 +66,7 @@ import { getFile, saveFile, type GitHubError } from "@/lib/github"
 import { useAuth } from "@/components/AuthProvider"
 import { AuthModal } from "@/components/AuthModal"
 import { useTerminalExtension } from "@/hooks/useTerminalExtension"
+import { useWorkingDirectory, isPathUnderWorkingDir } from "@/hooks/useWorkingDirectory"
 import { Github, User } from "lucide-react"
 import { toast } from "sonner"
 
@@ -189,6 +190,7 @@ export default function BookmarksSection({
     pasteToTerminal,
     sendToChat,
   } = useTerminalExtension()
+  const { workingDir: globalWorkingDir } = useWorkingDirectory()
 
   // Handler for launching terminals with toast feedback
   const handleLaunchTerminal = React.useCallback(async (
@@ -351,6 +353,16 @@ export default function BookmarksSection({
     return crumbs
   }
 
+  // Filter terminal bookmarks by global working directory
+  const filterByWorkingDir = (bookmark: BookmarkItem): boolean => {
+    // Only filter terminal bookmarks with workingDir set
+    if (bookmark.type !== "terminal" || !bookmark.workingDir) return true
+    // If global working dir is ~, show all
+    if (globalWorkingDir === "~") return true
+    // Check if bookmark's workingDir is under the global working dir
+    return isPathUnderWorkingDir(bookmark.workingDir, globalWorkingDir)
+  }
+
   // Filter items for current view
   const getVisibleItems = () => {
     if (searchQuery.trim()) {
@@ -358,9 +370,10 @@ export default function BookmarksSection({
       const query = searchQuery.toLowerCase()
       const matchingBookmarks = data.bookmarks.filter(
         (b) =>
-          b.name.toLowerCase().includes(query) ||
-          b.url.toLowerCase().includes(query) ||
-          b.description?.toLowerCase().includes(query)
+          (b.name.toLowerCase().includes(query) ||
+           b.url.toLowerCase().includes(query) ||
+           b.description?.toLowerCase().includes(query)) &&
+          filterByWorkingDir(b)
       )
       const matchingFolders = data.folders.filter((f) =>
         f.name.toLowerCase().includes(query)
@@ -368,9 +381,11 @@ export default function BookmarksSection({
       return { folders: matchingFolders, bookmarks: matchingBookmarks }
     }
 
-    // Show items in current folder
+    // Show items in current folder (filtered by working dir for terminal bookmarks)
     const folders = data.folders.filter((f) => f.parentId === currentFolderId)
-    const bookmarks = data.bookmarks.filter((b) => b.folderId === currentFolderId)
+    const bookmarks = data.bookmarks.filter(
+      (b) => b.folderId === currentFolderId && filterByWorkingDir(b)
+    )
     return { folders, bookmarks }
   }
 

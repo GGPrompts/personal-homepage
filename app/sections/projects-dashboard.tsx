@@ -98,6 +98,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { useAuth } from "@/components/AuthProvider"
 import { AuthModal } from "@/components/AuthModal"
 import { useTerminalExtension } from "@/hooks/useTerminalExtension"
+import { useWorkingDirectory } from "@/hooks/useWorkingDirectory"
 import { toast } from "sonner"
 import {
   mergeProjects,
@@ -157,6 +158,7 @@ export default function ProjectsDashboard({
   const { user, getGitHubToken } = useAuth()
   const { available: terminalAvailable, runCommand } = useTerminalExtension()
   const { isPinned, togglePinned, isConfigured: metaConfigured, isSyncing: metaSyncing } = useAllProjectsMeta()
+  const { workingDir, isLoaded: workingDirLoaded } = useWorkingDirectory()
 
   // Handler for launching terminals with toast feedback
   const handleLaunchTerminal = React.useCallback(async (
@@ -299,22 +301,24 @@ export default function ProjectsDashboard({
     gcTime: 30 * 60 * 1000,
   })
 
-  // Fetch local projects
+  // Fetch local projects (scoped by global working directory)
   const {
     data: localData,
     isLoading: localLoading,
     error: localError,
     refetch: refetchLocal,
   } = useQuery({
-    queryKey: ["projects-local"],
+    queryKey: ["projects-local", workingDir],
     queryFn: async () => {
-      const res = await fetch("/api/projects/local")
+      const params = workingDir && workingDir !== "~" ? `?workingDir=${encodeURIComponent(workingDir)}` : ""
+      const res = await fetch(`/api/projects/local${params}`)
       if (!res.ok) {
         const error = await res.json()
         throw new Error(error.error || "Failed to scan projects")
       }
-      return res.json() as Promise<{ projects: LocalProject[]; count: number }>
+      return res.json() as Promise<{ projects: LocalProject[]; count: number; scanDir?: string; workingDir?: string }>
     },
+    enabled: workingDirLoaded,
     staleTime: 60 * 1000,
     gcTime: 5 * 60 * 1000,
   })
@@ -776,20 +780,28 @@ export default function ProjectsDashboard({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <div>
           <h1 className="text-3xl font-bold font-mono gradient-text-theme terminal-glow mb-1">Projects</h1>
-          <p className="text-muted-foreground text-sm flex items-center gap-2">
-            {isLoading ? (
-              <>
-                <Loader2 className="h-3 w-3 animate-spin" />
-                <span>Loading projects...</span>
-              </>
-            ) : (
-              <>
-                {filteredProjects.length} projects
-                {githubData?.count ? ` (${githubData.count} GitHub` : ""}
-                {localData?.count ? `, ${localData.count} local)` : githubData?.count ? ")" : ""}
-              </>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-muted-foreground text-sm flex items-center gap-2">
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span>Loading projects...</span>
+                </>
+              ) : (
+                <>
+                  {filteredProjects.length} projects
+                  {githubData?.count ? ` (${githubData.count} GitHub` : ""}
+                  {localData?.count ? `, ${localData.count} local)` : githubData?.count ? ")" : ""}
+                </>
+              )}
+            </p>
+            {workingDir && workingDir !== "~" && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono">
+                <FolderOpen className="h-2.5 w-2.5 mr-1" />
+                {workingDir.length > 30 ? "..." + workingDir.slice(-27) : workingDir}
+              </Badge>
             )}
-          </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
