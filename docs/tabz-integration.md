@@ -299,6 +299,16 @@ All interactive elements have `data-tabz-*` attributes for reliable MCP tool tar
 | `[data-tabz-action="buy"]` | Buy button |
 | `[data-tabz-action="sell"]` | Sell button |
 
+### Search Hub Section (Chrome Bookmarks)
+
+| Selector | Purpose |
+|----------|---------|
+| `[data-tabz-action="search-bookmarks"]` | Chrome bookmarks tab |
+| `[data-tabz-input="bookmark-search"]` | Bookmark search input |
+| `[data-tabz-list="bookmark-results"]` | Bookmark results container |
+| `[data-tabz-item^="bookmark-"]` | Individual bookmark results |
+| `[data-tabz-action="open-bookmark"]` | Open bookmark button |
+
 ### Setup Wizard Section
 
 | Selector | Purpose |
@@ -350,6 +360,16 @@ tabz_click('[data-tabz-section="bookmarks"][data-tabz-action="navigate"]')
 tabz_click('[data-tabz-command="lazygit"]')
 # Or by action type
 tabz_click('[data-tabz-action="spawn-terminal"][data-tabz-item="bookmark-dev-server"]')
+```
+
+**Search Chrome Bookmarks:**
+
+```python
+tabz_click('[data-tabz-section="search-hub"][data-tabz-action="navigate"]')
+tabz_click('[data-tabz-action="search-bookmarks"]')  # Switch to Chrome tab
+tabz_fill('[data-tabz-input="bookmark-search"]', 'github')
+# Results appear automatically - click first result
+tabz_click('[data-tabz-item="bookmark-0"]')
 ```
 
 **Add a New Task:**

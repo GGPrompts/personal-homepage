@@ -25,17 +25,23 @@ import {
   Camera,
   Clipboard,
   Check,
+  Bookmark,
+  ExternalLink,
+  Loader2,
+  AlertCircle,
+  Plus,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { TabzConnectionStatus } from "@/components/TabzConnectionStatus"
+import { useTabzBookmarks, ChromeBookmark } from "@/hooks/useTabzBookmarks"
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type Category = "search" | "ai" | "image"
+type Category = "search" | "ai" | "image" | "bookmarks"
 
 interface SearchEngine {
   id: string
@@ -271,6 +277,8 @@ const searchEngines = allEngines.filter((e) => e.category === "search")
 const aiEngines = allEngines.filter((e) => e.category === "ai")
 const imageEngines = allEngines.filter((e) => e.category === "image")
 
+// Bookmark search is handled differently - inline results instead of URL redirect
+
 // ============================================================================
 // STORAGE
 // ============================================================================
@@ -318,31 +326,51 @@ export default function SearchHubSection({
   const [activeCategory, setActiveCategory] = React.useState<Category>("search")
   const [prefs, setPrefs] = React.useState<SearchPrefs>({ defaultEngine: "google", activeCategory: "search", recentSearches: [] })
   const [copied, setCopied] = React.useState(false)
+  const [saveBookmarkOpen, setSaveBookmarkOpen] = React.useState(false)
+  const [saveBookmarkUrl, setSaveBookmarkUrl] = React.useState("")
+  const [saveBookmarkTitle, setSaveBookmarkTitle] = React.useState("")
   const inputRef = React.useRef<HTMLInputElement>(null)
+
+  // Chrome bookmarks hook
+  const {
+    results: bookmarkResults,
+    isLoading: isBookmarkLoading,
+    error: bookmarkError,
+    isAvailable: isBookmarkAvailable,
+    search: searchBookmarks,
+    clearSearch: clearBookmarks,
+    openUrl: openBookmarkUrl,
+    saveBookmark,
+  } = useTabzBookmarks(300)
 
   const currentEngines = activeCategory === "search"
     ? searchEngines
     : activeCategory === "ai"
       ? aiEngines
-      : imageEngines
+      : activeCategory === "bookmarks"
+        ? [] // No engine selection for bookmarks
+        : imageEngines
 
   // Load preferences on mount
   React.useEffect(() => {
     const loaded = loadPrefs()
     setPrefs(loaded)
     setActiveCategory(loaded.activeCategory || "search")
-    // Set engine based on saved category
-    const savedEngine = allEngines.find((e) => e.id === loaded.defaultEngine)
-    if (savedEngine && savedEngine.category === loaded.activeCategory) {
-      setSelectedEngine(loaded.defaultEngine)
-    } else {
-      // Default to first engine in category
-      const defaultEngines: Record<Category, string> = {
-        search: "google",
-        ai: "chatgpt",
-        image: "sora",
+    // Set engine based on saved category (bookmarks has no engines)
+    if (loaded.activeCategory !== "bookmarks") {
+      const savedEngine = allEngines.find((e) => e.id === loaded.defaultEngine)
+      if (savedEngine && savedEngine.category === loaded.activeCategory) {
+        setSelectedEngine(loaded.defaultEngine)
+      } else {
+        // Default to first engine in category
+        const defaultEngines: Record<Exclude<Category, "bookmarks">, string> = {
+          search: "google",
+          ai: "chatgpt",
+          image: "sora",
+        }
+        const category = loaded.activeCategory as Exclude<Category, "bookmarks">
+        setSelectedEngine(defaultEngines[category] || "google")
       }
-      setSelectedEngine(defaultEngines[loaded.activeCategory] || "google")
     }
   }, [])
 
@@ -389,6 +417,11 @@ export default function SearchHubSection({
     e?.preventDefault()
     if (!query.trim()) return
 
+    // Bookmarks don't use form submission - search happens live
+    if (activeCategory === "bookmarks") {
+      return
+    }
+
     // Copy to clipboard if engine requires it
     if (currentEngine.copyPrompt) {
       try {
@@ -421,18 +454,31 @@ export default function SearchHubSection({
 
   const handleCategoryChange = (category: Category) => {
     setActiveCategory(category)
-    // Switch to first engine in new category
-    const defaultEngines: Record<Category, string> = {
-      search: "google",
-      ai: "chatgpt",
-      image: "sora",
+    // Clear query when switching categories
+    setQuery("")
+    // Clear bookmark results when switching away from bookmarks
+    if (activeCategory === "bookmarks" && category !== "bookmarks") {
+      clearBookmarks()
     }
-    const defaultEngine = defaultEngines[category]
-    setSelectedEngine(defaultEngine)
-    // Save preference
-    const updatedPrefs = { ...prefs, activeCategory: category, defaultEngine }
-    setPrefs(updatedPrefs)
-    savePrefs(updatedPrefs)
+    // Switch to first engine in new category (bookmarks has no engines)
+    if (category !== "bookmarks") {
+      const defaultEngines: Record<Exclude<Category, "bookmarks">, string> = {
+        search: "google",
+        ai: "chatgpt",
+        image: "sora",
+      }
+      const defaultEngine = defaultEngines[category]
+      setSelectedEngine(defaultEngine)
+      // Save preference
+      const updatedPrefs = { ...prefs, activeCategory: category, defaultEngine }
+      setPrefs(updatedPrefs)
+      savePrefs(updatedPrefs)
+    } else {
+      // For bookmarks, just save the category
+      const updatedPrefs = { ...prefs, activeCategory: category }
+      setPrefs(updatedPrefs)
+      savePrefs(updatedPrefs)
+    }
     inputRef.current?.focus()
   }
 
@@ -460,6 +506,36 @@ export default function SearchHubSection({
     const updatedPrefs = { ...prefs, recentSearches: [] }
     setPrefs(updatedPrefs)
     savePrefs(updatedPrefs)
+  }
+
+  // Handle input change for bookmarks (live search)
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setQuery(value)
+    // If in bookmarks mode, trigger live search
+    if (activeCategory === "bookmarks") {
+      searchBookmarks(value)
+    }
+  }
+
+  // Handle clicking a bookmark result
+  const handleBookmarkClick = async (bookmark: ChromeBookmark) => {
+    await openBookmarkUrl(bookmark.url)
+  }
+
+  // Handle saving a bookmark
+  const handleSaveBookmark = async () => {
+    if (!saveBookmarkUrl.trim() || !saveBookmarkTitle.trim()) return
+
+    const result = await saveBookmark(saveBookmarkUrl, saveBookmarkTitle)
+    if (result.success) {
+      setSaveBookmarkOpen(false)
+      setSaveBookmarkUrl("")
+      setSaveBookmarkTitle("")
+      // Show success feedback
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
   }
 
   return (
@@ -513,84 +589,224 @@ export default function SearchHubSection({
             <Image className="h-4 w-4" />
             Image AI
           </button>
+          {/* Chrome Bookmarks - only show if MCP is available */}
+          {isBookmarkAvailable !== false && (
+            <button
+              onClick={() => handleCategoryChange("bookmarks")}
+              className={`
+                flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all
+                ${activeCategory === "bookmarks"
+                  ? "bg-primary/20 text-primary border border-primary/30"
+                  : "bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
+                }
+              `}
+              data-tabz-action="search-bookmarks"
+            >
+              <Bookmark className="h-4 w-4" />
+              Chrome
+            </button>
+          )}
         </div>
 
         <form onSubmit={handleSearch} className="mb-6">
           <div className="glass rounded-lg p-3 sm:p-4">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
               <div className="flex items-center gap-3 flex-1">
-                <div className={`p-2 rounded-lg bg-primary/10 ${currentEngine.color} flex-shrink-0`}>
-                  <Icon className="h-5 w-5" />
+                <div className={`p-2 rounded-lg bg-primary/10 ${activeCategory === "bookmarks" ? "text-amber-400" : currentEngine.color} flex-shrink-0`}>
+                  {activeCategory === "bookmarks" ? (
+                    <Bookmark className="h-5 w-5" />
+                  ) : (
+                    <Icon className="h-5 w-5" />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <Input
                     ref={inputRef}
                     value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder={currentEngine.placeholder}
+                    onChange={handleInputChange}
+                    placeholder={activeCategory === "bookmarks" ? "Search Chrome bookmarks..." : currentEngine.placeholder}
                     className="text-base sm:text-lg h-11 sm:h-12 bg-transparent border border-transparent rounded-lg px-3 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-0 focus-visible:border-primary/30"
+                    data-tabz-input={activeCategory === "bookmarks" ? "bookmark-search" : "search-query"}
                   />
                 </div>
               </div>
               <div className="flex gap-2 w-full sm:w-auto">
-                <Button type="submit" disabled={!query.trim()} className="h-11 sm:h-10 flex-1 sm:flex-initial">
-                  {activeCategory === "ai" ? (
-                    <>
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Ask
-                    </>
-                  ) : activeCategory === "image" ? (
-                    <>
-                      <Image className="h-4 w-4 mr-2" />
-                      Generate
-                    </>
-                  ) : (
-                    <>
-                      <Search className="h-4 w-4 mr-2" />
-                      Search
-                    </>
-                  )}
-                </Button>
+                {activeCategory === "bookmarks" ? (
+                  <>
+                    {isBookmarkLoading && (
+                      <div className="h-11 sm:h-10 flex items-center px-3 text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      </div>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 sm:h-10"
+                      onClick={() => setSaveBookmarkOpen(!saveBookmarkOpen)}
+                      title="Save new bookmark"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <Button type="submit" disabled={!query.trim()} className="h-11 sm:h-10 flex-1 sm:flex-initial">
+                    {activeCategory === "ai" ? (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Ask
+                      </>
+                    ) : activeCategory === "image" ? (
+                      <>
+                        <Image className="h-4 w-4 mr-2" />
+                        Generate
+                      </>
+                    ) : (
+                      <>
+                        <Search className="h-4 w-4 mr-2" />
+                        Search
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
             </div>
 
-            {/* Engine Selection */}
-            <div className="flex flex-wrap gap-1.5 sm:gap-2">
-              {currentEngines.map((engine, index) => {
-                const EngineIcon = engine.icon
-                const isSelected = selectedEngine === engine.id
-                return (
-                  <button
-                    key={engine.id}
-                    type="button"
-                    onClick={() => handleEngineSelect(engine.id)}
-                    className={`
-                      flex items-center gap-1 sm:gap-1.5 px-2.5 py-2 sm:px-3 sm:py-1.5 rounded-md text-sm transition-all
-                      ${isSelected
-                        ? "bg-primary/20 text-primary border border-primary/30"
-                        : "bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
-                      }
-                    `}
-                  >
-                    <EngineIcon className={`h-4 w-4 sm:h-3.5 sm:w-3.5 ${isSelected ? engine.color : ""}`} />
-                    <span className="hidden sm:inline">{engine.name}</span>
-                    <span className="sm:hidden text-xs">{engine.shortcut}</span>
-                    {engine.copyPrompt && (
-                      <Clipboard className="h-3 w-3 opacity-50 hidden sm:block" />
-                    )}
-                    <kbd className="ml-1 text-[10px] opacity-50 font-mono hidden sm:inline-flex items-center gap-0.5">
-                      Alt+{index + 1}
-                    </kbd>
-                  </button>
-                )
-              })}
-            </div>
+            {/* Engine Selection - not shown for bookmarks */}
+            {activeCategory !== "bookmarks" && (
+              <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                {currentEngines.map((engine, index) => {
+                  const EngineIcon = engine.icon
+                  const isSelected = selectedEngine === engine.id
+                  return (
+                    <button
+                      key={engine.id}
+                      type="button"
+                      onClick={() => handleEngineSelect(engine.id)}
+                      className={`
+                        flex items-center gap-1 sm:gap-1.5 px-2.5 py-2 sm:px-3 sm:py-1.5 rounded-md text-sm transition-all
+                        ${isSelected
+                          ? "bg-primary/20 text-primary border border-primary/30"
+                          : "bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
+                        }
+                      `}
+                    >
+                      <EngineIcon className={`h-4 w-4 sm:h-3.5 sm:w-3.5 ${isSelected ? engine.color : ""}`} />
+                      <span className="hidden sm:inline">{engine.name}</span>
+                      <span className="sm:hidden text-xs">{engine.shortcut}</span>
+                      {engine.copyPrompt && (
+                        <Clipboard className="h-3 w-3 opacity-50 hidden sm:block" />
+                      )}
+                      <kbd className="ml-1 text-[10px] opacity-50 font-mono hidden sm:inline-flex items-center gap-0.5">
+                        Alt+{index + 1}
+                      </kbd>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Save Bookmark Form */}
+            {activeCategory === "bookmarks" && saveBookmarkOpen && (
+              <div className="mt-4 p-3 rounded-lg bg-muted/30 border border-muted/50">
+                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  Save New Bookmark
+                </h4>
+                <div className="space-y-2">
+                  <Input
+                    value={saveBookmarkUrl}
+                    onChange={(e) => setSaveBookmarkUrl(e.target.value)}
+                    placeholder="URL (https://...)"
+                    className="text-sm"
+                  />
+                  <Input
+                    value={saveBookmarkTitle}
+                    onChange={(e) => setSaveBookmarkTitle(e.target.value)}
+                    placeholder="Title"
+                    className="text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleSaveBookmark}
+                      disabled={!saveBookmarkUrl.trim() || !saveBookmarkTitle.trim()}
+                    >
+                      Save to Bookmarks Bar
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setSaveBookmarkOpen(false)
+                        setSaveBookmarkUrl("")
+                        setSaveBookmarkTitle("")
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Bookmark Results */}
+            {activeCategory === "bookmarks" && query.trim() && (
+              <div className="mt-4" data-tabz-list="bookmark-results">
+                {bookmarkError ? (
+                  <div className="flex items-center gap-2 text-sm text-red-400 p-3 rounded-lg bg-red-500/10">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>{bookmarkError}</span>
+                  </div>
+                ) : bookmarkResults.length > 0 ? (
+                  <ul className="space-y-1">
+                    {bookmarkResults.map((bookmark, index) => (
+                      <li key={bookmark.id}>
+                        <button
+                          type="button"
+                          onClick={() => handleBookmarkClick(bookmark)}
+                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-primary/10 transition-colors text-left group"
+                          data-tabz-item={`bookmark-${index}`}
+                          data-tabz-action="open-bookmark"
+                        >
+                          <Bookmark className="h-4 w-4 text-amber-400 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">
+                              {bookmark.title || "Untitled"}
+                            </div>
+                            <div className="text-xs text-muted-foreground truncate">
+                              {bookmark.url}
+                            </div>
+                          </div>
+                          <ExternalLink className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : !isBookmarkLoading ? (
+                  <div className="text-sm text-muted-foreground text-center py-4">
+                    No bookmarks found for "{query}"
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            {/* Bookmarks help text when no query */}
+            {activeCategory === "bookmarks" && !query.trim() && !saveBookmarkOpen && (
+              <div className="mt-2 text-sm text-muted-foreground">
+                <p className="flex items-center gap-2">
+                  <Search className="h-3.5 w-3.5" />
+                  Type to search your Chrome bookmarks
+                </p>
+              </div>
+            )}
 
             {/* Copied feedback */}
             {copied && (
               <div className="flex items-center gap-2 mt-3 text-sm text-emerald-400">
                 <Check className="h-4 w-4" />
-                <span>Prompt copied to clipboard - paste when page loads</span>
+                <span>{activeCategory === "bookmarks" ? "Bookmark saved!" : "Prompt copied to clipboard - paste when page loads"}</span>
               </div>
             )}
           </div>
@@ -599,34 +815,51 @@ export default function SearchHubSection({
         {/* Quick Tips - hidden on mobile */}
         <div className="hidden sm:block glass rounded-lg p-4 mb-6">
           <h3 className="text-sm font-medium mb-3">Quick Tips</h3>
-          <ul className="text-sm text-muted-foreground space-y-1.5">
-            <li className="flex items-center gap-2">
-              <Badge variant="outline" className="text-[10px] font-mono">
-                Alt+1-{currentEngines.length}
-              </Badge>
-              <span>Switch between {
-                activeCategory === "ai" ? "AI assistants" :
-                activeCategory === "image" ? "image generators" :
-                "search engines"
-              }</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <Badge variant="outline" className="text-[10px] font-mono">Enter</Badge>
-              <span>{
-                activeCategory === "ai" ? "Send prompt in new tab" :
-                activeCategory === "image" ? "Generate in new tab" :
-                "Execute search in new tab"
-              }</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <ArrowRight className="h-3.5 w-3.5 text-primary" />
-              <span>Your default {
-                activeCategory === "ai" ? "assistant" :
-                activeCategory === "image" ? "generator" :
-                "engine"
-              } is saved automatically</span>
-            </li>
-          </ul>
+          {activeCategory === "bookmarks" ? (
+            <ul className="text-sm text-muted-foreground space-y-1.5">
+              <li className="flex items-center gap-2">
+                <Bookmark className="h-3.5 w-3.5 text-amber-400" />
+                <span>Search titles and URLs as you type</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <ExternalLink className="h-3.5 w-3.5 text-primary" />
+                <span>Click a result to open in browser via TabzChrome</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <Plus className="h-3.5 w-3.5 text-primary" />
+                <span>Use the + button to save new bookmarks</span>
+              </li>
+            </ul>
+          ) : (
+            <ul className="text-sm text-muted-foreground space-y-1.5">
+              <li className="flex items-center gap-2">
+                <Badge variant="outline" className="text-[10px] font-mono">
+                  Alt+1-{currentEngines.length}
+                </Badge>
+                <span>Switch between {
+                  activeCategory === "ai" ? "AI assistants" :
+                  activeCategory === "image" ? "image generators" :
+                  "search engines"
+                }</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <Badge variant="outline" className="text-[10px] font-mono">Enter</Badge>
+                <span>{
+                  activeCategory === "ai" ? "Send prompt in new tab" :
+                  activeCategory === "image" ? "Generate in new tab" :
+                  "Execute search in new tab"
+                }</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <ArrowRight className="h-3.5 w-3.5 text-primary" />
+                <span>Your default {
+                  activeCategory === "ai" ? "assistant" :
+                  activeCategory === "image" ? "generator" :
+                  "engine"
+                } is saved automatically</span>
+              </li>
+            </ul>
+          )}
         </div>
 
         {/* Recent Searches */}
