@@ -44,6 +44,7 @@ import {
   Github,
   AlertCircle,
   Sparkles,
+  LayoutGrid,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -74,6 +75,7 @@ const sectionMeta: Record<ToggleableSection, { label: string; icon: React.Elemen
   integrations: { label: "Integrations", icon: Link2, description: "Connected services" },
   profile: { label: "Profile", icon: User, description: "Account & sync" },
   setup: { label: "Setup Wizard", icon: Sparkles, description: "Initial configuration" },
+  kanban: { label: "Kanban", icon: LayoutGrid, description: "Visual task board" },
 }
 
 // Sortable section item component
