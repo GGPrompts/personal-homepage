@@ -1,6 +1,15 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import {
+  Globe,
+  CheckSquare,
+  Code,
+  TrendingUp,
+  Play,
+  User,
+  type LucideIcon,
+} from "lucide-react"
 
 // Section IDs that can be toggled (excluding home and settings which are always visible)
 export type ToggleableSection = "weather" | "feed" | "api-playground" | "notes" | "bookmarks" | "search" | "stocks" | "crypto" | "spacex" | "github-activity" | "disasters" | "tasks" | "projects" | "jobs" | "profile" | "ai-workspace" | "market-pulse" | "kanban" | "photo-gallery" | "music-player" | "video-player"
@@ -16,16 +25,17 @@ export interface CategoryMeta {
   id: CategoryId
   label: string
   description: string
+  icon: LucideIcon
 }
 
 // Category definitions (in display order)
 export const CATEGORIES: CategoryMeta[] = [
-  { id: "information", label: "Information", description: "Weather, news, and alerts" },
-  { id: "productivity", label: "Productivity", description: "Notes, tasks, and bookmarks" },
-  { id: "development", label: "Development", description: "API tools and code" },
-  { id: "finance", label: "Finance", description: "Stocks and crypto" },
-  { id: "entertainment", label: "Entertainment", description: "Feeds and media" },
-  { id: "personal", label: "Personal", description: "Profile and settings" },
+  { id: "information", label: "Information", description: "Weather, news, and alerts", icon: Globe },
+  { id: "productivity", label: "Productivity", description: "Notes, tasks, and bookmarks", icon: CheckSquare },
+  { id: "development", label: "Development", description: "API tools and code", icon: Code },
+  { id: "finance", label: "Finance", description: "Stocks and crypto", icon: TrendingUp },
+  { id: "entertainment", label: "Entertainment", description: "Feeds and media", icon: Play },
+  { id: "personal", label: "Personal", description: "Profile and settings", icon: User },
 ]
 
 // Default category assignments for each section
