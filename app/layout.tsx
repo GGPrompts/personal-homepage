@@ -7,6 +7,7 @@ import { PageBackgroundProvider } from "@/hooks/usePageBackground";
 import { MasterBackground } from "@/components/MasterBackground";
 import { QueryProvider } from "@/components/QueryProvider";
 import { AuthProvider } from "@/components/AuthProvider";
+import { LocalhostRedirect } from "@/components/LocalhostRedirect";
 import { Toaster } from "sonner";
 
 const inter = Inter({
@@ -32,6 +33,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
       <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans`}>
+        <LocalhostRedirect />
         <QueryProvider>
           <AuthProvider>
             <BackgroundProvider>

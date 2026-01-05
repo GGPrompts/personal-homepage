@@ -62,6 +62,7 @@ interface ApiKeyConfig {
   storageKey: string
   icon: React.ElementType
   docsUrl?: string
+  linkText?: string // Custom text for docs link (default: "Get API key")
   free?: boolean
   note?: string
   envVar?: string
@@ -113,7 +114,7 @@ function ApiKeyInput({
   config: ApiKeyConfig
   value: string
   onChange: (value: string) => void
-  status: "valid" | "invalid" | "unknown" | "free"
+  status: "valid" | "invalid" | "unknown" | "free" | "saved"
   onTest?: () => void
   testing?: boolean
 }) {
@@ -124,6 +125,7 @@ function ApiKeyInput({
     valid: { icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10", label: "Connected" },
     invalid: { icon: XCircle, color: "text-red-500", bg: "bg-red-500/10", label: "Invalid" },
     unknown: { icon: Key, color: "text-muted-foreground", bg: "bg-muted/10", label: "Not Configured" },
+    saved: { icon: CheckCircle2, color: "text-blue-500", bg: "bg-blue-500/10", label: "Saved" },
     free: { icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10", label: "Free" },
   }
 
@@ -137,7 +139,9 @@ function ApiKeyInput({
           ? "border-emerald-500/30"
           : status === "invalid"
             ? "border-red-500/30"
-            : "border-border"
+            : status === "saved"
+              ? "border-blue-500/30"
+              : "border-border"
       }`}
       data-tabz-card={`api-key-${config.id}`}
     >
@@ -207,7 +211,7 @@ function ApiKeyInput({
                   className="text-xs text-primary hover:underline inline-flex items-center gap-1"
                   data-tabz-link={`${config.id}-docs`}
                 >
-                  Get API key <ExternalLink className="h-3 w-3" />
+                  {config.linkText || "Get API key"} <ExternalLink className="h-3 w-3" />
                 </a>
               )}
             </div>
@@ -573,7 +577,8 @@ function ApiKeysTab() {
       storageKey: "spotify-client-id",
       icon: Headphones,
       docsUrl: "https://developer.spotify.com/dashboard",
-      note: "Get Client ID from Spotify Developer Dashboard. Add redirect URI: [origin]/api/spotify/callback",
+      linkText: "Get Client ID",
+      note: "Add redirect URI: http://127.0.0.1:3001/api/spotify/callback",
     },
     {
       id: "youtube",
@@ -612,24 +617,24 @@ function ApiKeysTab() {
     }
   }
 
-  const getStatus = (id: string): "valid" | "invalid" | "unknown" | "free" => {
+  const getStatus = (id: string): "valid" | "invalid" | "unknown" | "free" | "saved" => {
     if (id === "open-meteo") return "free"
     if (id === "finnhub") {
       if (apiStatus?.apis.finnhub) return "valid"
       if (finnhubStatus === "valid") return "valid"
       if (finnhubStatus === "invalid") return "invalid"
-      return finnhubKey.trim() ? "unknown" : "unknown"
+      return finnhubKey.trim() ? "saved" : "unknown"
     }
     if (id === "alpha-vantage") {
-      return apiStatus?.apis.alphaVantage ? "valid" : alphaVantageKey.trim() ? "unknown" : "unknown"
+      return apiStatus?.apis.alphaVantage ? "valid" : alphaVantageKey.trim() ? "saved" : "unknown"
     }
     if (id === "youtube") {
       if (youtubeStatus === "valid") return "valid"
       if (youtubeStatus === "invalid") return "invalid"
-      return youtubeKey.trim() ? "unknown" : "unknown"
+      return youtubeKey.trim() ? "saved" : "unknown"
     }
     const value = getKeyValue(id)
-    return value.trim() ? "unknown" : "unknown"
+    return value.trim() ? "saved" : "unknown"
   }
 
   return (
