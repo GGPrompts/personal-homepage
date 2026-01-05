@@ -117,17 +117,15 @@ export async function GET(request: NextRequest) {
           const fullPath = path.join(dir, entry.name)
 
           if (entry.isDirectory()) {
-            // Add directory entry if not filtering by type
-            if (!mediaType) {
-              files.push({
-                name: entry.name,
-                path: fullPath,
-                type: "directory",
-                size: 0,
-                modified: "",
-                extension: "",
-              })
-            }
+            // Always add directory entries to allow subfolder navigation
+            files.push({
+              name: entry.name,
+              path: fullPath,
+              type: "directory",
+              size: 0,
+              modified: "",
+              extension: "",
+            })
 
             // Recurse into subdirectories
             if (recursive) {
