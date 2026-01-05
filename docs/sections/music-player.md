@@ -1,13 +1,15 @@
 # Music Player
 
-Audio player with Spotify integration and local file support.
+Audio player with Spotify integration, local file support, and pyradio stations.
 
 ## Files
 - `app/sections/music-player.tsx` - Main component
 - `components/SpotifyPlayer.tsx` - Spotify Web Playback
 - `components/LocalMediaBrowser.tsx` - Local file browser
 - `hooks/useMediaLibrary.ts` - Media file handling
+- `lib/radio-utils.ts` - Radio station parsing and playlist resolution
 - `app/api/spotify/` - Spotify OAuth routes
+- `app/api/radio/pyradio/` - pyradio stations API
 
 ## Features
 - **Local Audio**:
@@ -16,6 +18,10 @@ Audio player with Spotify integration and local file support.
   - Browse local media directory
   - Queue management
   - Playback controls
+- **Radio Stations** (My Stations):
+  - Imports stations from ~/.config/pyradio/stations.csv
+  - Resolves playlist URLs (.pls, .m3u) to direct streams
+  - Click to play live radio streams
 - **Spotify Integration**:
   - OAuth authentication
   - Web Playback SDK
@@ -30,6 +36,7 @@ Audio player with Spotify integration and local file support.
 ## Integration
 - **Spotify**: OAuth via Settings, requires Premium
 - **Local Files**: MediaBrowser API (Node backend)
+- **Radio**: Reads pyradio stations from `~/.config/pyradio/stations.csv`
 
 ## TabzChrome Selectors
 - `data-tabz-section="music-player"` - Container

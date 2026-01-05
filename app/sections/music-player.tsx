@@ -68,6 +68,7 @@ import { LocalMediaBrowser } from "@/components/LocalMediaBrowser"
 import { getMediaUrl, type MediaFile } from "@/hooks/useMediaLibrary"
 import { SpotifyPlayer } from "@/components/SpotifyPlayer"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import type { RadioStation } from "@/lib/radio-utils"
 
 // TypeScript Interfaces
 interface Artist {
@@ -188,7 +189,7 @@ export function MusicPlayerSection({
   }, [playerMode])
 
   // Navigation state
-  const [activeView, setActiveView] = useState<"home" | "search" | "library" | "localfiles" | "playlist" | "album" | "artist">("home")
+  const [activeView, setActiveView] = useState<"home" | "search" | "library" | "localfiles" | "radio" | "playlist" | "album" | "artist">("home")
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null)
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -232,6 +233,11 @@ export function MusicPlayerSection({
 
   // Audio error state
   const [audioError, setAudioError] = useState<string | null>(null)
+
+  // Radio stations state
+  const [radioStations, setRadioStations] = useState<RadioStation[]>([])
+  const [radioLoading, setRadioLoading] = useState(false)
+  const [radioError, setRadioError] = useState<string | null>(null)
 
   // Audio event handlers - timeupdate syncs progress bar
   const handleTimeUpdate = useCallback(() => {
@@ -361,6 +367,30 @@ export function MusicPlayerSection({
     }
   }, [searchQuery])
 
+  // Fetch radio stations when radio view is active
+  useEffect(() => {
+    if (activeView === "radio" && radioStations.length === 0 && !radioLoading) {
+      setRadioLoading(true)
+      setRadioError(null)
+      fetch("/api/radio/pyradio?resolve=true")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.stations) {
+            setRadioStations(data.stations)
+          }
+          if (data.error) {
+            setRadioError(data.error)
+          }
+        })
+        .catch((err) => {
+          setRadioError(err.message || "Failed to load radio stations")
+        })
+        .finally(() => {
+          setRadioLoading(false)
+        })
+    }
+  }, [activeView, radioStations.length, radioLoading])
+
   // Format time
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -400,6 +430,28 @@ export function MusicPlayerSection({
 
   const addToQueue = (track: Track) => {
     setQueue((prev) => [...prev, track])
+  }
+
+  // Play a radio station
+  const playRadioStation = (station: RadioStation) => {
+    const radioArtist = createUserTrackArtist("Radio")
+    const radioAlbum = createUserTrackAlbum(station.name, radioArtist)
+
+    const radioTrack: Track = {
+      id: station.id,
+      title: station.name,
+      artist: radioArtist,
+      album: radioAlbum,
+      duration: 0, // Live stream, no duration
+      isLiked: false,
+      isExplicit: false,
+      plays: 0,
+      url: station.url,
+    }
+
+    setNowPlaying((prev) => ({ ...prev, track: radioTrack, isPlaying: true, progress: 0 }))
+    // Clear queue when playing radio - it's a live stream
+    setQueue([])
   }
 
   const skipNext = () => {
@@ -605,6 +657,14 @@ export function MusicPlayerSection({
         >
           <HardDrive className="h-5 w-5" />
           {!sidebarCollapsed && "Local Files"}
+        </Button>
+        <Button
+          variant={activeView === "radio" ? "secondary" : "ghost"}
+          className={`w-full justify-start gap-3 ${sidebarCollapsed ? "px-3" : ""}`}
+          onClick={() => setActiveView("radio")}
+        >
+          <Radio className="h-5 w-5" />
+          {!sidebarCollapsed && "My Stations"}
         </Button>
       </nav>
 
@@ -1194,6 +1254,105 @@ export function MusicPlayerSection({
             onPlayFile={handlePlayLocalFile}
           />
         </Card>
+      </div>
+    )
+  }
+
+  // Render radio stations view
+  const renderRadio = () => {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-foreground">My Stations</h2>
+          <Badge variant="outline" className="text-muted-foreground">
+            <Radio className="h-4 w-4 mr-2" />
+            pyradio stations
+          </Badge>
+        </div>
+
+        {radioLoading && (
+          <Card className="glass border-border/30 p-8 text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+            <p className="text-muted-foreground">Loading radio stations...</p>
+          </Card>
+        )}
+
+        {radioError && (
+          <Card className="glass border-border/30 p-8 text-center">
+            <Radio className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
+            <p className="text-foreground font-medium mb-2">Unable to load stations</p>
+            <p className="text-sm text-muted-foreground">{radioError}</p>
+          </Card>
+        )}
+
+        {!radioLoading && !radioError && radioStations.length === 0 && (
+          <Card className="glass border-border/30 p-8 text-center">
+            <Radio className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <p className="text-foreground font-medium mb-2">No radio stations found</p>
+            <p className="text-sm text-muted-foreground mb-4">
+              Add stations to ~/.config/pyradio/stations.csv
+            </p>
+            <p className="text-xs text-muted-foreground font-mono">
+              Format: Station Name,http://stream.url/stream.mp3
+            </p>
+          </Card>
+        )}
+
+        {!radioLoading && radioStations.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {radioStations.map((station, idx) => (
+              <motion.div
+                key={station.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: idx * 0.05 }}
+              >
+                <Card
+                  className={`glass border-border/30 p-4 cursor-pointer group hover:bg-primary/5 transition-colors ${
+                    nowPlaying.track.id === station.id ? "ring-2 ring-primary" : ""
+                  }`}
+                  onClick={() => playRadioStation(station)}
+                  data-tabz-item={station.id}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="relative">
+                      <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-primary/30 to-secondary/30 flex items-center justify-center">
+                        <Radio className="h-6 w-6 text-primary/70" />
+                      </div>
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <div className="w-14 h-14 rounded-lg bg-primary/80 flex items-center justify-center">
+                          {nowPlaying.track.id === station.id && nowPlaying.isPlaying ? (
+                            <Pause className="h-6 w-6 text-primary-foreground" />
+                          ) : (
+                            <Play className="h-6 w-6 text-primary-foreground" />
+                          )}
+                        </div>
+                      </motion.div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-foreground truncate">{station.name}</h4>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {station.source === "pyradio" ? "pyradio" : station.source}
+                      </p>
+                    </div>
+                    {nowPlaying.track.id === station.id && nowPlaying.isPlaying && (
+                      <motion.div
+                        animate={{ scale: [1, 1.2, 1] }}
+                        transition={{ duration: 1, repeat: Infinity }}
+                        className="text-primary"
+                      >
+                        <Volume2 className="h-5 w-5" />
+                      </motion.div>
+                    )}
+                  </div>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        )}
       </div>
     )
   }
@@ -1795,6 +1954,8 @@ export function MusicPlayerSection({
         return renderLibrary()
       case "localfiles":
         return renderLocalFiles()
+      case "radio":
+        return renderRadio()
       case "playlist":
         return renderPlaylist()
       case "album":
@@ -2003,6 +2164,14 @@ export function MusicPlayerSection({
           >
             <HardDrive className="h-5 w-5" />
             <span className="text-xs">Local</span>
+          </Button>
+          <Button
+            variant="ghost"
+            className={`flex flex-col items-center gap-1 h-auto py-2 ${activeView === "radio" ? "text-primary" : "text-muted-foreground"}`}
+            onClick={() => setActiveView("radio")}
+          >
+            <Radio className="h-5 w-5" />
+            <span className="text-xs">Radio</span>
           </Button>
         </div>
 
