@@ -27,6 +27,11 @@ import {
   MessageSquare,
   Palette,
   ClipboardPaste,
+  Download,
+  Upload,
+  FileJson,
+  ArrowRightLeft,
+  Replace,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -69,6 +74,17 @@ import { useTerminalExtension } from "@/hooks/useTerminalExtension"
 import { useWorkingDirectory, isPathUnderWorkingDir } from "@/hooks/useWorkingDirectory"
 import { Github, User } from "lucide-react"
 import { toast } from "sonner"
+import {
+  exportAsTabzProfiles,
+  exportAsTabzBookmarks,
+  parseTabzProfileExport,
+  parseTabzBookmarkExport,
+  importTabzProfiles,
+  importTabzBookmarks,
+  downloadJson,
+  readJsonFile,
+  generateFilename,
+} from "@/lib/tabz-import-export"
 
 // ============================================================================
 // TYPES
@@ -241,6 +257,15 @@ export default function BookmarksSection({
   const [editItem, setEditItem] = React.useState<BookmarkItem | FolderItem | null>(null)
   const [editType, setEditType] = React.useState<"bookmark" | "folder">("bookmark")
   const [deleteConfirm, setDeleteConfirm] = React.useState<{ item: BookmarkItem | FolderItem; type: "bookmark" | "folder" } | null>(null)
+
+  // Import/Export state
+  const [importDialogOpen, setImportDialogOpen] = React.useState(false)
+  const [importType, setImportType] = React.useState<"bookmarks" | "profiles">("bookmarks")
+  const [importMode, setImportMode] = React.useState<"merge" | "replace">("merge")
+  const [importFile, setImportFile] = React.useState<File | null>(null)
+  const [importPreview, setImportPreview] = React.useState<{ profiles?: number; bookmarks?: number; folders?: number } | null>(null)
+  const [isImporting, setIsImporting] = React.useState(false)
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   // Form state
   const [formName, setFormName] = React.useState("")
@@ -525,6 +550,114 @@ export default function BookmarksSection({
     setFormContextActions([])
   }
 
+  // ============================================================================
+  // IMPORT/EXPORT HANDLERS
+  // ============================================================================
+
+  const handleExportBookmarks = () => {
+    const exportData = exportAsTabzBookmarks(data)
+    downloadJson(exportData, generateFilename("bookmarks"))
+    toast.success(`Exported ${data.bookmarks.length} bookmarks`)
+  }
+
+  const handleExportProfiles = () => {
+    const terminalCount = data.bookmarks.filter(b => b.type === "terminal").length
+    if (terminalCount === 0) {
+      toast.error("No terminal commands to export as profiles")
+      return
+    }
+    const exportData = exportAsTabzProfiles(data)
+    downloadJson(exportData, generateFilename("profiles"))
+    toast.success(`Exported ${exportData.profiles.length} terminal profiles`)
+  }
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setImportFile(file)
+    setImportPreview(null)
+
+    try {
+      const content = await readJsonFile(file)
+
+      // Try to detect and parse the file type
+      if (importType === "profiles") {
+        const parsed = parseTabzProfileExport(content)
+        setImportPreview({
+          profiles: parsed.profiles.length,
+        })
+      } else {
+        const parsed = parseTabzBookmarkExport(content)
+        // Count items recursively
+        let bookmarkCount = 0
+        let folderCount = 0
+        const countItems = (nodes: any[]) => {
+          nodes.forEach(node => {
+            if (node.children) {
+              folderCount++
+              countItems(node.children)
+            } else if (node.url) {
+              bookmarkCount++
+            }
+          })
+        }
+        countItems(parsed.bookmarks)
+        setImportPreview({
+          bookmarks: bookmarkCount,
+          folders: folderCount,
+        })
+      }
+    } catch (err) {
+      toast.error("Invalid file format")
+      setImportFile(null)
+    }
+  }
+
+  const handleImport = async () => {
+    if (!importFile) return
+
+    setIsImporting(true)
+    try {
+      const content = await readJsonFile(importFile)
+      let newData: BookmarksData
+
+      if (importType === "profiles") {
+        const parsed = parseTabzProfileExport(content)
+        newData = importTabzProfiles(parsed, data, importMode)
+        toast.success(`Imported ${parsed.profiles.length} profiles as terminal commands`)
+      } else {
+        const parsed = parseTabzBookmarkExport(content)
+        newData = importTabzBookmarks(parsed, data, importMode)
+        const addedCount = newData.bookmarks.length - (importMode === "merge" ? data.bookmarks.length : 0)
+        toast.success(`Imported bookmarks (${importMode === "merge" ? `added ${addedCount} new` : "replaced all"})`)
+      }
+
+      saveMutation.mutate(newData)
+      setImportDialogOpen(false)
+      resetImportState()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Import failed")
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
+  const resetImportState = () => {
+    setImportFile(null)
+    setImportPreview(null)
+    setImportMode("merge")
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
+  const openImportDialog = (type: "bookmarks" | "profiles") => {
+    setImportType(type)
+    resetImportState()
+    setImportDialogOpen(true)
+  }
+
   const openEditBookmark = (bookmark: BookmarkItem) => {
     setEditItem(bookmark)
     setEditType("bookmark")
@@ -695,6 +828,36 @@ export default function BookmarksSection({
               </Button>
             )}
           </div>
+
+          {/* Import/Export dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <ArrowRightLeft className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Sync</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 bg-popover/95 backdrop-blur-sm">
+              <DropdownMenuItem onClick={handleExportBookmarks}>
+                <Download className="h-4 w-4 mr-2" />
+                Export Bookmarks
+                <span className="ml-auto text-xs text-muted-foreground">.json</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportProfiles}>
+                <Terminal className="h-4 w-4 mr-2" />
+                Export as TabzChrome Profiles
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => openImportDialog("bookmarks")}>
+                <Upload className="h-4 w-4 mr-2" />
+                Import Bookmarks
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => openImportDialog("profiles")}>
+                <FileJson className="h-4 w-4 mr-2" />
+                Import TabzChrome Profiles
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* Add buttons */}
           <Button variant="outline" size="sm" onClick={() => { resetForm(); setAddFolderOpen(true) }}>
@@ -1787,6 +1950,118 @@ export default function BookmarksSection({
               disabled={saveMutation.isPending}
             >
               {saveMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Dialog */}
+      <Dialog open={importDialogOpen} onOpenChange={(open) => { if (!open) { setImportDialogOpen(false); resetImportState(); } }}>
+        <DialogContent className="glass">
+          <DialogHeader>
+            <DialogTitle>
+              Import {importType === "profiles" ? "TabzChrome Profiles" : "Bookmarks"}
+            </DialogTitle>
+            <DialogDescription>
+              {importType === "profiles"
+                ? "Import TabzChrome profile export as terminal commands"
+                : "Import bookmarks from a TabzChrome JSON export"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* File Input */}
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Select JSON File</label>
+              <div className="flex gap-2">
+                <Input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={handleFileSelect}
+                  className="cursor-pointer"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {importType === "profiles"
+                  ? "Expected: tabz-profiles-*.json"
+                  : "Expected: tabz-bookmarks-*.json or Chrome bookmark export"}
+              </p>
+            </div>
+
+            {/* Preview */}
+            {importPreview && (
+              <div className="rounded-lg border bg-muted/30 p-4">
+                <p className="text-sm font-medium mb-2">File Preview</p>
+                <div className="flex gap-4 text-sm">
+                  {importPreview.profiles !== undefined && (
+                    <div className="flex items-center gap-2">
+                      <Terminal className="h-4 w-4 text-emerald-400" />
+                      <span>{importPreview.profiles} profiles</span>
+                    </div>
+                  )}
+                  {importPreview.bookmarks !== undefined && (
+                    <div className="flex items-center gap-2">
+                      <Bookmark className="h-4 w-4 text-blue-400" />
+                      <span>{importPreview.bookmarks} bookmarks</span>
+                    </div>
+                  )}
+                  {importPreview.folders !== undefined && importPreview.folders > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Folder className="h-4 w-4 text-yellow-400" />
+                      <span>{importPreview.folders} folders</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Import Mode */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Import Mode</label>
+              <div className="flex gap-2 p-1 rounded-lg bg-muted/50">
+                <button
+                  type="button"
+                  onClick={() => setImportMode("merge")}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all ${
+                    importMode === "merge"
+                      ? "bg-background shadow-sm text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <ArrowRightLeft className="h-4 w-4" />
+                  Merge
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImportMode("replace")}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all ${
+                    importMode === "replace"
+                      ? "bg-destructive/20 shadow-sm text-destructive border border-destructive/30"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Replace className="h-4 w-4" />
+                  Replace
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1.5">
+                {importMode === "merge"
+                  ? "Add new items, skip duplicates (by ID)"
+                  : importType === "profiles"
+                    ? "Replace all terminal bookmarks with imported profiles"
+                    : "Replace all bookmarks with imported data"}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setImportDialogOpen(false); resetImportState(); }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleImport}
+              disabled={!importFile || isImporting || saveMutation.isPending}
+            >
+              {isImporting ? "Importing..." : `Import ${importType === "profiles" ? "Profiles" : "Bookmarks"}`}
             </Button>
           </DialogFooter>
         </DialogContent>
