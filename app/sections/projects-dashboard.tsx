@@ -340,7 +340,7 @@ export default function ProjectsDashboard({
       filtered = filtered.filter((p) => {
         if (statusFilter === "cloned") return p.source === "both"
         if (statusFilter === "remote") return p.source === "github"
-        if (statusFilter === "local") return p.source === "local"
+        if (statusFilter === "local") return !!p.local // Any project with local path
         if (statusFilter === "dirty") return p.local?.git?.status === "dirty"
         if (statusFilter === "archived") return p.github?.archived
         if (statusFilter === "pinned") return isPinned(p.slug)
@@ -862,7 +862,7 @@ export default function ProjectsDashboard({
             <SelectItem value="pinned" data-tabz-action="filter-status-pinned">Pinned</SelectItem>
             <SelectItem value="cloned" data-tabz-action="filter-status-cloned">Cloned</SelectItem>
             <SelectItem value="remote" data-tabz-action="filter-status-remote">Remote Only</SelectItem>
-            <SelectItem value="local" data-tabz-action="filter-status-local">Local Only</SelectItem>
+            <SelectItem value="local" data-tabz-action="filter-status-local">Local</SelectItem>
             <SelectItem value="dirty" data-tabz-action="filter-status-dirty">Modified</SelectItem>
             <SelectItem value="archived" data-tabz-action="filter-status-archived">Archived</SelectItem>
           </SelectContent>
