@@ -140,6 +140,54 @@ const EVENT_FILTERS: { value: EventFilter; label: string; icon: React.ReactNode 
   { value: "comment", label: "Comments", icon: <MessageSquare className="h-3 w-3" /> },
 ]
 
+// Contribution calendar types from GraphQL API
+interface ContributionDay {
+  date: string
+  contributionCount: number
+  contributionLevel: "NONE" | "FIRST_QUARTILE" | "SECOND_QUARTILE" | "THIRD_QUARTILE" | "FOURTH_QUARTILE"
+}
+
+interface ContributionWeek {
+  contributionDays: ContributionDay[]
+}
+
+interface ContributionCalendar {
+  totalContributions: number
+  weeks: ContributionWeek[]
+}
+
+interface ContributionsCollection {
+  contributionCalendar: ContributionCalendar
+}
+
+interface GitHubGraphQLUserResponse {
+  data: {
+    user: {
+      contributionsCollection: ContributionsCollection
+    }
+  }
+}
+
+// GraphQL query for contribution calendar (requires authentication)
+const CONTRIBUTION_QUERY = `
+query($login: String!) {
+  user(login: $login) {
+    contributionsCollection {
+      contributionCalendar {
+        totalContributions
+        weeks {
+          contributionDays {
+            date
+            contributionCount
+            contributionLevel
+          }
+        }
+      }
+    }
+  }
+}
+`
+
 const LANGUAGE_COLORS: Record<string, string> = {
   TypeScript: "#3178c6",
   JavaScript: "#f7df1e",
@@ -318,8 +366,49 @@ function getEventDescription(event: GitHubEvent): string {
   }
 }
 
-function generateActivityData(events: GitHubEvent[]): { day: string; count: number; level: number }[] {
-  // Generate last 52 weeks of data (simplified contribution graph)
+// Convert contribution level from GraphQL to numeric level (0-4)
+function contributionLevelToNumber(level: ContributionDay["contributionLevel"]): number {
+  switch (level) {
+    case "NONE":
+      return 0
+    case "FIRST_QUARTILE":
+      return 1
+    case "SECOND_QUARTILE":
+      return 2
+    case "THIRD_QUARTILE":
+      return 3
+    case "FOURTH_QUARTILE":
+      return 4
+    default:
+      return 0
+  }
+}
+
+// Convert GraphQL contribution calendar to our display format
+function convertContributionCalendar(
+  calendar: ContributionCalendar | undefined
+): { day: string; count: number; level: number }[] {
+  if (!calendar?.weeks) return []
+
+  const data: { day: string; count: number; level: number }[] = []
+
+  // Get all contribution days from all weeks
+  calendar.weeks.forEach((week) => {
+    week.contributionDays.forEach((day) => {
+      data.push({
+        day: day.date,
+        count: day.contributionCount,
+        level: contributionLevelToNumber(day.contributionLevel),
+      })
+    })
+  })
+
+  // Return only the last 91 days (13 weeks) for display
+  return data.slice(-91)
+}
+
+// Fallback: Generate activity data from events (for non-authenticated users)
+function generateActivityDataFromEvents(events: GitHubEvent[]): { day: string; count: number; level: number }[] {
   const now = new Date()
   const data: { day: string; count: number; level: number }[] = []
 
@@ -450,6 +539,39 @@ export default function GitHubActivity({ activeSubItem, onSubItemHandled }: GitH
     retry: false,
   })
 
+  // Fetch contribution calendar via GraphQL (requires authentication)
+  const { data: contributionData, refetch: refetchContributions } = useQuery<ContributionCalendar | null>({
+    queryKey: ["github-contributions", username],
+    queryFn: async () => {
+      // GraphQL API always requires authentication
+      const token = await getGitHubToken()
+      if (!token) return null
+
+      const res = await fetch("https://api.github.com/graphql", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: CONTRIBUTION_QUERY,
+          variables: { login: username },
+        }),
+      })
+
+      if (!res.ok) {
+        console.error("GraphQL request failed:", res.status)
+        return null
+      }
+
+      const data: GitHubGraphQLUserResponse = await res.json()
+      return data?.data?.user?.contributionsCollection?.contributionCalendar || null
+    },
+    enabled: isLoaded && !!username,
+    staleTime: 300000, // 5 minutes
+    retry: false,
+  })
+
   // Filtered events
   const filteredEvents = useMemo(() => {
     if (!eventsData) return []
@@ -485,10 +607,18 @@ export default function GitHubActivity({ activeSubItem, onSubItemHandled }: GitH
     }
   }, [reposData, repoSearch, repoSort])
 
-  // Activity visualization data
+  // Activity visualization data - use GraphQL contribution data when available, fallback to events
   const activityData = useMemo(() => {
-    return generateActivityData(eventsData || [])
-  }, [eventsData])
+    // Prefer GraphQL contribution calendar (accurate, includes all contributions)
+    if (contributionData) {
+      return convertContributionCalendar(contributionData)
+    }
+    // Fallback to events API data (limited, only public events)
+    return generateActivityDataFromEvents(eventsData || [])
+  }, [contributionData, eventsData])
+
+  // Total contributions from GraphQL data
+  const totalContributions = contributionData?.totalContributions
 
   // Event counts by type
   const eventCounts = useMemo(() => {
@@ -541,6 +671,7 @@ export default function GitHubActivity({ activeSubItem, onSubItemHandled }: GitH
     queryClient.invalidateQueries({ queryKey: ["github-user", username] })
     refetchEvents()
     refetchRepos()
+    refetchContributions()
   }
 
   return (
@@ -654,10 +785,24 @@ export default function GitHubActivity({ activeSubItem, onSubItemHandled }: GitH
       {activityData.length > 0 && (
         <Card className="glass border-border">
           <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
-              Activity (Last 13 Weeks)
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                Contributions (Last 13 Weeks)
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                {totalContributions !== undefined && (
+                  <Badge variant="outline" className="text-emerald-500 border-emerald-500/50">
+                    {formatNumber(totalContributions)} this year
+                  </Badge>
+                )}
+                {!contributionData && (
+                  <Badge variant="secondary" className="text-xs">
+                    Events API
+                  </Badge>
+                )}
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-1">
@@ -667,7 +812,7 @@ export default function GitHubActivity({ activeSubItem, onSubItemHandled }: GitH
                   initial={{ opacity: 0, scale: 0 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: i * 0.005 }}
-                  title={`${day.day}: ${day.count} events`}
+                  title={`${day.day}: ${day.count} contribution${day.count !== 1 ? "s" : ""}`}
                   className={`h-3 w-3 rounded-sm ${
                     day.level === 0
                       ? "bg-muted/30"
@@ -682,16 +827,21 @@ export default function GitHubActivity({ activeSubItem, onSubItemHandled }: GitH
                 />
               ))}
             </div>
-            <div className="mt-3 flex items-center justify-end gap-2 text-xs text-muted-foreground">
-              <span>Less</span>
-              <div className="flex gap-1">
-                <div className="h-3 w-3 rounded-sm bg-muted/30" />
-                <div className="h-3 w-3 rounded-sm bg-emerald-900/50" />
-                <div className="h-3 w-3 rounded-sm bg-emerald-700/70" />
-                <div className="h-3 w-3 rounded-sm bg-emerald-500/80" />
-                <div className="h-3 w-3 rounded-sm bg-emerald-400" />
+            <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+              {!contributionData && (
+                <span className="text-yellow-500/70">Sign in for accurate contribution data</span>
+              )}
+              <div className="flex items-center gap-2 ml-auto">
+                <span>Less</span>
+                <div className="flex gap-1">
+                  <div className="h-3 w-3 rounded-sm bg-muted/30" />
+                  <div className="h-3 w-3 rounded-sm bg-emerald-900/50" />
+                  <div className="h-3 w-3 rounded-sm bg-emerald-700/70" />
+                  <div className="h-3 w-3 rounded-sm bg-emerald-500/80" />
+                  <div className="h-3 w-3 rounded-sm bg-emerald-400" />
+                </div>
+                <span>More</span>
               </div>
-              <span>More</span>
             </div>
           </CardContent>
         </Card>
