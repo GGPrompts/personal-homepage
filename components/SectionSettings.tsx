@@ -116,6 +116,8 @@ function SortableItem({
   } = useSortable({ id: sectionId })
 
   const meta = sectionMeta[sectionId]
+  // Skip sections that don't have metadata (e.g., removed sections still in localStorage)
+  if (!meta) return null
   const Icon = meta.icon
   const currentCategory = CATEGORIES.find(c => c.id === categoryId)
 
