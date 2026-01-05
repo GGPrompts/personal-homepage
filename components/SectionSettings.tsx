@@ -45,13 +45,23 @@ import {
   AlertCircle,
   Sparkles,
   LayoutGrid,
+  ChevronDown,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   useSectionPreferences,
   ToggleableSection,
-  DEFAULT_SECTION_ORDER
+  DEFAULT_SECTION_ORDER,
+  DEFAULT_CATEGORY_ASSIGNMENTS,
+  CategoryId,
+  CATEGORIES,
 } from "@/hooks/useSectionPreferences"
 
 // Section metadata for display
@@ -82,12 +92,16 @@ const sectionMeta: Record<ToggleableSection, { label: string; icon: React.Elemen
 function SortableItem({
   sectionId,
   isEnabled,
+  categoryId,
   onToggleVisibility,
+  onCategoryChange,
   isOverlay = false,
 }: {
   sectionId: ToggleableSection
   isEnabled: boolean
+  categoryId: CategoryId
   onToggleVisibility: () => void
+  onCategoryChange: (categoryId: CategoryId) => void
   isOverlay?: boolean
 }) {
   const {
@@ -101,6 +115,7 @@ function SortableItem({
 
   const meta = sectionMeta[sectionId]
   const Icon = meta.icon
+  const currentCategory = CATEGORIES.find(c => c.id === categoryId)
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -145,6 +160,30 @@ function SortableItem({
         </p>
       </div>
 
+      {/* Category selector */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            className="flex items-center gap-1 px-2 py-1 text-xs rounded border border-border/50 hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="max-w-[70px] truncate">{currentCategory?.label}</span>
+            <ChevronDown className="h-3 w-3" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-40">
+          {CATEGORIES.map((category) => (
+            <DropdownMenuItem
+              key={category.id}
+              onClick={() => onCategoryChange(category.id)}
+              className={categoryId === category.id ? "bg-primary/10" : ""}
+            >
+              {category.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
       {/* Visibility toggle */}
       <div className="flex items-center gap-2">
         {isEnabled ? (
@@ -172,10 +211,12 @@ export function SectionSettings() {
   const {
     visibility,
     order,
+    categoryAssignments,
     isLoaded,
     toggleVisibility,
     reorder,
     resetToDefaults,
+    setSectionCategory,
   } = useSectionPreferences()
 
   const [activeId, setActiveId] = useState<ToggleableSection | null>(null)
@@ -205,7 +246,8 @@ export function SectionSettings() {
   const visibleCount = Object.values(visibility).filter(Boolean).length
   const hasChanges =
     JSON.stringify(order) !== JSON.stringify(DEFAULT_SECTION_ORDER) ||
-    Object.values(visibility).some((v) => !v)
+    Object.values(visibility).some((v) => !v) ||
+    JSON.stringify(categoryAssignments) !== JSON.stringify(DEFAULT_CATEGORY_ASSIGNMENTS)
 
   function handleDragStart(event: DragStartEvent) {
     setActiveId(event.active.id as ToggleableSection)
@@ -260,7 +302,7 @@ export function SectionSettings() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Drag sections to reorder. Changes are saved automatically.
+        Drag sections to reorder, change categories with the dropdown, or toggle visibility. Changes are saved automatically.
       </p>
 
       <DndContext
@@ -286,7 +328,9 @@ export function SectionSettings() {
                   <SortableItem
                     sectionId={sectionId}
                     isEnabled={isEnabled}
+                    categoryId={categoryAssignments[sectionId]}
                     onToggleVisibility={() => toggleVisibility(sectionId)}
+                    onCategoryChange={(categoryId) => setSectionCategory(sectionId, categoryId)}
                   />
                   {showIndicatorAfterThis && <DropIndicator />}
                 </div>
@@ -300,7 +344,9 @@ export function SectionSettings() {
             <SortableItem
               sectionId={activeId}
               isEnabled={visibility[activeId]}
+              categoryId={categoryAssignments[activeId]}
               onToggleVisibility={() => {}}
+              onCategoryChange={() => {}}
               isOverlay
             />
           ) : null}
@@ -308,7 +354,7 @@ export function SectionSettings() {
       </DndContext>
 
       <p className="text-xs text-muted-foreground pt-2">
-        Home and Settings are always visible. Hidden sections won&apos;t appear in the sidebar or on the Home dashboard.
+        Home and Settings are always visible. Hidden sections won&apos;t appear in the sidebar or on the Home dashboard. Categories help organize sections into collapsible groups.
       </p>
     </div>
   )

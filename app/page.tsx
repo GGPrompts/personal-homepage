@@ -9,6 +9,7 @@ import {
   Menu,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Home,
   Bookmark,
   RefreshCw,
@@ -47,7 +48,16 @@ import { ThemeSettingsPanel } from "@/components/ThemeSettingsPanel"
 import { SectionSettings } from "@/components/SectionSettings"
 import { useAuth } from "@/components/AuthProvider"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { useSectionPreferences, ToggleableSection, DEFAULT_SECTION_ORDER, DEFAULT_VISIBILITY } from "@/hooks/useSectionPreferences"
+import {
+  useSectionPreferences,
+  ToggleableSection,
+  DEFAULT_SECTION_ORDER,
+  DEFAULT_VISIBILITY,
+  CategoryId,
+  CATEGORIES,
+  DEFAULT_CATEGORY_ASSIGNMENTS,
+  DEFAULT_COLLAPSED_CATEGORIES,
+} from "@/hooks/useSectionPreferences"
 import { useEnvironment, requiresLocalhost } from "@/hooks/useEnvironment"
 import { useWorkingDirectory } from "@/hooks/useWorkingDirectory"
 import { WorkingDirSelector } from "@/components/WorkingDirSelector"
@@ -136,6 +146,9 @@ function SidebarContent({
   userName,
   sectionOrder,
   sectionVisibility,
+  categoryAssignments,
+  collapsedCategories,
+  onToggleCategoryCollapsed,
   prefsLoaded = false,
   isLocal = false,
   workingDir,
@@ -154,6 +167,9 @@ function SidebarContent({
   userName?: string | null
   sectionOrder: ToggleableSection[]
   sectionVisibility: Record<ToggleableSection, boolean>
+  categoryAssignments: Record<ToggleableSection, CategoryId>
+  collapsedCategories: Record<CategoryId, boolean>
+  onToggleCategoryCollapsed: (categoryId: CategoryId) => void
   prefsLoaded?: boolean
   isLocal?: boolean
   workingDir: string
@@ -171,6 +187,37 @@ function SidebarContent({
     setActiveSection("home")
     onNavigate?.()
   }
+
+  // Group sections by category
+  const getSectionsByCategory = React.useCallback(() => {
+    const effectiveOrder = prefsLoaded ? sectionOrder : DEFAULT_SECTION_ORDER
+    const effectiveVisibility = prefsLoaded ? sectionVisibility : DEFAULT_VISIBILITY
+    const effectiveAssignments = prefsLoaded ? categoryAssignments : DEFAULT_CATEGORY_ASSIGNMENTS
+
+    const result: Record<CategoryId, NavigationItem[]> = {
+      information: [],
+      productivity: [],
+      development: [],
+      finance: [],
+      entertainment: [],
+      personal: [],
+    }
+
+    for (const id of effectiveOrder) {
+      if (effectiveVisibility[id]) {
+        const item = navigationItems.find((i) => i.id === id)
+        if (item) {
+          const category = effectiveAssignments[id]
+          result[category].push(item)
+        }
+      }
+    }
+
+    return result
+  }, [prefsLoaded, sectionOrder, sectionVisibility, categoryAssignments])
+
+  const sectionsByCategory = getSectionsByCategory()
+  const effectiveCollapsedCategories = prefsLoaded ? collapsedCategories : DEFAULT_COLLAPSED_CATEGORIES
 
   return (
     <div className="flex flex-col h-full">
@@ -221,76 +268,124 @@ function SidebarContent({
         mobile={mobile}
       />
 
-      {/* Navigation */}
+      {/* Navigation with Categories */}
       <nav className="flex-1 p-4 overflow-y-auto">
-        <ul className="space-y-1">
-          {/* Reorder and filter navigation items based on preferences */}
-          {(() => {
-            // Use defaults during SSR/before hydration to prevent mismatch
-            const effectiveOrder = prefsLoaded ? sectionOrder : DEFAULT_SECTION_ORDER
-            const effectiveVisibility = prefsLoaded ? sectionVisibility : DEFAULT_VISIBILITY
+        <div className="space-y-3">
+          {CATEGORIES.map((category) => {
+            const sections = sectionsByCategory[category.id]
+            if (sections.length === 0) return null
 
-            const orderedItems: NavigationItem[] = []
-            // First, add ordered toggleable sections that are visible
-            for (const id of effectiveOrder) {
-              if (effectiveVisibility[id]) {
-                const item = navigationItems.find((i) => i.id === id)
-                if (item) orderedItems.push(item)
-              }
-            }
-            // Then always add settings at the end
-            const settingsItem = navigationItems.find((i) => i.id === "settings")
-            if (settingsItem) orderedItems.push(settingsItem)
-            return orderedItems
-          })().map((item) => {
-            const Icon = item.icon
-            const isActive = activeSection === item.id
+            const isCollapsed = effectiveCollapsedCategories[category.id]
 
             return (
-              <li key={item.id}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => handleSectionClick(item.id)}
-                      className={`
-                        w-full flex items-center rounded-lg transition-[background-color,color,padding,gap] duration-200
-                        ${collapsed && !mobile ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'}
-                        ${isActive
-                          ? 'glass text-primary border-glow'
-                          : 'hover:bg-primary/10 text-muted-foreground hover:text-foreground'
-                        }
-                      `}
-                      data-tabz-section={item.id}
-                      data-tabz-action="navigate"
-                    >
-                      <div className="relative flex-shrink-0">
-                        <Icon className="h-5 w-5" />
-                        {/* Jobs needs-human badge */}
-                        {item.id === "jobs" && jobsNeedsHumanCount > 0 && (
-                          <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-amber-500 text-[9px] flex items-center justify-center text-white font-medium">
-                            {jobsNeedsHumanCount > 9 ? '!' : jobsNeedsHumanCount}
-                          </span>
-                        )}
-                      </div>
-                      <span className={`flex-1 text-left transition-[max-width,opacity] duration-300 overflow-hidden whitespace-nowrap ${
-                        collapsed && !mobile ? 'max-w-0 opacity-0' : 'max-w-[180px] opacity-100'
-                      }`}>{item.label}</span>
-                      {/* Local-only badge for sections requiring localhost */}
-                      {!isLocal && requiresLocalhost(item.id) && !(collapsed && !mobile) && (
-                        <LocalOnlyBadge />
-                      )}
-                    </button>
-                  </TooltipTrigger>
-                  {collapsed && !mobile && (
-                    <TooltipContent side="right">
-                      <p>{item.label}</p>
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-              </li>
+              <div key={category.id} data-tabz-category={category.id}>
+                {/* Category Header */}
+                {!(collapsed && !mobile) && (
+                  <button
+                    onClick={() => onToggleCategoryCollapsed(category.id)}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors group"
+                    data-tabz-action="toggle-category"
+                  >
+                    <ChevronDown
+                      className={`h-3 w-3 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`}
+                    />
+                    <span className="flex-1 text-left">{category.label}</span>
+                    <span className="text-[10px] font-normal opacity-0 group-hover:opacity-60 transition-opacity">
+                      {sections.length}
+                    </span>
+                  </button>
+                )}
+
+                {/* Category Items */}
+                <ul
+                  className={`space-y-1 overflow-hidden transition-all duration-200 ${
+                    isCollapsed && !(collapsed && !mobile) ? 'max-h-0 opacity-0' : 'max-h-[500px] opacity-100'
+                  }`}
+                >
+                  {sections.map((item) => {
+                    const Icon = item.icon
+                    const isActive = activeSection === item.id
+
+                    return (
+                      <li key={item.id}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={() => handleSectionClick(item.id)}
+                              className={`
+                                w-full flex items-center rounded-lg transition-[background-color,color,padding,gap] duration-200
+                                ${collapsed && !mobile ? 'justify-center p-2.5' : 'gap-3 px-3 py-2 pl-5'}
+                                ${isActive
+                                  ? 'glass text-primary border-glow'
+                                  : 'hover:bg-primary/10 text-muted-foreground hover:text-foreground'
+                                }
+                              `}
+                              data-tabz-section={item.id}
+                              data-tabz-action="navigate"
+                            >
+                              <div className="relative flex-shrink-0">
+                                <Icon className="h-4 w-4" />
+                                {/* Jobs needs-human badge */}
+                                {item.id === "jobs" && jobsNeedsHumanCount > 0 && (
+                                  <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-amber-500 text-[9px] flex items-center justify-center text-white font-medium">
+                                    {jobsNeedsHumanCount > 9 ? '!' : jobsNeedsHumanCount}
+                                  </span>
+                                )}
+                              </div>
+                              <span className={`flex-1 text-left text-sm transition-[max-width,opacity] duration-300 overflow-hidden whitespace-nowrap ${
+                                collapsed && !mobile ? 'max-w-0 opacity-0' : 'max-w-[180px] opacity-100'
+                              }`}>{item.label}</span>
+                              {/* Local-only badge for sections requiring localhost */}
+                              {!isLocal && requiresLocalhost(item.id) && !(collapsed && !mobile) && (
+                                <LocalOnlyBadge />
+                              )}
+                            </button>
+                          </TooltipTrigger>
+                          {collapsed && !mobile && (
+                            <TooltipContent side="right">
+                              <p>{item.label}</p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
             )
           })}
-        </ul>
+
+          {/* Settings - always at the end, outside categories */}
+          <div className="pt-2 border-t border-border/10">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => handleSectionClick("settings")}
+                  className={`
+                    w-full flex items-center rounded-lg transition-[background-color,color,padding,gap] duration-200
+                    ${collapsed && !mobile ? 'justify-center p-2.5' : 'gap-3 px-3 py-2'}
+                    ${activeSection === "settings"
+                      ? 'glass text-primary border-glow'
+                      : 'hover:bg-primary/10 text-muted-foreground hover:text-foreground'
+                    }
+                  `}
+                  data-tabz-section="settings"
+                  data-tabz-action="navigate"
+                >
+                  <Settings className="h-4 w-4 flex-shrink-0" />
+                  <span className={`flex-1 text-left text-sm transition-[max-width,opacity] duration-300 overflow-hidden whitespace-nowrap ${
+                    collapsed && !mobile ? 'max-w-0 opacity-0' : 'max-w-[180px] opacity-100'
+                  }`}>Settings</span>
+                </button>
+              </TooltipTrigger>
+              {collapsed && !mobile && (
+                <TooltipContent side="right">
+                  <p>Settings</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </div>
+        </div>
       </nav>
 
       {/* Footer */}
@@ -776,7 +871,15 @@ function SettingsSection({ activeSubItem, onSubItemHandled }: { activeSubItem?: 
 
 export default function PersonalHomepage() {
   const { user } = useAuth()
-  const { visibility, order, isVisible, isLoaded } = useSectionPreferences()
+  const {
+    visibility,
+    order,
+    isVisible,
+    isLoaded,
+    categoryAssignments,
+    collapsedCategories,
+    toggleCategoryCollapsed,
+  } = useSectionPreferences()
   const { isLocal } = useEnvironment()
   const {
     workingDir,
@@ -929,6 +1032,9 @@ export default function PersonalHomepage() {
               userName={userName}
               sectionOrder={order}
               sectionVisibility={visibility}
+              categoryAssignments={categoryAssignments}
+              collapsedCategories={collapsedCategories}
+              onToggleCategoryCollapsed={toggleCategoryCollapsed}
               prefsLoaded={isLoaded}
               isLocal={isLocal}
               workingDir={workingDir}
@@ -958,6 +1064,9 @@ export default function PersonalHomepage() {
                 userName={userName}
                 sectionOrder={order}
                 sectionVisibility={visibility}
+                categoryAssignments={categoryAssignments}
+                collapsedCategories={collapsedCategories}
+                onToggleCategoryCollapsed={toggleCategoryCollapsed}
                 prefsLoaded={isLoaded}
                 isLocal={isLocal}
                 workingDir={workingDir}
