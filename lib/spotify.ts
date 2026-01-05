@@ -179,12 +179,15 @@ export function setClientId(clientId: string): void {
 
 /**
  * Get the redirect URI for OAuth callback
+ * Note: Spotify requires 127.0.0.1 instead of localhost for loopback redirect URIs
  */
 export function getRedirectUri(): string {
   if (typeof window !== 'undefined') {
-    return `${window.location.origin}/api/spotify/callback`
+    // Spotify security requirement: use 127.0.0.1 instead of localhost
+    const origin = window.location.origin.replace('localhost', '127.0.0.1')
+    return `${origin}/api/spotify/callback`
   }
-  return process.env.NEXT_PUBLIC_SPOTIFY_REDIRECT_URI || 'http://localhost:3001/api/spotify/callback'
+  return process.env.NEXT_PUBLIC_SPOTIFY_REDIRECT_URI || 'http://127.0.0.1:3001/api/spotify/callback'
 }
 
 /**
