@@ -47,3 +47,40 @@ export {
   type UseGraphMetricsOptions,
   type UseGraphMetricsReturn,
 } from './hooks/useGraphMetrics'
+export {
+  useBeadsIssues,
+  useBeadsAvailable,
+  useSyncBeadsTask,
+  type UseBeadsIssuesOptions,
+  type UseBeadsIssuesResult,
+} from './hooks/useBeadsIssues'
+
+// Re-export contexts
+export {
+  GraphMetricsProvider,
+  useGraphMetricsContext,
+  useGraphMetricsContextSafe,
+  useTaskGraphMetrics,
+} from './contexts/GraphMetricsContext'
+
+// Re-export shared components (excluding types already exported from ./types)
+export {
+  PriorityBadge,
+  TimeEstimate,
+  AgentBadge,
+  AgentCard,
+  ContextIndicator,
+  ContextIndicatorCompact,
+} from './shared'
+
+// Re-export board components
+export {
+  KanbanBoard,
+  KanbanColumn,
+  KanbanCard,
+  CommandBar,
+  BoardSettingsDialog,
+  ColumnConfigDialog,
+  AddColumnButton,
+  AddTaskButton,
+} from './board'
