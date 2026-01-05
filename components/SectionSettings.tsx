@@ -30,7 +30,6 @@ import {
   Search,
   TrendingUp,
   CheckCircle2,
-  Link2,
   User,
   GripVertical,
   RotateCcw,
@@ -43,7 +42,6 @@ import {
   Rocket,
   Github,
   AlertCircle,
-  Sparkles,
   LayoutGrid,
   ChevronDown,
 } from "lucide-react"
@@ -82,9 +80,7 @@ const sectionMeta: Record<ToggleableSection, { label: string; icon: React.Elemen
   tasks: { label: "Scratchpad", icon: CheckCircle2, description: "Quick notes and todos" },
   projects: { label: "Projects", icon: FolderGit2, description: "GitHub & local repos" },
   jobs: { label: "Jobs", icon: Play, description: "Claude batch prompts" },
-  integrations: { label: "Integrations", icon: Link2, description: "Connected services" },
   profile: { label: "Profile", icon: User, description: "Account & sync" },
-  setup: { label: "Setup Wizard", icon: Sparkles, description: "Initial configuration" },
   kanban: { label: "Kanban", icon: LayoutGrid, description: "Visual task board" },
 }
 
