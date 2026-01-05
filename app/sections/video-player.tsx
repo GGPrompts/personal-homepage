@@ -68,6 +68,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { LocalMediaBrowser } from "@/components/LocalMediaBrowser"
 import { getMediaUrl, type MediaFile } from "@/hooks/useMediaLibrary"
+import { getRandomVideos, type SeedVideo } from "@/lib/video-seeds"
 
 // TypeScript Interfaces
 interface Channel {
@@ -260,62 +261,19 @@ const comments: Comment[] = [
   },
 ]
 
-const recommendations: PlaylistItem[] = [
-  {
-    id: "r-001",
-    title: "React 19: Everything You Need to Know",
-    thumbnail: "/api/placeholder/168/94",
-    duration: 1842,
-    channel: "CodeCraft Academy",
-    views: 156000,
-    isPlaying: false,
-  },
-  {
-    id: "r-002",
-    title: "TypeScript Advanced Patterns",
-    thumbnail: "/api/placeholder/168/94",
-    duration: 2456,
-    channel: "TypeScript Tips",
-    views: 89000,
-    isPlaying: false,
-  },
-  {
-    id: "r-003",
-    title: "Building a Full-Stack App with T3 Stack",
-    thumbnail: "/api/placeholder/168/94",
-    duration: 4521,
-    channel: "Theo - t3.gg",
-    views: 234000,
-    isPlaying: false,
-  },
-  {
-    id: "r-004",
-    title: "TailwindCSS Tips and Tricks",
-    thumbnail: "/api/placeholder/168/94",
-    duration: 1234,
-    channel: "Tailwind Labs",
-    views: 178000,
-    isPlaying: false,
-  },
-  {
-    id: "r-005",
-    title: "Prisma ORM Complete Guide",
-    thumbnail: "/api/placeholder/168/94",
-    duration: 3654,
-    channel: "Prisma",
-    views: 112000,
-    isPlaying: false,
-  },
-  {
-    id: "r-006",
-    title: "Authentication Best Practices 2024",
-    thumbnail: "/api/placeholder/168/94",
-    duration: 2187,
-    channel: "Security First",
-    views: 67000,
-    isPlaying: false,
-  },
-]
+// Convert seed videos to playlist items for recommendations
+const seedToPlaylistItem = (video: SeedVideo): PlaylistItem => ({
+  id: video.youtubeId,
+  title: video.title,
+  thumbnail: `https://i.ytimg.com/vi/${video.youtubeId}/mqdefault.jpg`,
+  duration: video.durationSeconds,
+  channel: video.channel,
+  views: video.views,
+  isPlaying: false,
+})
+
+// Get real video recommendations from seed data
+const recommendations: PlaylistItem[] = getRandomVideos(8).map(seedToPlaylistItem)
 
 const playlist: PlaylistItem[] = [
   {
@@ -1788,9 +1746,22 @@ export default function VideoPlayerSection({
                       key={video.id}
                       className="flex gap-3 cursor-pointer group"
                       data-tabz-item={video.id}
+                      onClick={() => {
+                        setVideoSource({ type: 'youtube', url: `https://www.youtube.com/watch?v=${video.id}`, youtubeId: video.id })
+                        setShowSourceInput(false)
+                        setVideoError(null)
+                      }}
                     >
                       <div className="relative w-[168px] aspect-video rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                        <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900 group-hover:opacity-80 transition-opacity" />
+                        <img
+                          src={video.thumbnail}
+                          alt={video.title}
+                          className="absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none'
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 group-hover:opacity-80 transition-opacity" />
                         <span className="absolute bottom-1 right-1 bg-black/80 text-foreground text-xs px-1 rounded">
                           {formatTime(video.duration)}
                         </span>
