@@ -421,10 +421,13 @@ function ApiKeysTab() {
   const [anthropicKey, setAnthropicKey] = React.useState(() => getStoredApiKey("anthropic-api-key"))
   const [openaiKey, setOpenaiKey] = React.useState(() => getStoredApiKey("openai-api-key"))
   const [googleAiKey, setGoogleAiKey] = React.useState(() => getStoredApiKey("google-ai-key"))
+  const [youtubeKey, setYoutubeKey] = React.useState(() => getStoredApiKey("youtube-api-key"))
 
   // Test states
   const [testingFinnhub, setTestingFinnhub] = React.useState(false)
   const [finnhubStatus, setFinnhubStatus] = React.useState<"valid" | "invalid" | "unknown">("unknown")
+  const [testingYoutube, setTestingYoutube] = React.useState(false)
+  const [youtubeStatus, setYoutubeStatus] = React.useState<"valid" | "invalid" | "unknown">("unknown")
 
   // Save keys to localStorage
   React.useEffect(() => {
@@ -447,6 +450,10 @@ function ApiKeysTab() {
     setStoredApiKey("google-ai-key", googleAiKey)
   }, [googleAiKey])
 
+  React.useEffect(() => {
+    setStoredApiKey("youtube-api-key", youtubeKey)
+  }, [youtubeKey])
+
   // Test Finnhub API key
   const testFinnhub = async () => {
     if (!finnhubKey.trim()) return
@@ -467,6 +474,31 @@ function ApiKeysTab() {
       setFinnhubStatus("invalid")
     } finally {
       setTestingFinnhub(false)
+    }
+  }
+
+  // Test YouTube API key
+  const testYoutube = async () => {
+    if (!youtubeKey.trim()) return
+    setTestingYoutube(true)
+    try {
+      const res = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?part=id&id=dQw4w9WgXcQ&key=${youtubeKey.trim()}`
+      )
+      if (res.ok) {
+        const data = await res.json()
+        if (data.items && data.items.length > 0) {
+          setYoutubeStatus("valid")
+        } else {
+          setYoutubeStatus("invalid")
+        }
+      } else {
+        setYoutubeStatus("invalid")
+      }
+    } catch {
+      setYoutubeStatus("invalid")
+    } finally {
+      setTestingYoutube(false)
     }
   }
 
@@ -528,6 +560,16 @@ function ApiKeysTab() {
       docsUrl: "https://aistudio.google.com/app/apikey",
       note: "Optional, enables Gemini models in AI Workspace",
     },
+    {
+      id: "youtube",
+      name: "YouTube Data API",
+      description: "Search videos and load playlists in Video Player",
+      storageKey: "youtube-api-key",
+      icon: Video,
+      docsUrl: "https://console.cloud.google.com/apis/credentials",
+      note: "Free tier: 10,000 units/day. Search: 100 units, Video/Playlist: 1 unit",
+      testable: true,
+    },
   ]
 
   const getKeyValue = (id: string): string => {
@@ -537,6 +579,7 @@ function ApiKeysTab() {
       case "anthropic": return anthropicKey
       case "openai": return openaiKey
       case "google-ai": return googleAiKey
+      case "youtube": return youtubeKey
       default: return ""
     }
   }
@@ -548,6 +591,7 @@ function ApiKeysTab() {
       case "anthropic": setAnthropicKey(value); break
       case "openai": setOpenaiKey(value); break
       case "google-ai": setGoogleAiKey(value); break
+      case "youtube": setYoutubeKey(value); break
     }
   }
 
@@ -561,6 +605,11 @@ function ApiKeysTab() {
     }
     if (id === "alpha-vantage") {
       return apiStatus?.apis.alphaVantage ? "valid" : alphaVantageKey.trim() ? "unknown" : "unknown"
+    }
+    if (id === "youtube") {
+      if (youtubeStatus === "valid") return "valid"
+      if (youtubeStatus === "invalid") return "invalid"
+      return youtubeKey.trim() ? "unknown" : "unknown"
     }
     const value = getKeyValue(id)
     return value.trim() ? "unknown" : "unknown"
@@ -629,8 +678,16 @@ function ApiKeysTab() {
             value={getKeyValue(config.id)}
             onChange={(v) => setKeyValue(config.id, v)}
             status={getStatus(config.id)}
-            onTest={config.id === "finnhub" ? testFinnhub : undefined}
-            testing={config.id === "finnhub" ? testingFinnhub : false}
+            onTest={
+              config.id === "finnhub" ? testFinnhub :
+              config.id === "youtube" ? testYoutube :
+              undefined
+            }
+            testing={
+              config.id === "finnhub" ? testingFinnhub :
+              config.id === "youtube" ? testingYoutube :
+              false
+            }
           />
         ))}
       </div>

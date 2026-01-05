@@ -45,6 +45,7 @@ import {
   FileVideo,
   HardDrive,
   FolderOpen,
+  Key,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
@@ -69,6 +70,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { LocalMediaBrowser } from "@/components/LocalMediaBrowser"
 import { getMediaUrl, type MediaFile } from "@/hooks/useMediaLibrary"
 import { getRandomVideos, type SeedVideo } from "@/lib/video-seeds"
+import {
+  useEnrichedSearch,
+  useEnrichedPlaylist,
+  useYouTubeApiStatus,
+  extractPlaylistId,
+  type SearchFilters,
+} from "@/hooks/useYouTube"
+import { Search, Filter, ListPlus, Loader2 as LoaderIcon } from "lucide-react"
 
 // TypeScript Interfaces
 interface Channel {
@@ -432,9 +441,34 @@ export default function VideoPlayerSection({
   const [autoplay, setAutoplay] = useState(true)
   const [loopPlaylist, setLoopPlaylist] = useState(false)
   const [shufflePlaylist, setShufflePlaylist] = useState(false)
-  const [viewMode, setViewMode] = useState<"player" | "browse">("player")
+  const [viewMode, setViewMode] = useState<"player" | "browse" | "search" | "playlist">("player")
   const [localVideoUrl, setLocalVideoUrl] = useState<string | null>(null)
   const [localVideoName, setLocalVideoName] = useState<string | null>(null)
+
+  // YouTube Search State
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchInput, setSearchInput] = useState("")
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>({
+    order: "relevance",
+    videoDuration: "any",
+  })
+  const [showFilters, setShowFilters] = useState(false)
+
+  // Playlist State
+  const [playlistInput, setPlaylistInput] = useState("")
+  const [loadedPlaylistId, setLoadedPlaylistId] = useState<string | null>(null)
+
+  // YouTube API
+  const { hasApiKey } = useYouTubeApiStatus()
+  const { data: searchResults, isLoading: searchLoading, error: searchError } = useEnrichedSearch(
+    searchQuery,
+    searchFilters,
+    viewMode === "search" && !!searchQuery
+  )
+  const { playlist: playlistInfo, items: playlistItems, isLoading: playlistLoading, error: playlistError } = useEnrichedPlaylist(
+    loadedPlaylistId,
+    viewMode === "playlist" && !!loadedPlaylistId
+  )
 
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null)
   const playerRef = useRef<HTMLDivElement>(null)
@@ -787,11 +821,19 @@ export default function VideoPlayerSection({
       {/* View Mode Header */}
       {!isTheaterMode && !isFullscreen && (
         <div className="max-w-[1800px] mx-auto mb-4">
-          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "player" | "browse")}>
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "player" | "browse" | "search" | "playlist")}>
             <TabsList className="glass">
               <TabsTrigger value="player" className="gap-2">
                 <MonitorPlay className="h-4 w-4" />
                 Watch
+              </TabsTrigger>
+              <TabsTrigger value="search" className="gap-2">
+                <Search className="h-4 w-4" />
+                Search YouTube
+              </TabsTrigger>
+              <TabsTrigger value="playlist" className="gap-2">
+                <ListPlus className="h-4 w-4" />
+                Load Playlist
               </TabsTrigger>
               <TabsTrigger value="browse" className="gap-2">
                 <HardDrive className="h-4 w-4" />
@@ -821,6 +863,345 @@ export default function VideoPlayerSection({
               mediaType="video"
               onFileSelect={handlePlayLocalVideo}
             />
+          </Card>
+        </div>
+      ) : viewMode === "search" ? (
+        <div className="max-w-[1800px] mx-auto">
+          <Card className="glass border-border/30 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-foreground">Search YouTube</h2>
+                <p className="text-muted-foreground text-sm mt-1">
+                  Find videos to watch from YouTube
+                </p>
+              </div>
+              <Badge variant="outline" className="gap-2">
+                <Youtube className="h-4 w-4" />
+                YouTube Search
+              </Badge>
+            </div>
+
+            {!hasApiKey ? (
+              <div className="text-center py-12">
+                <Key className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold mb-2">YouTube API Key Required</h3>
+                <p className="text-muted-foreground text-sm mb-4 max-w-md mx-auto">
+                  To search YouTube, you need to configure a YouTube Data API key in Settings.
+                </p>
+                <div className="text-sm text-muted-foreground space-y-1 mb-4">
+                  <p>1. Go to console.cloud.google.com</p>
+                  <p>2. Create a project and enable YouTube Data API v3</p>
+                  <p>3. Create an API key and paste it in Settings → API Keys</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Search Input */}
+                <div className="flex gap-2 mb-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={searchInput}
+                      onChange={(e) => setSearchInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && searchInput.trim()) {
+                          setSearchQuery(searchInput.trim())
+                        }
+                      }}
+                      placeholder="Search for videos..."
+                      className="pl-10 glass"
+                      data-tabz-input="youtube-search"
+                    />
+                  </div>
+                  <Button
+                    onClick={() => searchInput.trim() && setSearchQuery(searchInput.trim())}
+                    disabled={!searchInput.trim()}
+                    data-tabz-action="search-youtube"
+                  >
+                    Search
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={showFilters ? "bg-primary/20" : ""}
+                  >
+                    <Filter className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Filters */}
+                <AnimatePresence>
+                  {showFilters && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="flex flex-wrap gap-4 mb-4 p-4 glass-dark rounded-lg">
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground">Sort By</label>
+                          <select
+                            value={searchFilters.order}
+                            onChange={(e) => setSearchFilters(f => ({ ...f, order: e.target.value as SearchFilters["order"] }))}
+                            className="bg-background border border-border rounded px-2 py-1 text-sm"
+                          >
+                            <option value="relevance">Relevance</option>
+                            <option value="date">Upload Date</option>
+                            <option value="viewCount">View Count</option>
+                            <option value="rating">Rating</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground">Duration</label>
+                          <select
+                            value={searchFilters.videoDuration}
+                            onChange={(e) => setSearchFilters(f => ({ ...f, videoDuration: e.target.value as SearchFilters["videoDuration"] }))}
+                            className="bg-background border border-border rounded px-2 py-1 text-sm"
+                          >
+                            <option value="any">Any</option>
+                            <option value="short">Short (&lt;4 min)</option>
+                            <option value="medium">Medium (4-20 min)</option>
+                            <option value="long">Long (&gt;20 min)</option>
+                          </select>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Search Results */}
+                {searchLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <LoaderIcon className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : searchError ? (
+                  <div className="text-center py-12">
+                    <X className="h-12 w-12 mx-auto mb-4 text-destructive" />
+                    <p className="text-destructive">{(searchError as Error).message}</p>
+                  </div>
+                ) : searchResults && searchResults.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {searchResults.map((result) => (
+                      <div
+                        key={result.videoId}
+                        className="group cursor-pointer"
+                        onClick={() => {
+                          setVideoSource({
+                            type: "youtube",
+                            url: `https://www.youtube.com/watch?v=${result.videoId}`,
+                            youtubeId: result.videoId,
+                          })
+                          setShowSourceInput(false)
+                          setVideoError(null)
+                          setViewMode("player")
+                        }}
+                        data-tabz-item={result.videoId}
+                      >
+                        <div className="relative aspect-video rounded-lg overflow-hidden bg-muted mb-2">
+                          <img
+                            src={result.thumbnail}
+                            alt={result.title}
+                            className="w-full h-full object-cover group-hover:opacity-80 transition-opacity"
+                          />
+                          {result.durationFormatted && (
+                            <span className="absolute bottom-1 right-1 bg-black/80 text-foreground text-xs px-1 rounded">
+                              {result.durationFormatted}
+                            </span>
+                          )}
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="w-12 h-12 rounded-full bg-primary/80 flex items-center justify-center">
+                              <Play className="h-6 w-6 text-primary-foreground ml-0.5" fill="currentColor" />
+                            </div>
+                          </div>
+                        </div>
+                        <h4 className="text-sm font-medium line-clamp-2 group-hover:text-primary transition-colors">
+                          {result.title}
+                        </h4>
+                        <p className="text-xs text-muted-foreground mt-1">{result.channelTitle}</p>
+                        {result.viewCount > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            {formatViews(result.viewCount)} views
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : searchQuery ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    No results found for "{searchQuery}"
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-muted-foreground">
+                    Enter a search query to find YouTube videos
+                  </div>
+                )}
+              </>
+            )}
+          </Card>
+        </div>
+      ) : viewMode === "playlist" ? (
+        <div className="max-w-[1800px] mx-auto">
+          <Card className="glass border-border/30 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-foreground">Load YouTube Playlist</h2>
+                <p className="text-muted-foreground text-sm mt-1">
+                  Enter a playlist URL or ID to load videos
+                </p>
+              </div>
+              <Badge variant="outline" className="gap-2">
+                <ListVideo className="h-4 w-4" />
+                Playlist
+              </Badge>
+            </div>
+
+            {!hasApiKey ? (
+              <div className="text-center py-12">
+                <Key className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold mb-2">YouTube API Key Required</h3>
+                <p className="text-muted-foreground text-sm mb-4 max-w-md mx-auto">
+                  To load playlists, you need to configure a YouTube Data API key in Settings.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Playlist Input */}
+                <div className="flex gap-2 mb-6">
+                  <Input
+                    value={playlistInput}
+                    onChange={(e) => setPlaylistInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && playlistInput.trim()) {
+                        const id = extractPlaylistId(playlistInput.trim())
+                        if (id) setLoadedPlaylistId(id)
+                      }
+                    }}
+                    placeholder="Paste YouTube playlist URL or ID (e.g., PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf)"
+                    className="glass"
+                    data-tabz-input="playlist-url"
+                  />
+                  <Button
+                    onClick={() => {
+                      const id = extractPlaylistId(playlistInput.trim())
+                      if (id) setLoadedPlaylistId(id)
+                    }}
+                    disabled={!playlistInput.trim()}
+                    data-tabz-action="load-playlist"
+                  >
+                    Load
+                  </Button>
+                </div>
+
+                {/* Playlist Content */}
+                {playlistLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <LoaderIcon className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : playlistError ? (
+                  <div className="text-center py-12">
+                    <X className="h-12 w-12 mx-auto mb-4 text-destructive" />
+                    <p className="text-destructive">{(playlistError as Error).message}</p>
+                  </div>
+                ) : playlistInfo && playlistItems.length > 0 ? (
+                  <div>
+                    {/* Playlist Header */}
+                    <div className="flex items-start gap-4 mb-6 p-4 glass-dark rounded-lg">
+                      <img
+                        src={playlistInfo.thumbnail}
+                        alt={playlistInfo.title}
+                        className="w-32 aspect-video object-cover rounded"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-lg line-clamp-1">{playlistInfo.title}</h3>
+                        <p className="text-sm text-muted-foreground">{playlistInfo.channelTitle}</p>
+                        <p className="text-sm text-muted-foreground">{playlistInfo.itemCount} videos</p>
+                        {playlistInfo.description && (
+                          <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                            {playlistInfo.description}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        onClick={() => {
+                          if (playlistItems.length > 0) {
+                            const firstVideo = playlistItems[0]
+                            setVideoSource({
+                              type: "youtube",
+                              url: `https://www.youtube.com/watch?v=${firstVideo.videoId}&list=${loadedPlaylistId}`,
+                              youtubeId: firstVideo.videoId,
+                            })
+                            setShowSourceInput(false)
+                            setVideoError(null)
+                            setViewMode("player")
+                          }
+                        }}
+                      >
+                        <Play className="h-4 w-4 mr-2" fill="currentColor" />
+                        Play All
+                      </Button>
+                    </div>
+
+                    {/* Playlist Items */}
+                    <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                      {playlistItems.map((item, idx) => (
+                        <div
+                          key={item.videoId}
+                          className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/20 cursor-pointer transition-colors"
+                          onClick={() => {
+                            setVideoSource({
+                              type: "youtube",
+                              url: `https://www.youtube.com/watch?v=${item.videoId}&list=${loadedPlaylistId}`,
+                              youtubeId: item.videoId,
+                            })
+                            setShowSourceInput(false)
+                            setVideoError(null)
+                            setViewMode("player")
+                          }}
+                          data-tabz-item={item.videoId}
+                        >
+                          <span className="text-muted-foreground text-sm w-6 text-center flex-shrink-0 pt-2">
+                            {idx + 1}
+                          </span>
+                          <div className="relative w-[120px] aspect-video rounded overflow-hidden bg-muted flex-shrink-0">
+                            <img
+                              src={item.thumbnail}
+                              alt={item.title}
+                              className="w-full h-full object-cover"
+                            />
+                            {item.durationFormatted && (
+                              <span className="absolute bottom-1 right-1 bg-black/80 text-foreground text-xs px-1 rounded">
+                                {item.durationFormatted}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium line-clamp-2">{item.title}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{item.channelTitle}</p>
+                            {item.viewCount > 0 && (
+                              <p className="text-xs text-muted-foreground">
+                                {formatViews(item.viewCount)} views
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : loadedPlaylistId ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    No videos found in this playlist
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <ListVideo className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Enter a YouTube playlist URL or ID to load videos</p>
+                    <p className="text-xs mt-2">Supports URLs like youtube.com/playlist?list=... or direct playlist IDs</p>
+                  </div>
+                )}
+              </>
+            )}
           </Card>
         </div>
       ) : (
