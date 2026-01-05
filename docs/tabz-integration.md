@@ -481,6 +481,149 @@ TabzChrome integration uses no server-side environment variables. All configurat
 3. **Use specific working directories** - Avoid running commands in sensitive directories
 4. **Regenerate tokens periodically** - Tokens can be refreshed from TabzChrome extension
 
+## Adding Connectors
+
+When building new components or sections, add `data-tabz-*` attributes to enable MCP automation.
+
+### Attribute Guidelines
+
+**Section Container:**
+```tsx
+<div data-tabz-section="my-section">
+  {/* Section content */}
+</div>
+```
+
+**Interactive Actions:**
+```tsx
+<Button
+  onClick={handleAction}
+  data-tabz-action="submit-form"
+>
+  Submit
+</Button>
+
+<Button
+  onClick={() => setView('list')}
+  data-tabz-action="toggle-view"
+>
+  List View
+</Button>
+```
+
+**Input Fields:**
+```tsx
+<Input
+  value={query}
+  onChange={(e) => setQuery(e.target.value)}
+  data-tabz-input="search-query"
+/>
+
+<Select data-tabz-input="sort-order">
+  <SelectItem value="asc">Ascending</SelectItem>
+</Select>
+```
+
+**Lists and Items:**
+```tsx
+<div data-tabz-list="items">
+  {items.map((item, i) => (
+    <div key={item.id} data-tabz-item={`item-${i}`}>
+      {item.name}
+    </div>
+  ))}
+</div>
+```
+
+**Named Regions:**
+```tsx
+<Card data-tabz-region="summary">
+  {/* Summary content */}
+</Card>
+
+<Card data-tabz-region="details">
+  {/* Details content */}
+</Card>
+```
+
+**Terminal Commands:**
+```tsx
+<button
+  onClick={() => runCommand(item.command)}
+  data-tabz-command={item.command}
+  data-tabz-project={item.workingDir}
+>
+  Run
+</button>
+```
+
+### Naming Conventions
+
+| Attribute | Format | Examples |
+|-----------|--------|----------|
+| `data-tabz-section` | kebab-case | `weather`, `ai-workspace`, `stocks-dashboard` |
+| `data-tabz-action` | kebab-case, verb-noun | `submit-form`, `toggle-view`, `refresh-data` |
+| `data-tabz-input` | kebab-case, noun | `search-query`, `stock-symbol`, `api-key` |
+| `data-tabz-list` | kebab-case, plural | `items`, `conversations`, `results` |
+| `data-tabz-item` | prefix-index or prefix-id | `item-0`, `conversation-abc123` |
+| `data-tabz-region` | kebab-case, noun | `header`, `sidebar`, `chart-area` |
+
+### Complete Example
+
+```tsx
+export default function MySection() {
+  const [items, setItems] = useState([])
+  const [search, setSearch] = useState('')
+
+  return (
+    <div data-tabz-section="my-section">
+      {/* Header with search */}
+      <div data-tabz-region="header">
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          data-tabz-input="search"
+        />
+        <Button
+          onClick={handleSearch}
+          data-tabz-action="search"
+        >
+          Search
+        </Button>
+        <Button
+          onClick={handleRefresh}
+          data-tabz-action="refresh"
+        >
+          Refresh
+        </Button>
+      </div>
+
+      {/* Results list */}
+      <div data-tabz-list="results" data-tabz-region="results">
+        {items.map((item, i) => (
+          <Card
+            key={item.id}
+            data-tabz-item={`result-${i}`}
+            onClick={() => handleSelect(item)}
+            data-tabz-action="select-item"
+          >
+            {item.title}
+          </Card>
+        ))}
+      </div>
+    </div>
+  )
+}
+```
+
+### Tips
+
+1. **Be specific**: Use `data-tabz-action="refresh-weather"` over generic `data-tabz-action="refresh"`
+2. **Combine attributes**: Elements can have multiple attributes (e.g., both `data-tabz-item` and `data-tabz-action`)
+3. **Use regions**: Group related elements with `data-tabz-region` for easier targeting
+4. **Index items**: For lists, use consistent indexing (`item-0`, `item-1`) for automation
+5. **Document selectors**: Add new selectors to this file's Selector Reference section
+
 ## Troubleshooting
 
 ### Connection Issues

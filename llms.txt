@@ -1,0 +1,47 @@
+# Personal Homepage
+
+> Next.js 15 personal dashboard with weather, feeds, notes, stocks, AI chat, media players, and more.
+
+## Documentation
+
+- [CLAUDE.md](CLAUDE.md): Project overview and section index
+- [Navigation Guide](docs/navigation.md): Adding new sections
+- [Design System](docs/design-system.md): Themes and styling
+- [Auth](docs/auth.md): GitHub OAuth via Supabase
+- [State Management](docs/state-management.md): TanStack Query patterns
+
+## Section Documentation
+
+- [Weather](docs/sections/weather.md): Forecasts, alerts, radar
+- [Daily Feed](docs/sections/daily-feed.md): HN, GitHub, Reddit aggregation
+- [API Playground](docs/sections/api-playground.md): HTTP request builder
+- [Quick Notes](docs/sections/quick-notes.md): GitHub-synced markdown editor
+- [Bookmarks](docs/sections/bookmarks.md): Links and terminal commands
+- [Search Hub](docs/sections/search-hub.md): Multi-engine search with AI
+- [Stocks Dashboard](docs/sections/stocks-dashboard.md): Paper trading
+- [Crypto Dashboard](docs/sections/crypto-dashboard.md): Cryptocurrency prices
+- [Market Pulse](docs/sections/market-pulse.md): BLS salary data
+- [SpaceX Tracker](docs/sections/spacex-tracker.md): Launch schedule
+- [Disasters Monitor](docs/sections/disasters-monitor.md): USGS earthquakes
+- [GitHub Activity](docs/sections/github-activity.md): Personal events
+- [Tasks](docs/sections/tasks.md): Todo list and quick notes
+- [Kanban](docs/sections/kanban.md): Project kanban board
+- [Projects Dashboard](docs/sections/projects-dashboard.md): Local project management
+- [Jobs](docs/sections/jobs.md): Claude batch prompts
+- [AI Workspace](docs/sections/ai-workspace.md): Multi-model AI chat
+- [Music Player](docs/sections/music-player.md): Spotify and local audio
+- [Video Player](docs/sections/video-player.md): YouTube and local video
+- [Photo Gallery](docs/sections/photo-gallery.md): Photo management
+- [Profile](docs/sections/profile.md): User auth and config
+- [Settings](docs/sections/settings.md): Themes, sections, API keys
+
+## Integration Guides
+
+- [TabzChrome Integration](docs/tabz-integration.md): Terminal automation, MCP selectors
+- [Terminal Integration](docs/terminal-integration.md): Chrome extension terminals
+- [AI Workspace Patterns](docs/ai-workspace-patterns.md): Non-interactive mode, streaming
+- [Claude Jobs](docs/claude-jobs.md): Automated prompts across projects
+
+## Optional
+
+- [Roadmap](docs/roadmap.md): Planned features
