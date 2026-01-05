@@ -148,7 +148,13 @@ const genres = [
   { name: "Vaporwave", color: "hsl(300 70% 50%)" },
 ]
 
-export default function MusicPlayer() {
+export function MusicPlayerSection({
+  activeSubItem,
+  onSubItemHandled,
+}: {
+  activeSubItem?: string | null
+  onSubItemHandled?: () => void
+}) {
   // Navigation state
   const [activeView, setActiveView] = useState<"home" | "search" | "library" | "playlist" | "album" | "artist">("home")
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null)
@@ -338,7 +344,7 @@ export default function MusicPlayer() {
               <Plus className="h-4 w-4" />
             </Button>
           </div>
-          <ScrollArea className="h-[calc(100vh-400px)] px-2">
+          <ScrollArea className="h-48 px-2">
             {mockPlaylists.map((playlist) => (
               <Button
                 key={playlist.id}
@@ -393,7 +399,7 @@ export default function MusicPlayer() {
             </h2>
             <p className="text-muted-foreground">{nowPlaying.track.artist.name}</p>
             <div className="flex items-center justify-center md:justify-start gap-3 mt-4">
-              <Button size="lg" className="gap-2" onClick={togglePlay}>
+              <Button size="lg" className="gap-2" onClick={togglePlay} data-tabz-action="toggle-play">
                 {nowPlaying.isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
                 {nowPlaying.isPlaying ? "Pause" : "Play"}
               </Button>
@@ -552,6 +558,7 @@ export default function MusicPlayer() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-12 h-12 text-lg glass border-border/30"
+          data-tabz-input="search"
         />
       </div>
 
@@ -1015,7 +1022,8 @@ export default function MusicPlayer() {
           initial={{ x: 300, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: 300, opacity: 0 }}
-          className="fixed right-0 top-0 bottom-24 w-80 glass border-l border-border/30 z-40"
+          className="absolute right-0 top-0 bottom-0 w-80 glass border-l border-border/30 z-40"
+          data-tabz-action="queue-panel"
         >
           <div className="p-4 border-b border-border/30 flex items-center justify-between">
             <h3 className="font-semibold text-foreground">Queue</h3>
@@ -1078,7 +1086,7 @@ export default function MusicPlayer() {
 
   // Render now playing bar (desktop)
   const renderNowPlayingBar = () => (
-    <div className="fixed bottom-0 left-0 right-0 h-24 glass border-t border-border/30 z-50 hidden md:flex items-center px-4">
+    <div className="h-24 glass border-t border-border/30 hidden md:flex items-center px-4" data-tabz-action="now-playing">
       {/* Track Info */}
       <div className="flex items-center gap-4 w-1/4 min-w-0">
         <motion.div
@@ -1113,17 +1121,18 @@ export default function MusicPlayer() {
           >
             <Shuffle className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={skipPrevious}>
+          <Button variant="ghost" size="icon" onClick={skipPrevious} data-tabz-action="skip-previous">
             <SkipBack className="h-5 w-5" />
           </Button>
           <Button
             size="icon"
             className="h-10 w-10 rounded-full"
             onClick={togglePlay}
+            data-tabz-action="toggle-play"
           >
             {nowPlaying.isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
           </Button>
-          <Button variant="ghost" size="icon" onClick={skipNext}>
+          <Button variant="ghost" size="icon" onClick={skipNext} data-tabz-action="skip-next">
             <SkipForward className="h-5 w-5" />
           </Button>
           <Button
@@ -1181,8 +1190,9 @@ export default function MusicPlayer() {
     <>
       {/* Mini Player Bar */}
       <div
-        className="fixed bottom-0 left-0 right-0 glass border-t border-border/30 p-3 flex items-center gap-3 md:hidden z-50 cursor-pointer"
+        className="glass border-t border-border/30 p-3 flex items-center gap-3 md:hidden cursor-pointer"
         onClick={() => setShowMobilePlayer(true)}
+        data-tabz-action="mobile-player"
       >
         <motion.div
           animate={{ rotate: nowPlaying.isPlaying ? 360 : 0 }}
@@ -1334,14 +1344,14 @@ export default function MusicPlayer() {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="flex h-full" data-tabz-section="music-player">
       {/* Sidebar - Desktop */}
       {renderSidebar()}
 
       {/* Main Content */}
-      <main className="flex-1 pb-32 md:pb-28">
+      <main className="flex-1 flex flex-col overflow-hidden relative">
         {/* Mobile Header */}
-        <div className="md:hidden sticky top-0 glass border-b border-border/30 p-4 flex items-center justify-between z-30">
+        <div className="md:hidden glass border-b border-border/30 p-4 flex items-center justify-between z-30">
           <div className="flex items-center gap-2">
             <Disc3 className="h-6 w-6 text-primary" />
             <span className="font-bold text-foreground">SynthWave</span>
@@ -1358,7 +1368,7 @@ export default function MusicPlayer() {
         </div>
 
         {/* Mobile Navigation */}
-        <div className="md:hidden fixed bottom-[72px] left-0 right-0 glass border-t border-border/30 flex items-center justify-around py-2 z-40">
+        <div className="md:hidden glass border-t border-border/30 flex items-center justify-around py-2">
           <Button
             variant="ghost"
             className={`flex flex-col items-center gap-1 h-auto py-2 ${activeView === "home" ? "text-primary" : "text-muted-foreground"}`}
@@ -1386,7 +1396,7 @@ export default function MusicPlayer() {
         </div>
 
         {/* Content Area */}
-        <ScrollArea className="h-[calc(100vh-72px)] md:h-[calc(100vh-96px)]">
+        <ScrollArea className="flex-1">
           <div className="p-4 md:p-8">
             {/* Back Button for Detail Views */}
             {(activeView === "playlist" || activeView === "album") && (
@@ -1403,16 +1413,16 @@ export default function MusicPlayer() {
             {renderContent()}
           </div>
         </ScrollArea>
+
+        {/* Now Playing Bar - Desktop */}
+        {renderNowPlayingBar()}
+
+        {/* Mobile Player */}
+        {renderMobilePlayer()}
+
+        {/* Queue Panel */}
+        {renderQueue()}
       </main>
-
-      {/* Queue Panel */}
-      {renderQueue()}
-
-      {/* Now Playing Bar - Desktop */}
-      {renderNowPlayingBar()}
-
-      {/* Mobile Player */}
-      {renderMobilePlayer()}
     </div>
   )
 }

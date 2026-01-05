@@ -45,6 +45,7 @@ import {
   LayoutGrid,
   ChevronDown,
   Image,
+  Music,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -84,6 +85,7 @@ const sectionMeta: Record<ToggleableSection, { label: string; icon: React.Elemen
   jobs: { label: "Jobs", icon: Play, description: "Claude batch prompts" },
   profile: { label: "Profile", icon: User, description: "Account & sync" },
   kanban: { label: "Kanban", icon: LayoutGrid, description: "Visual task board" },
+  "music-player": { label: "Music Player", icon: Music, description: "Synthwave music player" },
 }
 
 // Sortable section item component
