@@ -48,6 +48,7 @@ import {
   Columns,
   Eye,
   EyeOff,
+  Copy,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -203,6 +204,7 @@ export default function ProjectsDashboard({
   const columnLabels: Record<string, string> = {
     select: "Select",
     name: "Name",
+    path: "Path",
     branch: "Branch",
     techStack: "Tech Stack",
     stars: "Stars",
@@ -449,6 +451,62 @@ export default function ProjectsDashboard({
             project.name.toLowerCase().includes(search) ||
             project.description?.toLowerCase().includes(search) ||
             false
+          )
+        },
+      },
+      {
+        accessorKey: "path",
+        header: "Path",
+        accessorFn: (row) => row.local?.path || "",
+        cell: ({ row }) => {
+          const project = row.original
+          const fullPath = project.local?.path
+          if (!fullPath) return <span className="text-muted-foreground">-</span>
+
+          // Calculate relative path if under working directory
+          let displayPath = fullPath
+          let isRelative = false
+          if (workingDir && workingDir !== "~" && fullPath.startsWith(workingDir)) {
+            displayPath = fullPath.slice(workingDir.length)
+            if (displayPath.startsWith("/")) displayPath = displayPath.slice(1)
+            isRelative = true
+          }
+
+          // Truncate long paths
+          const maxLength = 35
+          const truncated = displayPath.length > maxLength
+          const truncatedPath = truncated
+            ? "…" + displayPath.slice(-(maxLength - 1))
+            : displayPath
+
+          const handleCopy = (e: React.MouseEvent) => {
+            e.stopPropagation()
+            navigator.clipboard.writeText(fullPath)
+            toast.success("Path copied to clipboard")
+          }
+
+          return (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleCopy}
+                    className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors group font-mono max-w-[200px]"
+                    data-tabz-action="copy-path"
+                  >
+                    {isRelative && (
+                      <span className="text-[10px] text-primary/70">./</span>
+                    )}
+                    <span className="truncate">{truncatedPath}</span>
+                    <Copy className="h-3 w-3 opacity-0 group-hover:opacity-50 flex-shrink-0" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="font-mono text-xs max-w-[400px] break-all">
+                  <p>{fullPath}</p>
+                  <p className="text-muted-foreground mt-1">Click to copy</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )
         },
       },
@@ -713,7 +771,7 @@ export default function ProjectsDashboard({
         },
       },
     ],
-    [terminalAvailable, handleLaunchTerminal, isPinned, togglePinned, metaConfigured, metaSyncing, onNavigateToSection]
+    [terminalAvailable, handleLaunchTerminal, isPinned, togglePinned, metaConfigured, metaSyncing, onNavigateToSection, workingDir]
   )
 
   // TanStack Table instance
