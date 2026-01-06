@@ -128,11 +128,27 @@ export function KanbanBoard({ useBeadsSource = false, workspace, onBeadsModeChan
 
       // Otherwise, return tasks assigned to this column
       if (beadsMode && beadsAvailable) {
+        // In simplified mode with virtual columns, gather tasks by beads status
+        if (beadsSimplifiedMode && column.id.startsWith('beads-')) {
+          const targetStatus = getColumnBeadsStatus(column)
+          const allTasks = Array.from(beadsTasksByColumn.values()).flat()
+          return allTasks.filter(task =>
+            task.beadsMetadata?.beadsStatus === targetStatus
+          ).sort((a, b) => a.order - b.order)
+        }
+        // Also handle simplified mode for real columns (aggregate all tasks with same beads status)
+        if (beadsSimplifiedMode) {
+          const targetStatus = getColumnBeadsStatus(column)
+          const allTasks = Array.from(beadsTasksByColumn.values()).flat()
+          return allTasks.filter(task =>
+            task.beadsMetadata?.beadsStatus === targetStatus
+          ).sort((a, b) => a.order - b.order)
+        }
         return beadsTasksByColumn.get(column.id) ?? []
       }
       return getTasksByColumn(column.id)
     },
-    [beadsMode, beadsAvailable, beadsTasksByColumn, getTasksByColumn, localTasks]
+    [beadsMode, beadsAvailable, beadsTasksByColumn, getTasksByColumn, localTasks, beadsSimplifiedMode]
   )
 
   // All tasks for drag handling
@@ -200,7 +216,41 @@ export function KanbanBoard({ useBeadsSource = false, workspace, onBeadsModeChan
       }
     }
 
-    return visible
+    // Ensure all 4 beads statuses have a column (create virtual ones if missing)
+    const allStatuses: BeadsStatusType[] = ['open', 'in_progress', 'blocked', 'closed']
+    const statusColors: Record<BeadsStatusType, string> = {
+      open: 'border-t-cyan-500',
+      in_progress: 'border-t-amber-500',
+      blocked: 'border-t-red-500',
+      closed: 'border-t-green-500',
+    }
+    const statusTitles: Record<BeadsStatusType, string> = {
+      open: 'Ready',
+      in_progress: 'In Progress',
+      blocked: 'Blocked',
+      closed: 'Done',
+    }
+
+    for (const status of allStatuses) {
+      if (!seen.has(status)) {
+        // Create a virtual column for this missing status
+        visible.push({
+          id: `beads-${status}`,
+          title: statusTitles[status],
+          color: statusColors[status],
+          order: allStatuses.indexOf(status),
+          beadsStatus: status,
+        })
+        seen.add(status)
+      }
+    }
+
+    // Re-sort by beads status order (open, in_progress, blocked, closed)
+    return visible.sort((a, b) => {
+      const aStatus = getColumnBeadsStatus(a)
+      const bStatus = getColumnBeadsStatus(b)
+      return allStatuses.indexOf(aStatus) - allStatuses.indexOf(bStatus)
+    })
   }, [beadsMode, beadsSimplifiedMode])
 
   // Get columns that are grouped with a given column (same beads status)
