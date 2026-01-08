@@ -81,6 +81,7 @@ import {
   parseTabzBookmarkExport,
   importTabzProfiles,
   importTabzBookmarks,
+  prepareProfilesForSpawn,
   downloadJson,
   readJsonFile,
   generateFilename,
@@ -261,7 +262,7 @@ export default function BookmarksSection({
   // Import/Export state
   const [importDialogOpen, setImportDialogOpen] = React.useState(false)
   const [importType, setImportType] = React.useState<"bookmarks" | "profiles">("bookmarks")
-  const [importMode, setImportMode] = React.useState<"merge" | "replace">("merge")
+  const [importMode, setImportMode] = React.useState<"merge" | "replace" | "spawn">("merge")
   const [importFile, setImportFile] = React.useState<File | null>(null)
   const [importPreview, setImportPreview] = React.useState<{ profiles?: number; bookmarks?: number; folders?: number } | null>(null)
   const [isImporting, setIsImporting] = React.useState(false)
@@ -620,20 +621,63 @@ export default function BookmarksSection({
     setIsImporting(true)
     try {
       const content = await readJsonFile(importFile)
-      let newData: BookmarksData
 
       if (importType === "profiles") {
         const parsed = parseTabzProfileExport(content)
-        newData = importTabzProfiles(parsed, data, importMode)
+
+        // Spawn mode: spawn terminals directly instead of saving as bookmarks
+        if (importMode === "spawn") {
+          const profiles = prepareProfilesForSpawn(parsed)
+          let spawned = 0
+          let failed = 0
+
+          for (const profile of profiles) {
+            try {
+              const result = await spawnWithOptions({
+                name: profile.name,
+                command: profile.command,
+                workingDir: profile.workingDir,
+                profile: profile.profile,
+                color: profile.color,
+                autoExecute: true,
+              })
+              if (result.success) {
+                spawned++
+              } else {
+                failed++
+                console.error(`Failed to spawn ${profile.name}:`, result.error)
+              }
+              // Small delay between spawns to avoid overwhelming the backend
+              await new Promise(resolve => setTimeout(resolve, 300))
+            } catch (err) {
+              failed++
+              console.error(`Error spawning ${profile.name}:`, err)
+            }
+          }
+
+          if (failed > 0) {
+            toast.warning(`Spawned ${spawned} terminals, ${failed} failed`)
+          } else {
+            toast.success(`Spawned ${spawned} terminals`)
+          }
+
+          setImportDialogOpen(false)
+          resetImportState()
+          return
+        }
+
+        // Merge/Replace mode: save as bookmarks
+        const newData = importTabzProfiles(parsed, data, importMode as "merge" | "replace")
         toast.success(`Imported ${parsed.profiles.length} profiles as terminal commands`)
+        saveMutation.mutate(newData)
       } else {
         const parsed = parseTabzBookmarkExport(content)
-        newData = importTabzBookmarks(parsed, data, importMode)
+        const newData = importTabzBookmarks(parsed, data, importMode as "merge" | "replace")
         const addedCount = newData.bookmarks.length - (importMode === "merge" ? data.bookmarks.length : 0)
         toast.success(`Imported bookmarks (${importMode === "merge" ? `added ${addedCount} new` : "replaced all"})`)
+        saveMutation.mutate(newData)
       }
 
-      saveMutation.mutate(newData)
       setImportDialogOpen(false)
       resetImportState()
     } catch (err) {
@@ -2019,6 +2063,23 @@ export default function BookmarksSection({
             <div>
               <label className="text-sm font-medium mb-2 block">Import Mode</label>
               <div className="flex gap-2 p-1 rounded-lg bg-muted/50">
+                {/* Spawn option - only for profiles */}
+                {importType === "profiles" && (
+                  <button
+                    type="button"
+                    onClick={() => setImportMode("spawn")}
+                    disabled={!terminalAvailable}
+                    title={!terminalAvailable ? "TabzChrome required to spawn terminals" : undefined}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all ${
+                      importMode === "spawn"
+                        ? "bg-emerald-500/20 shadow-sm text-emerald-400 border border-emerald-500/30"
+                        : "text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                    }`}
+                  >
+                    <Play className="h-4 w-4" />
+                    Spawn
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setImportMode("merge")}
@@ -2045,11 +2106,13 @@ export default function BookmarksSection({
                 </button>
               </div>
               <p className="text-xs text-muted-foreground mt-1.5">
-                {importMode === "merge"
-                  ? "Add new items, skip duplicates (by ID)"
-                  : importType === "profiles"
-                    ? "Replace all terminal bookmarks with imported profiles"
-                    : "Replace all bookmarks with imported data"}
+                {importMode === "spawn"
+                  ? "Spawn terminals directly with full theme/metadata"
+                  : importMode === "merge"
+                    ? "Add new items, skip duplicates (by ID)"
+                    : importType === "profiles"
+                      ? "Replace all terminal bookmarks with imported profiles"
+                      : "Replace all bookmarks with imported data"}
               </p>
             </div>
           </div>
@@ -2059,9 +2122,13 @@ export default function BookmarksSection({
             </Button>
             <Button
               onClick={handleImport}
-              disabled={!importFile || isImporting || saveMutation.isPending}
+              disabled={!importFile || isImporting || saveMutation.isPending || (importMode === "spawn" && !terminalAvailable)}
             >
-              {isImporting ? "Importing..." : `Import ${importType === "profiles" ? "Profiles" : "Bookmarks"}`}
+              {isImporting
+                ? (importMode === "spawn" ? "Spawning..." : "Importing...")
+                : importMode === "spawn"
+                  ? "Spawn Terminals"
+                  : `Import ${importType === "profiles" ? "Profiles" : "Bookmarks"}`}
             </Button>
           </DialogFooter>
         </DialogContent>
