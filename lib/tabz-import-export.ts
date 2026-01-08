@@ -315,6 +315,53 @@ export function parseTabzBookmarkExport(json: string): TabzBookmarkExport {
 }
 
 /**
+ * Profile data prepared for immediate spawning
+ */
+export interface SpawnReadyProfile {
+  name: string
+  command: string
+  workingDir?: string
+  profile?: string  // TabzChrome profile name
+  color?: string
+  themeName?: string
+  backgroundGradient?: string
+  panelColor?: string
+  transparency?: number
+}
+
+/**
+ * Prepare TabzChrome profiles for immediate spawning
+ * Returns profiles with resolved workingDir (extracted from reference if needed)
+ */
+export function prepareProfilesForSpawn(
+  profileExport: TabzProfileExport
+): SpawnReadyProfile[] {
+  return profileExport.profiles
+    .filter(p => p.command) // Only profiles with commands
+    .map(profile => {
+      // Determine working directory:
+      // 1. Use profile.workingDir if set
+      // 2. Extract project dir from reference path if workingDir is empty
+      let workingDir = profile.workingDir || undefined
+      if (!workingDir && profile.reference) {
+        workingDir = extractProjectDirFromReference(profile.reference)
+      }
+
+      return {
+        name: profile.name,
+        command: profile.command!,
+        workingDir,
+        profile: profile.themeName || profile.reference,  // Use theme name for profile
+        color: profile.panelColor,  // Use panelColor for tab color
+        themeName: profile.themeName,
+        backgroundGradient: profile.backgroundGradient,
+        panelColor: profile.panelColor,
+        transparency: profile.transparency,
+      }
+    })
+}
+
+/**
  * Import TabzChrome profiles as terminal bookmarks
  */
 export function importTabzProfiles(
@@ -355,6 +402,14 @@ export function importTabzProfiles(
   const newBookmarks: BookmarkItem[] = profileExport.profiles
     .filter(p => p.command) // Only profiles with commands
     .map(profile => {
+      // Determine working directory:
+      // 1. Use profile.workingDir if set
+      // 2. Extract project dir from reference path if workingDir is empty
+      let workingDir = profile.workingDir || undefined
+      if (!workingDir && profile.reference) {
+        workingDir = extractProjectDirFromReference(profile.reference)
+      }
+
       const bookmark: BookmarkItem = {
         id: profile.id.startsWith("homepage-")
           ? profile.id.replace("homepage-", "")
@@ -365,7 +420,7 @@ export function importTabzProfiles(
         createdAt: now,
         type: "terminal",
         command: profile.command,
-        workingDir: profile.workingDir || undefined,
+        workingDir,
         profile: profile.reference || undefined,
         color: profile.category ? existingCategoryColors.get(profile.category) : undefined,
       }
@@ -477,6 +532,53 @@ export function importTabzBookmarks(
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 9)
+}
+
+/**
+ * Extract project directory from a reference doc path
+ *
+ * Reference docs are typically at paths like:
+ * - ~/projects/TabzChrome/docs/reference/claude-code.md -> ~/projects/TabzChrome
+ * - /home/user/code/myproject/docs/api.md -> /home/user/code/myproject
+ *
+ * The heuristic: find common project indicator directories (docs, src, lib, etc.)
+ * and return the parent of that directory as the project root.
+ */
+function extractProjectDirFromReference(refPath: string): string | undefined {
+  if (!refPath) return undefined
+
+  // Normalize path separators
+  const normalized = refPath.replace(/\\/g, '/')
+
+  // Common project subdirectories that indicate we're inside a project
+  const projectIndicators = [
+    '/docs/',
+    '/doc/',
+    '/reference/',
+    '/src/',
+    '/lib/',
+    '/packages/',
+    '/scripts/',
+    '/.claude/',
+    '/.github/',
+  ]
+
+  // Find the first matching indicator and extract the parent directory
+  for (const indicator of projectIndicators) {
+    const index = normalized.indexOf(indicator)
+    if (index > 0) {
+      return normalized.substring(0, index)
+    }
+  }
+
+  // Fallback: if the reference is a file (has extension), return its parent directory
+  const lastSlash = normalized.lastIndexOf('/')
+  const lastDot = normalized.lastIndexOf('.')
+  if (lastDot > lastSlash && lastSlash > 0) {
+    return normalized.substring(0, lastSlash)
+  }
+
+  return undefined
 }
 
 /**
