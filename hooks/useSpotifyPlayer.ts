@@ -154,7 +154,7 @@ export interface UseSpotifyPlayerReturn extends SpotifyPlayerState {
 
   // Device management
   devices: SpotifyDevice[]
-  refreshDevices: () => Promise<void>
+  refreshDevices: () => Promise<SpotifyDevice[]>
   switchDevice: (deviceId: string) => Promise<void>
 }
 
@@ -248,12 +248,48 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
           volume: 0.5,
         })
 
-        // Ready event
-        player.addListener("ready", ({ device_id }) => {
+        // Ready event - with retry to ensure device is registered in Spotify's API
+        player.addListener("ready", async ({ device_id }) => {
           console.log("Spotify player ready, device ID:", device_id)
           setDeviceId(device_id)
           setIsReady(true)
           setError(null)
+
+          // Retry fetching devices until our device appears (race condition fix)
+          // Spotify's API may not immediately reflect the newly registered device
+          const maxRetries = 5
+          const retryDelay = 500 // ms
+
+          for (let attempt = 0; attempt < maxRetries; attempt++) {
+            // Wait before fetching to give Spotify API time to register the device
+            await new Promise(resolve => setTimeout(resolve, retryDelay))
+
+            try {
+              const deviceList = await getDevices()
+              const ourDevice = deviceList.find(d => d.id === device_id)
+
+              if (ourDevice) {
+                console.log("Device registered in Spotify API:", ourDevice.name)
+                setDevices(deviceList)
+
+                // Auto-activate our device if no other device is active
+                const hasActiveDevice = deviceList.some(d => d.is_active)
+                if (!hasActiveDevice) {
+                  try {
+                    await transferPlayback(device_id, false) // false = don't start playing
+                    console.log("Auto-activated device:", ourDevice.name)
+                  } catch (err) {
+                    console.warn("Could not auto-activate device:", err)
+                  }
+                }
+                break // Success, exit retry loop
+              }
+
+              console.log(`Device not yet in API (attempt ${attempt + 1}/${maxRetries})`)
+            } catch (err) {
+              console.warn(`Failed to fetch devices (attempt ${attempt + 1}):`, err)
+            }
+          }
         })
 
         // Not ready event
@@ -377,8 +413,10 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
     try {
       const deviceList = await getDevices()
       setDevices(deviceList)
+      return deviceList
     } catch (err) {
       console.error("Failed to fetch devices:", err)
+      return []
     }
   }, [])
 
@@ -481,9 +519,12 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
     }
   }, [refreshDevices])
 
-  // Device fetch - initial and when SDK becomes ready
+  // Device fetch - only on initial authentication
+  // Note: The SDK ready event handler handles device refresh with proper retry logic
   useEffect(() => {
-    if (isAuthenticated && isPremium) {
+    if (isAuthenticated && isPremium && !isReady) {
+      // Fetch initial device list before SDK is ready
+      // This shows any existing devices (like phones, other computers)
       refreshDevices()
     }
   }, [isAuthenticated, isPremium, isReady, refreshDevices])
