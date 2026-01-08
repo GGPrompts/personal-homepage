@@ -32,8 +32,9 @@ export async function POST(request: NextRequest) {
       parentId,
     })
 
+    const claudePath = process.env.CLAUDE_PATH || "/home/marci/.local/bin/claude"
     const { stdout } = await execFileAsync(
-      "/home/matt/.local/bin/claude",
+      claudePath,
       ["--mcp-cli", "call", "tabz/tabz_save_bookmark", jsonArgs],
       { encoding: "utf-8", timeout: 10000 }
     )
