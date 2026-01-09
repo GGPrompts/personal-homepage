@@ -95,6 +95,7 @@ import SettingsSection from "./sections/settings"
 import { MusicPlayerSection } from "./sections/music-player"
 import dynamic from "next/dynamic"
 import { useLoginTrigger } from "@/hooks/useLoginTrigger"
+import { useMusicPlayerSafe } from "@/components/MusicPlayerProvider"
 
 // Lazy-loaded sections
 const VideoPlayerSection = dynamic(() => import("./sections/video-player"), {
@@ -196,7 +197,27 @@ function SidebarContent({
   clearWorkingDir: () => void
   categories: CategoryMeta[]
 }) {
+  // Music player context for now-playing indicator
+  const musicContext = useMusicPlayerSafe()
+
+  // Get current track info from music player
+  const currentTrack = musicContext?.player?.currentTrack ||
+    (musicContext?.remotePlayback?.item ? {
+      name: musicContext.remotePlayback.item.name,
+      artists: musicContext.remotePlayback.item.artists.map(a => ({ name: a.name })),
+    } : null)
+  const isPlaying = musicContext?.player?.isActive
+    ? musicContext.player.isPlaying
+    : (musicContext?.remotePlayback?.is_playing ?? false)
+  const isMusicActive = currentTrack && (isPlaying || musicContext?.isDrawerOpen)
+
   const handleSectionClick = (id: Section) => {
+    // Special handling for music-player: open drawer instead of navigating
+    if (id === "music-player" && musicContext) {
+      musicContext.setDrawerOpen(true)
+      onNavigate?.() // Close mobile menu
+      return
+    }
     setActiveSection(id)
     onNavigate?.() // Close mobile menu when section is clicked
   }
@@ -339,6 +360,13 @@ function SidebarContent({
                           const Icon = item.icon
                           const isActive = activeSection === item.id
 
+                          // Special handling for music player: show current track info
+                          const isMusicItem = item.id === "music-player"
+                          const showNowPlaying = isMusicItem && isMusicActive && currentTrack
+                          const displayLabel = showNowPlaying
+                            ? `${currentTrack.name} - ${currentTrack.artists.map(a => a.name).join(", ")}`
+                            : item.label
+
                           return (
                             <li key={item.id}>
                               <button
@@ -352,19 +380,22 @@ function SidebarContent({
                                     ? 'glass text-primary border-glow'
                                     : 'hover:bg-primary/10 text-muted-foreground hover:text-foreground'
                                   }
+                                  ${showNowPlaying ? 'text-[#1DB954]' : ''}
                                 `}
                                 data-tabz-section={item.id}
-                                data-tabz-action="navigate"
+                                data-tabz-action={isMusicItem ? "open-drawer" : "navigate"}
                               >
                                 <div className="relative flex-shrink-0">
-                                  <Icon className="h-4 w-4" />
+                                  <Icon className={`h-4 w-4 ${showNowPlaying && isPlaying ? 'animate-pulse' : ''}`} />
                                   {item.id === "jobs" && jobsNeedsHumanCount > 0 && (
                                     <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-amber-500 text-[9px] flex items-center justify-center text-white font-medium">
                                       {jobsNeedsHumanCount > 9 ? '!' : jobsNeedsHumanCount}
                                     </span>
                                   )}
                                 </div>
-                                <span className="flex-1 text-left text-sm">{item.label}</span>
+                                <span className={`flex-1 text-left text-sm truncate ${showNowPlaying ? 'max-w-[120px]' : ''}`}>
+                                  {displayLabel}
+                                </span>
                                 {!isLocal && requiresLocalhost(item.id) && (
                                   <LocalOnlyBadge />
                                 )}
@@ -413,6 +444,13 @@ function SidebarContent({
                       const Icon = item.icon
                       const isActive = activeSection === item.id
 
+                      // Special handling for music player: show current track info
+                      const isMusicItem = item.id === "music-player"
+                      const showNowPlaying = isMusicItem && isMusicActive && currentTrack
+                      const displayLabel = showNowPlaying
+                        ? `${currentTrack.name} - ${currentTrack.artists.map(a => a.name).join(", ")}`
+                        : item.label
+
                       return (
                         <li key={item.id}>
                           <button
@@ -423,19 +461,22 @@ function SidebarContent({
                                 ? 'glass text-primary border-glow'
                                 : 'hover:bg-primary/10 text-muted-foreground hover:text-foreground'
                               }
+                              ${showNowPlaying ? 'text-[#1DB954]' : ''}
                             `}
                             data-tabz-section={item.id}
-                            data-tabz-action="navigate"
+                            data-tabz-action={isMusicItem ? "open-drawer" : "navigate"}
                           >
                             <div className="relative flex-shrink-0">
-                              <Icon className="h-4 w-4" />
+                              <Icon className={`h-4 w-4 ${showNowPlaying && isPlaying ? 'animate-pulse' : ''}`} />
                               {item.id === "jobs" && jobsNeedsHumanCount > 0 && (
                                 <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-amber-500 text-[9px] flex items-center justify-center text-white font-medium">
                                   {jobsNeedsHumanCount > 9 ? '!' : jobsNeedsHumanCount}
                                 </span>
                               )}
                             </div>
-                            <span className="flex-1 text-left text-sm">{item.label}</span>
+                            <span className={`flex-1 text-left text-sm truncate ${showNowPlaying ? 'max-w-[140px]' : ''}`}>
+                              {displayLabel}
+                            </span>
                             {!isLocal && requiresLocalhost(item.id) && (
                               <LocalOnlyBadge />
                             )}
@@ -999,7 +1040,7 @@ export default function PersonalHomepage() {
           </div>
 
           {/* Main Content */}
-          <main className="flex-1 overflow-auto pb-24" data-tabz-container="main" data-tabz-section={activeSection}>
+          <main className="flex-1 overflow-auto" data-tabz-container="main" data-tabz-section={activeSection}>
             {/* Mobile header spacer */}
             <div className="h-16 lg:hidden" />
 
