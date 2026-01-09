@@ -1,18 +1,8 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from "react"
-import { motion } from "framer-motion"
 import {
   Play,
-  Pause,
-  SkipBack,
-  SkipForward,
-  Shuffle,
-  Repeat,
-  Repeat1,
-  Volume2,
-  VolumeX,
-  Volume1,
   Heart,
   ListMusic,
   ListPlus,
@@ -29,7 +19,6 @@ import Image from "next/image"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Slider } from "@/components/ui/slider"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -181,22 +170,9 @@ export function SpotifyPlayer() {
   const {
     error: playerError,
     isReady,
-    isPlaying,
-    position,
-    duration,
-    volume,
-    shuffle,
-    repeatMode,
     currentTrack,
-    togglePlay,
     playTrack,
     playContext,
-    skipNext,
-    skipPrevious,
-    seekTo,
-    setPlayerVolume,
-    toggleShuffle,
-    cycleRepeat,
   } = player
 
   // Search state
@@ -296,14 +272,6 @@ export function SpotifyPlayer() {
       console.error("Failed to toggle like:", err)
     }
   }
-
-  // Get volume icon
-  const getVolumeIcon = () => {
-    if (volume === 0) return VolumeX
-    if (volume < 50) return Volume1
-    return Volume2
-  }
-  const VolumeIcon = getVolumeIcon()
 
   // Loading state
   if (authLoading) {
@@ -797,109 +765,6 @@ export function SpotifyPlayer() {
         </Tabs>
       </div>
 
-      {/* Now Playing Bar */}
-      {currentTrack && (
-        <div className="border-t border-border/30 p-4 glass">
-          <div className="flex items-center gap-4">
-            {/* Track info */}
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              {currentTrack.album.images?.[0] ? (
-                <motion.div
-                  animate={{ rotate: isPlaying ? 360 : 0 }}
-                  transition={{ duration: 3, repeat: isPlaying ? Infinity : 0, ease: "linear" }}
-                >
-                  <Image
-                    src={currentTrack.album.images[0].url}
-                    alt={currentTrack.album.name}
-                    width={56}
-                    height={56}
-                    className="rounded-lg"
-                  />
-                </motion.div>
-              ) : (
-                <div className="w-14 h-14 bg-muted rounded-lg flex items-center justify-center">
-                  <Music className="h-6 w-6 text-muted-foreground" />
-                </div>
-              )}
-              <div className="min-w-0">
-                <p className="font-medium truncate">{currentTrack.name}</p>
-                <p className="text-sm text-muted-foreground truncate">
-                  {currentTrack.artists.map((a) => a.name).join(", ")}
-                </p>
-              </div>
-              <Button variant="ghost" size="icon" onClick={toggleLike}>
-                <Heart className={`h-4 w-4 ${currentTrackLiked ? "fill-[#1DB954] text-[#1DB954]" : ""}`} />
-              </Button>
-            </div>
-
-            {/* Controls */}
-            <div className="flex flex-col items-center gap-1">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={toggleShuffle}
-                  className={shuffle ? "text-[#1DB954]" : "text-muted-foreground"}
-                >
-                  <Shuffle className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" onClick={skipPrevious}>
-                  <SkipBack className="h-5 w-5" />
-                </Button>
-                <Button
-                  size="icon"
-                  onClick={togglePlay}
-                  className="h-10 w-10 rounded-full bg-white text-black hover:scale-105 transition-transform"
-                >
-                  {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 ml-0.5" />}
-                </Button>
-                <Button variant="ghost" size="icon" onClick={skipNext}>
-                  <SkipForward className="h-5 w-5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={cycleRepeat}
-                  className={repeatMode !== "off" ? "text-[#1DB954]" : "text-muted-foreground"}
-                >
-                  {repeatMode === "track" ? <Repeat1 className="h-4 w-4" /> : <Repeat className="h-4 w-4" />}
-                </Button>
-              </div>
-
-              {/* Progress bar */}
-              <div className="flex items-center gap-2 w-full max-w-md">
-                <span className="text-xs text-muted-foreground w-10 text-right">
-                  {formatTime(position)}
-                </span>
-                <Slider
-                  value={[position]}
-                  max={duration || 100}
-                  step={1000}
-                  onValueChange={([value]) => seekTo(value)}
-                  className="flex-1"
-                />
-                <span className="text-xs text-muted-foreground w-10">
-                  {formatTime(duration)}
-                </span>
-              </div>
-            </div>
-
-            {/* Volume & device */}
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" onClick={() => setPlayerVolume(volume === 0 ? 50 : 0)}>
-                <VolumeIcon className="h-4 w-4" />
-              </Button>
-              <Slider
-                value={[volume]}
-                max={100}
-                step={1}
-                onValueChange={([value]) => setPlayerVolume(value)}
-                className="w-24"
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
