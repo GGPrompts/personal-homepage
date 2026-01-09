@@ -62,9 +62,25 @@ function formatTime(ms: number) {
 export function PersistentMusicDrawer() {
   const context = useMusicPlayerSafe()
 
+  // Track liked state - must be called before any early returns (Rules of Hooks)
+  const [isLiked, setIsLiked] = React.useState(false)
+
+  // Get track ID for useEffect dependency (safe to access before null checks)
+  const trackId = context?.player?.currentTrack?.id || context?.remotePlayback?.item?.id
+
+  // Check liked state when track changes
+  React.useEffect(() => {
+    if (trackId) {
+      checkSavedTracks([trackId])
+        .then(([liked]) => setIsLiked(liked))
+        .catch(() => {})
+    }
+  }, [trackId])
+
   // Don't render if context is not available
   if (!context) return null
 
+  // Extract values after null check - TypeScript now knows these are defined
   const { auth, player, isDrawerOpen, setDrawerOpen, isDrawerExpanded, setDrawerExpanded, remotePlayback, isRemoteMode } = context
 
   // Don't render if not authenticated or not premium
@@ -90,17 +106,6 @@ export function PersistentMusicDrawer() {
   const volume = player.isActive ? player.volume : (remotePlayback?.device?.volume_percent ?? 50)
   const shuffleState = player.isActive ? player.shuffle : (remotePlayback?.shuffle_state ?? false)
   const repeatModeState = player.isActive ? player.repeatMode : (remotePlayback?.repeat_state ?? "off")
-
-  // Track liked state
-  const [isLiked, setIsLiked] = React.useState(false)
-
-  React.useEffect(() => {
-    if (currentTrack?.id) {
-      checkSavedTracks([currentTrack.id])
-        .then(([liked]) => setIsLiked(liked))
-        .catch(() => {})
-    }
-  }, [currentTrack?.id])
 
   const toggleLike = async () => {
     if (!currentTrack?.id) return
