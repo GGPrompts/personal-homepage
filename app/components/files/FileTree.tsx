@@ -154,9 +154,13 @@ export function FileTree({
 
     doFetch()
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      // Reset on cleanup so Strict Mode double-invoke works
+      hasFetchedRef.current = false
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fileTree])
+  }, [])
 
   // Handle pending navigation from context
   useEffect(() => {
