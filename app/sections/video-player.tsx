@@ -74,8 +74,14 @@ import {
   useEnrichedSearch,
   useEnrichedPlaylist,
   useYouTubeApiStatus,
+  useYouTubeComments,
+  useChannelInfo,
+  useChannelUploads,
+  useVideoDetails,
   extractPlaylistId,
   type SearchFilters,
+  type CommentData,
+  type ChannelData,
 } from "@/hooks/useYouTube"
 import { Search, Filter, ListPlus, Loader2 as LoaderIcon, Download } from "lucide-react"
 import { VideoDownloadModal, DownloadProgressIndicator } from "@/components/VideoDownloadModal"
@@ -481,6 +487,43 @@ export default function VideoPlayerSection({
   const { playlist: playlistInfo, items: playlistItems, isLoading: playlistLoading, error: playlistError } = useEnrichedPlaylist(
     loadedPlaylistId,
     viewMode === "playlist" && !!loadedPlaylistId
+  )
+
+  // Get video details for currently playing YouTube video
+  const currentYouTubeId = (videoSource.type === 'youtube' && videoSource.youtubeId) ? videoSource.youtubeId : null
+  const { data: currentVideoData } = useVideoDetails(
+    currentYouTubeId ? [currentYouTubeId] : [],
+    !!currentYouTubeId && hasApiKey
+  )
+  const currentVideoDetails = currentVideoData?.videos?.[0]
+
+  // Fetch comments for currently playing YouTube video
+  const {
+    data: commentsData,
+    isLoading: commentsLoading,
+    isError: commentsError,
+  } = useYouTubeComments(
+    currentYouTubeId,
+    { order: commentSort === "top" ? "relevance" : "time", maxResults: 20 },
+    !!currentYouTubeId && hasApiKey
+  )
+  const youtubeComments = commentsData?.comments || []
+
+  // Fetch channel info for currently playing video
+  const currentChannelId = currentVideoDetails?.channelId
+  const { data: channelData } = useChannelInfo(
+    currentChannelId ? [currentChannelId] : [],
+    !!currentChannelId && hasApiKey
+  )
+  const channelInfo = channelData?.channels?.[0]
+
+  // Fetch channel's other videos for sidebar
+  const {
+    items: channelVideos,
+    isLoading: channelVideosLoading,
+  } = useChannelUploads(
+    currentChannelId || null,
+    !!currentChannelId && hasApiKey
   )
 
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null)
@@ -1838,17 +1881,17 @@ export default function VideoPlayerSection({
               className="mt-4"
             >
               <h1 className="text-xl md:text-2xl font-bold text-foreground mb-2">
-                {currentVideo.title}
+                {currentVideoDetails?.title || currentVideo.title}
               </h1>
 
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 {/* Views and Date */}
                 <div className="flex items-center gap-2 text-muted-foreground text-sm">
                   <Eye className="h-4 w-4" />
-                  <span>{formatViews(currentVideo.views)} views</span>
+                  <span>{formatViews(currentVideoDetails?.viewCount || currentVideo.views)} views</span>
                   <span>•</span>
                   <Clock className="h-4 w-4" />
-                  <span>{new Date(currentVideo.uploadDate).toLocaleDateString()}</span>
+                  <span>{new Date(currentVideoDetails?.publishedAt || currentVideo.uploadDate).toLocaleDateString()}</span>
                 </div>
 
                 {/* Action Buttons */}
@@ -1918,22 +1961,24 @@ export default function VideoPlayerSection({
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
                   <div className="flex items-center gap-3">
                     <Avatar className="h-12 w-12">
-                      <AvatarImage src={currentVideo.channel.avatar} />
+                      <AvatarImage src={channelInfo?.avatar || currentVideo.channel.avatar} />
                       <AvatarFallback className="bg-primary/20 text-primary">
-                        {currentVideo.channel.name[0]}
+                        {(channelInfo?.name || currentVideo.channel.name)[0]}
                       </AvatarFallback>
                     </Avatar>
                     <div>
                       <div className="flex items-center gap-1">
                         <h3 className="font-semibold text-foreground">
-                          {currentVideo.channel.name}
+                          {currentVideoDetails?.channelTitle || currentVideo.channel.name}
                         </h3>
                         {currentVideo.channel.isVerified && (
                           <CheckCircle2 className="h-4 w-4 text-primary" />
                         )}
                       </div>
                       <p className="text-muted-foreground text-sm">
-                        {formatSubscribers(currentVideo.channel.subscribers)} subscribers
+                        {channelInfo
+                          ? channelInfo.subscriberCountFormatted + " subscribers"
+                          : formatSubscribers(currentVideo.channel.subscribers) + " subscribers"}
                       </p>
                     </div>
                   </div>
@@ -1962,9 +2007,12 @@ export default function VideoPlayerSection({
                 <Collapsible open={isDescriptionExpanded} onOpenChange={setIsDescriptionExpanded}>
                   <div className="glass-dark rounded-lg p-4">
                     <p className="text-foreground text-sm whitespace-pre-line">
-                      {isDescriptionExpanded
-                        ? currentVideo.description
-                        : currentVideo.description.slice(0, 200) + "..."}
+                      {(() => {
+                        const description = currentVideoDetails?.description || currentVideo.description
+                        return isDescriptionExpanded
+                          ? description
+                          : description.slice(0, 200) + (description.length > 200 ? "..." : "")
+                      })()}
                     </p>
                     <CollapsibleContent>
                       <div className="mt-4 pt-4 border-t border-border">
@@ -2020,7 +2068,9 @@ export default function VideoPlayerSection({
                 <div className="flex items-center gap-2">
                   <MessageSquare className="h-5 w-5 text-primary" />
                   <h3 className="text-lg font-semibold text-foreground">
-                    {comments.length} Comments
+                    {currentYouTubeId && hasApiKey
+                      ? `${commentsData?.totalResults || youtubeComments.length} Comments`
+                      : `${comments.length} Comments`}
                   </h3>
                 </div>
                 <Popover>
@@ -2082,9 +2132,34 @@ export default function VideoPlayerSection({
 
               {/* Comment List */}
               <div className="space-y-6">
-                {comments.map((comment) => (
-                  <CommentItem key={comment.id} comment={comment} />
-                ))}
+                {/* YouTube Comments (when playing YouTube video) */}
+                {currentYouTubeId && hasApiKey ? (
+                  commentsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <LoaderIcon className="h-6 w-6 animate-spin text-primary" />
+                      <span className="ml-2 text-muted-foreground">Loading comments...</span>
+                    </div>
+                  ) : commentsError ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>{commentsData?.error || "Comments are not available for this video"}</p>
+                    </div>
+                  ) : youtubeComments.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>No comments yet</p>
+                    </div>
+                  ) : (
+                    youtubeComments.map((comment) => (
+                      <YouTubeCommentItem key={comment.id} comment={comment} />
+                    ))
+                  )
+                ) : (
+                  /* Mock comments when no YouTube video */
+                  comments.map((comment) => (
+                    <CommentItem key={comment.id} comment={comment} />
+                  ))
+                )}
               </div>
             </motion.div>
           </div>
@@ -2097,14 +2172,16 @@ export default function VideoPlayerSection({
               transition={{ duration: 0.5, delay: 0.2 }}
               className="w-full lg:w-[400px] space-y-4"
             >
-              {/* Playlist */}
+              {/* Channel Videos / Playlist */}
               <Card className="glass border-border">
                 <div className="p-4 border-b border-border">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <ListVideo className="h-5 w-5 text-primary" />
-                      <h3 className="font-semibold text-foreground">
-                        Next.js 15 Complete Course
+                      <h3 className="font-semibold text-foreground line-clamp-1">
+                        {channelInfo?.name && currentYouTubeId
+                          ? `More from ${channelInfo.name}`
+                          : "Next.js 15 Complete Course"}
                       </h3>
                     </div>
                     <Button
@@ -2121,7 +2198,9 @@ export default function VideoPlayerSection({
                     </Button>
                   </div>
                   <p className="text-muted-foreground text-sm">
-                    CodeCraft Academy • 2/5
+                    {channelInfo && currentYouTubeId
+                      ? `${channelInfo.subscriberCountFormatted} subscribers`
+                      : "CodeCraft Academy • 2/5"}
                   </p>
                   <div className="flex items-center gap-4 mt-3">
                     <Button
@@ -2164,36 +2243,88 @@ export default function VideoPlayerSection({
                     >
                       <ScrollArea className="h-[300px]">
                         <div className="p-2">
-                          {playlist.map((item, idx) => (
-                            <div
-                              key={item.id}
-                              className={`flex items-start gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
-                                item.isPlaying ? "bg-primary/20" : "hover:bg-muted/20"
-                              }`}
-                            >
-                              <span className="text-muted-foreground text-sm w-6 text-center">
-                                {item.isPlaying ? (
-                                  <Play className="h-4 w-4 text-primary" fill="currentColor" />
-                                ) : (
-                                  idx + 1
-                                )}
-                              </span>
-                              <div className="relative w-[100px] aspect-video rounded overflow-hidden bg-muted flex-shrink-0">
-                                <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900" />
-                                <span className="absolute bottom-1 right-1 bg-black/80 text-foreground text-xs px-1 rounded">
-                                  {formatTime(item.duration)}
+                          {/* Show channel videos when playing YouTube, otherwise show mock playlist */}
+                          {currentYouTubeId && hasApiKey && channelVideos.length > 0 ? (
+                            channelVideosLoading ? (
+                              <div className="flex items-center justify-center py-8">
+                                <LoaderIcon className="h-5 w-5 animate-spin text-primary" />
+                              </div>
+                            ) : (
+                              channelVideos
+                                .filter(v => v.videoId !== currentYouTubeId)
+                                .slice(0, 10)
+                                .map((item, idx) => (
+                                  <div
+                                    key={item.videoId}
+                                    className="flex items-start gap-2 p-2 rounded-lg cursor-pointer transition-colors hover:bg-muted/20"
+                                    onClick={() => {
+                                      setVideoSource({ type: 'youtube', url: `https://www.youtube.com/watch?v=${item.videoId}`, youtubeId: item.videoId })
+                                      setShowSourceInput(false)
+                                      setVideoError(null)
+                                    }}
+                                  >
+                                    <span className="text-muted-foreground text-sm w-6 text-center">
+                                      {idx + 1}
+                                    </span>
+                                    <div className="relative w-[100px] aspect-video rounded overflow-hidden bg-muted flex-shrink-0">
+                                      <img
+                                        src={item.thumbnail}
+                                        alt={item.title}
+                                        className="absolute inset-0 w-full h-full object-cover"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none'
+                                        }}
+                                      />
+                                      <div className="absolute inset-0 bg-gradient-to-br from-slate-800/30 to-slate-900/30" />
+                                      {item.durationFormatted && (
+                                        <span className="absolute bottom-1 right-1 bg-black/80 text-foreground text-xs px-1 rounded">
+                                          {item.durationFormatted}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-foreground text-sm line-clamp-2">
+                                        {item.title}
+                                      </p>
+                                      <p className="text-muted-foreground text-xs mt-1">
+                                        {item.viewCount ? `${formatViews(item.viewCount)} views` : item.channelTitle}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))
+                            )
+                          ) : (
+                            playlist.map((item, idx) => (
+                              <div
+                                key={item.id}
+                                className={`flex items-start gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
+                                  item.isPlaying ? "bg-primary/20" : "hover:bg-muted/20"
+                                }`}
+                              >
+                                <span className="text-muted-foreground text-sm w-6 text-center">
+                                  {item.isPlaying ? (
+                                    <Play className="h-4 w-4 text-primary" fill="currentColor" />
+                                  ) : (
+                                    idx + 1
+                                  )}
                                 </span>
+                                <div className="relative w-[100px] aspect-video rounded overflow-hidden bg-muted flex-shrink-0">
+                                  <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900" />
+                                  <span className="absolute bottom-1 right-1 bg-black/80 text-foreground text-xs px-1 rounded">
+                                    {formatTime(item.duration)}
+                                  </span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-foreground text-sm line-clamp-2">
+                                    {item.title}
+                                  </p>
+                                  <p className="text-muted-foreground text-xs mt-1">
+                                    {item.channel}
+                                  </p>
+                                </div>
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-foreground text-sm line-clamp-2">
-                                  {item.title}
-                                </p>
-                                <p className="text-muted-foreground text-xs mt-1">
-                                  {item.channel}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
+                            ))
+                          )}
                         </div>
                       </ScrollArea>
                     </motion.div>
@@ -2472,6 +2603,106 @@ function CommentItem({ comment, isReply = false }: { comment: Comment; isReply?:
                 </motion.div>
               )}
             </AnimatePresence>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// YouTube Comment Component (for real YouTube comments)
+function YouTubeCommentItem({ comment, isReply = false }: { comment: CommentData; isReply?: boolean }) {
+  const [isLiked, setIsLiked] = useState(false)
+  const [likes, setLikes] = useState(comment.likes)
+  const [showReplies, setShowReplies] = useState(false)
+
+  const handleLike = () => {
+    if (isLiked) {
+      setIsLiked(false)
+      setLikes((prev) => prev - 1)
+    } else {
+      setIsLiked(true)
+      setLikes((prev) => prev + 1)
+    }
+  }
+
+  return (
+    <div className={`flex gap-3 ${isReply ? "ml-12" : ""}`}>
+      <Avatar className={isReply ? "h-8 w-8" : "h-10 w-10"}>
+        <AvatarImage src={comment.author.avatar} />
+        <AvatarFallback className="bg-primary/20 text-primary">
+          {comment.author.name[0]}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex-1">
+        <div className="flex items-center gap-2 mb-1">
+          <a
+            href={comment.author.channelUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-foreground text-sm font-medium hover:text-primary transition-colors"
+          >
+            {comment.author.name}
+          </a>
+          <span className="text-muted-foreground text-xs">{comment.date}</span>
+        </div>
+        <div
+          className="text-foreground text-sm mb-2 [&_a]:text-primary [&_a]:hover:underline"
+          dangerouslySetInnerHTML={{ __html: comment.content }}
+        />
+        <div className="flex items-center gap-4">
+          <button
+            className={`flex items-center gap-1 text-sm ${isLiked ? "text-primary" : "text-muted-foreground"} hover:text-primary transition-colors`}
+            onClick={handleLike}
+          >
+            <ThumbsUp className={`h-4 w-4 ${isLiked ? "fill-current" : ""}`} />
+            {likes > 0 && <span>{likes}</span>}
+          </button>
+          <button className="text-muted-foreground hover:text-foreground transition-colors">
+            <ThumbsDown className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Replies */}
+        {comment.replies && comment.replies.length > 0 && (
+          <div className="mt-3">
+            <button
+              className="flex items-center gap-2 text-primary text-sm font-medium"
+              onClick={() => setShowReplies(!showReplies)}
+            >
+              {showReplies ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+              {comment.replyCount > comment.replies.length
+                ? `${comment.replyCount} replies`
+                : `${comment.replies.length} ${comment.replies.length === 1 ? "reply" : "replies"}`}
+            </button>
+            <AnimatePresence>
+              {showReplies && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mt-3 space-y-4"
+                >
+                  {comment.replies.map((reply) => (
+                    <YouTubeCommentItem key={reply.id} comment={reply} isReply />
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
+        {/* Show reply count even if replies not loaded */}
+        {comment.replyCount > 0 && (!comment.replies || comment.replies.length === 0) && (
+          <div className="mt-3">
+            <span className="flex items-center gap-2 text-muted-foreground text-sm">
+              <Reply className="h-4 w-4" />
+              {comment.replyCount} {comment.replyCount === 1 ? "reply" : "replies"}
+            </span>
           </div>
         )}
       </div>
