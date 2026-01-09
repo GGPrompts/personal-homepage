@@ -62,6 +62,7 @@ import {
   CategoryMeta,
   DEFAULT_CATEGORY_ASSIGNMENTS,
   DEFAULT_COLLAPSED_CATEGORIES,
+  CATEGORIES,
 } from "@/hooks/useSectionPreferences"
 import { useEnvironment, requiresLocalhost } from "@/hooks/useEnvironment"
 import { useWorkingDirectory } from "@/hooks/useWorkingDirectory"
@@ -777,7 +778,8 @@ export default function PersonalHomepage() {
   } = useSectionPreferences()
 
   // Get dynamic categories (default + custom)
-  const categories = getAllCategories()
+  // Use default categories until preferences are loaded to prevent hydration mismatch
+  const categories = isLoaded ? getAllCategories() : CATEGORIES
   const { isLocal } = useEnvironment()
   const {
     workingDir,

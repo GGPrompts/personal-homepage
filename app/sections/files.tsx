@@ -38,13 +38,14 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled }: FilesSectionPr
 
       {/* Main content with resizable panels */}
       <div className="flex-1 min-h-0 glass-dark rounded-lg border border-border overflow-hidden">
-        <ResizablePanelGroup direction="horizontal" className="h-full">
+        <ResizablePanelGroup direction="horizontal" className="h-full w-full">
           {/* Left sidebar - File Tree */}
           <ResizablePanel
+            id="files-tree"
             defaultSize={25}
             minSize={15}
             maxSize={40}
-            className="border-r border-border/50"
+            className="border-r border-border/50 overflow-hidden"
           >
             <FileTree
               basePath={workingDir || '~'}
@@ -54,10 +55,10 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled }: FilesSectionPr
             />
           </ResizablePanel>
 
-          <ResizableHandle withHandle className="bg-border/50 hover:bg-primary/20 transition-colors" />
+          <ResizableHandle withHandle className="bg-border/50 hover:bg-primary/20 transition-colors data-[resize-handle-active]:bg-primary/40" />
 
           {/* Main area - Tabs for Files and Plugins */}
-          <ResizablePanel defaultSize={75} minSize={40}>
+          <ResizablePanel id="files-content" defaultSize={75} minSize={40}>
             <div className="h-full flex flex-col">
               <Tabs
                 value={activeTab}
