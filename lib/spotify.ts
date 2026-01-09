@@ -474,6 +474,13 @@ export async function spotifyFetch<T>(
   // Handle empty response body (some endpoints return 200 OK with no content)
   const text = await response.text()
   if (!text) return {} as T
+
+  // Some endpoints return non-JSON text (e.g., snapshot IDs)
+  const contentType = response.headers.get("content-type")
+  if (!contentType?.includes("application/json")) {
+    return {} as T
+  }
+
   return JSON.parse(text)
 }
 

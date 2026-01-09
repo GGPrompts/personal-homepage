@@ -291,7 +291,7 @@ export function PersistentMusicDrawer() {
                         ) : (
                           player.devices.map((device) => {
                             const Icon = getDeviceIcon(device.type)
-                            const isActive = device.is_active || device.id === player.deviceId
+                            const isActive = device.is_active
                             return (
                               <DropdownMenuItem
                                 key={device.id}
