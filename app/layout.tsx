@@ -8,6 +8,8 @@ import { MasterBackground } from "@/components/MasterBackground";
 import { QueryProvider } from "@/components/QueryProvider";
 import { AuthProvider } from "@/components/AuthProvider";
 import { LocalhostRedirect } from "@/components/LocalhostRedirect";
+import { MusicPlayerProvider } from "@/components/MusicPlayerProvider";
+import { PersistentMusicDrawer } from "@/components/PersistentMusicDrawer";
 import { Toaster } from "sonner";
 
 const inter = Inter({
@@ -39,19 +41,22 @@ export default function RootLayout({
             <BackgroundProvider>
               <PageBackgroundProvider>
                 <ThemeProvider>
-                  <MasterBackground />
-                  {children}
-                  <Toaster
-                    theme="dark"
-                    position="bottom-right"
-                    toastOptions={{
-                      style: {
-                        background: 'hsl(var(--popover))',
-                        border: '1px solid hsl(var(--border))',
-                        color: 'hsl(var(--popover-foreground))',
-                      },
-                    }}
-                  />
+                  <MusicPlayerProvider>
+                    <MasterBackground />
+                    {children}
+                    <PersistentMusicDrawer />
+                    <Toaster
+                      theme="dark"
+                      position="bottom-right"
+                      toastOptions={{
+                        style: {
+                          background: 'hsl(var(--popover))',
+                          border: '1px solid hsl(var(--border))',
+                          color: 'hsl(var(--popover-foreground))',
+                        },
+                      }}
+                    />
+                  </MusicPlayerProvider>
                 </ThemeProvider>
               </PageBackgroundProvider>
             </BackgroundProvider>
