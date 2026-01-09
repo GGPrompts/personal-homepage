@@ -26,7 +26,7 @@ import {
 } from "lucide-react"
 
 // Section IDs that can be toggled (excluding home and settings which are always visible)
-export type ToggleableSection = "weather" | "feed" | "api-playground" | "notes" | "bookmarks" | "search" | "stocks" | "crypto" | "spacex" | "github-activity" | "disasters" | "tasks" | "projects" | "jobs" | "profile" | "ai-workspace" | "market-pulse" | "kanban" | "photo-gallery" | "music-player" | "video-player"
+export type ToggleableSection = "weather" | "feed" | "api-playground" | "notes" | "bookmarks" | "search" | "stocks" | "crypto" | "spacex" | "github-activity" | "disasters" | "tasks" | "projects" | "jobs" | "profile" | "ai-workspace" | "market-pulse" | "kanban" | "photo-gallery" | "music-player" | "video-player" | "files"
 
 // All sections including non-toggleable ones
 export type Section = "home" | ToggleableSection | "settings"
@@ -144,6 +144,7 @@ export const DEFAULT_CATEGORY_ASSIGNMENTS: Record<ToggleableSection, CategoryId>
   "photo-gallery": "entertainment",
   "music-player": "entertainment",
   "video-player": "entertainment",
+  files: "development",
 }
 
 // Default collapsed state (all expanded)
@@ -174,6 +175,7 @@ export const DEFAULT_SECTION_ORDER: ToggleableSection[] = [
   "disasters",
   "tasks",
   "projects",
+  "files",
   "jobs",
   "profile",
   "kanban",
@@ -199,6 +201,7 @@ export const DEFAULT_VISIBILITY: Record<ToggleableSection, boolean> = {
   disasters: true,
   tasks: true,
   projects: true,
+  files: true,
   jobs: true,
   profile: true,
   kanban: true,
