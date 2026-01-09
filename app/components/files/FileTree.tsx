@@ -294,7 +294,6 @@ export function FileTree({
         <Collapsible
           key={node.path}
           open={isExpanded}
-          onOpenChange={() => toggleFolder(node.path, hasChildren)}
         >
           <CollapsibleTrigger asChild>
             <button
