@@ -71,12 +71,21 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result)
   } catch (error) {
-    console.error("Error opening URL:", error)
     const message = error instanceof Error ? error.message : "Failed to open URL"
 
-    if (message.includes("ENOENT") || message.includes("not found")) {
+    // Check if it's an MCP session error (no active Claude Code session)
+    if (
+      message.includes("not found") ||
+      message.includes("Is Claude Code running") ||
+      message.includes("MCP state file") ||
+      message.includes("endpoint file")
+    ) {
+      // Don't log expected errors when Claude isn't running
       return NextResponse.json(
-        { error: "mcp-cli not available. Make sure MCP is configured." },
+        {
+          error: "Opening URLs via TabzChrome requires an active Claude Code session.",
+          hint: "URLs will open in a new browser tab instead.",
+        },
         { status: 503 }
       )
     }
@@ -89,6 +98,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    console.error("Error opening URL:", error)
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

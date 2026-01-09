@@ -71,17 +71,26 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ results: bookmarks, query })
   } catch (error) {
-    console.error("Error searching bookmarks:", error)
     const message = error instanceof Error ? error.message : "Failed to search bookmarks"
 
-    // Check if it's an MCP connection error
-    if (message.includes("ENOENT") || message.includes("not found")) {
+    // Check if it's an MCP session error (no active Claude Code session)
+    if (
+      message.includes("not found") ||
+      message.includes("Is Claude Code running") ||
+      message.includes("MCP state file") ||
+      message.includes("endpoint file")
+    ) {
+      // Don't log expected errors when Claude isn't running
       return NextResponse.json(
-        { error: "mcp-cli not available. Make sure MCP is configured." },
+        {
+          error: "Chrome bookmark search requires an active Claude Code session with TabzChrome MCP.",
+          hint: "Start Claude Code in a terminal to enable this feature.",
+        },
         { status: 503 }
       )
     }
 
+    console.error("Error searching bookmarks:", error)
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
