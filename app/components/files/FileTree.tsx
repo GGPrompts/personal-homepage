@@ -20,6 +20,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/component
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useFilesContext, FileNode } from '@/app/contexts/FilesContext'
 import { getClaudeFileType, claudeFileColors } from '@/lib/claudeFileTypes'
+import { FileTreeContextMenu } from './FileTreeContextMenu'
 import { cn } from '@/lib/utils'
 
 interface FileTreeProps {
@@ -295,32 +296,39 @@ export function FileTree({
           key={node.path}
           open={isExpanded}
         >
-          <CollapsibleTrigger asChild>
-            <button
-              className={cn(
-                'flex w-full items-center gap-1.5 rounded px-2 py-1 text-sm transition-colors',
-                'hover:bg-primary/10',
-                isSelected && 'bg-primary/20 text-primary'
-              )}
-              style={{ paddingLeft: `${depth * 12 + 8}px` }}
-              onClick={() => handleNodeClick(node)}
-              title={node.path}
-            >
-              <span className="flex h-4 w-4 items-center justify-center">
-                {isLoading ? (
-                  <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                ) : isExpanded ? (
-                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="h-3 w-3 text-muted-foreground" />
+          <FileTreeContextMenu
+            path={node.path}
+            name={node.name}
+            isDirectory={true}
+            source="local"
+          >
+            <CollapsibleTrigger asChild>
+              <button
+                className={cn(
+                  'flex w-full items-center gap-1.5 rounded px-2 py-1 text-sm transition-colors',
+                  'hover:bg-primary/10',
+                  isSelected && 'bg-primary/20 text-primary'
                 )}
-              </span>
-              {getFolderIcon(node.name, node.path, isExpanded)}
-              <span className={cn('truncate font-medium', textColor)}>
-                {node.name}
-              </span>
-            </button>
-          </CollapsibleTrigger>
+                style={{ paddingLeft: `${depth * 12 + 8}px` }}
+                onClick={() => handleNodeClick(node)}
+                title={node.path}
+              >
+                <span className="flex h-4 w-4 items-center justify-center">
+                  {isLoading ? (
+                    <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                  ) : isExpanded ? (
+                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                  )}
+                </span>
+                {getFolderIcon(node.name, node.path, isExpanded)}
+                <span className={cn('truncate font-medium', textColor)}>
+                  {node.name}
+                </span>
+              </button>
+            </CollapsibleTrigger>
+          </FileTreeContextMenu>
           <CollapsibleContent>
             {node.children?.map(child => renderNode(child, depth + 1))}
           </CollapsibleContent>
@@ -330,22 +338,29 @@ export function FileTree({
 
     // File node
     return (
-      <button
+      <FileTreeContextMenu
         key={node.path}
-        className={cn(
-          'flex w-full items-center gap-1.5 rounded px-2 py-1 text-sm transition-colors',
-          'hover:bg-primary/10',
-          isSelected && 'bg-primary/20 text-primary'
-        )}
-        style={{ paddingLeft: `${depth * 12 + 8 + 16}px` }}
-        onClick={() => handleNodeClick(node)}
-        title={node.path}
+        path={node.path}
+        name={node.name}
+        isDirectory={false}
+        source="local"
       >
-        {getFileIcon(node.name, node.path)}
-        <span className={cn('truncate', textColor)}>
-          {node.name}
-        </span>
-      </button>
+        <button
+          className={cn(
+            'flex w-full items-center gap-1.5 rounded px-2 py-1 text-sm transition-colors',
+            'hover:bg-primary/10',
+            isSelected && 'bg-primary/20 text-primary'
+          )}
+          style={{ paddingLeft: `${depth * 12 + 8 + 16}px` }}
+          onClick={() => handleNodeClick(node)}
+          title={node.path}
+        >
+          {getFileIcon(node.name, node.path)}
+          <span className={cn('truncate', textColor)}>
+            {node.name}
+          </span>
+        </button>
+      </FileTreeContextMenu>
     )
   }, [expandedFolders, selectedPath, loadingFolders, toggleFolder, handleNodeClick, getFolderIcon, getFileIcon, getTextColor])
 
