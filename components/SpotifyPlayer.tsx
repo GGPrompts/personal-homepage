@@ -20,9 +20,6 @@ import {
   LogOut,
   Loader2,
   AlertCircle,
-  Monitor,
-  Smartphone,
-  Speaker,
   ChevronDown,
   Music,
   Clock,
@@ -36,13 +33,6 @@ import { Slider } from "@/components/ui/slider"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useSpotifyAuth } from "@/hooks/useSpotifyAuth"
@@ -171,75 +161,6 @@ function SpotifySetup({
 }
 
 // ============================================================================
-// DEVICE SELECTOR
-// ============================================================================
-
-function DeviceSelector({
-  devices,
-  currentDeviceId,
-  onRefresh,
-  onSelect,
-}: {
-  devices: Array<{ id: string; name: string; type: string; is_active: boolean; volume_percent: number }>
-  currentDeviceId: string | null
-  onRefresh: () => void
-  onSelect: (deviceId: string) => void
-}) {
-  const getDeviceIcon = (type: string) => {
-    switch (type.toLowerCase()) {
-      case "computer":
-        return Monitor
-      case "smartphone":
-        return Smartphone
-      case "speaker":
-        return Speaker
-      default:
-        return Speaker
-    }
-  }
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-          <Monitor className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
-        <div className="px-2 py-1.5 flex items-center justify-between">
-          <span className="text-sm font-medium">Devices</span>
-          <Button variant="ghost" size="sm" onClick={onRefresh} className="h-6 w-6 p-0">
-            <Loader2 className="h-3 w-3" />
-          </Button>
-        </div>
-        <DropdownMenuSeparator />
-        {devices.length === 0 ? (
-          <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-            No devices found
-          </div>
-        ) : (
-          devices.map((device) => {
-            const Icon = getDeviceIcon(device.type)
-            const isActive = device.is_active || device.id === currentDeviceId
-            return (
-              <DropdownMenuItem
-                key={device.id}
-                onClick={() => onSelect(device.id)}
-                className={isActive ? "bg-primary/10" : ""}
-              >
-                <Icon className={`h-4 w-4 mr-2 ${isActive ? "text-primary" : ""}`} />
-                <span className={isActive ? "text-primary font-medium" : ""}>{device.name}</span>
-                {isActive && <Badge variant="secondary" className="ml-auto text-xs">Active</Badge>}
-              </DropdownMenuItem>
-            )
-          })
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
-// ============================================================================
 // MAIN SPOTIFY PLAYER COMPONENT
 // ============================================================================
 
@@ -258,11 +179,8 @@ export function SpotifyPlayer() {
   } = useSpotifyAuth()
 
   const {
-    sdkLoaded,
     error: playerError,
     isReady,
-    deviceId,
-    isActive,
     isPlaying,
     position,
     duration,
@@ -272,7 +190,6 @@ export function SpotifyPlayer() {
     currentTrack,
     togglePlay,
     playTrack,
-    playTracks,
     playContext,
     skipNext,
     skipPrevious,
@@ -280,9 +197,6 @@ export function SpotifyPlayer() {
     setPlayerVolume,
     toggleShuffle,
     cycleRepeat,
-    devices,
-    refreshDevices,
-    switchDevice,
   } = useSpotifyPlayer(isAuthenticated, isPremium)
 
   // Search state
@@ -457,17 +371,9 @@ export function SpotifyPlayer() {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <DeviceSelector
-            devices={devices}
-            currentDeviceId={deviceId}
-            onRefresh={refreshDevices}
-            onSelect={switchDevice}
-          />
-          <Button variant="ghost" size="sm" onClick={logout}>
-            <LogOut className="h-4 w-4" />
-          </Button>
-        </div>
+        <Button variant="ghost" size="sm" onClick={logout}>
+          <LogOut className="h-4 w-4" />
+        </Button>
       </div>
 
       {/* Error display */}
@@ -992,12 +898,6 @@ export function SpotifyPlayer() {
                 step={1}
                 onValueChange={([value]) => setPlayerVolume(value)}
                 className="w-24"
-              />
-              <DeviceSelector
-                devices={devices}
-                currentDeviceId={deviceId}
-                onRefresh={refreshDevices}
-                onSelect={switchDevice}
               />
             </div>
           </div>

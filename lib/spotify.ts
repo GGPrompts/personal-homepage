@@ -471,7 +471,10 @@ export async function spotifyFetch<T>(
     throw new Error(error.error?.message || `Spotify API error: ${response.status}`)
   }
 
-  return response.json()
+  // Handle empty response body (some endpoints return 200 OK with no content)
+  const text = await response.text()
+  if (!text) return {} as T
+  return JSON.parse(text)
 }
 
 // ============================================================================

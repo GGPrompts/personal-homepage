@@ -148,6 +148,13 @@ export function useSpotifyAuth(): UseSpotifyAuthReturn {
 
           const userProfile = await getCurrentUser()
           setUser(userProfile)
+
+          // Clean up spotify-auth=pending from URL after successful auth
+          if (window.location.search.includes('spotify-auth=pending')) {
+            const url = new URL(window.location.href)
+            url.searchParams.delete('spotify-auth')
+            window.history.replaceState({}, '', url.toString())
+          }
         } catch (err) {
           console.error("Failed to complete Spotify auth:", err)
           setError(err instanceof Error ? err.message : "Authentication failed")

@@ -266,11 +266,13 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
 
             try {
               const deviceList = await getDevices()
+              // Always update devices list (other devices exist even if ours isn't registered yet)
+              setDevices(deviceList)
+
               const ourDevice = deviceList.find(d => d.id === device_id)
 
               if (ourDevice) {
                 console.log("Device registered in Spotify API:", ourDevice.name)
-                setDevices(deviceList)
 
                 // Auto-activate our device if no other device is active
                 const hasActiveDevice = deviceList.some(d => d.is_active)
@@ -519,12 +521,11 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
     }
   }, [refreshDevices])
 
-  // Device fetch - only on initial authentication
-  // Note: The SDK ready event handler handles device refresh with proper retry logic
+  // Device fetch - on initial authentication and when SDK becomes ready
   useEffect(() => {
-    if (isAuthenticated && isPremium && !isReady) {
-      // Fetch initial device list before SDK is ready
-      // This shows any existing devices (like phones, other computers)
+    if (isAuthenticated && isPremium) {
+      // Fetch device list both before SDK is ready (to show existing devices)
+      // and when SDK becomes ready (to ensure fresh list)
       refreshDevices()
     }
   }, [isAuthenticated, isPremium, isReady, refreshDevices])
