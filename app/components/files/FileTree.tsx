@@ -52,48 +52,7 @@ export function FileTree({
   const [error, setError] = useState<string | null>(null)
   const [currentPath, setCurrentPath] = useState(basePath)
   const treeRef = useRef<HTMLDivElement>(null)
-
-  // Fetch file tree from API
-  const fetchFileTree = useCallback(async (path: string, forceRefresh = false) => {
-    // Use cache if available
-    if (!forceRefresh && fileTree && fileTreePath === path) {
-      if (expandedFolders.size === 0 && fileTree.path) {
-        setExpandedFolders(new Set([fileTree.path]))
-      }
-      return
-    }
-
-    setLoading(true)
-    setError(null)
-
-    try {
-      const params = new URLSearchParams({
-        path,
-        depth: maxDepth.toString(),
-        showHidden: showHidden.toString(),
-      })
-      const response = await fetch(`/api/files/tree?${params}`)
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to load file tree')
-      }
-
-      const data = await response.json()
-      setFileTree(data)
-      setFileTreePath(data.path)
-
-      // Expand root folder
-      if (data?.path) {
-        setExpandedFolders(new Set([data.path]))
-      }
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load files'
-      setError(errorMessage)
-    } finally {
-      setLoading(false)
-    }
-  }, [fileTree, fileTreePath, maxDepth, showHidden, expandedFolders.size, setFileTree, setFileTreePath])
+  const hasFetchedRef = useRef(false)
 
   // Helper to update nested tree node
   const updateTreeNode = useCallback((tree: FileNode, dirPath: string, newChildren: FileNode[]): FileNode => {
@@ -142,19 +101,103 @@ export function FileTree({
     }
   }, [showHidden, setFileTree, updateTreeNode])
 
-  // Initial load
+  // Initial load - run once on mount, skip if data already exists in context
   useEffect(() => {
-    fetchFileTree(currentPath)
-  }, [currentPath, fetchFileTree])
+    // If data already exists in context, just expand the root and skip fetch
+    if (fileTree && fileTree.children && fileTree.children.length > 0) {
+      if (expandedFolders.size === 0 && fileTree.path) {
+        setExpandedFolders(new Set([fileTree.path]))
+      }
+      return
+    }
+
+    // Skip if already fetching
+    if (hasFetchedRef.current) return
+    hasFetchedRef.current = true
+
+    let cancelled = false
+
+    const doFetch = async () => {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const params = new URLSearchParams({
+          path: basePath,
+          depth: maxDepth.toString(),
+          showHidden: showHidden.toString(),
+        })
+        const response = await fetch(`/api/files/tree?${params}`)
+
+        if (cancelled) return
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to load file tree')
+        }
+
+        const data = await response.json()
+        if (cancelled) return
+
+        setFileTree(data)
+        setFileTreePath(data.path)
+        setExpandedFolders(new Set([data.path]))
+      } catch (err: unknown) {
+        if (cancelled) return
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load files'
+        setError(errorMessage)
+        hasFetchedRef.current = false
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    doFetch()
+
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileTree])
 
   // Handle pending navigation from context
   useEffect(() => {
-    if (pendingTreeNavigation) {
+    if (!pendingTreeNavigation) return
+
+    const navigateToPath = async () => {
       setCurrentPath(pendingTreeNavigation)
-      fetchFileTree(pendingTreeNavigation, true)
       clearPendingNavigation()
+      hasFetchedRef.current = false // Allow new fetch for navigation
+
+      setLoading(true)
+      setError(null)
+
+      try {
+        const params = new URLSearchParams({
+          path: pendingTreeNavigation,
+          depth: maxDepth.toString(),
+          showHidden: showHidden.toString(),
+        })
+        const response = await fetch(`/api/files/tree?${params}`)
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to load file tree')
+        }
+
+        const data = await response.json()
+        setFileTree(data)
+        setFileTreePath(data.path)
+        setExpandedFolders(new Set([data.path]))
+        hasFetchedRef.current = true
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load files'
+        setError(errorMessage)
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [pendingTreeNavigation, clearPendingNavigation, fetchFileTree])
+
+    navigateToPath()
+  }, [pendingTreeNavigation, clearPendingNavigation, maxDepth, showHidden, setFileTree, setFileTreePath])
 
   // Toggle folder expansion with lazy loading
   const toggleFolder = useCallback((path: string, hasChildren: boolean) => {
@@ -303,13 +346,45 @@ export function FileTree({
     )
   }, [expandedFolders, selectedPath, loadingFolders, toggleFolder, handleNodeClick, getFolderIcon, getFileIcon, getTextColor])
 
+  // Refresh handler for manual refresh button
+  const handleRefresh = useCallback(async () => {
+    hasFetchedRef.current = false
+    setLoading(true)
+    setError(null)
+
+    try {
+      const params = new URLSearchParams({
+        path: currentPath,
+        depth: maxDepth.toString(),
+        showHidden: showHidden.toString(),
+      })
+      const response = await fetch(`/api/files/tree?${params}`)
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to load file tree')
+      }
+
+      const data = await response.json()
+      setFileTree(data)
+      setFileTreePath(data.path)
+      setExpandedFolders(new Set([data.path]))
+      hasFetchedRef.current = true
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load files'
+      setError(errorMessage)
+    } finally {
+      setLoading(false)
+    }
+  }, [currentPath, maxDepth, showHidden, setFileTree, setFileTreePath])
+
   return (
     <div className={cn('flex h-full flex-col', className)}>
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border/50 px-3 py-2">
         <h3 className="text-sm font-semibold terminal-glow">Files</h3>
         <button
-          onClick={() => fetchFileTree(currentPath, true)}
+          onClick={handleRefresh}
           className="rounded p-1 hover:bg-muted transition-colors"
           title="Refresh"
           disabled={loading}

@@ -172,8 +172,8 @@ export function FilesProvider({ children }: { children: ReactNode }) {
     return stored
   })
 
-  // Wrapper to also save to localStorage
-  const setFileTreePath = (path: string | null) => {
+  // Wrapper to also save to localStorage - memoized to prevent infinite loops
+  const setFileTreePath = useCallback((path: string | null) => {
     setFileTreePathState(path)
     if (typeof window !== 'undefined') {
       if (path) {
@@ -182,7 +182,7 @@ export function FilesProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('files-tree-path')
       }
     }
-  }
+  }, [])
 
   // Pending navigation - for external requests to navigate the tree
   const [pendingTreeNavigation, setPendingTreeNavigation] = useState<string | null>(null)
