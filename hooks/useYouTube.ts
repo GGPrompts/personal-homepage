@@ -2,6 +2,40 @@ import { useQuery } from "@tanstack/react-query"
 import { useState, useCallback } from "react"
 
 // Types from API routes
+export interface CommentAuthor {
+  name: string
+  avatar: string
+  channelUrl: string
+}
+
+export interface CommentData {
+  id: string
+  author: CommentAuthor
+  content: string
+  likes: number
+  date: string
+  publishedAt: string
+  replyCount: number
+  replies: CommentData[]
+}
+
+export interface ChannelData {
+  id: string
+  name: string
+  handle?: string
+  description: string
+  avatar: string
+  avatarHigh?: string
+  bannerUrl?: string
+  subscriberCount: number
+  subscriberCountFormatted: string
+  videoCount: number
+  viewCount: number
+  uploadsPlaylistId: string
+  publishedAt: string
+  country?: string
+}
+
 export interface SearchResult {
   videoId: string
   title: string
@@ -248,4 +282,114 @@ export function extractPlaylistId(input: string): string | null {
   }
 
   return null
+}
+
+// Hook for fetching video comments
+export function useYouTubeComments(
+  videoId: string | null,
+  options: { order?: "relevance" | "time"; maxResults?: number } = {},
+  enabled = true
+) {
+  const apiKey = getYouTubeApiKey()
+  const { order = "relevance", maxResults = 20 } = options
+
+  return useQuery({
+    queryKey: ["youtube-comments", videoId, order, maxResults],
+    queryFn: async () => {
+      if (!videoId) return { comments: [], totalResults: 0 }
+
+      const params = new URLSearchParams({
+        videoId,
+        maxResults: maxResults.toString(),
+        order,
+      })
+
+      const response = await fetch(`/api/youtube/comments?${params.toString()}`, {
+        headers: apiKey ? { "x-youtube-api-key": apiKey } : {},
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to fetch comments")
+      }
+
+      return response.json() as Promise<{
+        comments: CommentData[]
+        nextPageToken?: string
+        totalResults: number
+        error?: string
+      }>
+    },
+    enabled: enabled && !!videoId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: (failureCount, error) => {
+      // Don't retry if comments are disabled
+      if (error instanceof Error && error.message.includes("disabled")) {
+        return false
+      }
+      return failureCount < 2
+    },
+  })
+}
+
+// Hook for fetching channel info
+export function useChannelInfo(channelIds: string[], enabled = true) {
+  const apiKey = getYouTubeApiKey()
+
+  return useQuery({
+    queryKey: ["youtube-channels", channelIds],
+    queryFn: async () => {
+      if (channelIds.length === 0) return { channels: [] }
+
+      const response = await fetch(`/api/youtube/channel?ids=${channelIds.join(",")}`, {
+        headers: apiKey ? { "x-youtube-api-key": apiKey } : {},
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to fetch channel info")
+      }
+
+      return response.json() as Promise<{ channels: ChannelData[] }>
+    },
+    enabled: enabled && channelIds.length > 0,
+    staleTime: 30 * 60 * 1000, // 30 minutes - channel info changes less frequently
+  })
+}
+
+// Hook for fetching channel's uploaded videos (as "related" videos alternative)
+export function useChannelUploads(channelId: string | null, enabled = true) {
+  const apiKey = getYouTubeApiKey()
+
+  // First get channel info to get uploads playlist ID
+  const channelQuery = useChannelInfo(channelId ? [channelId] : [], enabled && !!channelId)
+  const uploadsPlaylistId = channelQuery.data?.channels[0]?.uploadsPlaylistId
+
+  // Then get playlist items
+  const playlistQuery = usePlaylist(uploadsPlaylistId || null, enabled && !!uploadsPlaylistId)
+
+  // Get video details for durations
+  const videoIds = playlistQuery.data?.items.map(item => item.videoId) || []
+  const detailsQuery = useVideoDetails(videoIds, playlistQuery.isSuccess && videoIds.length > 0)
+
+  // Merge playlist items with video details
+  const enrichedItems = playlistQuery.data?.items.map(item => {
+    const details = detailsQuery.data?.videos.find(v => v.id === item.videoId)
+    return {
+      ...item,
+      duration: details?.duration || 0,
+      durationFormatted: details?.durationFormatted || "",
+      viewCount: details?.viewCount || 0,
+    }
+  })
+
+  return {
+    channel: channelQuery.data?.channels[0],
+    items: enrichedItems || [],
+    isLoading: channelQuery.isLoading || playlistQuery.isLoading ||
+               (playlistQuery.isSuccess && detailsQuery.isLoading),
+    isError: channelQuery.isError || playlistQuery.isError || detailsQuery.isError,
+    error: channelQuery.error || playlistQuery.error || detailsQuery.error,
+    totalResults: playlistQuery.data?.totalResults || 0,
+  }
 }
