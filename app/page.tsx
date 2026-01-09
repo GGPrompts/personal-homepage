@@ -212,14 +212,12 @@ function SidebarContent({
   const isMusicActive = currentTrack && (isPlaying || musicContext?.isDrawerOpen)
 
   const handleSectionClick = (id: Section) => {
-    // Special handling for music-player: open drawer instead of navigating
-    if (id === "music-player" && musicContext) {
-      musicContext.setDrawerOpen(true)
-      onNavigate?.() // Close mobile menu
-      return
-    }
     setActiveSection(id)
     onNavigate?.() // Close mobile menu when section is clicked
+    // If navigating to music-player and music is playing, also open the drawer
+    if (id === "music-player" && musicContext && isPlaying) {
+      musicContext.setDrawerOpen(true)
+    }
   }
 
   const handleHomeClick = () => {
@@ -383,7 +381,7 @@ function SidebarContent({
                                   ${showNowPlaying ? 'text-[#1DB954]' : ''}
                                 `}
                                 data-tabz-section={item.id}
-                                data-tabz-action={isMusicItem ? "open-drawer" : "navigate"}
+                                data-tabz-action="navigate"
                               >
                                 <div className="relative flex-shrink-0">
                                   <Icon className={`h-4 w-4 ${showNowPlaying && isPlaying ? 'animate-pulse' : ''}`} />
@@ -464,7 +462,7 @@ function SidebarContent({
                               ${showNowPlaying ? 'text-[#1DB954]' : ''}
                             `}
                             data-tabz-section={item.id}
-                            data-tabz-action={isMusicItem ? "open-drawer" : "navigate"}
+                            data-tabz-action="navigate"
                           >
                             <div className="relative flex-shrink-0">
                               <Icon className={`h-4 w-4 ${showNowPlaying && isPlaying ? 'animate-pulse' : ''}`} />
