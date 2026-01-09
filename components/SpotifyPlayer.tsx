@@ -35,9 +35,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useSpotifyAuth } from "@/hooks/useSpotifyAuth"
-import { useSpotifyPlayer } from "@/hooks/useSpotifyPlayer"
-import { useMusicPlayerSafe, type TimeRange } from "@/components/MusicPlayerProvider"
+import { useMusicPlayer, type TimeRange } from "@/components/MusicPlayerProvider"
 import {
   Select,
   SelectContent,
@@ -165,6 +163,9 @@ function SpotifySetup({
 // ============================================================================
 
 export function SpotifyPlayer() {
+  // Use shared context instead of separate hook instances
+  const { auth, player, topTracks, topTracksTimeRange, setTopTracksTimeRange, isLoadingTopTracks } = useMusicPlayer()
+
   const {
     isAuthenticated,
     isLoading: authLoading,
@@ -172,11 +173,10 @@ export function SpotifyPlayer() {
     error: authError,
     clientId,
     setClientId,
-    hasClientId,
     login,
     logout,
     isPremium,
-  } = useSpotifyAuth()
+  } = auth
 
   const {
     error: playerError,
@@ -197,7 +197,7 @@ export function SpotifyPlayer() {
     setPlayerVolume,
     toggleShuffle,
     cycleRepeat,
-  } = useSpotifyPlayer(isAuthenticated, isPremium)
+  } = player
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("")
@@ -216,9 +216,6 @@ export function SpotifyPlayer() {
 
   // Active view
   const [activeTab, setActiveTab] = useState<"search" | "playlists" | "liked" | "recent" | "top">("playlists")
-
-  // Get top tracks from global context
-  const musicPlayerContext = useMusicPlayerSafe()
 
   // Format time
   const formatTime = (ms: number) => {
@@ -718,8 +715,8 @@ export function SpotifyPlayer() {
               <div className="flex items-center gap-3">
                 <span className="text-sm text-muted-foreground">Time range:</span>
                 <Select
-                  value={musicPlayerContext?.topTracksTimeRange || "medium_term"}
-                  onValueChange={(value) => musicPlayerContext?.setTopTracksTimeRange(value as TimeRange)}
+                  value={topTracksTimeRange || "medium_term"}
+                  onValueChange={(value) => setTopTracksTimeRange(value as TimeRange)}
                 >
                   <SelectTrigger className="w-40">
                     <SelectValue />
@@ -733,13 +730,13 @@ export function SpotifyPlayer() {
               </div>
 
               <ScrollArea className="flex-1">
-                {musicPlayerContext?.isLoadingTopTracks ? (
+                {isLoadingTopTracks ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
-                ) : musicPlayerContext?.topTracks.length ? (
+                ) : topTracks.length ? (
                   <div className="space-y-1">
-                    {musicPlayerContext.topTracks.map((track, idx) => (
+                    {topTracks.map((track, idx) => (
                       <div
                         key={`${track.id}-${idx}`}
                         className={`group flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-primary/5 transition-colors ${
