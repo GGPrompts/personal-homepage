@@ -999,7 +999,7 @@ export default function PersonalHomepage() {
           </div>
 
           {/* Main Content */}
-          <main className="flex-1 overflow-auto" data-tabz-container="main" data-tabz-section={activeSection}>
+          <main className="flex-1 overflow-auto pb-24" data-tabz-container="main" data-tabz-section={activeSection}>
             {/* Mobile header spacer */}
             <div className="h-16 lg:hidden" />
 

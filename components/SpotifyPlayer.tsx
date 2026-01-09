@@ -26,6 +26,7 @@ import {
   ChevronDown,
   Music,
   Clock,
+  TrendingUp,
 } from "lucide-react"
 import Image from "next/image"
 import { Card } from "@/components/ui/card"
@@ -46,6 +47,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useSpotifyAuth } from "@/hooks/useSpotifyAuth"
 import { useSpotifyPlayer } from "@/hooks/useSpotifyPlayer"
+import { useMusicPlayerSafe, type TimeRange } from "@/components/MusicPlayerProvider"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   search,
   getPlaylists,
@@ -292,7 +301,10 @@ export function SpotifyPlayer() {
   const [currentTrackLiked, setCurrentTrackLiked] = useState(false)
 
   // Active view
-  const [activeTab, setActiveTab] = useState<"search" | "playlists" | "liked" | "recent">("playlists")
+  const [activeTab, setActiveTab] = useState<"search" | "playlists" | "liked" | "recent" | "top">("playlists")
+
+  // Get top tracks from global context
+  const musicPlayerContext = useMusicPlayerSafe()
 
   // Format time
   const formatTime = (ms: number) => {
@@ -484,6 +496,10 @@ export function SpotifyPlayer() {
             <TabsTrigger value="recent" className="gap-1">
               <Clock className="h-4 w-4" />
               Recent
+            </TabsTrigger>
+            <TabsTrigger value="top" className="gap-1">
+              <TrendingUp className="h-4 w-4" />
+              Top
             </TabsTrigger>
           </TabsList>
 
@@ -787,6 +803,93 @@ export function SpotifyPlayer() {
                 ))}
               </div>
             </ScrollArea>
+          </TabsContent>
+
+          {/* Top Tracks Tab */}
+          <TabsContent value="top" className="flex-1 overflow-hidden m-0 p-4">
+            <div className="space-y-4 h-full flex flex-col">
+              {/* Time Range Selector */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">Time range:</span>
+                <Select
+                  value={musicPlayerContext?.topTracksTimeRange || "medium_term"}
+                  onValueChange={(value) => musicPlayerContext?.setTopTracksTimeRange(value as TimeRange)}
+                >
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="short_term">Last 4 weeks</SelectItem>
+                    <SelectItem value="medium_term">Last 6 months</SelectItem>
+                    <SelectItem value="long_term">All time</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <ScrollArea className="flex-1">
+                {musicPlayerContext?.isLoadingTopTracks ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : musicPlayerContext?.topTracks.length ? (
+                  <div className="space-y-1">
+                    {musicPlayerContext.topTracks.map((track, idx) => (
+                      <div
+                        key={`${track.id}-${idx}`}
+                        className={`group flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-primary/5 transition-colors ${
+                          currentTrack?.id === track.id ? "bg-primary/10" : ""
+                        }`}
+                        onClick={() => playTrack(track.uri)}
+                      >
+                        <span className="text-sm text-muted-foreground w-6 text-right tabular-nums">
+                          #{idx + 1}
+                        </span>
+                        {track.album.images?.[0] ? (
+                          <Image
+                            src={track.album.images[0].url}
+                            alt={track.album.name}
+                            width={40}
+                            height={40}
+                            className="rounded"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
+                            <Music className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium truncate ${currentTrack?.id === track.id ? "text-primary" : ""}`}>
+                            {track.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {track.artists.map((a) => a.name).join(", ")}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            addToQueue(track.uri).catch(console.error)
+                          }}
+                          title="Add to queue"
+                        >
+                          <ListPlus className="h-4 w-4" />
+                        </Button>
+                        <span className="text-xs text-muted-foreground">
+                          {formatTime(track.duration_ms)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No top tracks available
+                  </div>
+                )}
+              </ScrollArea>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
