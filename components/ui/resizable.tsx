@@ -1,30 +1,44 @@
 "use client"
 
+import * as React from "react"
 import { GripVertical } from "lucide-react"
+// Note: react-resizable-panels exports Group, Panel, Separator (not PanelGroup, PanelResizeHandle)
 import { Group, Panel, Separator } from "react-resizable-panels"
 
 import { cn } from "@/lib/utils"
 
+type PanelGroupProps = React.ComponentProps<typeof Group> & {
+  direction?: "horizontal" | "vertical"
+}
+
 const ResizablePanelGroup = ({
   className,
+  direction = "horizontal",
   ...props
-}: React.ComponentProps<typeof Group>) => (
-  <Group
-    className={cn(
-      "flex h-full w-full data-[panel-group-direction=vertical]:flex-col",
-      className
-    )}
-    {...props}
-  />
-)
+}: PanelGroupProps) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const GroupComponent = Group as any
+  return (
+    <GroupComponent
+      direction={direction}
+      className={cn(
+        "flex h-full w-full data-[panel-group-direction=vertical]:flex-col",
+        className
+      )}
+      {...props}
+    />
+  )
+}
 
 const ResizablePanel = Panel
+
+type SeparatorProps = React.ComponentProps<typeof Separator>
 
 const ResizableHandle = ({
   withHandle,
   className,
   ...props
-}: React.ComponentProps<typeof Separator> & {
+}: SeparatorProps & {
   withHandle?: boolean
 }) => (
   <Separator

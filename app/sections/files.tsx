@@ -38,7 +38,7 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled }: FilesSectionPr
 
       {/* Main content with resizable panels */}
       <div className="flex-1 min-h-0 glass-dark rounded-lg border border-border overflow-hidden">
-        <ResizablePanelGroup orientation="horizontal" className="h-full">
+        <ResizablePanelGroup direction="horizontal" className="h-full">
           {/* Left sidebar - File Tree */}
           <ResizablePanel
             defaultSize={25}
