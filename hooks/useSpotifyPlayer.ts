@@ -425,8 +425,39 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
   // Player controls
   const togglePlay = useCallback(async () => {
     if (!playerRef.current) return
-    await playerRef.current.togglePlay()
-  }, [])
+
+    // If player is active (has loaded context), use SDK
+    if (isActive) {
+      try {
+        await playerRef.current.togglePlay()
+      } catch (err) {
+        // Handle "no list was loaded" error gracefully
+        if (err instanceof Error && err.message.includes("no list")) {
+          setError("No track loaded. Play something from a playlist or search first.")
+        } else {
+          console.error("Playback error:", err)
+        }
+      }
+      return
+    }
+
+    // If not active but we have a device, try REST API to resume last context
+    if (deviceId) {
+      try {
+        if (isPlaying) {
+          await pause(deviceId)
+        } else {
+          // Try to resume whatever was last playing via REST API
+          await play({ deviceId })
+        }
+      } catch (err) {
+        setError("No track loaded. Play something from a playlist or search first.")
+      }
+      return
+    }
+
+    setError("No device available. Please wait for player to connect.")
+  }, [isActive, deviceId, isPlaying])
 
   const playTrack = useCallback(async (uri: string) => {
     if (!deviceId) {
@@ -481,19 +512,95 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
 
   const handleSkipNext = useCallback(async () => {
     if (!playerRef.current) return
-    await playerRef.current.nextTrack()
-  }, [])
+
+    // If player is active, use SDK
+    if (isActive) {
+      try {
+        await playerRef.current.nextTrack()
+      } catch (err) {
+        if (err instanceof Error && err.message.includes("no list")) {
+          setError("No track loaded. Play something from a playlist or search first.")
+        } else {
+          console.error("Skip next error:", err)
+        }
+      }
+      return
+    }
+
+    // Fall back to REST API
+    if (deviceId) {
+      try {
+        await skipToNext(deviceId)
+      } catch (err) {
+        setError("No track loaded. Play something from a playlist or search first.")
+      }
+      return
+    }
+
+    setError("No track loaded. Play something from a playlist or search first.")
+  }, [isActive, deviceId])
 
   const handleSkipPrevious = useCallback(async () => {
     if (!playerRef.current) return
-    await playerRef.current.previousTrack()
-  }, [])
+
+    // If player is active, use SDK
+    if (isActive) {
+      try {
+        await playerRef.current.previousTrack()
+      } catch (err) {
+        if (err instanceof Error && err.message.includes("no list")) {
+          setError("No track loaded. Play something from a playlist or search first.")
+        } else {
+          console.error("Skip previous error:", err)
+        }
+      }
+      return
+    }
+
+    // Fall back to REST API
+    if (deviceId) {
+      try {
+        await skipToPrevious(deviceId)
+      } catch (err) {
+        setError("No track loaded. Play something from a playlist or search first.")
+      }
+      return
+    }
+
+    setError("No track loaded. Play something from a playlist or search first.")
+  }, [isActive, deviceId])
 
   const seekTo = useCallback(async (positionMs: number) => {
     if (!playerRef.current) return
-    await playerRef.current.seek(positionMs)
-    setPosition(positionMs)
-  }, [])
+
+    // If player is active, use SDK
+    if (isActive) {
+      try {
+        await playerRef.current.seek(positionMs)
+        setPosition(positionMs)
+      } catch (err) {
+        if (err instanceof Error && err.message.includes("no list")) {
+          setError("No track loaded. Play something from a playlist or search first.")
+        } else {
+          console.error("Seek error:", err)
+        }
+      }
+      return
+    }
+
+    // Fall back to REST API
+    if (deviceId) {
+      try {
+        await seek(positionMs, deviceId)
+        setPosition(positionMs)
+      } catch (err) {
+        setError("No track loaded. Play something from a playlist or search first.")
+      }
+      return
+    }
+
+    setError("No track loaded. Play something from a playlist or search first.")
+  }, [isActive, deviceId])
 
   const setPlayerVolume = useCallback(async (percent: number) => {
     if (!playerRef.current) return
