@@ -851,6 +851,14 @@ export default function PersonalHomepage() {
     }
   }, [activeSection, sectionRestored])
 
+  // Set CSS variable for sidebar width (used by PersistentMusicDrawer)
+  React.useEffect(() => {
+    document.documentElement.style.setProperty(
+      '--sidebar-width',
+      sidebarCollapsed ? '80px' : '280px'
+    )
+  }, [sidebarCollapsed])
+
   // Get user info for personalization
   const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.user_metadata?.user_name || null
   const userAvatar = user?.user_metadata?.avatar_url || null
