@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import {
   ChevronRight,
   ChevronDown,
@@ -22,6 +22,19 @@ import { useFilesContext, FileNode } from '@/app/contexts/FilesContext'
 import { getClaudeFileType, claudeFileColors } from '@/lib/claudeFileTypes'
 import { FileTreeContextMenu } from './FileTreeContextMenu'
 import { cn } from '@/lib/utils'
+
+// Git status types
+type GitStatus = 'staged' | 'modified' | 'untracked'
+
+interface GitStatusInfo {
+  status: GitStatus
+  indexStatus: string
+  workTreeStatus: string
+}
+
+interface GitStatusMap {
+  [path: string]: GitStatusInfo
+}
 
 interface FileTreeProps {
   basePath?: string
@@ -54,6 +67,10 @@ export function FileTree({
   const [currentPath, setCurrentPath] = useState(basePath)
   const treeRef = useRef<HTMLDivElement>(null)
   const hasFetchedRef = useRef(false)
+
+  // Git status state
+  const [gitStatus, setGitStatus] = useState<GitStatusMap>({})
+  const [isGitRepo, setIsGitRepo] = useState(false)
 
   // Helper to update nested tree node
   const updateTreeNode = useCallback((tree: FileNode, dirPath: string, newChildren: FileNode[]): FileNode => {
@@ -102,6 +119,24 @@ export function FileTree({
     }
   }, [showHidden, setFileTree, updateTreeNode])
 
+  // Fetch git status for the current directory
+  const fetchGitStatus = useCallback(async (path?: string) => {
+    const targetPath = path || currentPath
+    try {
+      const response = await fetch(
+        `/api/files/git-status?${new URLSearchParams({ path: targetPath })}`
+      )
+      if (response.ok) {
+        const data = await response.json()
+        setIsGitRepo(data.isGitRepo)
+        setGitStatus(data.files || {})
+      }
+    } catch (err) {
+      // Silently fail - git status is optional enhancement
+      console.debug('[FileTree] Git status fetch failed:', err)
+    }
+  }, [currentPath])
+
   // Initial load - run once on mount, skip if data already exists in context
   useEffect(() => {
     // If data already exists in context, just expand the root and skip fetch
@@ -109,6 +144,8 @@ export function FileTree({
       if (expandedFolders.size === 0 && fileTree.path) {
         setExpandedFolders(new Set([fileTree.path]))
       }
+      // Still fetch git status for existing tree
+      fetchGitStatus(fileTree.path)
       return
     }
 
@@ -143,6 +180,9 @@ export function FileTree({
         setFileTree(data)
         setFileTreePath(data.path)
         setExpandedFolders(new Set([data.path]))
+
+        // Fetch git status after tree loads
+        fetchGitStatus(data.path)
       } catch (err: unknown) {
         if (cancelled) return
         const errorMessage = err instanceof Error ? err.message : 'Failed to load files'
@@ -161,7 +201,7 @@ export function FileTree({
       hasFetchedRef.current = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [fetchGitStatus])
 
   // Handle pending navigation from context
   useEffect(() => {
@@ -193,6 +233,9 @@ export function FileTree({
         setFileTreePath(data.path)
         setExpandedFolders(new Set([data.path]))
         hasFetchedRef.current = true
+
+        // Fetch git status for new location
+        fetchGitStatus(pendingTreeNavigation)
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load files'
         setError(errorMessage)
@@ -202,7 +245,7 @@ export function FileTree({
     }
 
     navigateToPath()
-  }, [pendingTreeNavigation, clearPendingNavigation, maxDepth, showHidden, setFileTree, setFileTreePath])
+  }, [pendingTreeNavigation, clearPendingNavigation, maxDepth, showHidden, setFileTree, setFileTreePath, fetchGitStatus])
 
   // Toggle folder expansion with lazy loading
   const toggleFolder = useCallback((path: string, hasChildren: boolean) => {
@@ -281,6 +324,79 @@ export function FileTree({
     return ''
   }, [])
 
+  // Get git status indicator for a file
+  const getGitStatusIndicator = useCallback((filePath: string) => {
+    const status = gitStatus[filePath]
+    if (!status) return null
+
+    // Color-coded dot indicator
+    const colors = {
+      staged: 'bg-blue-400',     // Blue for staged
+      modified: 'bg-yellow-400', // Yellow for modified
+      untracked: 'bg-green-400', // Green for untracked
+    }
+
+    const titles = {
+      staged: 'Staged for commit',
+      modified: 'Modified',
+      untracked: 'Untracked',
+    }
+
+    return (
+      <span
+        className={cn('w-2 h-2 rounded-full ml-1 flex-shrink-0', colors[status.status])}
+        title={titles[status.status]}
+      />
+    )
+  }, [gitStatus])
+
+  // Check if a directory has any modified files (for subtle folder indicator)
+  const getFolderGitStatus = useCallback((folderPath: string): GitStatus | null => {
+    // Check if any files under this folder have git status
+    // Return the "most important" status (staged > modified > untracked)
+    for (const [filePath, info] of Object.entries(gitStatus)) {
+      if (filePath.startsWith(folderPath + '/')) {
+        if (info.status === 'staged') return 'staged'
+      }
+    }
+    for (const [filePath, info] of Object.entries(gitStatus)) {
+      if (filePath.startsWith(folderPath + '/')) {
+        if (info.status === 'modified') return 'modified'
+      }
+    }
+    for (const [filePath, info] of Object.entries(gitStatus)) {
+      if (filePath.startsWith(folderPath + '/')) {
+        if (info.status === 'untracked') return 'untracked'
+      }
+    }
+    return null
+  }, [gitStatus])
+
+  // Get folder git status indicator
+  const getFolderGitStatusIndicator = useCallback((folderPath: string) => {
+    const status = getFolderGitStatus(folderPath)
+    if (!status) return null
+
+    const colors = {
+      staged: 'bg-blue-400/50',     // Softer blue for folders
+      modified: 'bg-yellow-400/50', // Softer yellow for folders
+      untracked: 'bg-green-400/50', // Softer green for folders
+    }
+
+    const titles = {
+      staged: 'Contains staged files',
+      modified: 'Contains modified files',
+      untracked: 'Contains untracked files',
+    }
+
+    return (
+      <span
+        className={cn('w-1.5 h-1.5 rounded-full ml-1 flex-shrink-0', colors[status])}
+        title={titles[status]}
+      />
+    )
+  }, [getFolderGitStatus])
+
   // Render a single tree node
   const renderNode = useCallback((node: FileNode, depth: number = 0): React.ReactNode => {
     const isExpanded = expandedFolders.has(node.path)
@@ -326,6 +442,7 @@ export function FileTree({
                 <span className={cn('truncate font-medium', textColor)}>
                   {node.name}
                 </span>
+                {getFolderGitStatusIndicator(node.path)}
               </button>
             </CollapsibleTrigger>
           </FileTreeContextMenu>
@@ -359,10 +476,11 @@ export function FileTree({
           <span className={cn('truncate', textColor)}>
             {node.name}
           </span>
+          {getGitStatusIndicator(node.path)}
         </button>
       </FileTreeContextMenu>
     )
-  }, [expandedFolders, selectedPath, loadingFolders, toggleFolder, handleNodeClick, getFolderIcon, getFileIcon, getTextColor])
+  }, [expandedFolders, selectedPath, loadingFolders, toggleFolder, handleNodeClick, getFolderIcon, getFileIcon, getTextColor, getGitStatusIndicator, getFolderGitStatusIndicator])
 
   // Refresh handler for manual refresh button
   const handleRefresh = useCallback(async () => {
@@ -388,13 +506,16 @@ export function FileTree({
       setFileTreePath(data.path)
       setExpandedFolders(new Set([data.path]))
       hasFetchedRef.current = true
+
+      // Refresh git status too
+      fetchGitStatus(data.path)
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load files'
       setError(errorMessage)
     } finally {
       setLoading(false)
     }
-  }, [currentPath, maxDepth, showHidden, setFileTree, setFileTreePath])
+  }, [currentPath, maxDepth, showHidden, setFileTree, setFileTreePath, fetchGitStatus])
 
   return (
     <div className={cn('flex h-full flex-col', className)}>
