@@ -233,7 +233,18 @@ export function SpotifyPlayer() {
     if (isAuthenticated && isPremium) {
       getPlaylists().then((data) => setPlaylists(data.items)).catch(console.error)
       getSavedTracks(50).then((data) => setSavedTracks(data.items.map((i) => i.track))).catch(console.error)
-      getRecentlyPlayed(20).then((data) => setRecentTracks(data.items.map((i) => i.track))).catch(console.error)
+      getRecentlyPlayed(50).then((data) => {
+        // Deduplicate by track ID, keeping only the first (most recent) occurrence
+        const seen = new Set<string>()
+        const uniqueTracks = data.items
+          .map((i) => i.track)
+          .filter((track) => {
+            if (seen.has(track.id)) return false
+            seen.add(track.id)
+            return true
+          })
+        setRecentTracks(uniqueTracks)
+      }).catch(console.error)
     }
   }, [isAuthenticated, isPremium])
 
