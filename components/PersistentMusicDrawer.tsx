@@ -141,7 +141,7 @@ export function PersistentMusicDrawer() {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 100, opacity: 0 }}
           transition={{ type: "spring", damping: 25, stiffness: 300 }}
-          className="fixed bottom-0 left-0 right-0 z-50 lg:left-[80px]"
+          className="fixed bottom-0 left-0 right-0 z-50 lg:left-[var(--sidebar-width,80px)]"
           data-tabz-region="music-drawer"
         >
           {/* Collapsed Mini Player */}
