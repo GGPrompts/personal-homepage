@@ -178,7 +178,11 @@ export function FileTreeContextMenu({
   // Open in editor (local files only)
   const handleOpenInEditor = async () => {
     if (source === 'local' && terminalAvailable) {
-      const result = await pasteToTerminal(`code "${path}"`, { name: 'Open in Editor' })
+      const result = await spawnWithOptions({
+        name: 'Open in Editor',
+        command: `code "${path}"`,
+        autoExecute: true,
+      })
       if (result.success) {
         toast.success('Opening in editor...')
       } else {
