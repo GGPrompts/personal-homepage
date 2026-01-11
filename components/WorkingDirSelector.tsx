@@ -246,18 +246,25 @@ export function WorkingDirSelector({
       ) : (
         <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full h-8 justify-between gap-2 font-mono text-xs text-muted-foreground hover:text-foreground"
-              data-tabz-action="open-working-dir-menu"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <FolderOpen className="h-3 w-3 flex-shrink-0" />
-                <span className="truncate">{displayPath}</span>
-              </div>
-              <ChevronDown className="h-3 w-3 flex-shrink-0" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full h-8 justify-between gap-2 font-mono text-xs text-muted-foreground hover:text-foreground"
+                  data-tabz-action="open-working-dir-menu"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FolderOpen className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{displayPath}</span>
+                  </div>
+                  <ChevronDown className="h-3 w-3 flex-shrink-0" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="font-mono text-xs">
+                {workingDir}
+              </TooltipContent>
+            </Tooltip>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-72" data-tabz-list="working-dir-menu">
             <DropdownMenuItem
