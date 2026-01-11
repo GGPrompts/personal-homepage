@@ -48,6 +48,7 @@ import {
   Image,
   Music,
   Video,
+  BarChart3,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -86,6 +87,7 @@ const sectionMeta: Record<ToggleableSection, { label: string; icon: React.Elemen
   projects: { label: "Projects", icon: FolderGit2, description: "GitHub & local repos" },
   files: { label: "Files", icon: FolderOpen, description: "File browser & plugins" },
   jobs: { label: "Jobs", icon: Play, description: "Claude batch prompts" },
+  analytics: { label: "Analytics", icon: BarChart3, description: "Claude Code usage stats" },
   "video-player": { label: "Video Player", icon: Video, description: "Media playback" },
   profile: { label: "Profile", icon: User, description: "Account & sync" },
   kanban: { label: "Kanban", icon: LayoutGrid, description: "Visual task board" },
