@@ -12,6 +12,10 @@ import {
   MessageSquare,
   Eye,
   Wand2,
+  ImagePlus,
+  Link2,
+  Copy,
+  Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -28,7 +32,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { useAvatarGeneration } from '@/hooks/useAvatarGeneration'
+import { toast } from 'sonner'
 import type {
   CreateAgentInput,
   AgentPersonalityTrait,
@@ -178,6 +184,8 @@ interface IdentityStepProps {
   setDescription: (description: string) => void
   personality: AgentPersonalityTrait[]
   setPersonality: (traits: AgentPersonalityTrait[]) => void
+  /** Optional callback when user wants to generate an AI avatar */
+  onGenerateAvatar?: (prompt: string) => void
 }
 
 function IdentityStep({
@@ -189,7 +197,13 @@ function IdentityStep({
   setDescription,
   personality,
   setPersonality,
+  onGenerateAvatar,
 }: IdentityStepProps) {
+  const [showUrlInput, setShowUrlInput] = React.useState(false)
+  const [customUrl, setCustomUrl] = React.useState('')
+  const [generatedPrompt, setGeneratedPrompt] = React.useState<string | null>(null)
+  const { generatePrompt, isValidAvatarUrl } = useAvatarGeneration()
+
   const toggleTrait = (trait: AgentPersonalityTrait) => {
     if (personality.includes(trait)) {
       setPersonality(personality.filter(t => t !== trait))
@@ -198,33 +212,164 @@ function IdentityStep({
     }
   }
 
+  // Check if avatar is a URL (not an emoji)
+  const isAvatarUrl = avatar && (
+    avatar.startsWith('http') ||
+    avatar.startsWith('data:') ||
+    avatar.startsWith('/') ||
+    avatar.includes('/ai-images/')
+  )
+
+  const handleGeneratePrompt = () => {
+    if (!name && personality.length === 0) {
+      toast.error('Add a name or personality first')
+      return
+    }
+    const prompt = generatePrompt(name || 'AI Assistant', personality, description)
+    setGeneratedPrompt(prompt)
+    onGenerateAvatar?.(prompt)
+  }
+
+  const copyPrompt = () => {
+    if (generatedPrompt) {
+      navigator.clipboard.writeText(generatedPrompt)
+      toast.success('Prompt copied to clipboard')
+    }
+  }
+
+  const handleUrlSubmit = () => {
+    if (customUrl && isValidAvatarUrl(customUrl)) {
+      setAvatar(customUrl)
+      setShowUrlInput(false)
+      setCustomUrl('')
+      toast.success('Avatar updated')
+    } else {
+      toast.error('Please enter a valid image URL')
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Avatar Selection */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         <Label>Avatar</Label>
-        <div className="flex items-center gap-4">
-          <Avatar className="h-16 w-16 text-3xl">
-            <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5">
-              {avatar || '🤖'}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex flex-wrap gap-2">
-            {AVATAR_EMOJIS.map((emoji) => (
+        <div className="flex items-start gap-4">
+          {/* Avatar Preview */}
+          <div className="flex flex-col items-center gap-2">
+            <Avatar className="h-20 w-20 text-3xl ring-2 ring-border">
+              {isAvatarUrl && <AvatarImage src={avatar} alt="Agent avatar" />}
+              <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-3xl">
+                {!isAvatarUrl ? (avatar || '🤖') : '🤖'}
+              </AvatarFallback>
+            </Avatar>
+            {isAvatarUrl && (
               <button
-                key={emoji}
                 type="button"
-                onClick={() => setAvatar(emoji)}
-                className={cn(
-                  'h-10 w-10 rounded-lg text-xl flex items-center justify-center transition-all',
-                  avatar === emoji
-                    ? 'bg-primary/20 ring-2 ring-primary'
-                    : 'bg-muted hover:bg-muted/80'
-                )}
+                onClick={() => setAvatar('🤖')}
+                className="text-xs text-muted-foreground hover:text-foreground"
               >
-                {emoji}
+                Reset
               </button>
-            ))}
+            )}
+          </div>
+
+          <div className="flex-1 space-y-3">
+            {/* Emoji Selection */}
+            <div className="flex flex-wrap gap-2">
+              {AVATAR_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => setAvatar(emoji)}
+                  className={cn(
+                    'h-9 w-9 rounded-lg text-lg flex items-center justify-center transition-all',
+                    avatar === emoji
+                      ? 'bg-primary/20 ring-2 ring-primary'
+                      : 'bg-muted hover:bg-muted/80'
+                  )}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+
+            {/* Avatar Actions */}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowUrlInput(!showUrlInput)}
+                className="gap-1.5"
+              >
+                <Link2 className="h-3.5 w-3.5" />
+                URL
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleGeneratePrompt}
+                className="gap-1.5"
+                data-tabz-action="generate-avatar"
+              >
+                <ImagePlus className="h-3.5 w-3.5" />
+                Generate with AI
+              </Button>
+            </div>
+
+            {/* Custom URL Input */}
+            {showUrlInput && (
+              <div className="flex gap-2">
+                <Input
+                  value={customUrl}
+                  onChange={(e) => setCustomUrl(e.target.value)}
+                  placeholder="https://... or /path/to/image.png"
+                  className="glass text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleUrlSubmit()
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleUrlSubmit}
+                  disabled={!customUrl}
+                >
+                  Set
+                </Button>
+              </div>
+            )}
+
+            {/* Generated Prompt Display */}
+            {generatedPrompt && (
+              <div className="p-3 rounded-lg bg-muted/50 border border-border/50 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    DALL-E Prompt
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={copyPrompt}
+                    className="h-6 px-2 gap-1"
+                  >
+                    <Copy className="h-3 w-3" />
+                    Copy
+                  </Button>
+                </div>
+                <p className="text-xs text-foreground/80 leading-relaxed">
+                  {generatedPrompt}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Ask Claude to generate this avatar, or paste the prompt into ChatGPT/DALL-E
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
