@@ -5,21 +5,23 @@ import { useState, useEffect, useCallback } from "react"
 // TabzChrome REST API configuration
 const TABZ_API_BASE = "http://localhost:8129"
 const TOKEN_STORAGE_KEY = "tabz-api-token"
-const DEFAULT_WORKDIR_KEY = "tabz-default-workdir"
+// Use same key as global working directory for sync
+const GLOBAL_WORKDIR_KEY = "global-working-directory"
+const DEFAULT_WORKDIR = "~"
 
 function getDefaultWorkDir(): string {
-  if (typeof window === "undefined") return "~/projects"
+  if (typeof window === "undefined") return DEFAULT_WORKDIR
   try {
-    return localStorage.getItem(DEFAULT_WORKDIR_KEY) || "~/projects"
+    return localStorage.getItem(GLOBAL_WORKDIR_KEY) || DEFAULT_WORKDIR
   } catch {
-    return "~/projects"
+    return DEFAULT_WORKDIR
   }
 }
 
 function setDefaultWorkDir(dir: string): void {
   if (typeof window === "undefined") return
   try {
-    localStorage.setItem(DEFAULT_WORKDIR_KEY, dir)
+    localStorage.setItem(GLOBAL_WORKDIR_KEY, dir)
   } catch {
     // Ignore storage errors
   }

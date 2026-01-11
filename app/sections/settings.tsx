@@ -1155,7 +1155,7 @@ function TabzChromeTab() {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground mt-2">
-          Used when launching terminals without a specific working directory.
+          Global working directory used by sidebar, terminals, and sections.
         </p>
       </Card>
 

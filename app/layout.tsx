@@ -9,6 +9,7 @@ import { QueryProvider } from "@/components/QueryProvider";
 import { AuthProvider } from "@/components/AuthProvider";
 import { LocalhostRedirect } from "@/components/LocalhostRedirect";
 import { MusicPlayerProvider } from "@/components/MusicPlayerProvider";
+import { WorkingDirProvider } from "@/components/WorkingDirProvider";
 import { PersistentMusicDrawer } from "@/components/PersistentMusicDrawer";
 import { Toaster } from "sonner";
 
@@ -41,9 +42,10 @@ export default function RootLayout({
             <BackgroundProvider>
               <PageBackgroundProvider>
                 <ThemeProvider>
-                  <MusicPlayerProvider>
-                    <MasterBackground />
-                    {children}
+                  <WorkingDirProvider>
+                    <MusicPlayerProvider>
+                      <MasterBackground />
+                      {children}
                     <PersistentMusicDrawer />
                     <Toaster
                       theme="dark"
@@ -57,6 +59,7 @@ export default function RootLayout({
                       }}
                     />
                   </MusicPlayerProvider>
+                  </WorkingDirProvider>
                 </ThemeProvider>
               </PageBackgroundProvider>
             </BackgroundProvider>
