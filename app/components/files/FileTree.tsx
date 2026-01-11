@@ -15,6 +15,9 @@ import {
   Music,
   RefreshCw,
   Loader2,
+  ChevronsUpDown,
+  ChevronsDownUp,
+  Home,
 } from 'lucide-react'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -413,6 +416,109 @@ export function FileTree({
     return items
   }, [fileTree, expandedFolders])
 
+  // Collect all directory paths for expand/collapse all
+  const allDirectoryPaths = useMemo(() => {
+    const paths: string[] = []
+    const collectDirs = (node: FileNode) => {
+      if (node.type === 'directory') {
+        paths.push(node.path)
+        node.children?.forEach(collectDirs)
+      }
+    }
+    if (fileTree) {
+      collectDirs(fileTree)
+    }
+    return paths
+  }, [fileTree])
+
+  // Expand all directories
+  const handleExpandAll = useCallback(() => {
+    setExpandedFolders(new Set(allDirectoryPaths))
+  }, [allDirectoryPaths])
+
+  // Collapse all except root
+  const handleCollapseAll = useCallback(() => {
+    if (fileTree) {
+      setExpandedFolders(new Set([fileTree.path]))
+    } else {
+      setExpandedFolders(new Set())
+    }
+  }, [fileTree])
+
+  // Parse path into breadcrumb segments
+  const breadcrumbSegments = useMemo(() => {
+    if (!fileTree?.path) return []
+
+    const path = fileTree.path
+    // Handle home directory
+    if (path === '~') {
+      return [{ name: '~', path: '~' }]
+    }
+
+    // Split path and build segments
+    const parts = path.split('/').filter(Boolean)
+    const segments: { name: string; path: string }[] = []
+
+    // Check if it's an absolute path
+    const isAbsolute = path.startsWith('/')
+
+    let currentPath = isAbsolute ? '' : ''
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i]
+      currentPath = isAbsolute ? `${currentPath}/${part}` : (currentPath ? `${currentPath}/${part}` : part)
+      segments.push({
+        name: i === 0 && part === 'home' ? '~' : part,
+        path: currentPath,
+      })
+    }
+
+    return segments
+  }, [fileTree?.path])
+
+  // Navigate to a breadcrumb path
+  const handleBreadcrumbClick = useCallback((path: string) => {
+    if (path === fileTree?.path) return
+
+    // Use the pending navigation mechanism from context
+    setCurrentPath(path)
+    hasFetchedRef.current = false
+
+    setLoading(true)
+    setError(null)
+
+    const doNavigate = async () => {
+      try {
+        const params = new URLSearchParams({
+          path,
+          depth: maxDepth.toString(),
+          showHidden: showHidden.toString(),
+        })
+        const response = await fetch(`/api/files/tree?${params}`)
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to load file tree')
+        }
+
+        const data = await response.json()
+        setFileTree(data)
+        setFileTreePath(data.path)
+        setExpandedFolders(new Set([data.path]))
+        hasFetchedRef.current = true
+
+        // Fetch git status for new location
+        fetchGitStatus(path)
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load files'
+        setError(errorMessage)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    doNavigate()
+  }, [fileTree?.path, maxDepth, showHidden, setFileTree, setFileTreePath, fetchGitStatus])
+
   // Keyboard navigation handler
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (visibleItems.length === 0) return
@@ -615,18 +721,76 @@ export function FileTree({
 
   return (
     <div className={cn('flex h-full flex-col', className)}>
-      {/* Header */}
+      {/* Header with controls */}
       <div className="flex items-center justify-between border-b border-border/50 px-3 py-2">
         <h3 className="text-sm font-semibold terminal-glow">Files</h3>
-        <button
-          onClick={handleRefresh}
-          className="rounded p-1 hover:bg-muted transition-colors"
-          title="Refresh"
-          disabled={loading}
-        >
-          <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={handleExpandAll}
+            className="rounded p-1 hover:bg-muted transition-colors"
+            title="Expand All"
+            disabled={loading}
+          >
+            <ChevronsUpDown className="h-4 w-4" />
+          </button>
+          <button
+            onClick={handleCollapseAll}
+            className="rounded p-1 hover:bg-muted transition-colors"
+            title="Collapse All"
+            disabled={loading}
+          >
+            <ChevronsDownUp className="h-4 w-4" />
+          </button>
+          <button
+            onClick={handleRefresh}
+            className="rounded p-1 hover:bg-muted transition-colors"
+            title="Refresh"
+            disabled={loading}
+          >
+            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+          </button>
+        </div>
       </div>
+
+      {/* Breadcrumb navigation */}
+      {breadcrumbSegments.length > 0 && (
+        <div className="flex items-center gap-1 px-3 py-1.5 text-xs text-muted-foreground border-b border-border/30 overflow-x-auto scrollbar-hide">
+          <button
+            onClick={() => handleBreadcrumbClick('~')}
+            className="hover:text-foreground transition-colors flex-shrink-0"
+            title="Home"
+          >
+            <Home className="h-3.5 w-3.5" />
+          </button>
+          {breadcrumbSegments.map((segment, index) => {
+            const isLast = index === breadcrumbSegments.length - 1
+            const isHome = segment.name === '~'
+            // Skip the home segment since we already have the home icon
+            if (isHome && breadcrumbSegments.length > 1) return null
+
+            return (
+              <React.Fragment key={segment.path}>
+                {(index > 0 || !isHome) && (
+                  <ChevronRight className="h-3 w-3 flex-shrink-0 opacity-50" />
+                )}
+                <button
+                  onClick={() => !isLast && handleBreadcrumbClick(segment.path)}
+                  className={cn(
+                    'truncate max-w-[120px] transition-colors flex-shrink-0',
+                    isLast
+                      ? 'text-foreground font-medium cursor-default'
+                      : 'hover:text-foreground cursor-pointer'
+                  )}
+                  title={segment.path}
+                  disabled={isLast}
+                >
+                  {segment.name}
+                </button>
+              </React.Fragment>
+            )
+          })}
+        </div>
+      )}
 
       {/* Tree content */}
       <ScrollArea className="flex-1">
