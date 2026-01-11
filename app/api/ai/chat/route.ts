@@ -11,13 +11,75 @@ import { streamMock } from '@/lib/ai/mock'
 import { streamGemini } from '@/lib/ai/gemini'
 import { streamCodex } from '@/lib/ai/codex'
 import {
+  getOrCreateSession as getCodexMcpSession,
+  codexFirstTurn,
+  codexReply,
+  hasSession as hasCodexMcpSession,
+} from '@/lib/ai/codex-mcp'
+import {
   readConversation,
   appendMessage,
   buildModelContext,
   createConversation,
   type ModelId
 } from '@/lib/ai/conversation'
-import type { ChatRequest, AIBackend } from '@/lib/ai/types'
+import type { ChatRequest, AIBackend, ChatSettings } from '@/lib/ai/types'
+
+/**
+ * Stream Codex responses using MCP server for persistent sessions
+ */
+async function streamCodexMcp(
+  conversationKey: string,
+  message: string,
+  settings?: ChatSettings,
+  cwd?: string
+): Promise<ReadableStream<string>> {
+  return new ReadableStream<string>({
+    async start(controller) {
+      try {
+        const session = await getCodexMcpSession(conversationKey, settings, cwd)
+
+        let resultText: string
+
+        // Check if this is a new session or continuation
+        const isFirstTurn = !hasCodexMcpSession(conversationKey) || !session.conversationId
+
+        if (isFirstTurn) {
+          const r = await codexFirstTurn(session, message)
+          resultText = r.text
+        } else {
+          const r = await codexReply(session, message)
+          resultText = r.text
+        }
+
+        // Stream the response in chunks for better UX
+        const chunkSize = 50
+        for (let i = 0; i < resultText.length; i += chunkSize) {
+          controller.enqueue(resultText.slice(i, i + chunkSize))
+        }
+
+        controller.close()
+      } catch (error) {
+        console.error('Codex MCP error:', error)
+        // Fall back to one-shot mode on error
+        const context = {
+          systemPrompt: settings?.systemPrompt || '',
+          messages: [{ role: 'user' as const, content: message }]
+        }
+        const fallbackStream = await streamCodex(context, settings, cwd)
+        const reader = fallbackStream.getReader()
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          controller.enqueue(value)
+        }
+
+        controller.close()
+      }
+    }
+  })
+}
 
 // Map API backend names to conversation ModelId
 function toModelId(backend: AIBackend): ModelId {
@@ -84,7 +146,8 @@ export async function POST(request: NextRequest) {
         } else if (backend === 'gemini') {
           stream = await streamGemini(context, settings, cwd)
         } else if (backend === 'codex') {
-          stream = await streamCodex(context, settings, cwd)
+          // Use MCP server for persistent multi-turn sessions
+          stream = await streamCodexMcp(convId!, lastUserMessage.content, settings, cwd)
         } else if (backend === 'docker') {
           if (!model) {
             return new Response(
@@ -113,11 +176,11 @@ export async function POST(request: NextRequest) {
           }
           stream = await streamGemini(context, settings, cwd)
         } else if (backend === 'codex') {
-          const context = {
-            systemPrompt: settings?.systemPrompt || '',
-            messages: messages.map(m => ({ role: m.role, content: m.content }))
-          }
-          stream = await streamCodex(context, settings, cwd)
+          // Use MCP server for persistent multi-turn sessions
+          // Generate a session key from messages if no conversationId
+          const sessionKey = `codex_legacy_${Date.now()}`
+          const lastMsg = messages.findLast(m => m.role === 'user')
+          stream = await streamCodexMcp(sessionKey, lastMsg?.content || '', settings, cwd)
         } else if (backend === 'docker') {
           if (!model) {
             return new Response(
