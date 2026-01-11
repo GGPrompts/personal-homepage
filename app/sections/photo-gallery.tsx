@@ -65,7 +65,7 @@ import { getMediaUrl, type MediaFile } from "@/hooks/useMediaLibrary"
 
 // LocalStorage keys
 const STORAGE_KEY_PHOTOS = "photo-gallery-custom-photos"
-const STORAGE_KEY_USE_DEMO = "photo-gallery-use-demo"
+const STORAGE_KEY_FAVORITES = "photo-gallery-favorites"
 
 // TypeScript Interfaces
 interface ExifData {
@@ -106,345 +106,6 @@ interface Photo {
   sourceType?: "url" | "file" // How the photo was added
 }
 
-// Mock Data
-const mockAlbums: Album[] = [
-  {
-    id: "album-1",
-    name: "Nature & Landscapes",
-    description: "Beautiful outdoor photography",
-    coverPhoto: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400",
-    photoCount: 24,
-    createdAt: "2024-01-15",
-  },
-  {
-    id: "album-2",
-    name: "Urban Architecture",
-    description: "City skylines and buildings",
-    coverPhoto: "https://images.unsplash.com/photo-1486325212027-8081e485255e?w=400",
-    photoCount: 18,
-    createdAt: "2024-02-20",
-  },
-  {
-    id: "album-3",
-    name: "Portraits",
-    description: "People and faces",
-    coverPhoto: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400",
-    photoCount: 12,
-    createdAt: "2024-03-10",
-  },
-  {
-    id: "album-4",
-    name: "Travel",
-    description: "Adventures around the world",
-    coverPhoto: "https://images.unsplash.com/photo-1488085061387-422e29b40080?w=400",
-    photoCount: 32,
-    createdAt: "2024-04-05",
-  },
-  {
-    id: "album-5",
-    name: "Wildlife",
-    description: "Animals in their habitat",
-    coverPhoto: "https://images.unsplash.com/photo-1474511320723-9a56873571b7?w=400",
-    photoCount: 15,
-    createdAt: "2024-05-12",
-  },
-  {
-    id: "album-6",
-    name: "Abstract",
-    description: "Creative and artistic shots",
-    coverPhoto: "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=400",
-    photoCount: 9,
-    createdAt: "2024-06-01",
-  },
-]
-
-const mockPhotos: Photo[] = [
-  {
-    id: "photo-1",
-    url: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200",
-    thumbnail: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400",
-    title: "Mountain Sunrise",
-    description: "Golden hour light over the alpine peaks",
-    albumId: "album-1",
-    uploadDate: "2024-12-15",
-    takenDate: "2024-12-10",
-    width: 4000,
-    height: 2667,
-    size: 4520000,
-    isFavorite: true,
-    tags: ["mountains", "sunrise", "landscape", "nature"],
-    exif: {
-      camera: "Sony A7R IV",
-      lens: "24-70mm f/2.8 GM",
-      focalLength: "35mm",
-      aperture: "f/8",
-      shutter: "1/250s",
-      iso: 100,
-    },
-    location: { lat: 46.8182, lng: 8.2275, name: "Swiss Alps, Switzerland" },
-  },
-  {
-    id: "photo-2",
-    url: "https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1200",
-    thumbnail: "https://images.unsplash.com/photo-1486325212027-8081e485255e?w=400",
-    title: "City Lights",
-    description: "Downtown skyline at blue hour",
-    albumId: "album-2",
-    uploadDate: "2024-12-14",
-    takenDate: "2024-12-08",
-    width: 3600,
-    height: 2400,
-    size: 3890000,
-    isFavorite: false,
-    tags: ["city", "architecture", "night", "skyline"],
-    exif: {
-      camera: "Canon EOS R5",
-      lens: "16-35mm f/2.8L",
-      focalLength: "24mm",
-      aperture: "f/11",
-      shutter: "30s",
-      iso: 200,
-    },
-    location: { lat: 40.7128, lng: -74.006, name: "New York City, USA" },
-  },
-  {
-    id: "photo-3",
-    url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1200",
-    thumbnail: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400",
-    title: "Portrait Study",
-    description: "Natural light portrait session",
-    albumId: "album-3",
-    uploadDate: "2024-12-13",
-    takenDate: "2024-12-05",
-    width: 3000,
-    height: 4000,
-    size: 2780000,
-    isFavorite: true,
-    tags: ["portrait", "people", "studio"],
-    exif: {
-      camera: "Nikon Z8",
-      lens: "85mm f/1.4",
-      focalLength: "85mm",
-      aperture: "f/1.8",
-      shutter: "1/500s",
-      iso: 400,
-    },
-  },
-  {
-    id: "photo-4",
-    url: "https://images.unsplash.com/photo-1488085061387-422e29b40080?w=1200",
-    thumbnail: "https://images.unsplash.com/photo-1488085061387-422e29b40080?w=400",
-    title: "Ocean Serenity",
-    description: "Calm waters at sunset",
-    albumId: "album-4",
-    uploadDate: "2024-12-12",
-    takenDate: "2024-12-01",
-    width: 4200,
-    height: 2800,
-    size: 5120000,
-    isFavorite: false,
-    tags: ["ocean", "sunset", "travel", "beach"],
-    exif: {
-      camera: "Sony A7R IV",
-      lens: "70-200mm f/2.8 GM",
-      focalLength: "135mm",
-      aperture: "f/5.6",
-      shutter: "1/1000s",
-      iso: 200,
-    },
-    location: { lat: -33.8688, lng: 151.2093, name: "Sydney, Australia" },
-  },
-  {
-    id: "photo-5",
-    url: "https://images.unsplash.com/photo-1474511320723-9a56873571b7?w=1200",
-    thumbnail: "https://images.unsplash.com/photo-1474511320723-9a56873571b7?w=400",
-    title: "Wild Encounter",
-    description: "Lion in the African savanna",
-    albumId: "album-5",
-    uploadDate: "2024-12-11",
-    takenDate: "2024-11-28",
-    width: 4500,
-    height: 3000,
-    size: 6200000,
-    isFavorite: true,
-    tags: ["wildlife", "africa", "lion", "nature"],
-    exif: {
-      camera: "Canon EOS R5",
-      lens: "100-400mm f/4.5-5.6L",
-      focalLength: "400mm",
-      aperture: "f/5.6",
-      shutter: "1/2000s",
-      iso: 800,
-    },
-    location: { lat: -2.3333, lng: 34.8333, name: "Serengeti, Tanzania" },
-  },
-  {
-    id: "photo-6",
-    url: "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=1200",
-    thumbnail: "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=400",
-    title: "Abstract Flow",
-    description: "Fluid art photography",
-    albumId: "album-6",
-    uploadDate: "2024-12-10",
-    takenDate: "2024-11-25",
-    width: 3200,
-    height: 3200,
-    size: 2340000,
-    isFavorite: false,
-    tags: ["abstract", "art", "creative", "colors"],
-    exif: {
-      camera: "Sony A7 III",
-      lens: "90mm f/2.8 Macro",
-      focalLength: "90mm",
-      aperture: "f/4",
-      shutter: "1/125s",
-      iso: 100,
-    },
-  },
-  {
-    id: "photo-7",
-    url: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1200",
-    thumbnail: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400",
-    title: "Starry Night",
-    description: "Mountains under the Milky Way",
-    albumId: "album-1",
-    uploadDate: "2024-12-09",
-    takenDate: "2024-11-20",
-    width: 4000,
-    height: 2667,
-    size: 4890000,
-    isFavorite: true,
-    tags: ["night", "stars", "mountains", "astrophotography"],
-    exif: {
-      camera: "Nikon Z8",
-      lens: "14-24mm f/2.8",
-      focalLength: "14mm",
-      aperture: "f/2.8",
-      shutter: "20s",
-      iso: 3200,
-    },
-    location: { lat: 45.8326, lng: 6.8652, name: "Mont Blanc, France" },
-  },
-  {
-    id: "photo-8",
-    url: "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=1200",
-    thumbnail: "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400",
-    title: "Street Scene",
-    description: "Busy city intersection",
-    albumId: "album-2",
-    uploadDate: "2024-12-08",
-    takenDate: "2024-11-18",
-    width: 3800,
-    height: 2533,
-    size: 3560000,
-    isFavorite: false,
-    tags: ["street", "city", "urban", "people"],
-    exif: {
-      camera: "Fujifilm X-T5",
-      lens: "23mm f/1.4",
-      focalLength: "23mm",
-      aperture: "f/2.8",
-      shutter: "1/500s",
-      iso: 400,
-    },
-    location: { lat: 35.6762, lng: 139.6503, name: "Tokyo, Japan" },
-  },
-  {
-    id: "photo-9",
-    url: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=1200",
-    thumbnail: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=400",
-    title: "Ocean Waves",
-    description: "Powerful waves crashing",
-    albumId: "album-4",
-    uploadDate: "2024-12-07",
-    takenDate: "2024-11-15",
-    width: 4200,
-    height: 2800,
-    size: 4780000,
-    isFavorite: false,
-    tags: ["ocean", "waves", "power", "nature"],
-    exif: {
-      camera: "Sony A7R IV",
-      lens: "24-70mm f/2.8 GM",
-      focalLength: "50mm",
-      aperture: "f/8",
-      shutter: "1/2000s",
-      iso: 400,
-    },
-    location: { lat: 21.2743, lng: -157.8233, name: "Hawaii, USA" },
-  },
-  {
-    id: "photo-10",
-    url: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=1200",
-    thumbnail: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=400",
-    title: "Lakeside Reflection",
-    description: "Perfect mirror reflection on calm lake",
-    albumId: "album-1",
-    uploadDate: "2024-12-06",
-    takenDate: "2024-11-10",
-    width: 4000,
-    height: 2667,
-    size: 4120000,
-    isFavorite: true,
-    tags: ["lake", "reflection", "mountains", "calm"],
-    exif: {
-      camera: "Canon EOS R5",
-      lens: "16-35mm f/2.8L",
-      focalLength: "20mm",
-      aperture: "f/11",
-      shutter: "1/60s",
-      iso: 100,
-    },
-    location: { lat: 46.4146, lng: 11.7677, name: "Dolomites, Italy" },
-  },
-  {
-    id: "photo-11",
-    url: "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200",
-    thumbnail: "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=400",
-    title: "Forest Path",
-    description: "Sunlight through the trees",
-    albumId: "album-1",
-    uploadDate: "2024-12-05",
-    takenDate: "2024-11-05",
-    width: 3600,
-    height: 2400,
-    size: 3890000,
-    isFavorite: false,
-    tags: ["forest", "trees", "path", "sunlight"],
-    exif: {
-      camera: "Nikon Z8",
-      lens: "24-70mm f/2.8",
-      focalLength: "35mm",
-      aperture: "f/5.6",
-      shutter: "1/125s",
-      iso: 400,
-    },
-  },
-  {
-    id: "photo-12",
-    url: "https://images.unsplash.com/photo-1534430480872-3498386e7856?w=1200",
-    thumbnail: "https://images.unsplash.com/photo-1534430480872-3498386e7856?w=400",
-    title: "Eagle in Flight",
-    description: "Majestic bird soaring",
-    albumId: "album-5",
-    uploadDate: "2024-12-04",
-    takenDate: "2024-11-01",
-    width: 4500,
-    height: 3000,
-    size: 5670000,
-    isFavorite: true,
-    tags: ["wildlife", "bird", "eagle", "flight"],
-    exif: {
-      camera: "Canon EOS R5",
-      lens: "600mm f/4L",
-      focalLength: "600mm",
-      aperture: "f/4",
-      shutter: "1/4000s",
-      iso: 1600,
-    },
-    location: { lat: 61.218, lng: -149.9003, name: "Alaska, USA" },
-  },
-]
 
 // Helper Functions
 const formatFileSize = (bytes: number): string => {
@@ -467,20 +128,14 @@ const generateId = () => `photo-custom-${Date.now()}-${Math.random().toString(36
 // Custom hook for persisting photos to localStorage
 function useCustomPhotos() {
   const [customPhotos, setCustomPhotos] = useState<Photo[]>([])
-  const [useDemo, setUseDemo] = useState(true)
   const [isLoaded, setIsLoaded] = useState(false)
 
   // Load from localStorage on mount
   useEffect(() => {
     try {
       const savedPhotos = localStorage.getItem(STORAGE_KEY_PHOTOS)
-      const savedUseDemo = localStorage.getItem(STORAGE_KEY_USE_DEMO)
-
       if (savedPhotos) {
         setCustomPhotos(JSON.parse(savedPhotos))
-      }
-      if (savedUseDemo !== null) {
-        setUseDemo(JSON.parse(savedUseDemo))
       }
     } catch (error) {
       console.error("Failed to load photos from localStorage:", error)
@@ -497,16 +152,6 @@ function useCustomPhotos() {
       console.error("Failed to save photos to localStorage:", error)
     }
   }, [customPhotos, isLoaded])
-
-  // Save useDemo preference
-  useEffect(() => {
-    if (!isLoaded) return
-    try {
-      localStorage.setItem(STORAGE_KEY_USE_DEMO, JSON.stringify(useDemo))
-    } catch (error) {
-      console.error("Failed to save demo preference:", error)
-    }
-  }, [useDemo, isLoaded])
 
   const addPhoto = useCallback((photo: Omit<Photo, "id" | "uploadDate" | "isCustom">) => {
     const newPhoto: Photo = {
@@ -535,13 +180,69 @@ function useCustomPhotos() {
 
   return {
     customPhotos,
-    useDemo,
-    setUseDemo,
     addPhoto,
     removePhoto,
     updatePhoto,
     clearAllCustom,
     isLoaded,
+  }
+}
+
+// Custom hook for persisting favorites to localStorage
+function useFavorites() {
+  const [favorites, setFavorites] = useState<Set<string>>(new Set())
+  const [isLoaded, setIsLoaded] = useState(false)
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedFavorites = localStorage.getItem(STORAGE_KEY_FAVORITES)
+      if (savedFavorites) {
+        setFavorites(new Set(JSON.parse(savedFavorites)))
+      }
+    } catch (error) {
+      console.error("Failed to load favorites from localStorage:", error)
+    }
+    setIsLoaded(true)
+  }, [])
+
+  // Save to localStorage whenever favorites changes
+  useEffect(() => {
+    if (!isLoaded) return
+    try {
+      localStorage.setItem(STORAGE_KEY_FAVORITES, JSON.stringify([...favorites]))
+    } catch (error) {
+      console.error("Failed to save favorites to localStorage:", error)
+    }
+  }, [favorites, isLoaded])
+
+  const toggleFavorite = useCallback((photoId: string) => {
+    setFavorites((prev) => {
+      const next = new Set(prev)
+      if (next.has(photoId)) {
+        next.delete(photoId)
+      } else {
+        next.add(photoId)
+      }
+      return next
+    })
+  }, [])
+
+  const isFavorite = useCallback((photoId: string) => {
+    return favorites.has(photoId)
+  }, [favorites])
+
+  const clearAllFavorites = useCallback(() => {
+    setFavorites(new Set())
+  }, [])
+
+  return {
+    favorites,
+    toggleFavorite,
+    isFavorite,
+    clearAllFavorites,
+    isLoaded,
+    favoriteCount: favorites.size,
   }
 }
 
@@ -585,8 +286,6 @@ export default function PhotoGallerySection({
   // Custom photos persistence
   const {
     customPhotos,
-    useDemo,
-    setUseDemo,
     addPhoto,
     removePhoto,
     updatePhoto: updateCustomPhoto,
@@ -594,8 +293,17 @@ export default function PhotoGallerySection({
     isLoaded: customPhotosLoaded,
   } = useCustomPhotos()
 
+  // Favorites persistence (works for any photo by ID)
+  const {
+    toggleFavorite: toggleFavoriteById,
+    isFavorite,
+    clearAllFavorites,
+    favoriteCount,
+    isLoaded: favoritesLoaded,
+  } = useFavorites()
+
   // State
-  const [albums] = useState<Album[]>(mockAlbums)
+  const [albums] = useState<Album[]>([])
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [showInfoPanel, setShowInfoPanel] = useState(false)
@@ -624,10 +332,8 @@ export default function PhotoGallerySection({
   const [photoDescription, setPhotoDescription] = useState("")
   const [isAddingPhoto, setIsAddingPhoto] = useState(false)
 
-  // Combine custom photos with demo photos
-  const photos = customPhotosLoaded
-    ? [...customPhotos, ...(useDemo ? mockPhotos : [])]
-    : mockPhotos
+  // Photos are now just customPhotos (no demo data)
+  const photos = customPhotosLoaded ? customPhotos : []
 
   // Filter photos
   const filteredPhotos = photos.filter((photo) => {
@@ -636,7 +342,7 @@ export default function PhotoGallerySection({
       photo.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       photo.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
     const matchesAlbum = filterAlbum === "all" || photo.albumId === filterAlbum
-    const matchesFavorites = !filterFavorites || photo.isFavorite
+    const matchesFavorites = !filterFavorites || isFavorite(photo.id)
     return matchesSearch && matchesAlbum && matchesFavorites
   })
 
@@ -725,20 +431,9 @@ export default function PhotoGallerySection({
     }
   }, [slideshowActive, lightboxOpen, currentPhotoIndex, filteredPhotos])
 
-  // Toggle favorite
+  // Toggle favorite using the persistent favorites store
   const toggleFavorite = (photoId: string) => {
-    // Check if it's a custom photo
-    const isCustom = customPhotos.some((p) => p.id === photoId)
-    if (isCustom) {
-      const photo = customPhotos.find((p) => p.id === photoId)
-      if (photo) {
-        updateCustomPhoto(photoId, { isFavorite: !photo.isFavorite })
-      }
-    }
-    // Update selected photo state
-    if (selectedPhoto?.id === photoId) {
-      setSelectedPhoto((prev) => (prev ? { ...prev, isFavorite: !prev.isFavorite } : null))
-    }
+    toggleFavoriteById(photoId)
   }
 
   // Open lightbox
@@ -929,7 +624,7 @@ export default function PhotoGallerySection({
 
   // Stats
   const totalPhotos = photos.length
-  const totalFavorites = photos.filter((p) => p.isFavorite).length
+  const totalFavorites = favoriteCount
   const totalSize = photos.reduce((sum, p) => sum + p.size, 0)
 
   return (
@@ -948,9 +643,10 @@ export default function PhotoGallerySection({
             <Badge className="bg-primary/20 text-primary border-primary/30 text-sm px-3 py-1">
               {totalPhotos} Photos
             </Badge>
-            {customPhotos.length > 0 && (
-              <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-sm px-3 py-1">
-                {customPhotos.length} Custom
+            {favoriteCount > 0 && (
+              <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-sm px-3 py-1">
+                <Heart className="h-3 w-3 mr-1 fill-current" />
+                {favoriteCount}
               </Badge>
             )}
             <Badge className="bg-secondary/20 text-secondary border-secondary/30 text-sm px-3 py-1">
@@ -987,7 +683,7 @@ export default function PhotoGallerySection({
               <ImageIcon className="h-5 w-5 text-primary/50" />
             </div>
             <p className="text-3xl font-bold text-primary font-mono">{totalPhotos}</p>
-            <p className="text-muted-foreground text-xs mt-1">{albums.length} albums</p>
+            <p className="text-muted-foreground text-xs mt-1">in your gallery</p>
           </Card>
 
           <Card className="glass border-secondary/30 p-5">
@@ -1159,7 +855,7 @@ export default function PhotoGallerySection({
                         >
                           <Heart
                             className={`h-4 w-4 ${
-                              photo.isFavorite
+                              isFavorite(photo.id)
                                 ? "fill-red-500 text-red-500"
                                 : "text-foreground"
                             }`}
@@ -1174,7 +870,19 @@ export default function PhotoGallerySection({
               {filteredPhotos.length === 0 && (
                 <div className="text-center py-12">
                   <ImageIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No photos found</p>
+                  <p className="text-muted-foreground mb-2">
+                    {searchQuery || filterAlbum !== "all" ? "No photos match your filters" : "No photos yet"}
+                  </p>
+                  {!searchQuery && filterAlbum === "all" && (
+                    <Button
+                      variant="outline"
+                      className="mt-2 border-primary/30 text-primary hover:bg-primary/10"
+                      onClick={() => setShowAddModal(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Your First Photo
+                    </Button>
+                  )}
                 </div>
               )}
             </TabsContent>
@@ -1244,7 +952,7 @@ export default function PhotoGallerySection({
             {/* Favorites Tab */}
             <TabsContent value="favorites" className="space-y-6">
               {(() => {
-                const favoritePhotos = filteredPhotos.filter((p) => p.isFavorite)
+                const favoritePhotos = filteredPhotos.filter((p) => isFavorite(p.id))
                 return favoritePhotos.length > 0 ? (
                   <div
                     className={
@@ -1480,39 +1188,9 @@ export default function PhotoGallerySection({
                     <div className="glass-dark border-primary/20 rounded-lg p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div>
-                          <h5 className="text-foreground font-medium">Demo Images</h5>
+                          <h5 className="text-foreground font-medium">Your Photos</h5>
                           <p className="text-muted-foreground text-xs mt-1">
-                            Show demo Unsplash images in gallery
-                          </p>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={`border-primary/30 ${
-                            useDemo ? "bg-primary/20 text-primary" : ""
-                          }`}
-                          onClick={() => setUseDemo(!useDemo)}
-                        >
-                          {useDemo ? (
-                            <>
-                              <Check className="h-4 w-4 mr-2" />
-                              Enabled
-                            </>
-                          ) : (
-                            "Disabled"
-                          )}
-                        </Button>
-                      </div>
-                      <p className="text-muted-foreground text-xs">
-                        {useDemo ? `${mockPhotos.length} demo photos shown` : "Demo photos hidden"}
-                      </p>
-                    </div>
-                    <div className="glass-dark border-primary/20 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <h5 className="text-foreground font-medium">Custom Photos</h5>
-                          <p className="text-muted-foreground text-xs mt-1">
-                            Your uploaded images ({customPhotos.length})
+                            Uploaded images ({customPhotos.length})
                           </p>
                         </div>
                         {customPhotos.length > 0 && (
@@ -1521,7 +1199,7 @@ export default function PhotoGallerySection({
                             size="sm"
                             className="border-red-500/30 text-red-400 hover:bg-red-500/10"
                             onClick={() => {
-                              if (confirm("Clear all custom photos? This cannot be undone.")) {
+                              if (confirm("Clear all photos? This cannot be undone.")) {
                                 clearAllCustom()
                               }
                             }}
@@ -1533,6 +1211,34 @@ export default function PhotoGallerySection({
                       </div>
                       <p className="text-muted-foreground text-xs">
                         Stored in browser localStorage
+                      </p>
+                    </div>
+                    <div className="glass-dark border-secondary/20 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h5 className="text-foreground font-medium">Favorites</h5>
+                          <p className="text-muted-foreground text-xs mt-1">
+                            Your favorite photos ({favoriteCount})
+                          </p>
+                        </div>
+                        {favoriteCount > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                            onClick={() => {
+                              if (confirm("Clear all favorites? This cannot be undone.")) {
+                                clearAllFavorites()
+                              }
+                            }}
+                          >
+                            <Heart className="h-4 w-4 mr-2" />
+                            Clear
+                          </Button>
+                        )}
+                      </div>
+                      <p className="text-muted-foreground text-xs">
+                        Persisted across sessions
                       </p>
                     </div>
                   </div>
@@ -1706,13 +1412,13 @@ export default function PhotoGallerySection({
                         variant="outline"
                         size="icon"
                         className={`glass border-primary/30 hover:bg-primary/20 ${
-                          selectedPhoto.isFavorite ? "text-red-500" : ""
+                          isFavorite(selectedPhoto.id) ? "text-red-500" : ""
                         }`}
                         onClick={() => toggleFavorite(selectedPhoto.id)}
                       >
                         <Heart
                           className={`h-4 w-4 ${
-                            selectedPhoto.isFavorite ? "fill-current" : ""
+                            isFavorite(selectedPhoto.id) ? "fill-current" : ""
                           }`}
                         />
                       </Button>
