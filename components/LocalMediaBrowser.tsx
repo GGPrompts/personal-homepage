@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useCallback } from "react"
+import React, { useState, useCallback, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Folder,
@@ -33,6 +33,10 @@ import {
   formatFileSize,
   type MediaFile,
 } from "@/hooks/useMediaLibrary"
+import {
+  getVideoThumbnailUrl,
+  useVideosMetadata,
+} from "@/hooks/useVideoMetadata"
 
 interface LocalMediaBrowserProps {
   mediaType: "image" | "audio" | "video"
@@ -103,6 +107,13 @@ export function LocalMediaBrowser({
 
   const mediaFiles = files.filter((f) => f.type === mediaType)
   const directories_ = files.filter((f) => f.type === "directory")
+
+  // Fetch metadata for video files
+  const videoPaths = useMemo(
+    () => (mediaType === "video" ? mediaFiles.map((f) => f.path) : []),
+    [mediaType, mediaFiles]
+  )
+  const { data: videoMetadata } = useVideosMetadata(videoPaths)
 
   const handleFileClick = useCallback(
     (file: MediaFile) => {
@@ -310,13 +321,27 @@ export function LocalMediaBrowser({
                 }`}
                 onClick={() => handleFileClick(file)}
               >
-                <div className="aspect-square relative overflow-hidden rounded-lg mb-2 bg-muted/20">
+                <div className="aspect-video relative overflow-hidden rounded-lg mb-2 bg-muted/20">
                   {mediaType === "image" ? (
                     <img
                       src={getMediaUrl(file.path)}
                       alt={file.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                       loading="lazy"
+                    />
+                  ) : mediaType === "video" ? (
+                    <img
+                      src={getVideoThumbnailUrl(file.path)}
+                      alt={file.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      loading="lazy"
+                      onError={(e) => {
+                        // Hide broken thumbnail and show fallback icon
+                        const target = e.currentTarget
+                        target.style.display = "none"
+                        const fallback = target.nextElementSibling as HTMLElement
+                        if (fallback) fallback.style.display = "flex"
+                      }}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
@@ -325,14 +350,31 @@ export function LocalMediaBrowser({
                       }`} />
                     </div>
                   )}
+                  {/* Video fallback icon (hidden by default) */}
+                  {mediaType === "video" && (
+                    <div className="w-full h-full items-center justify-center absolute inset-0 hidden" style={{ display: "none" }}>
+                      <Video className="h-10 w-10 text-purple-400" />
+                    </div>
+                  )}
                   {(mediaType === "audio" || mediaType === "video") && (
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
                       <Play className="h-8 w-8 text-white" fill="currentColor" />
                     </div>
                   )}
+                  {/* Video duration badge */}
+                  {mediaType === "video" && videoMetadata?.[file.path] && (
+                    <div className="absolute bottom-1 right-1 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded">
+                      {videoMetadata[file.path]?.durationFormatted}
+                    </div>
+                  )}
                 </div>
                 <p className="text-xs text-foreground truncate">{file.name}</p>
-                <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{formatFileSize(file.size)}</span>
+                  {mediaType === "video" && videoMetadata?.[file.path] && (
+                    <span>{videoMetadata[file.path]?.width}×{videoMetadata[file.path]?.height}</span>
+                  )}
+                </div>
               </Card>
             </motion.div>
           ))}
@@ -374,13 +416,29 @@ export function LocalMediaBrowser({
                   onClick={() => handleFileClick(file)}
                 >
                   {mediaType === "image" ? (
-                    <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
+                    <div className="w-16 h-10 rounded overflow-hidden flex-shrink-0">
                       <img
                         src={getMediaUrl(file.path)}
                         alt={file.name}
                         className="w-full h-full object-cover"
                         loading="lazy"
                       />
+                    </div>
+                  ) : mediaType === "video" ? (
+                    <div className="w-16 h-10 rounded overflow-hidden flex-shrink-0 relative bg-muted/20">
+                      <img
+                        src={getVideoThumbnailUrl(file.path)}
+                        alt={file.name}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        onError={(e) => {
+                          const target = e.currentTarget
+                          target.style.display = "none"
+                        }}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <Video className="h-5 w-5 text-purple-400 opacity-50" />
+                      </div>
                     </div>
                   ) : (
                     <div className={`w-10 h-10 rounded flex items-center justify-center flex-shrink-0 ${
@@ -393,7 +451,17 @@ export function LocalMediaBrowser({
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-foreground truncate">{file.name}</p>
-                    <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{formatFileSize(file.size)}</span>
+                      {mediaType === "video" && videoMetadata?.[file.path] && (
+                        <>
+                          <span>•</span>
+                          <span>{videoMetadata[file.path]?.durationFormatted}</span>
+                          <span>•</span>
+                          <span>{videoMetadata[file.path]?.width}×{videoMetadata[file.path]?.height}</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                   {(mediaType === "audio" || mediaType === "video") && (
                     <Play className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
