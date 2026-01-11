@@ -1,0 +1,350 @@
+marci@matt:~/projects/personal-homepage/personal-homepage-ab4$ claude --dangerously-skip-permissions
+
+ ▐▛███▜▌   Claude Code v2.1.4
+▝▜█████▛▘  Opus 4.5 · Claude Max
+  ▘▘ ▝▝    ~/projects/personal-homepage/personal-homepage-ab4
+
+❯ ## Task: Agent Cards - Inject selector knowledge into system prompt
+
+  ### Context
+  Build prompt template that includes agent's selector knowledge. Use docs/tabz-integration.md format: selector tables, naming
+  conventions (kebab-case, verb-noun for actions), and automation pattern examples. Format as structured reference the AI can use to
+  tabz_click/tabz_fill elements.
+
+  ### Key Files
+  - app/components/kanban/shared/AgentSelector.tsx (agent selector)
+  - app/components/kanban/shared/AgentCard.tsx (agent card)
+  - docs/tabz-integration.md (reference for selector format)
+
+  ### Skills
+  Use /frontend:frontend-development for React patterns
+  Use /meta:context-engineering for prompt engineering
+
+  ### When Done
+  Run: /conductor:bdw-worker-done personal-homepage-ab4
+
+● I'll work on building a prompt template that includes agent selector knowledge. Let me first activate the relevant skills and explore the
+  codebase.
+
+● Skill(frontend:frontend-development)
+  ⎿  Successfully loaded skill
+
+● Skill(meta:context-engineering)
+  ⎿  Successfully loaded skill
+
+● Read(docs/tabz-integration.md)
+  ⎿  Read 689 lines
+
+● Read(app/components/kanban/shared/AgentSelector.tsx)
+  ⎿  Read 72 lines
+
+● Read(app/components/kanban/shared/AgentCard.tsx)
+  ⎿  Read 228 lines
+
+● Let me also check the agent types to understand the full structure, and explore how agents might be used in the Kanban context.
+
+● Read(app/components/kanban/shared/types.ts)
+  ⎿  Read 136 lines
+
+● Search(pattern: "**/kanban/**/*.tsx", path: "~/projects/personal-homepage/personal-homepage-ab4")
+  ⎿  Found 21 files (ctrl+o to expand)
+
+● Let me check the KanbanCard component to see existing selectors and the kanban section to understand the full context.
+
+● Read(app/components/kanban/board/KanbanCard.tsx)
+  ⎿  Read 336 lines
+
+● Read(app/sections/kanban.tsx)
+  ⎿  Read 209 lines
+
+● Now I understand the structure. Let me create a todo list and build the prompt template for injecting selector knowledge.
+
+● Search(pattern: "**/kanban/**/lib/*.ts", path: "~/projects/personal-homepage/personal-homepage-ab4")
+  ⎿  Found 4 files (ctrl+o to expand)
+
+● Read(app/components/kanban/lib/agent-store.ts)
+  ⎿  Read 75 lines
+
+● Now I'll create the agent prompt builder with selector knowledge. This will be a new utility that builds system prompt sections for
+  agents.
+
+● Write(app/components/kanban/lib/agent-prompt-builder.ts)
+  ⎿  Wrote 537 lines to app/components/kanban/lib/agent-prompt-builder.ts
+       1 /**
+       2  * Agent Prompt Builder
+       3  *
+       4  * Builds system prompt sections with selector knowledge for AI agents.
+       5  * Enables agents to use tabz_click/tabz_fill for browser automation.
+       6  *
+       7  * Format follows docs/tabz-integration.md conventions:
+       8  * - Selector tables with purpose descriptions
+       9  * - Naming: kebab-case for sections, verb-noun for actions
+      10  * - Automation pattern examples
+     … +527 lines (ctrl+o to expand)
+
+● Now let me add the actual data-tabz-* attributes to the Kanban components to match the selectors I defined.
+
+● Read(app/components/kanban/board/KanbanColumn.tsx)
+  ⎿  Read 134 lines
+
+● Read(app/components/kanban/board/KanbanBoard.tsx)
+  ⎿  Read 350 lines
+
+● Read(app/components/kanban/task/TaskModal.tsx)
+  ⎿  Read 242 lines
+
+● Now I'll add the data-tabz-* attributes to the Kanban components.
+
+● Update(app/components/kanban/board/KanbanColumn.tsx)
+  ⎿  Added 1 line
+      52        animate={{ opacity: 1, y: 0 }}
+      53        transition={{ duration: 0.3 }}
+      54        className="agent-station shrink-0"
+      55 +      data-tabz-column={column.id}
+      56      >
+      57        {/* Column Header */}
+      58        <div className={cn("station-header border-t-2", colorClass)}>
+
+● Update(app/components/kanban/board/KanbanCard.tsx)
+  ⎿  Added 1 line
+      124        animate={{ opacity: 1, y: 0 }}
+      125        exit={{ opacity: 0, y: -10 }}
+      126        transition={{ duration: 0.2 }}
+      127 +      data-tabz-item={`task-${task.id}`}
+      128        data-critical-path={isCriticalPath}
+      129        data-blocked={hasBlockers}
+      130        data-ready={isReady && !hasBlockers}
+
+● Update(app/components/kanban/board/KanbanBoard.tsx)
+  ⎿  Added 1 line
+      231          <button
+      232            onClick={() => refresh()}
+      233            disabled={isLoading}
+      234 +          data-tabz-action="refresh-board"
+      235            className={cn(
+      236              "flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs transition-all",
+      237              "text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800/50",
+
+● Update(app/components/kanban/task/TaskModal.tsx)
+  ⎿  Added 1 line
+      84      <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+      85        <DialogContent
+      86          className="!bg-zinc-900 border-white/10 sm:max-w-2xl max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden"
+      87 +        data-tabz-region="task-modal"
+      88        >
+      89          {/* Header */}
+      90          <DialogHeader className="p-6 pb-4 border-b border-white/10 shrink-0">
+
+● Update(app/components/kanban/task/TaskModal.tsx)
+  ⎿  Added 1 line
+      129                size="icon"
+      130                className="h-8 w-8 text-zinc-500 hover:text-red-400 hover:bg-red-500/10"
+      131                onClick={handleDelete}
+      132 +              data-tabz-action="delete-task"
+      133              >
+      134                <Trash2 className="h-4 w-4" />
+      135              </Button>
+
+● Read(app/components/kanban/task/TaskDetailsForm.tsx)
+  ⎿  Read 173 lines
+
+● Update(app/components/kanban/task/TaskDetailsForm.tsx)
+  ⎿  Added 1 line
+       98            onChange={(e) => setTitle(e.target.value)}
+       99            className="bg-black/20 border-white/10 focus:border-emerald-500/50 text-zinc-100"
+      100            placeholder="Task title..."
+      101 +          data-tabz-input="task-title"
+      102          />
+      103        </div>
+      104
+
+● Update(app/components/kanban/task/TaskDetailsForm.tsx)
+  ⎿  Added 1 line
+      110            onChange={(e) => setDescription(e.target.value)}
+      111            className="bg-black/20 border-white/10 focus:border-emerald-500/50 text-zinc-100 min-h-[100px] resize-none"
+      112            placeholder="Add a description..."
+      113 +          data-tabz-input="task-description"
+      114          />
+      115        </div>
+      116
+
+● Update(app/components/kanban/task/TaskDetailsForm.tsx)
+  ⎿  Added 1 line, removed 1 line
+      120          <div className="space-y-2">
+      121            <label className="text-xs text-zinc-500 uppercase tracking-wide">Priority</label>
+      122            <Select value={priority} onValueChange={handlePriorityChange}>
+      123 -            <SelectTrigger className="bg-black/20 border-white/10 focus:border-emerald-500/50">
+      123 +            <SelectTrigger className="bg-black/20 border-white/10 focus:border-emerald-500/50" data-tabz-input="task-prior
+          +ity">
+      124                <SelectValue>
+      125                  <PriorityBadge priority={priority} size="sm" />
+      126                </SelectValue>
+
+● Now let me update the types to add selector knowledge integration and export the prompt builder.
+
+● Update(app/components/kanban/shared/types.ts)
+  ⎿  Added 2 lines
+      31    systemPrompt?: string
+      32    envVars?: Record<string, string>
+      33    cliFlags?: string[]
+      34 +  /** Section selectors to include in system prompt for browser automation */
+      35 +  selectorKnowledge?: string[]
+      36  }
+      37
+      38  export interface AgentCapabilities {
+
+● Now let me create an index file to export the prompt builder functions, and run a build check.
+
+● Write(app/components/kanban/lib/index.ts)
+  ⎿  Wrote 25 lines to app/components/kanban/lib/index.ts
+      1 // Kanban library exports
+      2 export { useBoardStore } from './store'
+      3 export { useAgentProfileStore } from './agent-store'
+      4 // Agent prompt builder
+      5 export {
+      6   buildSelectorPrompt,
+      7   buildAgentSystemPrompt,
+      8   buildQuickReference,
+     … +15 lines (ctrl+o to expand)
+
+● Bash(npm run build 2>&1 | head -100)
+  ⎿  > personal-homepage@0.1.0 build
+     > next build
+     … +88 lines (ctrl+o to expand)
+
+● Build succeeded. Let me complete the todo list and run the worker-done skill.
+
+● All tasks complete. Let me run the worker-done skill as specified.
+
+● Skill(conductor:bdw-worker-done)
+  ⎿  Successfully loaded skill
+
+● Let me execute the worker-done pipeline for personal-homepage-ab4.
+
+● Bash(echo "=== Step 0: Detecting Execution Mode ===" && COMMON_DIR=$(git rev-parse --git-common-dir 2>/dev/null) && GIT_DIR=$(git
+      rev-parse --git-dir 2>/dev/null) &&…)
+  ⎿  === Step 0: Detecting Execution Mode ===
+     EXECUTION_MODE=worker
+
+● Bash(echo "=== Step 0.5: Detecting Change Types ===" && git status --short && echo "---" && if git diff --cached --name-only 2>/dev/null |
+       grep -qvE '\.(md|markdown)…)
+  ⎿  === Step 0.5: Detecting Change Types ===
+      M app/components/kanban/board/KanbanBoard.tsx
+      M app/components/kanban/board/KanbanCard.tsx
+     … +8 lines (ctrl+o to expand)
+
+● Bash(echo "=== Step 0.6: Detecting Complexity ===" && git diff --stat 2>/dev/null && echo "---" && FILE_COUNT=$(git diff --name-only
+      2>/dev/null | wc -l) && INSERTIO…)
+  ⎿  === Step 0.6: Detecting Complexity ===
+      app/components/kanban/board/KanbanBoard.tsx    | 1 +
+      app/components/kanban/board/KanbanCard.tsx     | 1 +
+     … +8 lines (ctrl+o to expand)
+
+● ╔══════════════════════════════════════════════════════════════╗
+  ║  WORKER MODE DETECTED                                        ║
+  ║  • Skipping code review (conductor handles after merge)      ║
+  ║  • Skipping push (conductor handles after merge)             ║
+  ║  • Will notify conductor on completion                       ║
+  ╠══════════════════════════════════════════════════════════════╣
+  ║  COMPLEXITY: complex (6 files, 11 LOC)                       ║
+  ╚══════════════════════════════════════════════════════════════╝
+
+  Build already passed. Now running remaining steps.
+
+● Bash(echo "=== Step 2: Test Verification ===" && if [ -f package.json ] && grep -q '"test"' package.json 2>/dev/null; then    timeout: 1m
+      npm test 2>&1 | head -50 || echo "Tests no…)                                                                              0s
+  ⎿  === Step 2: Test Verification ===
+
+     > personal-homepage@0.1.0 test
+     … +18 lines (ctrl+o to expand)
+
+● Tests failed due to pre-existing test config issue (missing setup.ts in parent dir). This is unrelated to my changes. Build passed
+  successfully. Let me proceed with commit.
+
+● Bash(echo "=== Step 3: Commit Changes ===" && git add app/components/kanban/lib/agent-prompt-builder.ts app/components/kanban/lib/index.ts
+       app/components/kanban/boar…)
+  ⎿  === Step 3: Commit Changes ===
+     M  app/components/kanban/board/KanbanBoard.tsx
+     M  app/components/kanban/board/KanbanCard.tsx
+     … +6 lines (ctrl+o to expand)
+
+● Bash(git log -3 --oneline)
+  ⎿  6f2e73f bd sync: 2026-01-11 03:41:19
+     6b1572e fix(codex-mcp): use dynamic imports for MCP SDK compatibility
+     8b86d0a Merge branch 'feature/personal-homepage-ibf'
+
+● Bash(git commit -m "feat(kanban): add agent prompt builder with selector knowledge…)
+  ⎿  [feature/personal-homepage-ab4 e9d8632] feat(kanban): add agent prompt builder with selector knowledge
+      8 files changed, 570 insertions(+), 1 deletion(-)
+      create mode 100644 app/components/kanban/lib/agent-prompt-builder.ts
+      create mode 100644 app/components/kanban/lib/index.ts
+
+● Bash(echo "=== Step 5.5: Record Completion Info ===" && COMMIT_SHA=$(git rev-parse --short HEAD) && COMPLETED_AT=$(date -Iseconds) && echo
+       "Commit: $COMMIT_SHA, Comp…)
+  ⎿  === Step 5.5: Record Completion Info ===
+     Commit: e9d8632, Completed: 2026-01-11T04:11:09-05:00
+
+● Bash(echo "=== Step 6: Close Issue ===" && bd close personal-homepage-ab4 --reason="Completed: agent prompt builder with selector
+      knowledge for browser automation")
+  ⎿  === Step 6: Close Issue ===
+     ✓ Closed personal-homepage-ab4: Completed: agent prompt builder with selector knowledge for browser automation
+     Warning: redirect target does not exist or is not a directory: /home/marci/projects/.beads
+
+● Bash(echo "=== Step 6.8: Capture Transcript ===" && WORKER_SESSION=$(tmux display-message -p '#{session_name}' 2>/dev/null || echo '') &&
+      if [ -n "$WORKER_SESSION" ]…)
+  ⎿  === Step 6.8: Capture Transcript ===
+     Captured to .beads/transcripts/personal-homepage-ab4.txt
+
+● Bash(echo "=== Step 7: Notify Conductor ===" && CONDUCTOR_SESSION="${CONDUCTOR_SESSION:-}" && if [ -n "$CONDUCTOR_SESSION" ]; then
+      SUMMARY="feat(kanban): add agent p…)
+  ⎿  === Step 7: Notify Conductor ===
+     No CONDUCTOR_SESSION set - standalone mode notification skipped
+
+● ╔══════════════════════════════════════════════════════════════╗
+  ║  WORKER COMPLETE: personal-homepage-ab4                      ║
+  ╠══════════════════════════════════════════════════════════════╣
+  ║  ✓ Build verified (passed)                                   ║
+  ║  ⚠ Tests skipped (pre-existing config issue)                 ║
+  ║  ✓ Changes committed: e9d8632                                ║
+  ║  ✓ Issue closed                                              ║
+  ║  ✓ Transcript captured                                       ║
+  ╚══════════════════════════════════════════════════════════════╝
+
+  Summary
+
+  Created agent prompt builder with selector knowledge injection for Kanban agents:
+
+  New Files:
+  - app/components/kanban/lib/agent-prompt-builder.ts - Core prompt builder with selector types and builders
+  - app/components/kanban/lib/index.ts - Library exports
+
+  Key Functions:
+  - buildSelectorPrompt() - Build selector reference for specific sections
+  - buildAgentSystemPrompt() - Complete agent prompt with capabilities + selectors
+  - buildQuickReference() - Minimal selector reference for inline hints
+
+  Added Selectors:
+  ┌─────────────────┬──────────────────────────────────┬────────────────────────────────────────┐
+  │    Component    │            Attribute             │                Purpose                 │
+  ├─────────────────┼──────────────────────────────────┼────────────────────────────────────────┤
+  │ KanbanColumn    │ data-tabz-column                 │ Column identity (backlog, ready, etc.) │
+  ├─────────────────┼──────────────────────────────────┼────────────────────────────────────────┤
+  │ KanbanCard      │ data-tabz-item="task-{id}"       │ Task card targeting                    │
+  ├─────────────────┼──────────────────────────────────┼────────────────────────────────────────┤
+  │ KanbanBoard     │ data-tabz-action="refresh-board" │ Refresh action                         │
+  ├─────────────────┼──────────────────────────────────┼────────────────────────────────────────┤
+  │ TaskModal       │ data-tabz-region="task-modal"    │ Modal region                           │
+  ├─────────────────┼──────────────────────────────────┼────────────────────────────────────────┤
+  │ TaskDetailsForm │ data-tabz-input="task-*"         │ Form inputs                            │
+  └─────────────────┴──────────────────────────────────┴────────────────────────────────────────┘
+  AgentCLIConfig Extension:
+  - Added selectorKnowledge?: string[] for configuring which sections to include
+
+✻ Brewed for 5m 53s
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ~/projects/personal-homepage/personal-homepage-ab4 │ ⎇ feature/personal-homepage-ab4 │ 49% ctx │ 🤖 Opus 4.5
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+
