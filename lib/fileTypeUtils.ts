@@ -1,6 +1,6 @@
 // File type detection utilities for syntax highlighting
 
-export type FileType = "markdown" | "code" | "text" | "json" | "image" | "video" | "csv"
+export type FileType = "markdown" | "code" | "text" | "json" | "image" | "video" | "csv" | "prompty"
 
 export interface FileTypeInfo {
   type: FileType
@@ -78,6 +78,11 @@ export const getFileTypeAndLanguage = (filePath: string): FileTypeInfo => {
   }
   if (lowerName === "makefile" || lowerName === "gnumakefile") {
     return { type: "code", language: "makefile" }
+  }
+
+  // Prompty files (.prompty - LLM prompt templates)
+  if (ext === "prompty") {
+    return { type: "prompty" }
   }
 
   // Markdown files

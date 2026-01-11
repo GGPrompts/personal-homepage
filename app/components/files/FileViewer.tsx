@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useCallback, useMemo } from 'react'
-import { X, Pin, FileCode, FileText, Image, Video, FileJson, Table2, Eye, ZoomIn, ZoomOut, RotateCcw, Download, Loader2, Volume2, VolumeX, Square } from 'lucide-react'
+import { X, Pin, FileCode, FileText, Image, Video, FileJson, Table2, Eye, ZoomIn, ZoomOut, RotateCcw, Download, Loader2, Volume2, VolumeX, Square, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import type { FileType } from '@/lib/fileTypeUtils'
+import { PromptyViewer } from './PromptyViewer'
 
 // File type icons
 const FILE_TYPE_ICONS: Record<FileType, typeof FileCode> = {
@@ -22,6 +23,7 @@ const FILE_TYPE_ICONS: Record<FileType, typeof FileCode> = {
   image: Image,
   video: Video,
   csv: Table2,
+  prompty: Sparkles,
 }
 
 // File type badge colors
@@ -33,6 +35,7 @@ const FILE_TYPE_COLORS: Record<FileType, string> = {
   image: 'bg-green-500/20 text-green-400 border-green-500/30',
   video: 'bg-red-500/20 text-red-400 border-red-500/30',
   csv: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+  prompty: 'bg-pink-500/20 text-pink-400 border-pink-500/30',
 }
 
 // ============================================================================
@@ -580,6 +583,8 @@ function FileContent({ file }: FileContentProps) {
   }
 
   switch (file.fileType) {
+    case 'prompty':
+      return <PromptyViewer content={file.content} fileName={file.name} />
     case 'markdown':
       return <MarkdownViewer content={file.content} />
     case 'json':
