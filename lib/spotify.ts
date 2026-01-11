@@ -100,6 +100,10 @@ export interface SpotifyPlaybackState {
   } | null
   shuffle_state: boolean
   repeat_state: 'off' | 'track' | 'context'
+  context: {
+    type: 'artist' | 'playlist' | 'album' | 'show' | null
+    uri: string | null
+  } | null
 }
 
 export interface SpotifyDevice {

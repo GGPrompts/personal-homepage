@@ -13,6 +13,7 @@ import {
   setRepeat as setSpotifyRepeat,
   transferPlayback,
   getDevices,
+  getPlaybackState,
   type SpotifyDevice,
   type SpotifyTrack,
 } from "@/lib/spotify"
@@ -621,12 +622,52 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
 
   const switchDevice = useCallback(async (targetDeviceId: string) => {
     try {
-      await transferPlayback(targetDeviceId, true)
+      // Capture current playback state before switching (context, position, playing state)
+      const currentState = await getPlaybackState()
+      const contextUri = currentState?.context?.uri
+      const wasPlaying = currentState?.is_playing ?? false
+      const currentPosition = currentState?.progress_ms ?? 0
+
+      // Transfer playback to the new device
+      await transferPlayback(targetDeviceId, wasPlaying)
+
+      // Wait a moment for the transfer to complete
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // Refresh devices to update the active state
       await refreshDevices()
+
+      // Check if we're switching to our SDK player
+      const isSwitchingToSdkPlayer = targetDeviceId === deviceId
+
+      if (isSwitchingToSdkPlayer && contextUri) {
+        // Give the SDK a moment to receive the playback state
+        await new Promise(resolve => setTimeout(resolve, 300))
+
+        // Check if the SDK has the context loaded by checking our current state
+        const sdkState = await playerRef.current?.getCurrentState()
+
+        // If SDK has no context or the context is null, restore it
+        if (!sdkState?.context?.uri) {
+          console.log("Restoring context after device switch:", contextUri)
+          try {
+            await play({
+              deviceId: targetDeviceId,
+              contextUri,
+              positionMs: currentPosition,
+            })
+          } catch (err) {
+            console.warn("Could not restore context:", err)
+            // Set a helpful error message
+            setError("Context could not be restored. Try playing from a playlist or album.")
+          }
+        }
+      }
     } catch (err) {
       console.error("Failed to switch device:", err)
+      setError("Failed to switch device. Please try again.")
     }
-  }, [refreshDevices])
+  }, [refreshDevices, deviceId])
 
   // Device fetch - on initial authentication and when SDK becomes ready
   useEffect(() => {
