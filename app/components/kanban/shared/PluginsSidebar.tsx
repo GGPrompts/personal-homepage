@@ -1,0 +1,240 @@
+'use client'
+
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  Package,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
+  AlertCircle,
+  Terminal,
+  Bot,
+  Command,
+  Webhook,
+  Server,
+  Search,
+} from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
+import { PluginCard, Plugin } from './PluginCard'
+
+interface PluginsApiResponse {
+  success: boolean
+  data?: {
+    marketplaces: Record<string, Plugin[]>
+    totalPlugins: number
+    enabledCount: number
+    disabledCount: number
+    componentCounts: Record<string, number>
+    scopeCounts: Record<string, number>
+  }
+  error?: string
+}
+
+interface PluginsSidebarProps {
+  className?: string
+}
+
+/**
+ * Component type summary icons
+ */
+const COMPONENT_ICONS: Record<string, { icon: typeof Terminal; color: string }> = {
+  skill: { icon: Terminal, color: 'text-cyan-400' },
+  agent: { icon: Bot, color: 'text-purple-400' },
+  command: { icon: Command, color: 'text-amber-400' },
+  hook: { icon: Webhook, color: 'text-emerald-400' },
+  mcp: { icon: Server, color: 'text-rose-400' },
+}
+
+/**
+ * PluginsSidebar displays installed plugins with component counts
+ * Collapsible sidebar for the Kanban board
+ */
+export function PluginsSidebar({ className }: PluginsSidebarProps) {
+  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const { data, isLoading, error, refetch } = useQuery<PluginsApiResponse>({
+    queryKey: ['plugins'],
+    queryFn: async () => {
+      const res = await fetch('/api/plugins')
+      if (!res.ok) throw new Error('Failed to fetch plugins')
+      return res.json()
+    },
+    staleTime: 60000, // 1 minute
+  })
+
+  // Flatten plugins and filter by search
+  const allPlugins = Object.values(data?.data?.marketplaces || {}).flat()
+  const filteredPlugins = searchQuery
+    ? allPlugins.filter(
+        (p) =>
+          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.marketplace.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : allPlugins
+
+  // Group filtered plugins by marketplace
+  const groupedPlugins = filteredPlugins.reduce((acc, plugin) => {
+    if (!acc[plugin.marketplace]) acc[plugin.marketplace] = []
+    acc[plugin.marketplace].push(plugin)
+    return acc
+  }, {} as Record<string, Plugin[]>)
+
+  if (isCollapsed) {
+    return (
+      <div
+        className={cn(
+          'flex-shrink-0 w-12 glass-dark border-l border-zinc-700/50',
+          'flex flex-col items-center py-4 gap-4',
+          className
+        )}
+      >
+        <button
+          onClick={() => setIsCollapsed(false)}
+          className="p-2 rounded-md hover:bg-zinc-800 transition-colors"
+          title="Expand plugins sidebar"
+        >
+          <ChevronLeft className="h-4 w-4 text-zinc-400" />
+        </button>
+        <div className="h-px w-6 bg-zinc-700" />
+        <div className="flex flex-col items-center gap-3">
+          <Package className="h-4 w-4 text-teal-400" />
+          <span className="text-xs text-zinc-500 font-mono rotate-[-90deg] whitespace-nowrap origin-center translate-y-8">
+            {data?.data?.totalPlugins || 0} plugins
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className={cn(
+        'flex-shrink-0 w-72 glass-dark border-l border-zinc-700/50',
+        'flex flex-col h-full',
+        className
+      )}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-700/50">
+        <div className="flex items-center gap-2">
+          <Package className="h-4 w-4 text-teal-400" />
+          <span className="text-sm font-medium text-foreground">Plugins</span>
+          {data?.data?.totalPlugins !== undefined && (
+            <Badge variant="secondary" className="text-[10px] h-5">
+              {data.data.totalPlugins}
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => refetch()}
+            disabled={isLoading}
+            className="p-1.5 rounded-md hover:bg-zinc-800 transition-colors"
+            title="Refresh plugins"
+          >
+            <RefreshCw
+              className={cn('h-3.5 w-3.5 text-zinc-400', isLoading && 'animate-spin')}
+            />
+          </button>
+          <button
+            onClick={() => setIsCollapsed(true)}
+            className="p-1.5 rounded-md hover:bg-zinc-800 transition-colors"
+            title="Collapse sidebar"
+          >
+            <ChevronRight className="h-3.5 w-3.5 text-zinc-400" />
+          </button>
+        </div>
+      </div>
+
+      {/* Component Summary */}
+      {data?.data?.componentCounts && (
+        <div className="px-4 py-2 border-b border-zinc-700/50 flex flex-wrap gap-2">
+          {Object.entries(data.data.componentCounts).map(([type, count]) => {
+            if (count === 0) return null
+            const meta = COMPONENT_ICONS[type]
+            if (!meta) return null
+            const Icon = meta.icon
+            return (
+              <div
+                key={type}
+                className="flex items-center gap-1.5 text-xs"
+                title={`${count} ${type}${count !== 1 ? 's' : ''}`}
+              >
+                <Icon className={cn('h-3 w-3', meta.color)} />
+                <span className="text-zinc-400">{count}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Search */}
+      <div className="px-3 py-2">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
+          <Input
+            placeholder="Search plugins..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-8 pl-8 text-xs bg-zinc-800/50 border-zinc-700"
+          />
+        </div>
+      </div>
+
+      {/* Plugins List */}
+      <div className="flex-1 overflow-y-auto px-3 pb-3 scrollbar-thin">
+        {isLoading && (
+          <div className="flex items-center justify-center py-8">
+            <RefreshCw className="h-5 w-5 text-zinc-500 animate-spin" />
+          </div>
+        )}
+
+        {error && (
+          <div className="flex items-center gap-2 text-xs text-red-400 py-4 px-2">
+            <AlertCircle className="h-4 w-4 flex-shrink-0" />
+            <span>Failed to load plugins</span>
+          </div>
+        )}
+
+        {!isLoading && !error && filteredPlugins.length === 0 && (
+          <div className="text-center py-8 text-zinc-500 text-sm">
+            {searchQuery ? 'No plugins match your search' : 'No plugins installed'}
+          </div>
+        )}
+
+        <AnimatePresence mode="wait">
+          {Object.entries(groupedPlugins).map(([marketplace, plugins]) => (
+            <motion.div
+              key={marketplace}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mb-4"
+            >
+              {/* Marketplace Header */}
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-[10px] font-medium text-zinc-500 uppercase tracking-wide">
+                  {marketplace}
+                </span>
+                <div className="flex-1 h-px bg-zinc-700/50" />
+                <span className="text-[10px] text-zinc-600">{plugins.length}</span>
+              </div>
+
+              {/* Plugin Cards */}
+              <div className="space-y-2">
+                {plugins.map((plugin) => (
+                  <PluginCard key={plugin.id} plugin={plugin} />
+                ))}
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+    </div>
+  )
+}

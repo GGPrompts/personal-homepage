@@ -17,11 +17,12 @@ import {
 } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { motion } from 'framer-motion'
-import { ChevronLeft, ChevronRight, RefreshCw, AlertCircle, Database } from 'lucide-react'
+import { ChevronLeft, ChevronRight, RefreshCw, AlertCircle, Database, Package } from 'lucide-react'
 import { useBeadsBan, BeadsBanColumnId, BEADSBAN_COLUMNS } from '../hooks/useBeadsBan'
 import { GraphMetricsProvider } from '../contexts/GraphMetricsContext'
 import { KanbanColumn } from './KanbanColumn'
 import { TaskModal } from '../task/TaskModal'
+import { PluginsSidebar } from '../shared/PluginsSidebar'
 import { Task } from '../types'
 import { cn } from '@/lib/utils'
 import { useBoardStore } from '../lib/store'
@@ -38,6 +39,7 @@ export function KanbanBoard({ workspace }: KanbanBoardProps) {
   const [hasMounted, setHasMounted] = useState(false)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
+  const [showPlugins, setShowPlugins] = useState(false)
 
   // Use the new BeadsBan hook
   const {
@@ -254,10 +256,28 @@ export function KanbanBoard({ workspace }: KanbanBoardProps) {
         <div className="text-xs text-zinc-500 font-mono">
           {allTasks.length} issue{allTasks.length !== 1 ? 's' : ''}
         </div>
+
+        <div className="h-4 w-px bg-zinc-700" />
+
+        <button
+          onClick={() => setShowPlugins(!showPlugins)}
+          data-tabz-action="toggle-plugins"
+          className={cn(
+            "flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs transition-all",
+            showPlugins
+              ? "text-teal-400 bg-teal-500/20"
+              : "text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800/50"
+          )}
+        >
+          <Package className="w-3.5 h-3.5" />
+          Plugins
+        </button>
       </div>
 
-      {/* Main board area */}
-      <div className="flex-1 relative overflow-hidden">
+      {/* Main board area with optional sidebar */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Board container */}
+        <div className="flex-1 relative overflow-hidden">
         {/* Scroll Left Button */}
         {canScrollLeft && (
           <button
@@ -344,6 +364,10 @@ export function KanbanBoard({ workspace }: KanbanBoardProps) {
           {/* Task Detail Modal */}
           <TaskModal />
         </div>
+        </div>
+
+        {/* Plugins Sidebar */}
+        {showPlugins && <PluginsSidebar />}
       </div>
     </motion.div>
   )
