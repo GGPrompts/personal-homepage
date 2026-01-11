@@ -906,7 +906,7 @@ export default function PersonalHomepage() {
         if (!isLocal) {
           return <LocalOnlyOverlay sectionName="AI Workspace" description="This feature streams from local AI CLIs (Claude, Gemini, Codex) that require localhost to run." />
         }
-        return <AIWorkspaceSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} initialProjectPath={aiWorkspaceProject} onProjectPathConsumed={() => setAiWorkspaceProject(null)} />
+        return <AIWorkspaceSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} initialProjectPath={aiWorkspaceProject} onProjectPathConsumed={() => setAiWorkspaceProject(null)} defaultWorkingDir={workingDir} />
       case "stocks":
         return <StocksDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("settings")} />
       case "crypto":

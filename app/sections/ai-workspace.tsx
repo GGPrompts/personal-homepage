@@ -64,11 +64,13 @@ export default function AIWorkspaceSection({
   onSubItemHandled,
   initialProjectPath,
   onProjectPathConsumed,
+  defaultWorkingDir,
 }: {
   activeSubItem?: string | null
   onSubItemHandled?: () => void
   initialProjectPath?: string | null
   onProjectPathConsumed?: () => void
+  defaultWorkingDir?: string | null
 }) {
   // Auth for user avatar
   const { user } = useAuth()
@@ -191,6 +193,17 @@ export default function AIWorkspaceSection({
       onProjectPathConsumed?.()
     }
   }, [initialProjectPath, availableProjects, onProjectPathConsumed])
+
+  // Use defaultWorkingDir as initial selection if no other path is set
+  React.useEffect(() => {
+    // Only apply if no project is selected and no explicit initialProjectPath was provided
+    if (selectedProjectPath === null && !initialProjectPath && defaultWorkingDir && availableProjects.length > 0) {
+      const project = availableProjects.find(p => p.local?.path === defaultWorkingDir)
+      if (project?.local?.path) {
+        setSelectedProjectPath(project.local.path)
+      }
+    }
+  }, [defaultWorkingDir, availableProjects, selectedProjectPath, initialProjectPath])
 
   // Fetch available agents on mount
   React.useEffect(() => {
@@ -1157,13 +1170,11 @@ export default function AIWorkspaceSection({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="default">Default (gpt-5)</SelectItem>
-                        <SelectItem value="gpt-5">GPT-5 Codex</SelectItem>
-                        <SelectItem value="gpt-5-mini">GPT-5 Codex Mini</SelectItem>
-                        <SelectItem value="gpt-5.1">GPT-5.1 Codex</SelectItem>
-                        <SelectItem value="gpt-5.1-mini">GPT-5.1 Codex Mini</SelectItem>
-                        <SelectItem value="gpt-5.1-max">GPT-5.1 Codex Max</SelectItem>
-                        <SelectItem value="codex-mini-latest">Codex Mini (Latest)</SelectItem>
+                        <SelectItem value="default">Default (gpt-5.2-codex)</SelectItem>
+                        <SelectItem value="gpt-5.2-codex">GPT-5.2 Codex (Frontier agentic)</SelectItem>
+                        <SelectItem value="gpt-5.1-codex-max">GPT-5.1 Codex Max (Deep reasoning)</SelectItem>
+                        <SelectItem value="gpt-5.1-codex-mini">GPT-5.1 Codex Mini (Faster)</SelectItem>
+                        <SelectItem value="gpt-5.2">GPT-5.2 (Frontier)</SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
