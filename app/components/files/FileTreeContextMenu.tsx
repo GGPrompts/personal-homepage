@@ -1,6 +1,6 @@
 'use client'
 
-import React, { ReactNode, useState, useCallback } from 'react'
+import React, { ReactNode, useState, useCallback, useMemo } from 'react'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -29,6 +29,7 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  Volume2,
 } from 'lucide-react'
 import { useFilesContext } from '@/app/contexts/FilesContext'
 import { useTerminalExtension } from '@/hooks/useTerminalExtension'
@@ -70,6 +71,9 @@ export function FileTreeContextMenu({
   const [isExplaining, setIsExplaining] = useState(false)
   const [explainResult, setExplainResult] = useState<string | null>(null)
   const [explainExpanded, setExplainExpanded] = useState(true)
+
+  // State for TTS
+  const [isSpeaking, setIsSpeaking] = useState(false)
 
   // Copy path to clipboard
   const handleCopyPath = async () => {
@@ -247,6 +251,74 @@ export function FileTreeContextMenu({
     setExplainResult(null)
   }, [])
 
+  // Read aloud (TTS)
+  const handleReadAloud = useCallback(async () => {
+    if (isSpeaking || isDirectory) return
+
+    setIsSpeaking(true)
+
+    try {
+      // First fetch the file content
+      const contentResponse = await fetch(`/api/files/content?path=${encodeURIComponent(path)}`)
+      if (!contentResponse.ok) {
+        const errorData = await contentResponse.json()
+        toast.error(errorData.error || 'Failed to read file')
+        return
+      }
+
+      const contentData = await contentResponse.json()
+      const text = contentData.content
+
+      if (!text || text.trim().length === 0) {
+        toast.error('File is empty')
+        return
+      }
+
+      // Now call TTS API
+      const ttsResponse = await fetch('/api/tabz/speak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, priority: 'low' }),
+      })
+
+      const ttsData = await ttsResponse.json()
+
+      if (!ttsResponse.ok) {
+        if (ttsResponse.status === 503) {
+          toast.error(ttsData.hint || ttsData.error || 'TTS not available')
+        } else {
+          toast.error(ttsData.error || 'Failed to read aloud')
+        }
+        return
+      }
+
+      if (ttsData.success) {
+        toast.success(`Reading ${name} aloud...`)
+      } else {
+        toast.error(ttsData.error || 'Failed to read aloud')
+      }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      toast.error(`Failed to read aloud: ${errorMessage}`)
+    } finally {
+      setIsSpeaking(false)
+    }
+  }, [isSpeaking, isDirectory, path, name])
+
+  // Check if file is a text-based file that can be read aloud
+  const isTextFile = useMemo(() => {
+    if (isDirectory) return false
+    const ext = name.split('.').pop()?.toLowerCase() || ''
+    const textExtensions = [
+      'txt', 'md', 'markdown', 'json', 'csv', 'xml', 'yaml', 'yml', 'toml', 'ini',
+      'js', 'jsx', 'ts', 'tsx', 'py', 'rb', 'java', 'cpp', 'c', 'h', 'cs', 'go', 'rs',
+      'swift', 'kt', 'scala', 'php', 'sql', 'sh', 'bash', 'zsh', 'css', 'scss', 'sass',
+      'less', 'html', 'htm', 'vue', 'svelte', 'astro', 'lua', 'perl', 'r', 'julia',
+      'dockerfile', 'makefile', 'gitignore', 'env', 'log', 'conf', 'cfg', 'properties'
+    ]
+    return textExtensions.includes(ext) || name.startsWith('.')
+  }, [isDirectory, name])
+
   return (
     <ContextMenu>
       <ContextMenuPrimitive.Trigger asChild>
@@ -286,6 +358,22 @@ export function FileTreeContextMenu({
           <ContextMenuItem onClick={handlePinFile}>
             <Pin className="mr-2 h-4 w-4" />
             Pin File
+          </ContextMenuItem>
+        )}
+
+        {/* Read Aloud (text files only) */}
+        {isTextFile && (
+          <ContextMenuItem
+            onClick={handleReadAloud}
+            disabled={isSpeaking}
+            className={cn(isSpeaking && 'opacity-50')}
+          >
+            {isSpeaking ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Volume2 className="mr-2 h-4 w-4" />
+            )}
+            {isSpeaking ? 'Reading...' : 'Read Aloud'}
           </ContextMenuItem>
         )}
 

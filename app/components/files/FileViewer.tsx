@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useState, useCallback, useMemo } from 'react'
-import { X, Pin, FileCode, FileText, Image, Video, FileJson, Table2, Eye, ZoomIn, ZoomOut, RotateCcw, Download, Loader2 } from 'lucide-react'
+import { X, Pin, FileCode, FileText, Image, Video, FileJson, Table2, Eye, ZoomIn, ZoomOut, RotateCcw, Download, Loader2, Volume2, VolumeX, Square } from 'lucide-react'
+import { toast } from 'sonner'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { useFilesContext, OpenFile } from '@/app/contexts/FilesContext'
@@ -121,6 +122,7 @@ function CodeViewer({ content, language = 'text', lineCount }: CodeViewerProps) 
   return (
     <div className="relative h-full" data-tabz-region="code-viewer">
       <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
+        <TTSControls content={content} />
         <Badge variant="outline" className="text-xs font-mono">
           {language}
         </Badge>
@@ -338,7 +340,10 @@ function MarkdownViewer({ content }: MarkdownViewerProps) {
   }, [content])
 
   return (
-    <div className="h-full" data-tabz-region="markdown-viewer">
+    <div className="relative h-full" data-tabz-region="markdown-viewer">
+      <div className="absolute top-2 right-2 z-10">
+        <TTSControls content={content} />
+      </div>
       <ScrollArea className="h-full">
         <div
           className="prose prose-invert max-w-none p-6"
@@ -393,7 +398,10 @@ function CsvViewer({ content }: CsvViewerProps) {
   }, [content])
 
   return (
-    <div className="h-full" data-tabz-region="csv-viewer">
+    <div className="relative h-full" data-tabz-region="csv-viewer">
+      <div className="absolute top-2 right-2 z-10">
+        <TTSControls content={content} />
+      </div>
       <ScrollArea className="h-full">
         <div className="p-4">
           <table className="w-full border-collapse text-sm">
@@ -427,6 +435,97 @@ function CsvViewer({ content }: CsvViewerProps) {
         </div>
       </ScrollArea>
     </div>
+  )
+}
+
+// ============================================================================
+// TTS Controls Component
+// ============================================================================
+
+interface TTSControlsProps {
+  content: string
+  className?: string
+}
+
+function TTSControls({ content, className }: TTSControlsProps) {
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleSpeak = async () => {
+    if (isLoading) return
+
+    if (isSpeaking) {
+      // Stop speaking - we can't actually stop TTS mid-speech via API
+      // but we'll toggle the state to indicate user wants to stop
+      setIsSpeaking(false)
+      toast.info('TTS cannot be stopped mid-speech')
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/tabz/speak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: content, priority: 'low' }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        if (response.status === 503) {
+          toast.error(data.hint || data.error || 'TTS not available')
+        } else {
+          toast.error(data.error || 'Failed to read aloud')
+        }
+        return
+      }
+
+      if (data.success) {
+        setIsSpeaking(true)
+        toast.success('Reading aloud...')
+        // Auto-reset speaking state after estimated duration
+        // Rough estimate: 150 words per minute, 5 chars per word
+        const wordCount = content.length / 5
+        const durationMs = (wordCount / 150) * 60 * 1000
+        setTimeout(() => setIsSpeaking(false), Math.min(durationMs, 60000))
+      } else {
+        toast.error(data.error || 'Failed to read aloud')
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to read aloud'
+      toast.error(message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn('h-8 w-8', className)}
+            onClick={handleSpeak}
+            disabled={isLoading || !content}
+            data-tabz-action="read-aloud"
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : isSpeaking ? (
+              <VolumeX className="h-4 w-4 text-cyan-400" />
+            ) : (
+              <Volume2 className="h-4 w-4" />
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {isLoading ? 'Starting...' : isSpeaking ? 'Speaking...' : 'Read Aloud'}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }
 
