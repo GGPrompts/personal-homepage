@@ -1,8 +1,3 @@
 export { KanbanBoard } from './KanbanBoard'
 export { KanbanColumn } from './KanbanColumn'
 export { KanbanCard } from './KanbanCard'
-export { CommandBar } from './CommandBar'
-export { BoardSettingsDialog } from './BoardSettingsDialog'
-export { ColumnConfigDialog } from './ColumnConfigDialog'
-export { AddColumnButton } from './AddColumnButton'
-export { AddTaskButton } from './AddTaskButton'

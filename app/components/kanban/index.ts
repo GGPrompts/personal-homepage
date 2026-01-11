@@ -54,6 +54,14 @@ export {
   type UseBeadsIssuesOptions,
   type UseBeadsIssuesResult,
 } from './hooks/useBeadsIssues'
+export {
+  useBeadsBan,
+  BEADSBAN_COLUMNS,
+  type BeadsBanColumnId,
+  type BeadsBanColumn,
+  type UseBeadsBanOptions,
+  type UseBeadsBanResult,
+} from './hooks/useBeadsBan'
 
 // Re-export contexts
 export {
@@ -89,11 +97,6 @@ export {
   KanbanBoard,
   KanbanColumn,
   KanbanCard,
-  CommandBar,
-  BoardSettingsDialog,
-  ColumnConfigDialog,
-  AddColumnButton,
-  AddTaskButton,
 } from './board'
 
 // Re-export visualization components
