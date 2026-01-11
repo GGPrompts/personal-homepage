@@ -15,12 +15,35 @@ import {
   FileText,
   Calendar,
   MessageSquare,
+  Clock,
 } from "lucide-react"
 import { Task, PRIORITY_COLORS } from "../types"
 import { useBoardStore } from "../lib/store"
 import { useGraphMetricsContextSafe } from "../contexts/GraphMetricsContext"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
+
+/**
+ * Format duration between two dates in a human-readable format
+ */
+function formatDuration(start: Date, end: Date): string {
+  const ms = end.getTime() - start.getTime()
+  if (ms < 0) return ''
+
+  const minutes = Math.floor(ms / (1000 * 60))
+  const hours = Math.floor(ms / (1000 * 60 * 60))
+  const days = Math.floor(ms / (1000 * 60 * 60 * 24))
+
+  if (days > 0) {
+    const remainingHours = hours % 24
+    return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`
+  }
+  if (hours > 0) {
+    const remainingMins = minutes % 60
+    return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`
+  }
+  return `${minutes}m`
+}
 
 interface KanbanCardProps {
   task: Task
@@ -79,7 +102,8 @@ export function KanbanCard({ task, isOverlay = false, isDoneColumn = false, hasT
 
   // Done column metadata
   const closeReason = task.beadsMetadata?.closeReason
-  const closedAt = task.updatedAt
+  const closedAt = task.beadsMetadata?.closedAt ?? task.updatedAt
+  const duration = closedAt && task.createdAt ? formatDuration(task.createdAt, closedAt) : null
 
   // Render overlay version (shown during drag)
   if (isOverlay) {
@@ -192,15 +216,24 @@ export function KanbanCard({ task, isOverlay = false, isDoneColumn = false, hasT
           </div>
         )}
 
-        {/* Done column: completed badge */}
+        {/* Done column: completed badge with metadata */}
         {isDoneColumn && (
           <div className="flex items-center gap-1.5 mb-2 flex-wrap">
             <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-500/15 border border-green-500/30">
               <CheckCircle2 className="h-3 w-3 text-green-400" />
               <span className="text-[10px] font-medium text-green-400 mono">Completed</span>
             </div>
+            {duration && (
+              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-500/15 border border-blue-500/30">
+                <Clock className="h-3 w-3 text-blue-400" />
+                <span className="text-[10px] font-medium text-blue-400 mono">{duration}</span>
+              </div>
+            )}
             {hasTranscript && (
-              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-violet-500/15 border border-violet-500/30">
+              <div
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-violet-500/15 border border-violet-500/30 cursor-pointer hover:bg-violet-500/25 transition-colors"
+                title="View transcript in task details"
+              >
                 <FileText className="h-3 w-3 text-violet-400" />
                 <span className="text-[10px] font-medium text-violet-400 mono">Transcript</span>
               </div>
@@ -280,8 +313,8 @@ export function KanbanCard({ task, isOverlay = false, isDoneColumn = false, hasT
         {isDoneColumn && closedAt && (
           <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-zinc-600">
             <Calendar className="h-3 w-3" />
-            <span className="mono">
-              {new Date(closedAt).toLocaleDateString('en-US', {
+            <span className="mono" suppressHydrationWarning>
+              {closedAt.toLocaleDateString('en-US', {
                 month: 'short',
                 day: 'numeric',
                 year: closedAt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined

@@ -188,6 +188,7 @@ function mapIssueToTask(
       type: issue.type as BeadsTaskMetadata['type'],
       closeReason: issue.closeReason,
       beadsStatus: issue.status,
+      closedAt: issue.closedAt ? new Date(issue.closedAt) : undefined,
     },
     // Store extra data for Done column
     ...(columnId === 'done' && {

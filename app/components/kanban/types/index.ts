@@ -184,6 +184,8 @@ export interface BeadsTaskMetadata {
   beadsStatus?: string
   // Whether this task originated from beads
   isBeadsTask: boolean
+  // When the issue was closed
+  closedAt?: Date
 }
 
 // Per-task Claude CLI configuration
