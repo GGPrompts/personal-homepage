@@ -8,15 +8,41 @@
  * be returned, so we keep the process alive per chat as a fallback.
  */
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js"
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
-import { ListToolsResultSchema, CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js"
+// Dynamic imports to work around Turbopack ESM subpath resolution issues
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let Client: any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let StdioClientTransport: any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let ListToolsResultSchema: any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let CallToolResultSchema: any
+
+async function loadMcpSdk() {
+  if (!Client) {
+    // Use template literals to prevent static analysis
+    const sdkBase = "@modelcontextprotocol/sdk"
+    const clientMod = await import(/* webpackIgnore: true */ `${sdkBase}/client`)
+    Client = clientMod.Client
+
+    // StdioClientTransport is in a separate subpath
+    const stdioMod = await import(/* webpackIgnore: true */ `${sdkBase}/client/stdio`)
+    StdioClientTransport = stdioMod.StdioClientTransport
+
+    const typesMod = await import(/* webpackIgnore: true */ `${sdkBase}/types`)
+    ListToolsResultSchema = typesMod.ListToolsResultSchema
+    CallToolResultSchema = typesMod.CallToolResultSchema
+  }
+}
+
 import type { ChatSettings } from './types'
 
 // Session state for a Codex MCP connection
 export interface CodexSession {
-  client: Client
-  transport: StdioClientTransport
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  client: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  transport: any
   conversationId?: string
   tools?: { codex: string; codexReply: string }
   lastUsedAt: number
@@ -37,6 +63,9 @@ export async function startCodexMcpServer(
   model?: string,
   cwd?: string
 ): Promise<CodexSession> {
+  // Load MCP SDK dynamically (workaround for Turbopack)
+  await loadMcpSdk()
+
   const args = ["mcp-server"]
 
   // Add model flag if specified
@@ -71,22 +100,28 @@ export async function startCodexMcpServer(
  * Discover available tools from the Codex MCP server
  */
 export async function discoverCodexTools(session: CodexSession) {
+  await loadMcpSdk() // Ensure schemas are loaded
   const resp = await session.client.request(
     { method: "tools/list" },
     ListToolsResultSchema
   )
 
-  const names = resp.tools.map((t) => t.name)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const names = resp.tools.map((t: any) => t.name)
 
   // Be tolerant: find by substring to survive renames
-  const codex = resp.tools.find((t) => t.name === "codex")?.name
-    ?? resp.tools.find((t) =>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const codex = resp.tools.find((t: any) => t.name === "codex")?.name
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ?? resp.tools.find((t: any) =>
         t.name.toLowerCase().includes("codex") &&
         !t.name.toLowerCase().includes("reply")
        )?.name
 
-  const codexReply = resp.tools.find((t) => t.name === "codex-reply")?.name
-    ?? resp.tools.find((t) => t.name.toLowerCase().includes("reply"))?.name
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const codexReply = resp.tools.find((t: any) => t.name === "codex-reply")?.name
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ?? resp.tools.find((t: any) => t.name.toLowerCase().includes("reply"))?.name
 
   if (!codex || !codexReply) {
     throw new Error(`Could not find codex tools. tools/list returned: ${names.join(", ")}`)
