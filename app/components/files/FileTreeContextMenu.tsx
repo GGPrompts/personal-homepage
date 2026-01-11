@@ -1,6 +1,6 @@
 'use client'
 
-import React, { ReactNode, useState, useCallback, useMemo } from 'react'
+import React, { ReactNode, useState, useCallback, useMemo, useEffect } from 'react'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -23,6 +23,8 @@ import {
   ExternalLink,
   FolderOpen,
   Play,
+  Square,
+  Music,
   CheckCircle,
   Brain,
   Loader2,
@@ -36,6 +38,19 @@ import { useTerminalExtension } from '@/hooks/useTerminalExtension'
 import { getScriptInfo, type ScriptInfo } from '@/lib/claudeFileTypes'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+
+// Audio file extensions supported for playback
+const AUDIO_EXTENSIONS = ['mp3', 'wav', 'ogg', 'm4a', 'webm', 'flac', 'aac']
+
+// Global audio instance for managing playback across context menus
+let globalAudioInstance: HTMLAudioElement | null = null
+let currentlyPlayingPath: string | null = null
+
+// Check if file is an audio file
+function isAudioFile(fileName: string): boolean {
+  const ext = fileName.split('.').pop()?.toLowerCase() || ''
+  return AUDIO_EXTENSIONS.includes(ext)
+}
 
 export type FileTreeSource = 'local' | 'github'
 
@@ -66,6 +81,26 @@ export function FileTreeContextMenu({
 
   // Script info for executable files
   const scriptInfo = !isDirectory ? getScriptInfo(name, path) : null
+
+  // Audio file detection
+  const isAudio = !isDirectory && isAudioFile(name)
+
+  // State for audio playback
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false)
+
+  // Update playing state when global audio changes
+  useEffect(() => {
+    const checkPlayingState = () => {
+      setIsPlaying(currentlyPlayingPath === path && globalAudioInstance !== null && !globalAudioInstance.paused)
+    }
+
+    // Check immediately and set up interval for updates
+    checkPlayingState()
+    const interval = setInterval(checkPlayingState, 500)
+
+    return () => clearInterval(interval)
+  }, [path])
 
   // State for explain script
   const [isExplaining, setIsExplaining] = useState(false)
@@ -319,6 +354,68 @@ export function FileTreeContextMenu({
     return textExtensions.includes(ext) || name.startsWith('.')
   }, [isDirectory, name])
 
+  // Play audio file
+  const handlePlayAudio = useCallback(async () => {
+    if (!isAudio || isLoadingAudio) return
+
+    // Stop any currently playing audio
+    if (globalAudioInstance) {
+      globalAudioInstance.pause()
+      globalAudioInstance = null
+    }
+
+    setIsLoadingAudio(true)
+
+    try {
+      const response = await fetch(`/api/files/audio?path=${encodeURIComponent(path)}`)
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to load audio')
+      }
+
+      // Create new audio instance
+      const audio = new Audio(data.dataUri)
+      globalAudioInstance = audio
+      currentlyPlayingPath = path
+
+      // Set up event handlers
+      audio.onended = () => {
+        setIsPlaying(false)
+        currentlyPlayingPath = null
+        globalAudioInstance = null
+      }
+
+      audio.onerror = () => {
+        toast.error('Failed to play audio')
+        setIsPlaying(false)
+        currentlyPlayingPath = null
+        globalAudioInstance = null
+      }
+
+      await audio.play()
+      setIsPlaying(true)
+      toast.success(`Playing: ${name}`)
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to play audio'
+      toast.error(errorMessage)
+    } finally {
+      setIsLoadingAudio(false)
+    }
+  }, [isAudio, isLoadingAudio, path, name])
+
+  // Stop audio playback
+  const handleStopAudio = useCallback(() => {
+    if (globalAudioInstance) {
+      globalAudioInstance.pause()
+      globalAudioInstance.currentTime = 0
+      globalAudioInstance = null
+      currentlyPlayingPath = null
+      setIsPlaying(false)
+      toast.success('Audio stopped')
+    }
+  }, [])
+
   return (
     <ContextMenu>
       <ContextMenuPrimitive.Trigger asChild>
@@ -459,6 +556,40 @@ export function FileTreeContextMenu({
                   )}
                   {isExplaining ? 'Analyzing...' : 'Explain Script'}
                 </ContextMenuItem>
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+          </>
+        )}
+
+        {/* Audio actions (for audio files) */}
+        {isAudio && source === 'local' && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuSub>
+              <ContextMenuSubTrigger>
+                <Music className="mr-2 h-4 w-4 text-pink-400" />
+                Audio Actions
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent className="w-48 glass">
+                {!isPlaying ? (
+                  <ContextMenuItem
+                    onClick={handlePlayAudio}
+                    disabled={isLoadingAudio}
+                    className={cn('text-green-400', isLoadingAudio && 'opacity-50')}
+                  >
+                    {isLoadingAudio ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Play className="mr-2 h-4 w-4" />
+                    )}
+                    {isLoadingAudio ? 'Loading...' : 'Play Audio'}
+                  </ContextMenuItem>
+                ) : (
+                  <ContextMenuItem onClick={handleStopAudio} className="text-red-400">
+                    <Square className="mr-2 h-4 w-4" />
+                    Stop Audio
+                  </ContextMenuItem>
+                )}
               </ContextMenuSubContent>
             </ContextMenuSub>
           </>
