@@ -1,10 +1,13 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Bot, GitBranch, Trash2, MessageSquare, FileText, Gem } from "lucide-react"
+import { Bot, GitBranch, Trash2, MessageSquare, FileText, Gem, ScrollText, Loader2 } from "lucide-react"
 import type { Task } from "../types"
 import { useBoardStore } from "../lib/store"
 import { useSyncBeadsTask } from "../hooks/useBeadsIssues"
+import { useTranscript, getStoredWorkspace } from "../hooks/useTranscript"
+import { useWorkingDirectory } from "@/hooks/useWorkingDirectory"
 import {
   Dialog,
   DialogContent,
@@ -14,6 +17,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { TaskDetailsForm } from "./TaskDetailsForm"
 import { TaskChat } from "./TaskChat"
 import { isBeadsTask } from "../lib/beads/mappers"
@@ -25,9 +29,31 @@ export function TaskModal() {
   const updateTask = useBoardStore((state) => state.updateTask)
   const deleteTask = useBoardStore((state) => state.deleteTask)
   const { syncTaskDetails } = useSyncBeadsTask()
+  const { workingDir: globalWorkingDir } = useWorkingDirectory()
+
+  // Get workspace from localStorage or fall back to global working dir
+  const [workspace, setWorkspace] = useState<string | null>(null)
+  useEffect(() => {
+    const stored = getStoredWorkspace()
+    const effectiveWorkspace = stored || (globalWorkingDir !== "~" ? globalWorkingDir : null)
+    setWorkspace(effectiveWorkspace)
+  }, [globalWorkingDir])
 
   const task = tasks.find((t) => t.id === selectedTaskId)
   const isOpen = !!task
+
+  // Check if this is a closed beads task (potentially has transcript)
+  const isClosedBeadsTask = task && isBeadsTask(task) && task.beadsMetadata?.beadsStatus === "closed"
+
+  // Fetch transcript for closed beads tasks
+  const {
+    transcript,
+    isLoading: transcriptLoading,
+  } = useTranscript({
+    issueId: task?.id || "",
+    workspace,
+    enabled: isClosedBeadsTask && !!workspace,
+  })
 
   const handleClose = () => {
     setSelectedTask(null)
@@ -119,6 +145,13 @@ export function TaskModal() {
               <MessageSquare className="h-4 w-4" />
               Chat
             </TabsTrigger>
+            {/* Show Transcript tab for closed beads tasks with transcript */}
+            {isClosedBeadsTask && transcript?.exists && (
+              <TabsTrigger value="transcript" className="gap-1.5">
+                <ScrollText className="h-4 w-4" />
+                Transcript
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <div className="flex-1 min-h-0 p-6 overflow-y-auto">
@@ -154,6 +187,52 @@ export function TaskModal() {
                 </motion.div>
               </AnimatePresence>
             </TabsContent>
+
+            {/* Transcript Tab */}
+            {isClosedBeadsTask && (
+              <TabsContent value="transcript" className="mt-0 h-full">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key="transcript"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                    className="h-full"
+                  >
+                    {transcriptLoading ? (
+                      <div className="flex items-center justify-center h-32 text-zinc-500">
+                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                        Loading transcript...
+                      </div>
+                    ) : transcript?.exists && transcript.content ? (
+                      <div className="glass-dark rounded-lg h-full flex flex-col">
+                        <div className="p-3 border-b border-white/10 flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-sm text-zinc-400">
+                            <ScrollText className="h-4 w-4" />
+                            <span>Worker Session Transcript</span>
+                          </div>
+                          {transcript.path && (
+                            <span className="text-xs text-zinc-600 font-mono truncate max-w-[200px]">
+                              {transcript.path.split("/").slice(-2).join("/")}
+                            </span>
+                          )}
+                        </div>
+                        <ScrollArea className="flex-1 p-4">
+                          <pre className="text-xs text-zinc-300 whitespace-pre-wrap font-mono leading-relaxed">
+                            {transcript.content}
+                          </pre>
+                        </ScrollArea>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center h-32 text-zinc-500">
+                        No transcript available for this issue.
+                      </div>
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+              </TabsContent>
+            )}
           </div>
         </Tabs>
       </DialogContent>
