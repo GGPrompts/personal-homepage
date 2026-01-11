@@ -19,8 +19,17 @@ import {
   MessageSquare, Bot, Plus, X, Trash2, Code, CheckCheck,
   Sparkles, Clock, Cpu, FolderOpen,
   Loader2, Search, Pencil, Gauge, AlertTriangle,
-  Download, ArrowRight, Settings, ChevronDown,
+  Download, ArrowRight, Settings, ChevronDown, Users,
 } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { AgentGallery } from "@/components/agents/AgentGallery"
+import type { AgentCard } from "@/lib/agents/types"
 import { useQuery } from "@tanstack/react-query"
 import { useSearchParams } from "next/navigation"
 import { useAllProjectsMeta } from "@/hooks/useProjectMeta"
@@ -115,6 +124,8 @@ export default function AIWorkspaceSection({
   const [inputValue, setInputValue] = React.useState('')
   const [showSettings, setShowSettings] = React.useState(false)
   const [showSidebar, setShowSidebar] = React.useState(true)
+  const [showAgentGallery, setShowAgentGallery] = React.useState(false)
+  const [selectedAgent, setSelectedAgent] = React.useState<AgentCard | null>(null)
   const [availableAgents, setAvailableAgents] = React.useState<{ name: string; description: string; model?: string; filename: string }[]>([])
   const [selectedProjectPath, setSelectedProjectPath] = React.useState<string | null>(null)
 
@@ -149,6 +160,17 @@ export default function AIWorkspaceSection({
       if (!res.ok) return []
       const data = await res.json()
       return (data.repos || []) as GitHubRepo[]
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // Fetch agent registry for agent gallery
+  const { data: agentRegistry, isLoading: agentsLoading } = useQuery({
+    queryKey: ['agent-registry'],
+    queryFn: async () => {
+      const res = await fetch('/api/ai/agents/registry')
+      if (!res.ok) return { agents: [] }
+      return res.json() as Promise<{ agents: AgentCard[] }>
     },
     staleTime: 5 * 60 * 1000,
   })
@@ -285,6 +307,25 @@ export default function AIWorkspaceSection({
     const markdown = exportConversationToMarkdown(activeConv)
     const filename = `${activeConv.title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${new Date().toISOString().split('T')[0]}.md`
     downloadMarkdown(markdown, filename)
+  }
+
+  const handleSelectAgent = (agent: AgentCard) => {
+    setSelectedAgent(agent)
+    // Update settings with agent's system prompt
+    setSettings(prev => ({
+      ...prev,
+      systemPrompt: agent.system_prompt,
+      temperature: agent.config.temperature,
+    }))
+    setShowAgentGallery(false)
+  }
+
+  const handleClearAgent = () => {
+    setSelectedAgent(null)
+    setSettings(prev => ({
+      ...prev,
+      systemPrompt: '',
+    }))
   }
 
   const handleContinueInNewChat = () => {
@@ -591,6 +632,60 @@ export default function AIWorkspaceSection({
               </Select>
             )}
 
+            {/* Agent Gallery Button */}
+            <Dialog open={showAgentGallery} onOpenChange={setShowAgentGallery}>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant={selectedAgent ? 'secondary' : 'ghost'}
+                        size="icon"
+                        className="relative"
+                        data-tabz-action="open-agent-gallery"
+                      >
+                        <Users className="h-4 w-4" />
+                        {selectedAgent && (
+                          <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-primary animate-pulse" />
+                        )}
+                      </Button>
+                    </DialogTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {selectedAgent ? `Agent: ${selectedAgent.name}` : 'Select an AI Agent'}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <DialogContent className="max-w-3xl max-h-[80vh] glass-dark">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-primary" />
+                    Select AI Agent
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="h-[60vh]">
+                  <AgentGallery
+                    agents={agentRegistry?.agents || []}
+                    selectedAgentId={selectedAgent?.id}
+                    onSelectAgent={handleSelectAgent}
+                    isLoading={agentsLoading}
+                  />
+                </div>
+                {selectedAgent && (
+                  <div className="flex items-center justify-between pt-4 border-t border-border/40">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Active:</span>
+                      <Badge variant="secondary">{selectedAgent.name}</Badge>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={handleClearAgent}>
+                      <X className="h-3 w-3 mr-1" />
+                      Clear Agent
+                    </Button>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
+
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -648,14 +743,27 @@ export default function AIWorkspaceSection({
                 >
                   <div className="space-y-2 sm:space-y-4">
                     <div className="inline-flex p-2 sm:p-4 rounded-full glass border-glow">
-                      <Sparkles className="h-6 w-6 sm:h-12 sm:w-12 text-primary terminal-glow" />
+                      {selectedAgent ? (
+                        <span className="text-2xl sm:text-4xl">{selectedAgent.avatar}</span>
+                      ) : (
+                        <Sparkles className="h-6 w-6 sm:h-12 sm:w-12 text-primary terminal-glow" />
+                      )}
                     </div>
                     <h3 className="text-lg sm:text-2xl font-bold font-mono gradient-text-theme terminal-glow">
-                      How can I help you today?
+                      {selectedAgent ? `I'm ${selectedAgent.name}` : 'How can I help you today?'}
                     </h3>
                     <p className="text-xs sm:text-base text-muted-foreground max-w-md mx-auto px-2">
-                      Choose a prompt or ask anything
+                      {selectedAgent ? selectedAgent.description : 'Choose a prompt or ask anything'}
                     </p>
+                    {selectedAgent && (
+                      <div className="flex items-center justify-center gap-2 flex-wrap">
+                        {selectedAgent.personality.slice(0, 3).map((trait) => (
+                          <Badge key={trait} variant="outline" className="text-xs capitalize">
+                            {trait}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 max-w-2xl mx-auto px-2">
