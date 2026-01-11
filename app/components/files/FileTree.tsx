@@ -61,6 +61,7 @@ export function FileTree({
 
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
+  const [focusedPath, setFocusedPath] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [loadingFolders, setLoadingFolders] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
@@ -397,10 +398,97 @@ export function FileTree({
     )
   }, [getFolderGitStatus])
 
+  // Flatten visible items for keyboard navigation (respects expanded folders)
+  const visibleItems = useMemo(() => {
+    const items: FileNode[] = []
+    const collectVisible = (node: FileNode) => {
+      items.push(node)
+      if (node.type === 'directory' && expandedFolders.has(node.path) && node.children) {
+        node.children.forEach(collectVisible)
+      }
+    }
+    if (fileTree) {
+      collectVisible(fileTree)
+    }
+    return items
+  }, [fileTree, expandedFolders])
+
+  // Keyboard navigation handler
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (visibleItems.length === 0) return
+
+    const currentIndex = focusedPath
+      ? visibleItems.findIndex(item => item.path === focusedPath)
+      : -1
+
+    switch (e.key) {
+      case 'ArrowDown': {
+        e.preventDefault()
+        const nextIndex = currentIndex < visibleItems.length - 1 ? currentIndex + 1 : 0
+        setFocusedPath(visibleItems[nextIndex].path)
+        setSelectedPath(visibleItems[nextIndex].path)
+        break
+      }
+      case 'ArrowUp': {
+        e.preventDefault()
+        const prevIndex = currentIndex > 0 ? currentIndex - 1 : visibleItems.length - 1
+        setFocusedPath(visibleItems[prevIndex].path)
+        setSelectedPath(visibleItems[prevIndex].path)
+        break
+      }
+      case 'ArrowRight': {
+        e.preventDefault()
+        if (currentIndex >= 0) {
+          const currentItem = visibleItems[currentIndex]
+          if (currentItem.type === 'directory' && !expandedFolders.has(currentItem.path)) {
+            toggleFolder(currentItem.path, !!(currentItem.children && currentItem.children.length > 0))
+          }
+        }
+        break
+      }
+      case 'ArrowLeft': {
+        e.preventDefault()
+        if (currentIndex >= 0) {
+          const currentItem = visibleItems[currentIndex]
+          if (currentItem.type === 'directory' && expandedFolders.has(currentItem.path)) {
+            toggleFolder(currentItem.path, !!(currentItem.children && currentItem.children.length > 0))
+          }
+        }
+        break
+      }
+      case 'Enter': {
+        e.preventDefault()
+        if (currentIndex >= 0) {
+          const currentItem = visibleItems[currentIndex]
+          handleNodeClick(currentItem)
+        }
+        break
+      }
+      case 'Home': {
+        e.preventDefault()
+        if (visibleItems.length > 0) {
+          setFocusedPath(visibleItems[0].path)
+          setSelectedPath(visibleItems[0].path)
+        }
+        break
+      }
+      case 'End': {
+        e.preventDefault()
+        if (visibleItems.length > 0) {
+          const lastItem = visibleItems[visibleItems.length - 1]
+          setFocusedPath(lastItem.path)
+          setSelectedPath(lastItem.path)
+        }
+        break
+      }
+    }
+  }, [visibleItems, focusedPath, expandedFolders, toggleFolder, handleNodeClick])
+
   // Render a single tree node
   const renderNode = useCallback((node: FileNode, depth: number = 0): React.ReactNode => {
     const isExpanded = expandedFolders.has(node.path)
     const isSelected = selectedPath === node.path
+    const isFocused = focusedPath === node.path
     const isDirectory = node.type === 'directory'
     const isLoading = loadingFolders.has(node.path)
     const hasChildren = !!(node.children && node.children.length > 0)
@@ -423,10 +511,14 @@ export function FileTree({
                 className={cn(
                   'flex w-full items-center gap-1.5 rounded px-2 py-1 text-sm transition-colors',
                   'hover:bg-primary/10',
-                  isSelected && 'bg-primary/20 text-primary'
+                  isSelected && 'bg-primary/20 text-primary',
+                  isFocused && 'ring-2 ring-primary/50 ring-inset'
                 )}
                 style={{ paddingLeft: `${depth * 12 + 8}px` }}
-                onClick={() => handleNodeClick(node)}
+                onClick={() => {
+                  setFocusedPath(node.path)
+                  handleNodeClick(node)
+                }}
                 title={node.path}
               >
                 <span className="flex h-4 w-4 items-center justify-center">
@@ -466,10 +558,14 @@ export function FileTree({
           className={cn(
             'flex w-full items-center gap-1.5 rounded px-2 py-1 text-sm transition-colors',
             'hover:bg-primary/10',
-            isSelected && 'bg-primary/20 text-primary'
+            isSelected && 'bg-primary/20 text-primary',
+            isFocused && 'ring-2 ring-primary/50 ring-inset'
           )}
           style={{ paddingLeft: `${depth * 12 + 8 + 16}px` }}
-          onClick={() => handleNodeClick(node)}
+          onClick={() => {
+            setFocusedPath(node.path)
+            handleNodeClick(node)
+          }}
           title={node.path}
         >
           {getFileIcon(node.name, node.path)}
@@ -480,7 +576,7 @@ export function FileTree({
         </button>
       </FileTreeContextMenu>
     )
-  }, [expandedFolders, selectedPath, loadingFolders, toggleFolder, handleNodeClick, getFolderIcon, getFileIcon, getTextColor, getGitStatusIndicator, getFolderGitStatusIndicator])
+  }, [expandedFolders, selectedPath, focusedPath, loadingFolders, toggleFolder, handleNodeClick, getFolderIcon, getFileIcon, getTextColor, getGitStatusIndicator, getFolderGitStatusIndicator])
 
   // Refresh handler for manual refresh button
   const handleRefresh = useCallback(async () => {
@@ -534,7 +630,12 @@ export function FileTree({
 
       {/* Tree content */}
       <ScrollArea className="flex-1">
-        <div ref={treeRef} className="p-2">
+        <div
+          ref={treeRef}
+          className="p-2 outline-none"
+          tabIndex={0}
+          onKeyDown={handleKeyDown}
+        >
           {loading && !fileTree && (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
