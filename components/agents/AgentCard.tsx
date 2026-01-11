@@ -1,9 +1,19 @@
 'use client'
 
+import * as React from 'react'
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { GlowEffect } from '@/components/ui/glow-effect'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { ImagePlus, RefreshCw, Copy } from 'lucide-react'
+import { toast } from 'sonner'
+import { useAvatarGeneration } from '@/hooks/useAvatarGeneration'
 import type { AgentCard as AgentCardType, AgentPersonalityTrait } from '@/lib/agents/types'
 
 export interface AgentCardProps {
@@ -17,6 +27,10 @@ export interface AgentCardProps {
   className?: string
   /** Display variant: 'card' for grid layout, 'compact' for list layout */
   variant?: 'card' | 'compact'
+  /** Callback when avatar is updated */
+  onAvatarChange?: (agentId: string, newAvatar: string) => void
+  /** Enable avatar editing mode */
+  editable?: boolean
 }
 
 /**
@@ -67,6 +81,86 @@ function getInitials(name: string): string {
 }
 
 /**
+ * AvatarRegeneratePopover - Popover for regenerating agent avatar
+ */
+function AvatarRegeneratePopover({
+  agent,
+  onAvatarChange,
+  children,
+}: {
+  agent: AgentCardType
+  onAvatarChange?: (agentId: string, newAvatar: string) => void
+  children: React.ReactNode
+}) {
+  const [isOpen, setIsOpen] = React.useState(false)
+  const { generatePrompt } = useAvatarGeneration()
+  const [prompt, setPrompt] = React.useState<string | null>(null)
+
+  const handleGeneratePrompt = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const newPrompt = generatePrompt(agent.name, agent.personality, agent.description)
+    setPrompt(newPrompt)
+    setIsOpen(true)
+  }
+
+  const copyPrompt = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (prompt) {
+      navigator.clipboard.writeText(prompt)
+      toast.success('Prompt copied to clipboard')
+    }
+  }
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          onClick={handleGeneratePrompt}
+          className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-primary/90 hover:bg-primary flex items-center justify-center shadow-lg transition-all opacity-0 group-hover:opacity-100"
+          title="Generate new avatar"
+        >
+          <RefreshCw className="h-3 w-3 text-primary-foreground" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-80"
+        onClick={(e) => e.stopPropagation()}
+        align="start"
+      >
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <ImagePlus className="h-4 w-4 text-primary" />
+            <span className="font-medium text-sm">Generate Avatar</span>
+          </div>
+          {prompt && (
+            <>
+              <div className="p-2 rounded bg-muted text-xs leading-relaxed">
+                {prompt}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={copyPrompt}
+                  className="flex-1 gap-1.5"
+                >
+                  <Copy className="h-3 w-3" />
+                  Copy Prompt
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Ask Claude to generate this avatar with DALL-E, or paste the prompt directly into ChatGPT.
+              </p>
+            </>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+/**
  * AgentCard - Visual component for displaying AI agent cards
  *
  * Displays an AI agent's avatar, name, personality traits, and section badges.
@@ -78,6 +172,8 @@ export function AgentCard({
   onClick,
   className,
   variant = 'card',
+  onAvatarChange,
+  editable = false,
 }: AgentCardProps) {
   const handleClick = () => {
     if (onClick) {
@@ -132,15 +228,22 @@ export function AgentCard({
         )}
 
         {/* Avatar */}
-        <Avatar className="h-10 w-10 shrink-0">
-          {avatarIsUrl && <AvatarImage src={agent.avatar} alt={agent.name} />}
-          <AvatarFallback className={cn(
-            'text-lg',
-            avatarIsEmoji ? 'bg-transparent' : 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white'
-          )}>
-            {avatarIsEmoji ? agent.avatar : getInitials(agent.name)}
-          </AvatarFallback>
-        </Avatar>
+        <div className="relative group shrink-0">
+          <Avatar className="h-10 w-10">
+            {avatarIsUrl && <AvatarImage src={agent.avatar} alt={agent.name} />}
+            <AvatarFallback className={cn(
+              'text-lg',
+              avatarIsEmoji ? 'bg-transparent' : 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white'
+            )}>
+              {avatarIsEmoji ? agent.avatar : getInitials(agent.name)}
+            </AvatarFallback>
+          </Avatar>
+          {editable && (
+            <AvatarRegeneratePopover agent={agent} onAvatarChange={onAvatarChange}>
+              <span />
+            </AvatarRegeneratePopover>
+          )}
+        </div>
 
         {/* Name and description */}
         <div className="flex-1 min-w-0">
@@ -200,15 +303,22 @@ export function AgentCard({
 
       {/* Header with avatar and status */}
       <div className="relative flex items-start gap-3 mb-3">
-        <Avatar className="h-12 w-12 shrink-0 ring-2 ring-white/10">
-          {avatarIsUrl && <AvatarImage src={agent.avatar} alt={agent.name} />}
-          <AvatarFallback className={cn(
-            'text-xl',
-            avatarIsEmoji ? 'bg-transparent' : 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white'
-          )}>
-            {avatarIsEmoji ? agent.avatar : getInitials(agent.name)}
-          </AvatarFallback>
-        </Avatar>
+        <div className="relative group shrink-0">
+          <Avatar className="h-12 w-12 ring-2 ring-white/10">
+            {avatarIsUrl && <AvatarImage src={agent.avatar} alt={agent.name} />}
+            <AvatarFallback className={cn(
+              'text-xl',
+              avatarIsEmoji ? 'bg-transparent' : 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white'
+            )}>
+              {avatarIsEmoji ? agent.avatar : getInitials(agent.name)}
+            </AvatarFallback>
+          </Avatar>
+          {editable && (
+            <AvatarRegeneratePopover agent={agent} onAvatarChange={onAvatarChange}>
+              <span />
+            </AvatarRegeneratePopover>
+          )}
+        </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
