@@ -1517,6 +1517,71 @@ export function MusicPlayerSection({
           </section>
         )}
 
+        {/* My Stations (Pyradio) Section */}
+        {!radioSearchQuery && !selectedGenre && !selectedCountry && pyradioStations.length > 0 && (
+          <section>
+            <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+              <HardDrive className="h-5 w-5 text-primary" />
+              My Stations
+              <Badge variant="outline" className="text-xs ml-2">pyradio</Badge>
+            </h3>
+            {pyradioLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : pyradioError ? (
+              <Card className="glass border-border/30 p-4 text-center">
+                <p className="text-sm text-muted-foreground">{pyradioError}</p>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {pyradioStations.map((station) => (
+                  <Card
+                    key={station.id}
+                    className={`glass border-border/30 p-4 cursor-pointer group hover:bg-primary/5 transition-colors ${
+                      nowPlaying.track.id === station.id ? "ring-2 ring-primary" : ""
+                    }`}
+                    onClick={() => playPyradioStation(station)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-green-500/20 to-emerald-500/20 flex items-center justify-center flex-shrink-0 relative overflow-hidden">
+                        {station.icon ? (
+                          <img
+                            src={station.icon}
+                            alt={station.name}
+                            className="w-10 h-10 rounded object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = "none"
+                            }}
+                          />
+                        ) : (
+                          <Radio className="h-6 w-6 text-green-500/50" />
+                        )}
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          {nowPlaying.track.id === station.id && nowPlaying.isPlaying ? (
+                            <Pause className="h-5 w-5 text-white" />
+                          ) : (
+                            <Play className="h-5 w-5 text-white" />
+                          )}
+                        </motion.div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground truncate">{station.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {station.encoding || "Stream"}
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
         {/* Popular/Search Results Section */}
         <section>
           <h3 className="text-lg font-semibold text-foreground mb-4">
