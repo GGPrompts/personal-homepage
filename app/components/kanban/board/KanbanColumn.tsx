@@ -52,6 +52,7 @@ export function KanbanColumn({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
       className="agent-station shrink-0"
+      data-tabz-column={column.id}
     >
       {/* Column Header */}
       <div className={cn("station-header border-t-2", colorClass)}>

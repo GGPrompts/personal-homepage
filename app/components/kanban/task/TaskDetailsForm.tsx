@@ -98,6 +98,7 @@ export function TaskDetailsForm({ task, onUpdate, className }: TaskDetailsFormPr
           onChange={(e) => setTitle(e.target.value)}
           className="bg-black/20 border-white/10 focus:border-emerald-500/50 text-zinc-100"
           placeholder="Task title..."
+          data-tabz-input="task-title"
         />
       </div>
 
@@ -109,6 +110,7 @@ export function TaskDetailsForm({ task, onUpdate, className }: TaskDetailsFormPr
           onChange={(e) => setDescription(e.target.value)}
           className="bg-black/20 border-white/10 focus:border-emerald-500/50 text-zinc-100 min-h-[100px] resize-none"
           placeholder="Add a description..."
+          data-tabz-input="task-description"
         />
       </div>
 
@@ -118,7 +120,7 @@ export function TaskDetailsForm({ task, onUpdate, className }: TaskDetailsFormPr
         <div className="space-y-2">
           <label className="text-xs text-zinc-500 uppercase tracking-wide">Priority</label>
           <Select value={priority} onValueChange={handlePriorityChange}>
-            <SelectTrigger className="bg-black/20 border-white/10 focus:border-emerald-500/50">
+            <SelectTrigger className="bg-black/20 border-white/10 focus:border-emerald-500/50" data-tabz-input="task-priority">
               <SelectValue>
                 <PriorityBadge priority={priority} size="sm" />
               </SelectValue>

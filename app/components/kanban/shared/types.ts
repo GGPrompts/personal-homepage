@@ -31,6 +31,8 @@ export interface AgentCLIConfig {
   systemPrompt?: string
   envVars?: Record<string, string>
   cliFlags?: string[]
+  /** Section selectors to include in system prompt for browser automation */
+  selectorKnowledge?: string[]
 }
 
 export interface AgentCapabilities {

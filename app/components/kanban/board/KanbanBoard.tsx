@@ -231,6 +231,7 @@ export function KanbanBoard({ workspace }: KanbanBoardProps) {
         <button
           onClick={() => refresh()}
           disabled={isLoading}
+          data-tabz-action="refresh-board"
           className={cn(
             "flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs transition-all",
             "text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800/50",

@@ -124,6 +124,7 @@ export function KanbanCard({ task, isOverlay = false, isDoneColumn = false, hasT
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       transition={{ duration: 0.2 }}
+      data-tabz-item={`task-${task.id}`}
       data-critical-path={isCriticalPath}
       data-blocked={hasBlockers}
       data-ready={isReady && !hasBlockers}
