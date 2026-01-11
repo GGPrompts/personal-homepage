@@ -373,6 +373,17 @@ export function FileTree({
     return null
   }, [gitStatus])
 
+  // Handle drag start for file/folder nodes
+  const handleDragStart = useCallback((e: React.DragEvent, node: FileNode) => {
+    // Set plain text data (file path)
+    e.dataTransfer.setData('text/plain', node.path)
+    // Set custom MIME type for TabzChrome integration
+    e.dataTransfer.setData('application/x-tabz-file-path', node.path)
+    // Include whether it's a directory
+    e.dataTransfer.setData('application/x-tabz-file-type', node.type)
+    e.dataTransfer.effectAllowed = 'copyMove'
+  }, [])
+
   // Get folder git status indicator
   const getFolderGitStatusIndicator = useCallback((folderPath: string) => {
     const status = getFolderGitStatus(folderPath)
@@ -509,7 +520,7 @@ export function FileTree({
             <CollapsibleTrigger asChild>
               <button
                 className={cn(
-                  'flex w-full items-center gap-1.5 rounded px-2 py-1 text-sm transition-colors',
+                  'flex w-full items-center gap-1.5 rounded px-2 py-1 text-sm transition-colors cursor-grab active:cursor-grabbing',
                   'hover:bg-primary/10',
                   isSelected && 'bg-primary/20 text-primary',
                   isFocused && 'ring-2 ring-primary/50 ring-inset'
@@ -520,6 +531,8 @@ export function FileTree({
                   handleNodeClick(node)
                 }}
                 title={node.path}
+                draggable
+                onDragStart={(e) => handleDragStart(e, node)}
               >
                 <span className="flex h-4 w-4 items-center justify-center">
                   {isLoading ? (
@@ -556,7 +569,7 @@ export function FileTree({
       >
         <button
           className={cn(
-            'flex w-full items-center gap-1.5 rounded px-2 py-1 text-sm transition-colors',
+            'flex w-full items-center gap-1.5 rounded px-2 py-1 text-sm transition-colors cursor-grab active:cursor-grabbing',
             'hover:bg-primary/10',
             isSelected && 'bg-primary/20 text-primary',
             isFocused && 'ring-2 ring-primary/50 ring-inset'
@@ -567,6 +580,8 @@ export function FileTree({
             handleNodeClick(node)
           }}
           title={node.path}
+          draggable
+          onDragStart={(e) => handleDragStart(e, node)}
         >
           {getFileIcon(node.name, node.path)}
           <span className={cn('truncate', textColor)}>
@@ -576,7 +591,7 @@ export function FileTree({
         </button>
       </FileTreeContextMenu>
     )
-  }, [expandedFolders, selectedPath, focusedPath, loadingFolders, toggleFolder, handleNodeClick, getFolderIcon, getFileIcon, getTextColor, getGitStatusIndicator, getFolderGitStatusIndicator])
+  }, [expandedFolders, selectedPath, focusedPath, loadingFolders, toggleFolder, handleNodeClick, getFolderIcon, getFileIcon, getTextColor, getGitStatusIndicator, getFolderGitStatusIndicator, handleDragStart])
 
   // Refresh handler for manual refresh button
   const handleRefresh = useCallback(async () => {
