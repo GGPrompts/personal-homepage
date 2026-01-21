@@ -11,9 +11,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { ImagePlus, RefreshCw, Copy } from 'lucide-react'
+import { ImagePlus, RefreshCw, Copy, Play, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAvatarGeneration } from '@/hooks/useAvatarGeneration'
+import { useTabzBridge } from '@/hooks/useTabzBridge'
 import type { AgentCard as AgentCardType, AgentPersonalityTrait } from '@/lib/agents/types'
 
 export interface AgentCardProps {
@@ -31,6 +32,10 @@ export interface AgentCardProps {
   onAvatarChange?: (agentId: string, newAvatar: string) => void
   /** Enable avatar editing mode */
   editable?: boolean
+  /** Show spawn button for TabzChrome integration */
+  showSpawn?: boolean
+  /** Callback when spawn is requested */
+  onSpawn?: (agent: AgentCardType) => void
 }
 
 /**
@@ -174,7 +179,12 @@ export function AgentCard({
   variant = 'card',
   onAvatarChange,
   editable = false,
+  showSpawn = false,
+  onSpawn,
 }: AgentCardProps) {
+  const [isSpawning, setIsSpawning] = React.useState(false)
+  const { isConnected, spawnTerminal } = useTabzBridge()
+
   const handleClick = () => {
     if (onClick) {
       onClick(agent)
@@ -188,12 +198,60 @@ export function AgentCard({
     }
   }
 
+  /**
+   * Spawn agent terminal via TabzChrome
+   * Builds claude command with --plugin-dir if configured
+   */
+  const handleSpawn = async (e: React.MouseEvent) => {
+    e.stopPropagation() // Don't trigger card selection
+
+    if (!isConnected) {
+      toast.error('TabzChrome not connected', {
+        description: 'Connect TabzChrome to spawn agent terminals',
+      })
+      return
+    }
+
+    setIsSpawning(true)
+
+    try {
+      // Build the claude command with optional --plugin-dir
+      let command = 'claude'
+      if (agent.pluginPath) {
+        command += ` --plugin-dir "${agent.pluginPath}"`
+      }
+
+      // Spawn via TabzBridge
+      spawnTerminal(command, {
+        name: `Agent: ${agent.name}`,
+      })
+
+      toast.success(`Spawning ${agent.name}`, {
+        description: agent.pluginPath
+          ? `With plugins from ${agent.pluginPath}`
+          : 'Default configuration',
+      })
+
+      // Call optional callback
+      onSpawn?.(agent)
+    } catch (error) {
+      toast.error('Failed to spawn agent', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      })
+    } finally {
+      setIsSpawning(false)
+    }
+  }
+
   // Determine avatar type and content
   const avatarIsEmoji = isEmoji(agent.avatar)
   const avatarIsUrl = isUrl(agent.avatar)
 
   // Get first personality trait for tagline
   const primaryTrait = agent.personality[0]
+
+  // Check if agent has spawn configuration
+  const hasSpawnConfig = agent.pluginPath || agent.profileId
 
   if (variant === 'compact') {
     return (
@@ -263,6 +321,28 @@ export function AgentCard({
           <Badge variant="outline" className="shrink-0 text-[10px]">
             {agent.sections.length} {agent.sections.length === 1 ? 'section' : 'sections'}
           </Badge>
+        )}
+
+        {/* Spawn button (compact) */}
+        {showSpawn && agent.enabled && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSpawn}
+            disabled={isSpawning || !isConnected}
+            className={cn(
+              'shrink-0 h-8 w-8 p-0',
+              hasSpawnConfig && 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
+            )}
+            title={isConnected ? `Spawn ${agent.name}` : 'TabzChrome not connected'}
+            data-tabz-action="spawn-agent"
+          >
+            {isSpawning ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Play className="h-4 w-4" />
+            )}
+          </Button>
         )}
       </div>
     )
@@ -410,6 +490,44 @@ export function AgentCard({
             </svg>
             <span>{agent.mcp_tools.length} tools available</span>
           </div>
+        </div>
+      )}
+
+      {/* Spawn button (card) */}
+      {showSpawn && agent.enabled && (
+        <div className="mt-3 pt-3 border-t border-white/10">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSpawn}
+            disabled={isSpawning || !isConnected}
+            className={cn(
+              'w-full gap-2',
+              hasSpawnConfig
+                ? 'border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300'
+                : 'border-white/20'
+            )}
+            data-tabz-action="spawn-agent"
+          >
+            {isSpawning ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Spawning...</span>
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4" />
+                <span>Spawn Agent</span>
+              </>
+            )}
+          </Button>
+          {hasSpawnConfig && (
+            <p className="text-[10px] text-white/40 mt-1.5 text-center">
+              {agent.pluginPath && `Plugin: ${agent.pluginPath.split('/').pop()}`}
+              {agent.pluginPath && agent.profileId && ' • '}
+              {agent.profileId && `Profile: ${agent.profileId}`}
+            </p>
+          )}
         </div>
       )}
     </div>

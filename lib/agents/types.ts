@@ -136,6 +136,10 @@ export interface AgentCard {
   created_at: string
   /** Last update timestamp (ISO string) */
   updated_at: string
+  /** Plugin directory path for --plugin-dir spawning (optional) */
+  pluginPath?: string
+  /** TabzChrome profile ID for pre-configured terminal spawning (optional) */
+  profileId?: string
 }
 
 // ============================================================================
@@ -245,6 +249,8 @@ export const AgentCardSchema = z.object({
   enabled: z.boolean(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
+  pluginPath: z.string().optional(),
+  profileId: z.string().optional(),
 })
 
 /**
