@@ -476,7 +476,8 @@ export async function spotifyFetch<T>(
   }
 
   // Handle empty response body (some endpoints return 200 OK with no content)
-  const text = await response.text()
+  // Trim whitespace since some APIs return whitespace-only responses
+  const text = (await response.text()).trim()
   if (!text) return {} as T
 
   // Some endpoints return non-JSON text (e.g., snapshot IDs)
