@@ -80,18 +80,45 @@ See [docs/tabz-integration.md](docs/tabz-integration.md) for adding connectors a
 
 ## Issue Tracking (Beads)
 
-This project uses `bd` (beads) for issue tracking:
+This project uses `bd` (beads) for issue tracking. Always use `--json` flag.
+
+### Worker Workflow
+
+1. **Find work**: `bd ready --json`
+2. **Claim it**: `bd update ID --status in_progress --json`
+3. **Discover new work?** Create linked issue:
+   ```bash
+   bd create "Found issue" --deps discovered-from:PARENT-ID --json
+   ```
+4. **Add progress notes** (for context recovery):
+   ```bash
+   bd update ID --notes "Implemented X, still need Y"
+   ```
+5. **Complete**: `bd close ID --reason "Done: summary" --json`
+6. **Sync**: `bd sync` (commits and pushes)
+
+### Essential Commands
 
 ```bash
-bd prime              # Get workflow context (run at session start)
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --status in_progress  # Claim work
-bd close <id>         # Complete work
-bd sync               # Sync with git (run at session end)
+bd ready --json              # Unblocked issues
+bd show ID --json            # Details with notes
+bd update ID --status in_progress --json  # Claim
+bd update ID --notes "Progress notes"     # Context
+bd close ID --reason "Done: what was done" --json
+bd create "Title" --deps discovered-from:PARENT --json  # Link discovered work
 ```
 
-See AGENTS.md for session completion workflow.
+### Session Close Protocol
+
+**CRITICAL**: Session is NOT complete until `git push` succeeds.
+
+```bash
+bd close ID --reason "Done: summary" --json  # Close finished work
+bd sync                      # Export/commit/push beads
+git push                     # MUST succeed before ending
+```
+
+Include issue ID in commits: `git commit -m "Fix bug (bd-abc)"`
 
 ## Quick Reference
 
