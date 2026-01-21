@@ -21,6 +21,9 @@ export interface MusicPlayerContextType {
   // Remote playback state (for when playing on other devices)
   remotePlayback: SpotifyPlaybackState | null
   isRemoteMode: boolean
+  // Centralized device selection state
+  activeDeviceId: string | null
+  switchToDevice: (deviceId: string) => Promise<void>
   // Top tracks
   topTracks: SpotifyTrack[]
   topTracksTimeRange: TimeRange
@@ -65,6 +68,41 @@ export function MusicPlayerProvider({ children }: MusicPlayerProviderProps) {
   const [topTracks, setTopTracks] = useState<SpotifyTrack[]>([])
   const [topTracksTimeRange, setTopTracksTimeRange] = useState<TimeRange>("medium_term")
   const [isLoadingTopTracks, setIsLoadingTopTracks] = useState(false)
+
+  // Centralized device selection state
+  // This tracks the device the user explicitly selected, providing a single source of truth
+  const [activeDeviceId, setActiveDeviceId] = useState<string | null>(null)
+
+  // Initialize activeDeviceId from player's deviceId when SDK is ready
+  useEffect(() => {
+    if (player.deviceId && !activeDeviceId) {
+      setActiveDeviceId(player.deviceId)
+    }
+  }, [player.deviceId, activeDeviceId])
+
+  // Update activeDeviceId when remote playback indicates a different active device
+  useEffect(() => {
+    if (remotePlayback?.device?.id && remotePlayback.device.id !== activeDeviceId) {
+      // Only update if we detect playback on a different device
+      // This keeps state in sync when user switches devices from other apps
+      setActiveDeviceId(remotePlayback.device.id)
+    }
+  }, [remotePlayback?.device?.id, activeDeviceId])
+
+  // Centralized device switching function
+  const switchToDevice = useCallback(async (deviceId: string) => {
+    // Optimistically update the UI immediately
+    setActiveDeviceId(deviceId)
+    try {
+      // Delegate to player's switchDevice which handles Spotify API
+      await player.switchDevice(deviceId)
+    } catch (err) {
+      // Revert on failure - get the actual active device from devices list
+      console.error("Failed to switch device:", err)
+      const actualActive = player.devices.find(d => d.is_active)
+      setActiveDeviceId(actualActive?.id ?? player.deviceId)
+    }
+  }, [player])
 
   // Determine if we're in remote mode (playing on another device, not our SDK player)
   const isRemoteMode = auth.isAuthenticated &&
@@ -137,6 +175,8 @@ export function MusicPlayerProvider({ children }: MusicPlayerProviderProps) {
     setDrawerExpanded,
     remotePlayback,
     isRemoteMode,
+    activeDeviceId,
+    switchToDevice,
     topTracks,
     topTracksTimeRange,
     setTopTracksTimeRange,

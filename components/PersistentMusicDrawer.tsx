@@ -81,7 +81,7 @@ export function PersistentMusicDrawer() {
   if (!context) return null
 
   // Extract values after null check - TypeScript now knows these are defined
-  const { auth, player, isDrawerOpen, setDrawerOpen, isDrawerExpanded, setDrawerExpanded, remotePlayback, isRemoteMode } = context
+  const { auth, player, isDrawerOpen, setDrawerOpen, isDrawerExpanded, setDrawerExpanded, remotePlayback, isRemoteMode, activeDeviceId, switchToDevice } = context
 
   // Don't render if not authenticated or not premium
   if (!auth.isAuthenticated || !auth.isPremium) return null
@@ -291,11 +291,12 @@ export function PersistentMusicDrawer() {
                         ) : (
                           player.devices.map((device) => {
                             const Icon = getDeviceIcon(device.type)
-                            const isActive = device.is_active
+                            // Use centralized activeDeviceId for consistent UI state
+                            const isActive = device.id === activeDeviceId
                             return (
                               <DropdownMenuItem
                                 key={device.id}
-                                onClick={() => player.switchDevice(device.id)}
+                                onClick={() => switchToDevice(device.id)}
                                 className={isActive ? "bg-primary/10" : ""}
                               >
                                 <Icon className={`h-4 w-4 mr-2 ${isActive ? "text-primary" : ""}`} />
