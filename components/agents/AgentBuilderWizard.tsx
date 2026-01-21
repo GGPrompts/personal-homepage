@@ -15,7 +15,9 @@ import {
   ImagePlus,
   Link2,
   Copy,
-  Loader2,
+  Plug,
+  FolderOpen,
+  Terminal,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -89,6 +91,12 @@ const WIZARD_STEPS: WizardStep[] = [
     title: 'Tools',
     description: 'MCP permissions',
     icon: Settings,
+  },
+  {
+    id: 'plugins',
+    title: 'Plugins',
+    description: 'Isolated spawning',
+    icon: Plug,
   },
   {
     id: 'prompts',
@@ -591,6 +599,85 @@ function ToolsStep({ selectedTools, setSelectedTools }: ToolsStepProps) {
   )
 }
 
+interface PluginsStepProps {
+  pluginPath: string
+  setPluginPath: (path: string) => void
+  profileId: string
+  setProfileId: (id: string) => void
+}
+
+function PluginsStep({
+  pluginPath,
+  setPluginPath,
+  profileId,
+  setProfileId,
+}: PluginsStepProps) {
+  return (
+    <div className="space-y-6">
+      {/* Plugin Path */}
+      <div className="space-y-2">
+        <Label htmlFor="plugin-path" className="flex items-center gap-2">
+          <FolderOpen className="h-4 w-4" />
+          Plugin Directory
+        </Label>
+        <p className="text-xs text-muted-foreground">
+          Path to a Claude Code plugin directory. When spawning this agent, Claude Code
+          will load plugins from this directory using the <code className="px-1 py-0.5 rounded bg-muted">--plugin-dir</code> flag,
+          providing isolated section-specific skills.
+        </p>
+        <Input
+          id="plugin-path"
+          value={pluginPath}
+          onChange={(e) => setPluginPath(e.target.value)}
+          placeholder="e.g., ~/.claude/plugins/weather-agent"
+          className="glass font-mono text-sm"
+          data-tabz-input="plugin-path"
+        />
+        <p className="text-[10px] text-muted-foreground">
+          Leave empty to spawn without custom plugins
+        </p>
+      </div>
+
+      {/* TabzChrome Profile */}
+      <div className="space-y-2">
+        <Label htmlFor="profile-id" className="flex items-center gap-2">
+          <Terminal className="h-4 w-4" />
+          TabzChrome Profile
+        </Label>
+        <p className="text-xs text-muted-foreground">
+          Select a pre-configured TabzChrome profile for terminal spawning. Profiles can
+          include window position, shell settings, and environment configuration.
+        </p>
+        <Input
+          id="profile-id"
+          value={profileId}
+          onChange={(e) => setProfileId(e.target.value)}
+          placeholder="e.g., agent-default, weather-dev"
+          className="glass text-sm"
+          data-tabz-input="profile-id"
+        />
+        <p className="text-[10px] text-muted-foreground">
+          Leave empty to use the default terminal profile
+        </p>
+      </div>
+
+      {/* Info box */}
+      <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 space-y-2">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <Plug className="h-4 w-4 text-primary" />
+          <span>Plugin Isolation Benefits</span>
+        </div>
+        <ul className="text-xs text-muted-foreground space-y-1 ml-6 list-disc">
+          <li>Each agent runs in isolated context with custom plugins</li>
+          <li>Section-specific skills without bloating main session</li>
+          <li>Pre-configured profiles for consistent terminal spawning</li>
+          <li>One-click spawn via TabzChrome integration</li>
+        </ul>
+      </div>
+    </div>
+  )
+}
+
 interface PromptsStepProps {
   systemPrompt: string
   setSystemPrompt: (prompt: string) => void
@@ -781,6 +868,8 @@ export function AgentBuilderWizard({
   )
   const [suggestedPrompts, setSuggestedPrompts] = React.useState<string[]>([])
   const [enabled, setEnabled] = React.useState(initialData?.enabled ?? true)
+  const [pluginPath, setPluginPath] = React.useState(initialData?.pluginPath || '')
+  const [profileId, setProfileId] = React.useState(initialData?.profileId || '')
 
   // Reset form when dialog closes
   React.useEffect(() => {
@@ -795,6 +884,8 @@ export function AgentBuilderWizard({
       setSystemPrompt(initialData?.system_prompt || 'You are a helpful AI assistant.')
       setSuggestedPrompts([])
       setEnabled(initialData?.enabled ?? true)
+      setPluginPath(initialData?.pluginPath || '')
+      setProfileId(initialData?.profileId || '')
     }
   }, [open, initialData])
 
@@ -810,13 +901,16 @@ export function AgentBuilderWizard({
     config: DEFAULT_CONFIG,
     sections,
     enabled,
+    pluginPath: pluginPath || undefined,
+    profileId: profileId || undefined,
   }
 
   // Validation
   const isStep1Valid = name.trim().length > 0 && description.trim().length > 0 && personality.length > 0
   const isStep2Valid = true // Sections are optional
   const isStep3Valid = true // Tools are optional
-  const isStep4Valid = systemPrompt.trim().length > 0
+  const isStep4Valid = true // Plugins are optional
+  const isStep5Valid = systemPrompt.trim().length > 0
 
   const canProceed = () => {
     switch (currentStep) {
@@ -829,6 +923,8 @@ export function AgentBuilderWizard({
       case 3:
         return isStep4Valid
       case 4:
+        return isStep5Valid
+      case 5:
         return true
       default:
         return false
@@ -851,8 +947,6 @@ export function AgentBuilderWizard({
     onAgentCreated(agentData)
     onOpenChange(false)
   }
-
-  const currentStepData = WIZARD_STEPS[currentStep]
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -956,6 +1050,14 @@ export function AgentBuilderWizard({
                 />
               )}
               {currentStep === 3 && (
+                <PluginsStep
+                  pluginPath={pluginPath}
+                  setPluginPath={setPluginPath}
+                  profileId={profileId}
+                  setProfileId={setProfileId}
+                />
+              )}
+              {currentStep === 4 && (
                 <PromptsStep
                   systemPrompt={systemPrompt}
                   setSystemPrompt={setSystemPrompt}
@@ -963,7 +1065,7 @@ export function AgentBuilderWizard({
                   setSuggestedPrompts={setSuggestedPrompts}
                 />
               )}
-              {currentStep === 4 && <PreviewStep agentData={agentData} />}
+              {currentStep === 5 && <PreviewStep agentData={agentData} />}
             </motion.div>
           </AnimatePresence>
         </ScrollArea>
@@ -971,7 +1073,7 @@ export function AgentBuilderWizard({
         {/* Footer with navigation */}
         <div className="flex items-center justify-between pt-4 border-t border-border/40">
           <div className="flex items-center gap-2">
-            {currentStep === 4 && (
+            {currentStep === 5 && (
               <div className="flex items-center gap-2">
                 <Switch
                   id="agent-enabled"
