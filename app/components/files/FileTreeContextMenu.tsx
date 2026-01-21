@@ -425,7 +425,7 @@ export function FileTreeContextMenu({
       <ContextMenuPrimitive.Trigger asChild>
         {children}
       </ContextMenuPrimitive.Trigger>
-      <ContextMenuContent className="w-56 glass">
+      <ContextMenuContent className="w-56 glass-dark">
         {/* Copy actions */}
         <ContextMenuItem onClick={handleCopyPath}>
           <Copy className="mr-2 h-4 w-4" />
@@ -537,7 +537,7 @@ export function FileTreeContextMenu({
                 <span className="mr-2">{scriptInfo.icon}</span>
                 Script Actions
               </ContextMenuSubTrigger>
-              <ContextMenuSubContent className="w-56 glass">
+              <ContextMenuSubContent className="w-56 glass-dark">
                 <ContextMenuItem onClick={handleRunScript} className="text-green-400">
                   <Play className="mr-2 h-4 w-4" />
                   Run Script
@@ -574,7 +574,7 @@ export function FileTreeContextMenu({
                 <Music className="mr-2 h-4 w-4 text-pink-400" />
                 Audio Actions
               </ContextMenuSubTrigger>
-              <ContextMenuSubContent className="w-48 glass">
+              <ContextMenuSubContent className="w-48 glass-dark">
                 {!isPlaying ? (
                   <ContextMenuItem
                     onClick={handlePlayAudio}
