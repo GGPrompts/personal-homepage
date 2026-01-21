@@ -328,7 +328,7 @@ export function GitHubFileTree({ className, onFileSelect }: GitHubFileTreeProps)
           title={node.path}
         >
           {getFileIcon(node.name, node.path)}
-          <span className={cn('truncate flex-1', textColor, !isMarkdown && 'text-muted-foreground')}>
+          <span className={cn('truncate', textColor, !isMarkdown && 'text-muted-foreground')}>
             {node.name}
           </span>
           {!isMarkdown && (
