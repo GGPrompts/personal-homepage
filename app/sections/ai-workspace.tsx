@@ -373,16 +373,20 @@ export default function AIWorkspaceSection({
 
   let totalTokens: number
   if (hasActualUsage) {
+    // Use actual token count from Claude CLI
     totalTokens = activeConv.usage!.totalTokens
   } else {
-    const BASELINE_TOKENS = 44000
+    // Estimate tokens from message content only (no arbitrary baseline)
+    // ~4 chars per token is a rough estimate for English text
     const messageTokens = activeConv.messages.reduce((sum, msg) => {
       const contentTokens = Math.ceil(msg.content.length / 4)
       const toolTokens = msg.toolUses?.reduce((t, tool) =>
         t + Math.ceil((tool.input?.length || 0) / 4) + 20, 0) || 0
       return sum + contentTokens + toolTokens
     }, 0)
-    totalTokens = BASELINE_TOKENS + messageTokens
+    // Only add minimal overhead for system prompt/formatting (~500 tokens)
+    // Don't inflate with a large baseline - let actual usage data drive accuracy
+    totalTokens = messageTokens > 0 ? messageTokens + 500 : 0
   }
 
   const contextUsage = totalTokens / CONTEXT_LIMIT
