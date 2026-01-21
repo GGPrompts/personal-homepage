@@ -36,6 +36,7 @@ import {
   Video,
   FolderOpen,
   BarChart3,
+  Beaker,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -93,6 +94,7 @@ import MarketPulseSection from "./sections/market-pulse"
 import KanbanSection from "./sections/kanban"
 import FilesSection from "./sections/files"
 import AnalyticsSection from "./sections/analytics"
+import PromptsPlaygroundSection from "./sections/prompts-playground"
 import SettingsSection from "./sections/settings"
 import { MusicPlayerSection } from "./sections/music-player"
 import dynamic from "next/dynamic"
@@ -145,6 +147,7 @@ const navigationItems: NavigationItem[] = [
   { id: "kanban", label: "Kanban", icon: LayoutGrid, description: "Visual task board" },
   { id: "jobs", label: "Jobs", icon: Play, description: "Claude batch prompts" },
   { id: "analytics", label: "Analytics", icon: BarChart3, description: "Claude Code usage stats" },
+  { id: "prompts-playground", label: "Prompts Playground", icon: Beaker, description: "A/B test agents" },
   { id: "music-player", label: "Music Player", icon: Music, description: "Synthwave music player" },
   { id: "video-player", label: "Video Player", icon: Video, description: "Media playback" },
   { id: "profile", label: "Profile", icon: User, description: "Account & sync" },
@@ -758,6 +761,7 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
             kanban: { icon: LayoutGrid, label: "Kanban", description: "Visual task board" },
             jobs: { icon: Play, label: "Jobs", description: "Claude batch prompts" },
             analytics: { icon: BarChart3, label: "Analytics", description: "Claude Code usage stats" },
+            "prompts-playground": { icon: Beaker, label: "Prompts Playground", description: "A/B test agents" },
             "music-player": { icon: Music, label: "Music Player", description: "Synthwave music player" },
             "video-player": { icon: Video, label: "Video Player", description: "Media playback" },
             profile: { icon: User, label: "Profile", description: "Account & sync status" },
@@ -950,6 +954,11 @@ export default function PersonalHomepage() {
           return <LocalOnlyOverlay sectionName="Analytics" description="This feature displays Claude Code usage analytics from local sessions." />
         }
         return <AnalyticsSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "prompts-playground":
+        if (!isLocal) {
+          return <LocalOnlyOverlay sectionName="Prompts Playground" description="This feature displays iframe previews from local dev servers running on localhost." />
+        }
+        return <PromptsPlaygroundSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "kanban":
         return <KanbanSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "music-player":
