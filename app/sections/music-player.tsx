@@ -85,6 +85,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { RadioStation as PyradioStation } from "@/lib/radio-utils"
+import { useAudioVisualizerSafe } from "@/components/AudioVisualizerProvider"
 
 // TypeScript Interfaces
 interface Artist {
@@ -274,6 +275,21 @@ export function MusicPlayerSection({
   const [pyradioStations, setPyradioStations] = useState<PyradioStation[]>([])
   const [pyradioLoading, setPyradioLoading] = useState(false)
   const [pyradioError, setPyradioError] = useState<string | null>(null)
+
+  // Audio visualizer integration
+  const audioVisualizer = useAudioVisualizerSafe()
+
+  // Connect audio element to visualizer when playing
+  useEffect(() => {
+    const audio = audioRef.current
+    if (audio && audioVisualizer && nowPlaying.isPlaying && nowPlaying.track.url) {
+      // Small delay to ensure audio element is ready
+      const timer = setTimeout(() => {
+        audioVisualizer.connectToElement(audio)
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [nowPlaying.isPlaying, nowPlaying.track.url, audioVisualizer])
 
   // Audio event handlers - timeupdate syncs progress bar
   const handleTimeUpdate = useCallback(() => {

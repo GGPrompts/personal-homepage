@@ -43,6 +43,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from "@/components/AuthProvider"
 import { useTerminalExtension } from "@/hooks/useTerminalExtension"
 import { ThemeSettingsPanel } from "@/components/ThemeSettingsPanel"
+import { AudioVisualizerSettings } from "@/components/AudioVisualizerSettings"
 import { SectionSettings } from "@/components/SectionSettings"
 import { CategorySettings } from "@/components/CategorySettings"
 import {
@@ -340,6 +341,16 @@ function GeneralTab() {
         </h3>
         <div className="glass rounded-lg p-6">
           <ThemeSettingsPanel />
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <Headphones className="h-5 w-5 text-primary" />
+          Audio Visualizer
+        </h3>
+        <div className="glass rounded-lg p-6">
+          <AudioVisualizerSettings />
         </div>
       </div>
     </div>

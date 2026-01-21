@@ -1,8 +1,10 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import { useEffect } from 'react'
 import { useBackground } from './BackgroundProvider'
 import { usePageBackground } from '@/hooks/usePageBackground'
+import { AudioReactiveBackground } from './AudioReactiveBackground'
+import { useAudioVisualizerSafe } from './AudioVisualizerProvider'
 
 export function MasterBackground() {
   const { background } = useBackground()
@@ -14,6 +16,9 @@ export function MasterBackground() {
     showMedia,
     handleMediaError,
   } = usePageBackground()
+
+  // Audio visualizer context (may be null if outside provider)
+  const visualizer = useAudioVisualizerSafe()
 
   const mediaOpacity = backgroundOpacity / 100
   const styleOpacity = backgroundStyleOpacity / 100
@@ -50,6 +55,16 @@ export function MasterBackground() {
           className={bgClass}
           style={{ opacity: styleOpacity }}
           aria-hidden="true"
+        />
+      )}
+
+      {/* Audio-reactive visualization layer */}
+      {visualizer && visualizer.enabled && (
+        <AudioReactiveBackground
+          data={visualizer.data}
+          style={visualizer.style}
+          intensity={visualizer.intensity}
+          opacity={visualizer.opacity}
         />
       )}
 
