@@ -108,6 +108,7 @@ export interface SpotifyPlayerState {
   isReady: boolean
   deviceId: string | null
   isActive: boolean
+  hasContext: boolean // Whether a playback context (playlist/album) is loaded
 
   // Playback state
   isPlaying: boolean
@@ -187,6 +188,7 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
   // Playback state
   const [isPlaying, setIsPlaying] = useState(false)
   const [isActive, setIsActive] = useState(false)
+  const [hasContext, setHasContext] = useState(false) // Tracks if a playlist/album context is loaded
   const [position, setPosition] = useState(0)
   const [duration, setDuration] = useState(0)
   const [volume, setVolumeState] = useState(50)
@@ -305,11 +307,14 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
         player.addListener("player_state_changed", (state) => {
           if (!state) {
             setIsActive(false)
+            setHasContext(false)
             return
           }
 
           const webPlaybackState = state as SpotifyWebPlaybackState
           setIsActive(true)
+          // Track whether SDK has a playback context loaded - this is needed for SDK methods to work
+          setHasContext(!!webPlaybackState.context?.uri)
           setIsPlaying(!webPlaybackState.paused)
           setPosition(webPlaybackState.position)
           setDuration(webPlaybackState.duration || webPlaybackState.track_window?.current_track?.duration_ms || 0)
@@ -425,30 +430,30 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
 
   // Player controls
   const togglePlay = useCallback(async () => {
-    if (!playerRef.current) return
-
-    // If player is active (has loaded context), use SDK
-    if (isActive) {
-      try {
-        await playerRef.current.togglePlay()
-      } catch (err) {
-        // Handle "no list was loaded" error gracefully
-        if (err instanceof Error && err.message.includes("no list")) {
-          setError("No track loaded. Play something from a playlist or search first.")
-        } else {
-          console.error("Playback error:", err)
-        }
-      }
+    if (!playerRef.current && !deviceId) {
+      setError("No device available. Please wait for player to connect.")
       return
     }
 
-    // If not active but we have a device, try REST API to resume last context
+    // Only use SDK if we have both an active player AND a loaded context
+    // SDK methods fail with "no list was loaded" if context.uri is null
+    if (isActive && hasContext && playerRef.current) {
+      try {
+        await playerRef.current.togglePlay()
+        return
+      } catch (err) {
+        // Fallthrough to REST API on SDK error
+        console.warn("SDK togglePlay failed, trying REST API:", err)
+      }
+    }
+
+    // Fall back to REST API - it handles resume/pause of last played context
     if (deviceId) {
       try {
         if (isPlaying) {
           await pause(deviceId)
         } else {
-          // Try to resume whatever was last playing via REST API
+          // REST API play() without uris/contextUri resumes last played content
           await play({ deviceId })
         }
       } catch (err) {
@@ -458,7 +463,7 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
     }
 
     setError("No device available. Please wait for player to connect.")
-  }, [isActive, deviceId, isPlaying])
+  }, [isActive, hasContext, deviceId, isPlaying])
 
   const playTrack = useCallback(async (uri: string) => {
     if (!deviceId) {
@@ -512,20 +517,20 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
   }, [deviceId, refreshDevices])
 
   const handleSkipNext = useCallback(async () => {
-    if (!playerRef.current) return
+    if (!playerRef.current && !deviceId) {
+      setError("No track loaded. Play something from a playlist or search first.")
+      return
+    }
 
-    // If player is active, use SDK
-    if (isActive) {
+    // Only use SDK if we have both an active player AND a loaded context
+    if (isActive && hasContext && playerRef.current) {
       try {
         await playerRef.current.nextTrack()
+        return
       } catch (err) {
-        if (err instanceof Error && err.message.includes("no list")) {
-          setError("No track loaded. Play something from a playlist or search first.")
-        } else {
-          console.error("Skip next error:", err)
-        }
+        // Fallthrough to REST API on SDK error
+        console.warn("SDK nextTrack failed, trying REST API:", err)
       }
-      return
     }
 
     // Fall back to REST API
@@ -539,23 +544,23 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
     }
 
     setError("No track loaded. Play something from a playlist or search first.")
-  }, [isActive, deviceId])
+  }, [isActive, hasContext, deviceId])
 
   const handleSkipPrevious = useCallback(async () => {
-    if (!playerRef.current) return
+    if (!playerRef.current && !deviceId) {
+      setError("No track loaded. Play something from a playlist or search first.")
+      return
+    }
 
-    // If player is active, use SDK
-    if (isActive) {
+    // Only use SDK if we have both an active player AND a loaded context
+    if (isActive && hasContext && playerRef.current) {
       try {
         await playerRef.current.previousTrack()
+        return
       } catch (err) {
-        if (err instanceof Error && err.message.includes("no list")) {
-          setError("No track loaded. Play something from a playlist or search first.")
-        } else {
-          console.error("Skip previous error:", err)
-        }
+        // Fallthrough to REST API on SDK error
+        console.warn("SDK previousTrack failed, trying REST API:", err)
       }
-      return
     }
 
     // Fall back to REST API
@@ -569,24 +574,24 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
     }
 
     setError("No track loaded. Play something from a playlist or search first.")
-  }, [isActive, deviceId])
+  }, [isActive, hasContext, deviceId])
 
   const seekTo = useCallback(async (positionMs: number) => {
-    if (!playerRef.current) return
+    if (!playerRef.current && !deviceId) {
+      setError("No track loaded. Play something from a playlist or search first.")
+      return
+    }
 
-    // If player is active, use SDK
-    if (isActive) {
+    // Only use SDK if we have both an active player AND a loaded context
+    if (isActive && hasContext && playerRef.current) {
       try {
         await playerRef.current.seek(positionMs)
         setPosition(positionMs)
+        return
       } catch (err) {
-        if (err instanceof Error && err.message.includes("no list")) {
-          setError("No track loaded. Play something from a playlist or search first.")
-        } else {
-          console.error("Seek error:", err)
-        }
+        // Fallthrough to REST API on SDK error
+        console.warn("SDK seek failed, trying REST API:", err)
       }
-      return
     }
 
     // Fall back to REST API
@@ -601,7 +606,7 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
     }
 
     setError("No track loaded. Play something from a playlist or search first.")
-  }, [isActive, deviceId])
+  }, [isActive, hasContext, deviceId])
 
   const setPlayerVolume = useCallback(async (percent: number) => {
     if (!playerRef.current) return
@@ -687,6 +692,7 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
     isReady,
     deviceId,
     isActive,
+    hasContext,
 
     // Playback state
     isPlaying,
