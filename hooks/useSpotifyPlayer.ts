@@ -533,8 +533,9 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
       return
     }
 
-    // Only use SDK if we have both an active player AND a loaded context
-    if (isActive && hasContext && playerRef.current) {
+    // Try SDK if player is active - works for both context-based and queue-based playback
+    // (e.g., Liked Songs has no context URI but SDK nextTrack still works)
+    if (isActive && playerRef.current) {
       try {
         await playerRef.current.nextTrack()
         return
@@ -555,7 +556,7 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
     }
 
     setError("No track loaded. Play something from a playlist or search first.")
-  }, [isActive, hasContext, deviceId])
+  }, [isActive, deviceId])
 
   const handleSkipPrevious = useCallback(async () => {
     if (!playerRef.current && !deviceId) {
@@ -563,8 +564,9 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
       return
     }
 
-    // Only use SDK if we have both an active player AND a loaded context
-    if (isActive && hasContext && playerRef.current) {
+    // Try SDK if player is active - works for both context-based and queue-based playback
+    // (e.g., Liked Songs has no context URI but SDK previousTrack still works)
+    if (isActive && playerRef.current) {
       try {
         await playerRef.current.previousTrack()
         return
@@ -585,7 +587,7 @@ export function useSpotifyPlayer(isAuthenticated: boolean, isPremium: boolean): 
     }
 
     setError("No track loaded. Play something from a playlist or search first.")
-  }, [isActive, hasContext, deviceId])
+  }, [isActive, deviceId])
 
   const seekTo = useCallback(async (positionMs: number) => {
     if (!playerRef.current && !deviceId) {
