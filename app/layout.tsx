@@ -8,7 +8,8 @@ import { MasterBackground } from "@/components/MasterBackground";
 import { QueryProvider } from "@/components/QueryProvider";
 import { AuthProvider } from "@/components/AuthProvider";
 import { LocalhostRedirect } from "@/components/LocalhostRedirect";
-import { MusicPlayerProvider } from "@/components/MusicPlayerProvider";
+import { MusicPlayerProvider } from "@/components/MusicPlayerProvider"
+import { AudioVisualizerProvider } from "@/components/AudioVisualizerProvider";
 import { WorkingDirProvider } from "@/components/WorkingDirProvider";
 import { PersistentMusicDrawer } from "@/components/PersistentMusicDrawer";
 import { Toaster } from "sonner";
@@ -44,21 +45,23 @@ export default function RootLayout({
                 <ThemeProvider>
                   <WorkingDirProvider>
                     <MusicPlayerProvider>
-                      <MasterBackground />
-                      {children}
-                    <PersistentMusicDrawer />
-                    <Toaster
-                      theme="dark"
-                      position="bottom-right"
-                      toastOptions={{
-                        style: {
-                          background: 'hsl(var(--popover))',
-                          border: '1px solid hsl(var(--border))',
-                          color: 'hsl(var(--popover-foreground))',
-                        },
-                      }}
-                    />
-                  </MusicPlayerProvider>
+                      <AudioVisualizerProvider>
+                        <MasterBackground />
+                        {children}
+                        <PersistentMusicDrawer />
+                        <Toaster
+                          theme="dark"
+                          position="bottom-right"
+                          toastOptions={{
+                            style: {
+                              background: 'hsl(var(--popover))',
+                              border: '1px solid hsl(var(--border))',
+                              color: 'hsl(var(--popover-foreground))',
+                            },
+                          }}
+                        />
+                      </AudioVisualizerProvider>
+                    </MusicPlayerProvider>
                   </WorkingDirProvider>
                 </ThemeProvider>
               </PageBackgroundProvider>
