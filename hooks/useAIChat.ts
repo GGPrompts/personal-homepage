@@ -134,12 +134,25 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
   }, [])
 
   // Sync from server-side JSONL on mount and when active conversation changes
+  // Track if we're currently streaming to prevent sync from adding duplicates
+  const isStreamingRef = React.useRef(false)
+
+  React.useEffect(() => {
+    isStreamingRef.current = isStreaming
+  }, [isStreaming])
+
   React.useEffect(() => {
     let pollInterval: NodeJS.Timeout | null = null
     let mounted = true
 
     async function syncFromServer(): Promise<boolean> {
       if (!activeConv?.id) return false
+
+      // Don't sync while actively streaming - the streaming code handles message updates
+      if (isStreamingRef.current) {
+        console.debug('Skipping server sync - streaming in progress')
+        return false
+      }
 
       try {
         const response = await fetch(`/api/ai/conversations?id=${activeConv.id}`)
@@ -155,6 +168,18 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
 
         const localMessages = activeConv.messages
         const lastLocalAssistant = [...localMessages].reverse().find(m => m.role === 'assistant')
+
+        // Check if we already have an assistant message with similar content
+        // This handles the case where IDs differ but content is the same
+        const hasMatchingContent = localMessages.some(m =>
+          m.role === 'assistant' &&
+          m.content === lastServerAssistant.content
+        )
+
+        if (hasMatchingContent) {
+          console.debug('Skipping server sync - matching content already exists')
+          return false
+        }
 
         if (lastServerAssistant.ts > (lastLocalAssistant?.timestamp?.getTime() || 0)) {
           console.log('Syncing missed response from server')
@@ -172,6 +197,8 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
             setConversations(prev => prev.map(conv => {
               if (conv.id !== activeConvId) return conv
               if (conv.messages.find(m => m.id === syncedMessage.id)) return conv
+              // Additional check: don't add if we already have matching content
+              if (conv.messages.some(m => m.role === 'assistant' && m.content === syncedMessage.content)) return conv
               return {
                 ...conv,
                 messages: [...conv.messages, syncedMessage],
@@ -201,6 +228,12 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
       const maxPolls = 30
       pollInterval = setInterval(async () => {
         pollCount++
+
+        // Skip polling if we're now streaming in this tab
+        if (isStreamingRef.current) {
+          console.debug('Pausing poll - streaming started in this tab')
+          return
+        }
 
         const synced = await syncFromServer()
         if (synced || pollCount >= maxPolls) {
