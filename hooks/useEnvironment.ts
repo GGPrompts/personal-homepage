@@ -47,9 +47,10 @@ export function useEnvironment(): EnvironmentInfo {
  * These use Node.js APIs (execSync, spawn, fs) that don't work on Vercel
  */
 export const LOCALHOST_REQUIRED_SECTIONS = [
-  "projects",      // Scans ~/projects/ directory
-  "jobs",          // Executes Claude CLI
-  "ai-workspace",  // Streams from Claude/Gemini/Codex CLIs
+  "projects",             // Scans ~/projects/ directory
+  "jobs",                 // Executes Claude CLI
+  "ai-workspace",         // Streams from Claude/Gemini/Codex CLIs
+  "prompts-playground",   // Loads iframe previews from local dev servers
 ] as const
 
 export type LocalhostRequiredSection = typeof LOCALHOST_REQUIRED_SECTIONS[number]

@@ -26,7 +26,7 @@ import {
 } from "lucide-react"
 
 // Section IDs that can be toggled (excluding home and settings which are always visible)
-export type ToggleableSection = "weather" | "feed" | "api-playground" | "notes" | "bookmarks" | "search" | "stocks" | "crypto" | "spacex" | "github-activity" | "disasters" | "tasks" | "projects" | "jobs" | "profile" | "ai-workspace" | "market-pulse" | "kanban" | "photo-gallery" | "music-player" | "video-player" | "files" | "analytics"
+export type ToggleableSection = "weather" | "feed" | "api-playground" | "notes" | "bookmarks" | "search" | "stocks" | "crypto" | "spacex" | "github-activity" | "disasters" | "tasks" | "projects" | "jobs" | "profile" | "ai-workspace" | "market-pulse" | "kanban" | "photo-gallery" | "music-player" | "video-player" | "files" | "analytics" | "prompts-playground"
 
 // All sections including non-toggleable ones
 export type Section = "home" | ToggleableSection | "settings"
@@ -146,6 +146,7 @@ export const DEFAULT_CATEGORY_ASSIGNMENTS: Record<ToggleableSection, CategoryId>
   "video-player": "entertainment",
   files: "development",
   analytics: "development",
+  "prompts-playground": "development",
 }
 
 // Default collapsed state (all expanded)
@@ -168,6 +169,7 @@ export const DEFAULT_SECTION_ORDER: ToggleableSection[] = [
   "bookmarks",
   "search",
   "ai-workspace",
+  "prompts-playground",
   "stocks",
   "crypto",
   "spacex",
@@ -195,6 +197,7 @@ export const DEFAULT_VISIBILITY: Record<ToggleableSection, boolean> = {
   bookmarks: true,
   search: true,
   "ai-workspace": true,
+  "prompts-playground": true,
   stocks: true,
   crypto: true,
   spacex: true,
