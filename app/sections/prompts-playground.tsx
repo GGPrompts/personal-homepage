@@ -237,6 +237,7 @@ export default function PromptsPlaygroundSection({
         <div className="flex-1 min-h-0">
           <QuadSplitViewer
             panels={panels}
+            viewMode={viewMode}
             onPanelChange={handlePanelChange}
             onRefresh={handleRefresh}
             onSave={handleSavePanel}

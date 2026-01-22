@@ -5,8 +5,11 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { BrowserPanel } from "./BrowserPanel"
 import type { PanelConfig } from "@/lib/prompts-playground"
 
+type ViewMode = "quad" | "horizontal" | "vertical"
+
 interface QuadSplitViewerProps {
   panels: [PanelConfig, PanelConfig, PanelConfig, PanelConfig]
+  viewMode?: ViewMode
   onPanelChange: (index: number, config: PanelConfig) => void
   onRefresh: (index: number) => void
   onSave: (index: number) => void
@@ -14,6 +17,7 @@ interface QuadSplitViewerProps {
 
 export function QuadSplitViewer({
   panels,
+  viewMode = "quad",
   onPanelChange,
   onRefresh,
   onSave,
@@ -41,6 +45,85 @@ export function QuadSplitViewer({
     )
   }
 
+  // Horizontal split: 2 panels side by side
+  if (viewMode === "horizontal") {
+    return (
+      <div className="h-full" data-tabz-region="horizontal-viewer">
+        <ResizablePanelGroup direction="horizontal" className="h-full">
+          <ResizablePanel defaultSize={50} minSize={20}>
+            <div className="h-full p-1">
+              <BrowserPanel
+                config={panels[0]}
+                index={0}
+                isFullscreen={false}
+                onConfigChange={(config) => onPanelChange(0, config)}
+                onRefresh={() => onRefresh(0)}
+                onToggleFullscreen={() => handleToggleFullscreen(0)}
+                onSave={() => onSave(0)}
+              />
+            </div>
+          </ResizablePanel>
+
+          <ResizableHandle withHandle className="bg-border/20" />
+
+          <ResizablePanel defaultSize={50} minSize={20}>
+            <div className="h-full p-1">
+              <BrowserPanel
+                config={panels[1]}
+                index={1}
+                isFullscreen={false}
+                onConfigChange={(config) => onPanelChange(1, config)}
+                onRefresh={() => onRefresh(1)}
+                onToggleFullscreen={() => handleToggleFullscreen(1)}
+                onSave={() => onSave(1)}
+              />
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
+    )
+  }
+
+  // Vertical split: 2 panels stacked
+  if (viewMode === "vertical") {
+    return (
+      <div className="h-full" data-tabz-region="vertical-viewer">
+        <ResizablePanelGroup direction="vertical" className="h-full">
+          <ResizablePanel defaultSize={50} minSize={20}>
+            <div className="h-full p-1">
+              <BrowserPanel
+                config={panels[0]}
+                index={0}
+                isFullscreen={false}
+                onConfigChange={(config) => onPanelChange(0, config)}
+                onRefresh={() => onRefresh(0)}
+                onToggleFullscreen={() => handleToggleFullscreen(0)}
+                onSave={() => onSave(0)}
+              />
+            </div>
+          </ResizablePanel>
+
+          <ResizableHandle withHandle className="bg-border/20" />
+
+          <ResizablePanel defaultSize={50} minSize={20}>
+            <div className="h-full p-1">
+              <BrowserPanel
+                config={panels[1]}
+                index={1}
+                isFullscreen={false}
+                onConfigChange={(config) => onPanelChange(1, config)}
+                onRefresh={() => onRefresh(1)}
+                onToggleFullscreen={() => handleToggleFullscreen(1)}
+                onSave={() => onSave(1)}
+              />
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
+    )
+  }
+
+  // Quad view: 2x2 grid (default)
   return (
     <div className="h-full" data-tabz-region="quad-viewer">
       <ResizablePanelGroup direction="vertical" className="h-full">
