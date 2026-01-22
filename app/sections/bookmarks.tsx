@@ -20,6 +20,7 @@ import {
   RotateCw,
   X,
   Copy,
+  Globe,
   AppWindow,
   Terminal,
   Play,
@@ -179,6 +180,23 @@ function getDomain(url: string): string {
   } catch {
     return url
   }
+}
+
+function FaviconWithFallback({ url, className }: { url: string; className?: string }) {
+  const [hasError, setHasError] = React.useState(false)
+
+  if (hasError) {
+    return <Globe className={className} />
+  }
+
+  return (
+    <img
+      src={getFaviconUrl(url)}
+      alt=""
+      className={className}
+      onError={() => setHasError(true)}
+    />
+  )
 }
 
 // ============================================================================
@@ -1107,14 +1125,7 @@ export default function BookmarksSection({
                         {bookmark.icon ? (
                           <span className="text-2xl">{bookmark.icon}</span>
                         ) : (
-                          <img
-                            src={getFaviconUrl(bookmark.url)}
-                            alt=""
-                            className="h-7 w-7"
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none"
-                            }}
-                          />
+                          <FaviconWithFallback url={bookmark.url} className="h-7 w-7" />
                         )}
                       </div>
                       <span className="text-xs text-center line-clamp-2">{bookmark.name}</span>
@@ -1344,14 +1355,7 @@ export default function BookmarksSection({
                       {bookmark.icon ? (
                         <span className="text-lg">{bookmark.icon}</span>
                       ) : (
-                        <img
-                          src={getFaviconUrl(bookmark.url)}
-                          alt=""
-                          className="h-5 w-5"
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none"
-                          }}
-                        />
+                        <FaviconWithFallback url={bookmark.url} className="h-5 w-5" />
                       )}
                     </div>
                     <div className="min-w-0 w-48 lg:w-64 flex-shrink-0">
