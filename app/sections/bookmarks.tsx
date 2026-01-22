@@ -224,6 +224,35 @@ export default function BookmarksSection({
     }
   }, [runCommand])
 
+  // Handler for spawning terminal bookmarks (supports profile parameter)
+  const handleSpawnBookmark = React.useCallback(async (bookmark: BookmarkItem) => {
+    console.log("[Bookmarks] Spawning bookmark:", bookmark)
+
+    // Profile bookmarks need spawnWithOptions to pass the profile parameter
+    if (bookmark.profile) {
+      const result = await spawnWithOptions({
+        name: bookmark.name,
+        command: bookmark.command,
+        workingDir: bookmark.workingDir,
+        profile: bookmark.profile,
+        color: bookmark.color,
+        autoExecute: bookmark.autoExecute !== false,
+      })
+      console.log("[Bookmarks] Spawn result:", result)
+      if (result.success) {
+        toast.success(`Spawned: ${bookmark.name}`)
+      } else {
+        toast.error(result.error || "Failed to spawn terminal")
+      }
+    } else {
+      // Non-profile bookmarks use runCommand
+      await handleLaunchTerminal(bookmark.command || "", {
+        workingDir: bookmark.workingDir,
+        name: bookmark.name,
+      })
+    }
+  }, [spawnWithOptions, handleLaunchTerminal])
+
   // GitHub config
   const [token, setToken] = React.useState<string | null>(null)
   const [repo, setRepo] = React.useState<string | null>(null)
@@ -1027,12 +1056,13 @@ export default function BookmarksSection({
                       data-tabz-profile={bookmark.profile}
                       data-tabz-item={`bookmark-${bookmark.id}`}
                       className="group flex flex-col items-center p-3 rounded-lg hover:bg-primary/10 transition-colors relative"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation()
                         if (bookmark.sendToChat) {
                           sendToChat(bookmark.command || "")
                           toast.success("Sent to TabzChrome chat")
                         } else {
-                          handleLaunchTerminal(bookmark.command || "", { workingDir: bookmark.workingDir, name: bookmark.name })
+                          handleSpawnBookmark(bookmark)
                         }
                       }}
                     >
@@ -1257,12 +1287,13 @@ export default function BookmarksSection({
                     data-tabz-profile={bookmark.profile}
                     data-tabz-item={`bookmark-${bookmark.id}`}
                     className="flex items-center gap-3 min-w-0 text-left"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation()
                       if (bookmark.sendToChat) {
                         sendToChat(bookmark.command || "")
                         toast.success("Sent to TabzChrome chat")
                       } else {
-                        handleLaunchTerminal(bookmark.command || "", { workingDir: bookmark.workingDir, name: bookmark.name })
+                        handleSpawnBookmark(bookmark)
                       }
                     }}
                   >
