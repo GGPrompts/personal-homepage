@@ -245,9 +245,9 @@ export function WorkingDirSelector({
         </div>
       ) : (
         <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-          <DropdownMenuTrigger asChild>
-            <Tooltip>
-              <TooltipTrigger asChild>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -260,12 +260,12 @@ export function WorkingDirSelector({
                   </div>
                   <ChevronDown className="h-3 w-3 flex-shrink-0" />
                 </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="font-mono text-xs">
-                {workingDir}
-              </TooltipContent>
-            </Tooltip>
-          </DropdownMenuTrigger>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="font-mono text-xs">
+              {workingDir}
+            </TooltipContent>
+          </Tooltip>
           <DropdownMenuContent align="start" className="w-72" data-tabz-list="working-dir-menu">
             <DropdownMenuItem
               onClick={() => {
