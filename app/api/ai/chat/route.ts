@@ -222,7 +222,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      return { text: text.replace(/\n+/g, ''), events }
+      return { text: text.replace(/\n{3,}/g, '\n\n'), events }
     }
 
     const sseStream = new ReadableStream({
