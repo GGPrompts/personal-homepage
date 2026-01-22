@@ -304,8 +304,8 @@ export function KanbanCard({ task, isOverlay = false, isDoneColumn = false, hasT
         {isDoneColumn && closeReason && (
           <div className="mt-2 pt-2 border-t border-zinc-800/50">
             <div className="flex items-start gap-1.5">
-              <MessageSquare className="h-3 w-3 text-zinc-500 mt-0.5 shrink-0" />
-              <p className="text-[10px] text-zinc-500 line-clamp-2">{closeReason}</p>
+              <MessageSquare className="h-3 w-3 text-zinc-300 mt-0.5 shrink-0" />
+              <p className="text-xs text-zinc-300 line-clamp-2">{closeReason}</p>
             </div>
           </div>
         )}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { Calendar, Clock } from "lucide-react"
+import { Calendar, Clock, MessageSquare, CheckCircle2 } from "lucide-react"
 import type { Task, Priority } from "../types"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -169,6 +169,24 @@ export function TaskDetailsForm({ task, onUpdate, className }: TaskDetailsFormPr
         <label className="text-xs text-zinc-500 uppercase tracking-wide">Labels</label>
         <TaskLabels labels={labels} onChange={handleLabelsChange} />
       </div>
+
+      {/* Close reason for completed tasks */}
+      {task.beadsMetadata?.closeReason && (
+        <div className="space-y-2">
+          <label className="text-xs text-zinc-500 uppercase tracking-wide flex items-center gap-1">
+            <CheckCircle2 className="h-3 w-3" />
+            Completion Summary
+          </label>
+          <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <MessageSquare className="h-4 w-4 text-green-400 mt-0.5 shrink-0" />
+              <p className="text-sm text-zinc-200 leading-relaxed whitespace-pre-wrap">
+                {task.beadsMetadata.closeReason}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </motion.div>
   )
 }
