@@ -278,6 +278,8 @@ function getStatusColor(status: Session["status"]) {
 // ============================================================================
 
 function TokenUsageChart({ data, timeRange }: { data: TokenUsage[]; timeRange: "7d" | "14d" | "30d" }) {
+  const CHART_HEIGHT = 160 // pixels available for bars (excluding label space)
+
   const chartData = useMemo(() => {
     const days = timeRange === "7d" ? 7 : timeRange === "14d" ? 14 : 30
     return data.slice(-days)
@@ -285,7 +287,9 @@ function TokenUsageChart({ data, timeRange }: { data: TokenUsage[]; timeRange: "
 
   const maxTokens = useMemo(() => {
     if (chartData.length === 0) return 1
-    return Math.max(...chartData.map((d) => d.inputTokens + d.outputTokens))
+    const max = Math.max(...chartData.map((d) => d.inputTokens + d.outputTokens))
+    // Ensure we have a sensible minimum to avoid division issues
+    return Math.max(max, 1)
   }, [chartData])
 
   if (chartData.length === 0) {
@@ -303,9 +307,11 @@ function TokenUsageChart({ data, timeRange }: { data: TokenUsage[]; timeRange: "
       {/* Bar chart */}
       <div className="flex items-end gap-1 h-48">
         {chartData.map((day, i) => {
-          const inputHeight = (day.inputTokens / maxTokens) * 100
-          const outputHeight = (day.outputTokens / maxTokens) * 100
           const total = day.inputTokens + day.outputTokens
+          // Calculate pixel heights instead of percentages
+          const totalHeight = (total / maxTokens) * CHART_HEIGHT
+          const inputHeight = total > 0 ? (day.inputTokens / total) * totalHeight : 0
+          const outputHeight = total > 0 ? (day.outputTokens / total) * totalHeight : 0
 
           return (
             <motion.div
@@ -326,15 +332,15 @@ function TokenUsageChart({ data, timeRange }: { data: TokenUsage[]; timeRange: "
                 </div>
               </div>
 
-              {/* Bars */}
-              <div className="w-full flex flex-col gap-0.5">
+              {/* Bars - using pixel heights for proper scaling */}
+              <div className="w-full flex flex-col gap-0.5 justify-end" style={{ height: CHART_HEIGHT }}>
                 <div
                   className="w-full bg-primary/70 rounded-t-sm transition-all hover:bg-primary"
-                  style={{ height: `${inputHeight}%`, minHeight: day.inputTokens > 0 ? "2px" : "0" }}
+                  style={{ height: Math.max(inputHeight, day.inputTokens > 0 ? 2 : 0) }}
                 />
                 <div
                   className="w-full bg-emerald-500/70 rounded-b-sm transition-all hover:bg-emerald-500"
-                  style={{ height: `${outputHeight}%`, minHeight: day.outputTokens > 0 ? "2px" : "0" }}
+                  style={{ height: Math.max(outputHeight, day.outputTokens > 0 ? 2 : 0) }}
                 />
               </div>
 
