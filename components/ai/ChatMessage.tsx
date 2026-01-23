@@ -1,12 +1,12 @@
 "use client"
 
 import * as React from "react"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Collapsible, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
   Bot, User, Copy, RotateCw, ThumbsUp, ThumbsDown,
   CheckCheck, Clock, Wrench, Loader2, ChevronRight,
@@ -19,6 +19,48 @@ import {
   MODEL_COLORS,
   MODEL_ICONS,
 } from "@/lib/ai-workspace"
+
+// ============================================================================
+// ANIMATION CONSTANTS
+// ============================================================================
+
+const messageVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.98 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      type: "spring" as const,
+      stiffness: 400,
+      damping: 30,
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: -10,
+    transition: { duration: 0.15 },
+  },
+}
+
+const toolUseVariants = {
+  collapsed: {
+    height: 0,
+    opacity: 0,
+    transition: {
+      height: { duration: 0.2, ease: [0.4, 0, 0.2, 1] as const },
+      opacity: { duration: 0.15 },
+    },
+  },
+  expanded: {
+    height: "auto",
+    opacity: 1,
+    transition: {
+      height: { duration: 0.25, ease: [0.4, 0, 0.2, 1] as const },
+      opacity: { duration: 0.2, delay: 0.05 },
+    },
+  },
+}
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -87,6 +129,7 @@ export function ToolUseDisplay({ tool }: ToolUseDisplayProps) {
   const [isOpen, setIsOpen] = React.useState(true)
   const collapseTimerRef = React.useRef<NodeJS.Timeout | null>(null)
   const manuallyToggledRef = React.useRef(false)
+  const shouldReduceMotion = useReducedMotion()
 
   React.useEffect(() => {
     if (tool.status === 'complete' && isOpen && !manuallyToggledRef.current) {
@@ -122,35 +165,64 @@ export function ToolUseDisplay({ tool }: ToolUseDisplayProps) {
   }
 
   return (
-    <Collapsible open={isOpen} onOpenChange={handleOpenChange}>
-      <CollapsibleTrigger className="flex items-center gap-2 w-full text-left">
-        <div className={`flex items-center gap-2 px-2 py-1 rounded text-xs ${
-          tool.status === 'running'
-            ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-            : 'bg-green-500/20 text-green-400 border border-green-500/30'
-        }`}>
-          {tool.status === 'running' ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <Wrench className="h-3 w-3" />
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: "spring" as const, stiffness: 500, damping: 35 }}
+    >
+      <Collapsible open={isOpen} onOpenChange={handleOpenChange}>
+        <CollapsibleTrigger className="flex items-center gap-2 w-full text-left group">
+          <motion.div
+            className={`flex items-center gap-2 px-2 py-1 rounded text-xs transition-colors ${
+              tool.status === 'running'
+                ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                : 'bg-green-500/20 text-green-400 border border-green-500/30'
+            }`}
+            whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+            whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+          >
+            {tool.status === 'running' ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <motion.div
+                initial={{ rotate: 0 }}
+                animate={{ rotate: [0, -10, 10, 0] }}
+                transition={{ delay: 0.2, duration: 0.4 }}
+              >
+                <Wrench className="h-3 w-3" />
+              </motion.div>
+            )}
+            <span className="font-mono">{tool.name}</span>
+            {tool.status === 'running' && (
+              <span className="text-[10px] opacity-70">running...</span>
+            )}
+          </motion.div>
+          {tool.input && (
+            <motion.div
+              animate={{ rotate: isOpen ? 90 : 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              <ChevronRight className="h-3 w-3 text-muted-foreground" />
+            </motion.div>
           )}
-          <span className="font-mono">{tool.name}</span>
-          {tool.status === 'running' && (
-            <span className="text-[10px] opacity-70">running...</span>
+        </CollapsibleTrigger>
+        <AnimatePresence>
+          {tool.input && isOpen && (
+            <motion.div
+              variants={toolUseVariants}
+              initial="collapsed"
+              animate="expanded"
+              exit="collapsed"
+              className="overflow-hidden"
+            >
+              <div className="mt-1 ml-2 p-2 bg-muted/30 rounded text-xs font-mono overflow-x-auto max-h-32 overflow-y-auto">
+                <pre className="whitespace-pre-wrap break-all">{tool.input}</pre>
+              </div>
+            </motion.div>
           )}
-        </div>
-        {tool.input && (
-          <ChevronRight className="h-3 w-3 text-muted-foreground transition-transform data-[state=open]:rotate-90" />
-        )}
-      </CollapsibleTrigger>
-      {tool.input && (
-        <CollapsibleContent>
-          <div className="mt-1 ml-2 p-2 bg-muted/30 rounded text-xs font-mono overflow-x-auto max-h-32 overflow-y-auto">
-            <pre className="whitespace-pre-wrap break-all">{tool.input}</pre>
-          </div>
-        </CollapsibleContent>
-      )}
-    </Collapsible>
+        </AnimatePresence>
+      </Collapsible>
+    </motion.div>
   )
 }
 
@@ -346,8 +418,9 @@ export function ChatMessage({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+      variants={messageVariants}
+      initial="hidden"
+      animate="visible"
       className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'} ${className}`}
       onHoverStart={() => !isUser && setShowActionButtons(true)}
       onHoverEnd={() => !isUser && setShowActionButtons(false)}
