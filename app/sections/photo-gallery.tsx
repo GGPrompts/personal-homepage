@@ -49,7 +49,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -1328,6 +1329,9 @@ export default function PhotoGallerySection({
         {/* Lightbox */}
         <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
           <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full p-0 bg-background/95 backdrop-blur-xl border-primary/30">
+            <VisuallyHidden>
+              <DialogTitle>Photo Lightbox</DialogTitle>
+            </VisuallyHidden>
             {selectedPhoto && (
               <div className="relative w-full h-full flex">
                 {/* Main Image Area */}
@@ -1688,6 +1692,9 @@ export default function PhotoGallerySection({
         {/* Add Photo Modal */}
         <Dialog open={showAddModal} onOpenChange={(open) => !open && closeAddModal()}>
           <DialogContent className="max-w-2xl glass border-primary/30">
+            <VisuallyHidden>
+              <DialogTitle>Add Photo</DialogTitle>
+            </VisuallyHidden>
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>

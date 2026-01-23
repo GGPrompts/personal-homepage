@@ -324,9 +324,9 @@ function TokenUsageChart({ data, timeRange }: { data: TokenUsage[]; timeRange: "
             >
               {/* Tooltip */}
               <div className="absolute bottom-full mb-2 hidden group-hover:block z-10">
-                <div className="glass rounded-lg px-3 py-2 text-xs whitespace-nowrap">
+                <div className="bg-popover border border-border rounded-lg px-3 py-2 text-xs whitespace-nowrap shadow-lg">
                   <p className="font-medium">{new Date(day.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</p>
-                  <p className="text-primary">Input: {formatNumber(day.inputTokens)}</p>
+                  <p className="text-blue-500">Input: {formatNumber(day.inputTokens)}</p>
                   <p className="text-emerald-500">Output: {formatNumber(day.outputTokens)}</p>
                   <p className="text-muted-foreground">Total: {formatNumber(total)}</p>
                 </div>
@@ -335,7 +335,7 @@ function TokenUsageChart({ data, timeRange }: { data: TokenUsage[]; timeRange: "
               {/* Bars - using pixel heights for proper scaling */}
               <div className="w-full flex flex-col gap-0.5 justify-end" style={{ height: CHART_HEIGHT }}>
                 <div
-                  className="w-full bg-primary/70 rounded-t-sm transition-all hover:bg-primary"
+                  className="w-full bg-blue-500/70 rounded-t-sm transition-all hover:bg-blue-500"
                   style={{ height: Math.max(inputHeight, day.inputTokens > 0 ? 2 : 0) }}
                 />
                 <div
@@ -356,7 +356,7 @@ function TokenUsageChart({ data, timeRange }: { data: TokenUsage[]; timeRange: "
       {/* Legend */}
       <div className="flex items-center justify-center gap-6 text-xs">
         <div className="flex items-center gap-2">
-          <div className="h-3 w-3 rounded bg-primary" />
+          <div className="h-3 w-3 rounded bg-blue-500" />
           <span className="text-muted-foreground">Input Tokens</span>
         </div>
         <div className="flex items-center gap-2">
