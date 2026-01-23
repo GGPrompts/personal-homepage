@@ -175,13 +175,22 @@ export function WorkingDirSelector({
                       </div>
                       <div className="space-y-1">
                         {recentDirs.map((dir) => (
-                          <button
+                          <div
                             key={dir}
+                            role="button"
+                            tabIndex={0}
                             onClick={() => {
                               setWorkingDir(dir)
                               setPopoverOpen(false)
                             }}
-                            className="w-full flex items-center gap-2 px-2 py-1.5 text-xs font-mono rounded hover:bg-primary/10 text-muted-foreground hover:text-foreground transition-colors group"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault()
+                                setWorkingDir(dir)
+                                setPopoverOpen(false)
+                              }
+                            }}
+                            className="w-full flex items-center gap-2 px-2 py-1.5 text-xs font-mono rounded hover:bg-primary/10 text-muted-foreground hover:text-foreground transition-colors group cursor-pointer"
                             data-tabz-item={`recent-dir-${dir.replace(/[^a-z0-9]/gi, "-")}`}
                           >
                             <FolderOpen className="h-3 w-3 flex-shrink-0" />
@@ -197,7 +206,7 @@ export function WorkingDirSelector({
                                 <X className="h-3 w-3" />
                               </Button>
                             )}
-                          </button>
+                          </div>
                         ))}
                       </div>
                     </>
