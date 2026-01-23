@@ -90,7 +90,7 @@ export function KanbanCard({ task, isOverlay = false, isDoneColumn = false, hasT
   // Dependency state - prefer graph metrics when available
   const hasBlockers = taskMetrics ? taskMetrics.inDegree > 0 : (task.blockedBy && task.blockedBy.length > 0)
   const blocksOthers = taskMetrics ? taskMetrics.outDegree > 0 : (task.blocking && task.blocking.length > 0)
-  const isReady = isDoneColumn ? false : (taskMetrics ? taskMetrics.inDegree === 0 : task.isReady)
+  const hasReadyLabel = task.labels?.includes('ready') ?? false
   const isCriticalPath = taskMetrics?.isCriticalPath ?? task.criticalPath
 
   // Graph-computed metrics for enhanced badges
@@ -127,13 +127,13 @@ export function KanbanCard({ task, isOverlay = false, isDoneColumn = false, hasT
       data-tabz-item={`task-${task.id}`}
       data-critical-path={isCriticalPath}
       data-blocked={hasBlockers}
-      data-ready={isReady && !hasBlockers}
+      data-ready={hasReadyLabel}
       className={cn(
         "kanban-card group relative p-3",
         isDragging && "opacity-50 scale-[1.02] border-glow",
         hasBlockers && "ring-1 ring-red-500/30 border-red-500/20",
         isCriticalPath && "critical-path-glow",
-        isReady && !hasBlockers && !isDoneColumn && "ring-1 ring-cyan-500/20 border-cyan-500/10",
+        hasReadyLabel && !hasBlockers && !isDoneColumn && "ring-1 ring-cyan-500/20 border-cyan-500/10",
         isDoneColumn && "opacity-80"
       )}
       onClick={handleClick}
@@ -150,7 +150,7 @@ export function KanbanCard({ task, isOverlay = false, isDoneColumn = false, hasT
 
       <div className="pl-4">
         {/* Dependency indicators row */}
-        {!isDoneColumn && (hasBlockers || effectiveUnblockCount > 0 || isCriticalPath || isReady || showHighImpact) && (
+        {!isDoneColumn && (hasBlockers || effectiveUnblockCount > 0 || isCriticalPath || hasReadyLabel || showHighImpact) && (
           <div className="flex items-center gap-1.5 mb-2 flex-wrap">
             {hasBlockers && (
               <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-500/15 border border-red-500/30">
@@ -188,7 +188,7 @@ export function KanbanCard({ task, isOverlay = false, isDoneColumn = false, hasT
               </div>
             )}
 
-            {isReady && !hasBlockers && (
+            {hasReadyLabel && (
               <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30">
                 <CheckCircle2 className="h-3 w-3 text-cyan-400" />
                 <span className="text-[10px] font-medium text-cyan-400 mono">Ready</span>
