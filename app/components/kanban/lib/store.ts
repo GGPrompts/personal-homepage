@@ -292,18 +292,40 @@ export const useBoardStore = create<BoardState>()(
       setSelectedTask: (id) => set({ selectedTaskId: id }),
 
       // Sync beads tasks to store (merge with existing, beads tasks take precedence)
+      // Preserves local state like messages, agent, and claudeSettings
       syncBeadsTasks: (beadsTasks) => {
         set((state) => {
-          // Keep local tasks that aren't from beads, add/update beads tasks
+          // Keep local tasks that aren't from beads
           const localTasks = state.tasks.filter(
             (t) => !t.beadsMetadata?.isBeadsTask
           )
+          // Create a map of existing beads tasks to preserve local state
+          const existingBeadsTaskMap = new Map(
+            state.tasks
+              .filter((t) => t.beadsMetadata?.isBeadsTask)
+              .map((t) => [t.id, t])
+          )
+          // Merge beads tasks while preserving messages, agent, and settings
+          const mergedBeadsTasks = beadsTasks.map((beadsTask) => {
+            const existing = existingBeadsTaskMap.get(beadsTask.id)
+            if (existing) {
+              // Preserve local state from existing task
+              return {
+                ...beadsTask,
+                messages: existing.messages,
+                agent: existing.agent,
+                claudeSettings: existing.claudeSettings,
+                activeCapabilities: existing.activeCapabilities,
+              }
+            }
+            return beadsTask
+          })
           // Create a map of beads tasks by ID for efficient lookup
-          const beadsTaskMap = new Map(beadsTasks.map((t) => [t.id, t]))
-          // Merge: local tasks + beads tasks (beads overwrite if same ID)
+          const beadsTaskMap = new Map(mergedBeadsTasks.map((t) => [t.id, t]))
+          // Merge: local tasks + beads tasks
           const merged = [
             ...localTasks.filter((t) => !beadsTaskMap.has(t.id)),
-            ...beadsTasks,
+            ...mergedBeadsTasks,
           ]
           return { tasks: merged }
         })

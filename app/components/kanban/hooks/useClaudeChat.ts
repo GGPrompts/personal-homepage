@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useRef } from 'react'
-import type { StreamChunk, ClaudeSettings, ChatMessage } from '../lib/ai/types'
+import type { ClaudeSettings, ChatMessage } from '../lib/ai/types'
 import type { Message, ToolUse } from '../types'
 
 interface UseClaudeChatOptions {
@@ -65,16 +65,28 @@ export function useClaudeChat(options: UseClaudeChatOptions = {}): UseClaudeChat
     toolUsesRef.current = []
 
     let fullContent = ''
-    let currentToolInput = ''
-    let currentToolName = ''
 
     try {
       const messages: ChatMessage[] = [{ role: 'user', content }]
 
-      const response = await fetch('/api/chat', {
+      const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages, settings, sessionId }),
+        body: JSON.stringify({
+          messages,
+          backend: 'claude',
+          settings: settings ? {
+            systemPrompt: settings.systemPrompt,
+            claudeModel: settings.model,
+            claudeAgent: settings.agent,
+            additionalDirs: settings.additionalDirs,
+            permissionMode: settings.permissionMode,
+            allowedTools: settings.allowedTools,
+            disallowedTools: settings.disallowedTools,
+          } : undefined,
+          cwd: settings?.workingDir,
+          claudeSessionId: sessionId,
+        }),
         signal: abortController.signal
       })
 
@@ -97,86 +109,48 @@ export function useClaudeChat(options: UseClaudeChatOptions = {}): UseClaudeChat
 
         buffer += decoder.decode(value, { stream: true })
 
-        // Process buffer - split on event markers or just accumulate text
-        while (buffer.includes('__CLAUDE_EVENT__')) {
-          const eventStart = buffer.indexOf('__CLAUDE_EVENT__')
+        // Process SSE format: data: {...}\n\n
+        const lines = buffer.split('\n\n')
+        buffer = lines.pop() || '' // Keep incomplete chunk in buffer
 
-          // Text before the event
-          if (eventStart > 0) {
-            const textBefore = buffer.substring(0, eventStart)
-            fullContent += textBefore
-            setStreamingContent(fullContent)
-          }
-
-          const eventEnd = buffer.indexOf('__END_EVENT__')
-          if (eventEnd === -1) break // Wait for complete event
-
-          const eventJson = buffer.substring(eventStart + 16, eventEnd)
-          buffer = buffer.substring(eventEnd + 13)
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
 
           try {
-            const event: StreamChunk = JSON.parse(eventJson)
+            const data = JSON.parse(line.slice(6)) // Remove 'data: ' prefix
 
-            switch (event.type) {
-              case 'tool_start':
-                if (event.tool) {
-                  currentToolName = event.tool.name
-                  currentToolInput = event.tool.input || ''
-                  setCurrentToolUse({ name: currentToolName, input: currentToolInput })
-                }
-                break
+            if (data.error) {
+              onError?.(data.error)
+              continue
+            }
 
-              case 'tool_input':
-                if (event.tool) {
-                  currentToolInput += event.tool.input || ''
-                  setCurrentToolUse({ name: currentToolName, input: currentToolInput })
-                }
-                break
+            if (data.content) {
+              fullContent += data.content
+              setStreamingContent(fullContent)
+            }
 
-              case 'tool_end':
-                if (event.tool) {
-                  toolUsesRef.current.push({
-                    name: event.tool.name,
-                    input: event.tool.input ? JSON.parse(event.tool.input) : {}
-                  })
-                  setCurrentToolUse(null)
-                  currentToolName = ''
-                  currentToolInput = ''
-                }
-                break
-
-              case 'done':
-                if (event.sessionId) {
-                  onSessionId?.(event.sessionId)
-                }
-                if (event.usage) {
-                  const totalTokens = event.usage.totalTokens
-                  const contextPercentage = Math.round((totalTokens / CONTEXT_LIMIT) * 100)
-                  setUsage({
-                    inputTokens: event.usage.inputTokens,
-                    outputTokens: event.usage.outputTokens,
-                    cacheReadTokens: event.usage.cacheReadTokens,
-                    cacheCreationTokens: event.usage.cacheCreationTokens,
-                    totalTokens,
-                    contextPercentage
-                  })
-                }
-                break
-
-              case 'error':
-                onError?.(event.error || 'Unknown error')
-                break
+            if (data.done) {
+              // Final event with metadata
+              if (data.claudeSessionId) {
+                onSessionId?.(data.claudeSessionId)
+              }
+              if (data.usage) {
+                const totalTokens = data.usage.totalTokens ||
+                  (data.usage.inputTokens + data.usage.outputTokens)
+                const contextPercentage = Math.round((totalTokens / CONTEXT_LIMIT) * 100)
+                setUsage({
+                  inputTokens: data.usage.inputTokens || 0,
+                  outputTokens: data.usage.outputTokens || 0,
+                  cacheReadTokens: data.usage.cacheReadTokens,
+                  cacheCreationTokens: data.usage.cacheCreationTokens,
+                  totalTokens,
+                  contextPercentage
+                })
+              }
             }
           } catch {
             // Ignore parse errors
           }
-        }
-
-        // Any remaining text in buffer (no event markers)
-        if (buffer && !buffer.includes('__CLAUDE_EVENT__')) {
-          fullContent += buffer
-          setStreamingContent(fullContent)
-          buffer = ''
         }
       }
 
