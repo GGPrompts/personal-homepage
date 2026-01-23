@@ -85,28 +85,43 @@ export function PluginsSidebar({ className }: PluginsSidebarProps) {
   }, {} as Record<string, Plugin[]>)
 
   if (isCollapsed) {
+    const pluginCount = data?.data?.totalPlugins || 0
     return (
       <div
+        onClick={() => setIsCollapsed(false)}
         className={cn(
-          'flex-shrink-0 w-12 glass-dark border-l border-zinc-700/50',
-          'flex flex-col items-center py-4 gap-4',
+          'flex-shrink-0 w-16 glass-dark border-l border-zinc-700/50',
+          'flex flex-col items-center py-4 gap-3 cursor-pointer',
+          'hover:bg-zinc-800/50 hover:border-teal-500/30 transition-all duration-200',
+          'group',
           className
         )}
+        title="Click to expand plugins sidebar"
       >
+        {/* Expand button */}
         <button
-          onClick={() => setIsCollapsed(false)}
-          className="p-2 rounded-md hover:bg-zinc-800 transition-colors"
-          title="Expand plugins sidebar"
+          className="p-2 rounded-md hover:bg-zinc-700 transition-colors group-hover:bg-zinc-700/50"
+          aria-label="Expand plugins sidebar"
         >
-          <ChevronLeft className="h-4 w-4 text-zinc-400" />
+          <ChevronLeft className="h-4 w-4 text-zinc-400 group-hover:text-teal-400 transition-colors" />
         </button>
-        <div className="h-px w-6 bg-zinc-700" />
-        <div className="flex flex-col items-center gap-3">
-          <Package className="h-4 w-4 text-teal-400" />
-          <span className="text-xs text-zinc-500 font-mono rotate-[-90deg] whitespace-nowrap origin-center translate-y-8">
-            {data?.data?.totalPlugins || 0} plugins
-          </span>
+
+        <div className="h-px w-8 bg-zinc-700 group-hover:bg-zinc-600 transition-colors" />
+
+        {/* Plugin icon with count badge */}
+        <div className="relative">
+          <Package className="h-5 w-5 text-teal-400 group-hover:text-teal-300 transition-colors" />
+          {pluginCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-teal-500/90 text-[10px] font-bold text-white px-1">
+              {pluginCount}
+            </span>
+          )}
         </div>
+
+        {/* Vertical label */}
+        <span className="text-sm text-zinc-300 font-medium tracking-wide rotate-[-90deg] whitespace-nowrap origin-center translate-y-6 group-hover:text-zinc-100 transition-colors">
+          Plugins
+        </span>
       </div>
     )
   }
@@ -153,7 +168,7 @@ export function PluginsSidebar({ className }: PluginsSidebarProps) {
 
       {/* Component Summary */}
       {data?.data?.componentCounts && (
-        <div className="px-4 py-2 border-b border-zinc-700/50 flex flex-wrap gap-2">
+        <div className="px-4 py-2.5 border-b border-zinc-700/50 flex flex-wrap gap-3 bg-zinc-800/30">
           {Object.entries(data.data.componentCounts).map(([type, count]) => {
             if (count === 0) return null
             const meta = COMPONENT_ICONS[type]
@@ -162,11 +177,11 @@ export function PluginsSidebar({ className }: PluginsSidebarProps) {
             return (
               <div
                 key={type}
-                className="flex items-center gap-1.5 text-xs"
+                className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors"
                 title={`${count} ${type}${count !== 1 ? 's' : ''}`}
               >
-                <Icon className={cn('h-3 w-3', meta.color)} />
-                <span className="text-zinc-400">{count}</span>
+                <Icon className={cn('h-3.5 w-3.5', meta.color)} />
+                <span className="text-zinc-300 font-medium">{count}</span>
               </div>
             )
           })}
@@ -218,11 +233,13 @@ export function PluginsSidebar({ className }: PluginsSidebarProps) {
             >
               {/* Marketplace Header */}
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-[10px] font-medium text-zinc-500 uppercase tracking-wide">
+                <span className="text-xs font-semibold text-zinc-300 uppercase tracking-wide">
                   {marketplace}
                 </span>
-                <div className="flex-1 h-px bg-zinc-700/50" />
-                <span className="text-[10px] text-zinc-600">{plugins.length}</span>
+                <div className="flex-1 h-px bg-zinc-600/50" />
+                <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-zinc-600 text-zinc-400">
+                  {plugins.length}
+                </Badge>
               </div>
 
               {/* Plugin Cards */}
