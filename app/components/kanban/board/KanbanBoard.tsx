@@ -17,9 +17,10 @@ import {
 } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { motion } from 'framer-motion'
-import { ChevronLeft, ChevronRight, RefreshCw, AlertCircle, Database, Package } from 'lucide-react'
+import { ChevronLeft, ChevronRight, RefreshCw, AlertCircle, Database, Package, Users } from 'lucide-react'
 import { useBeadsBan, BeadsBanColumnId, BEADSBAN_COLUMNS } from '../hooks/useBeadsBan'
 import { GraphMetricsProvider } from '../contexts/GraphMetricsContext'
+import { WorkerStatusProvider, useWorkerStatusContextSafe } from '../contexts/WorkerStatusContext'
 import { KanbanColumn } from './KanbanColumn'
 import { TaskModal } from '../task/TaskModal'
 import { PluginsSidebar } from '../shared/PluginsSidebar'
@@ -215,6 +216,82 @@ export function KanbanBoard({ workspace }: KanbanBoardProps) {
   }
 
   return (
+    <WorkerStatusProvider enabled={true} pollInterval={5000}>
+      <KanbanBoardContent
+        isLoading={isLoading}
+        error={error}
+        allTasks={allTasks}
+        columns={columns}
+        tasksByColumn={tasksByColumn}
+        hasTranscript={hasTranscript}
+        workspace={workspace}
+        refresh={refresh}
+        sensors={sensors}
+        collisionDetection={collisionDetection}
+        handleDragStart={handleDragStart}
+        handleDragOver={handleDragOver}
+        handleDragEnd={handleDragEnd}
+        scrollContainerRef={scrollContainerRef}
+        canScrollLeft={canScrollLeft}
+        canScrollRight={canScrollRight}
+        scroll={scroll}
+        showPlugins={showPlugins}
+        setShowPlugins={setShowPlugins}
+        activeTask={activeTask}
+      />
+    </WorkerStatusProvider>
+  )
+}
+
+/**
+ * Inner component that has access to worker status context
+ */
+function KanbanBoardContent({
+  isLoading,
+  error,
+  allTasks,
+  columns,
+  tasksByColumn,
+  hasTranscript,
+  workspace,
+  refresh,
+  sensors,
+  collisionDetection,
+  handleDragStart,
+  handleDragOver,
+  handleDragEnd,
+  scrollContainerRef,
+  canScrollLeft,
+  canScrollRight,
+  scroll,
+  showPlugins,
+  setShowPlugins,
+  activeTask,
+}: {
+  isLoading: boolean
+  error: string | null
+  allTasks: Task[]
+  columns: typeof BEADSBAN_COLUMNS
+  tasksByColumn: Map<BeadsBanColumnId, Task[]>
+  hasTranscript: (taskId: string) => boolean
+  workspace?: string
+  refresh: () => Promise<void>
+  sensors: ReturnType<typeof useSensors>
+  collisionDetection: CollisionDetection
+  handleDragStart: (event: DragStartEvent) => void
+  handleDragOver: (event: DragOverEvent) => void
+  handleDragEnd: (event: DragEndEvent) => Promise<void>
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>
+  canScrollLeft: boolean
+  canScrollRight: boolean
+  scroll: (direction: 'left' | 'right') => void
+  showPlugins: boolean
+  setShowPlugins: (show: boolean) => void
+  activeTask: Task | null
+}) {
+  const workerStatus = useWorkerStatusContextSafe()
+
+  return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -252,6 +329,22 @@ export function KanbanBoard({ workspace }: KanbanBoardProps) {
         )}
 
         <div className="flex-1" />
+
+        {/* Worker status indicator */}
+        {workerStatus && workerStatus.activeCount > 0 && (
+          <>
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs bg-green-500/15 text-green-400 border border-green-500/30">
+              <motion.div
+                className="w-1.5 h-1.5 rounded-full bg-green-400"
+                animate={{ scale: [1, 1.3, 1], opacity: [1, 0.6, 1] }}
+                transition={{ duration: 1.2, repeat: Infinity }}
+              />
+              <Users className="w-3 h-3" />
+              <span className="font-mono">{workerStatus.activeCount} active</span>
+            </div>
+            <div className="h-4 w-px bg-zinc-700" />
+          </>
+        )}
 
         <div className="text-xs text-zinc-500 font-mono">
           {allTasks.length} issue{allTasks.length !== 1 ? 's' : ''}
@@ -327,6 +420,7 @@ export function KanbanBoard({ workspace }: KanbanBoardProps) {
                 {columns.map((column) => {
                   const tasks = tasksByColumn.get(column.id) ?? []
                   const isDoneColumn = column.id === 'done'
+                  const isInProgressColumn = column.id === 'in-progress'
 
                   return (
                     <KanbanColumn
@@ -339,6 +433,7 @@ export function KanbanBoard({ workspace }: KanbanBoardProps) {
                       }}
                       tasks={tasks}
                       isDoneColumn={isDoneColumn}
+                      isInProgressColumn={isInProgressColumn}
                       hasTranscript={hasTranscript}
                       description={column.description}
                       workspace={workspace}

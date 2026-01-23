@@ -20,6 +20,8 @@ interface KanbanColumnProps {
   tasks: Task[]
   /** Whether this is the Done column (for closed tasks) */
   isDoneColumn?: boolean
+  /** Whether this is the In Progress column (for showing worker status) */
+  isInProgressColumn?: boolean
   /** Function to check if a task has a transcript */
   hasTranscript?: (taskId: string) => boolean
   /** Column description for tooltip */
@@ -32,6 +34,7 @@ export function KanbanColumn({
   column,
   tasks,
   isDoneColumn = false,
+  isInProgressColumn = false,
   hasTranscript,
   description,
   workspace,
@@ -128,6 +131,7 @@ export function KanbanColumn({
                       key={task.id}
                       task={task}
                       isDoneColumn={isDoneColumn}
+                      showWorkerStatus={isInProgressColumn}
                       hasTranscript={hasTranscript?.(task.id)}
                       workspace={workspace}
                     />

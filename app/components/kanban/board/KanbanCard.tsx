@@ -40,6 +40,8 @@ import {
   extractPromptFromNotes,
   PROMPT_SECTION_HEADER,
 } from "@/hooks/usePromptGeneration"
+import { useWorkerStatusContextSafe } from "../contexts/WorkerStatusContext"
+import { WorkerStatusBadge } from "./WorkerStatusBadge"
 
 /**
  * Gate label configuration - maps gate: prefixed labels to icons and display names
@@ -80,6 +82,8 @@ interface KanbanCardProps {
   isOverlay?: boolean
   /** Whether task is in the Done column (closed tasks) */
   isDoneColumn?: boolean
+  /** Whether to show worker status badge (for in-progress column) */
+  showWorkerStatus?: boolean
   /** Whether this task has a transcript available */
   hasTranscript?: boolean
   /** Workspace path for beads API calls */
@@ -92,12 +96,19 @@ export function KanbanCard({
   task,
   isOverlay = false,
   isDoneColumn = false,
+  showWorkerStatus = false,
   hasTranscript = false,
   workspace,
   initialNotes,
 }: KanbanCardProps) {
   const setSelectedTask = useBoardStore((state) => state.setSelectedTask)
   const graphMetrics = useGraphMetricsContextSafe()
+  const workerStatusContext = useWorkerStatusContextSafe()
+
+  // Get worker for this task if showing worker status
+  const worker = showWorkerStatus && workerStatusContext
+    ? workerStatusContext.getWorkerForIssue(task.id)
+    : undefined
 
   // Get graph-computed metrics for this task
   const taskMetrics = graphMetrics?.getMetrics(task.id)
@@ -378,6 +389,25 @@ export function KanbanCard({
                 </span>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Worker status badge for in-progress tasks */}
+        {showWorkerStatus && worker && (
+          <div className="mb-2">
+            <WorkerStatusBadge worker={worker} />
+          </div>
+        )}
+
+        {/* No worker indicator for in-progress tasks without active worker */}
+        {showWorkerStatus && !worker && (
+          <div className="flex items-center gap-1.5 mb-2">
+            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-zinc-500/15 border border-zinc-500/30">
+              <Clock className="h-3 w-3 text-zinc-400" />
+              <span className="text-[10px] font-medium text-zinc-400 mono">
+                No worker
+              </span>
+            </div>
           </div>
         )}
 
