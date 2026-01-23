@@ -107,7 +107,16 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null)
   const abortControllerRef = React.useRef<AbortController | null>(null)
 
-  const activeConv = conversations.find(c => c.id === activeConvId) || conversations[0]
+  // Default conversation for SSR when conversations array is empty
+  const defaultConv: Conversation = React.useMemo(() => ({
+    id: generateId(),
+    title: 'New Conversation',
+    messages: [],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }), [])
+
+  const activeConv = conversations.find(c => c.id === activeConvId) || conversations[0] || defaultConv
 
   // ============================================================================
   // EFFECTS
