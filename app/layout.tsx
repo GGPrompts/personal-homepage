@@ -12,6 +12,8 @@ import { MusicPlayerProvider } from "@/components/MusicPlayerProvider"
 import { AudioVisualizerProvider } from "@/components/AudioVisualizerProvider";
 import { WorkingDirProvider } from "@/components/WorkingDirProvider";
 import { PersistentMusicDrawer } from "@/components/PersistentMusicDrawer";
+import { AIDrawerProvider } from "@/components/ai/AIDrawerProvider";
+import { AIDrawer } from "@/components/ai/AIDrawer";
 import { Toaster } from "sonner";
 
 const inter = Inter({
@@ -46,20 +48,23 @@ export default function RootLayout({
                   <WorkingDirProvider>
                     <MusicPlayerProvider>
                       <AudioVisualizerProvider>
-                        <MasterBackground />
-                        {children}
-                        <PersistentMusicDrawer />
-                        <Toaster
-                          theme="dark"
-                          position="bottom-right"
-                          toastOptions={{
-                            style: {
-                              background: 'hsl(var(--popover))',
-                              border: '1px solid hsl(var(--border))',
-                              color: 'hsl(var(--popover-foreground))',
-                            },
-                          }}
-                        />
+                        <AIDrawerProvider>
+                          <MasterBackground />
+                          {children}
+                          <AIDrawer />
+                          <PersistentMusicDrawer />
+                          <Toaster
+                            theme="dark"
+                            position="bottom-right"
+                            toastOptions={{
+                              style: {
+                                background: 'hsl(var(--popover))',
+                                border: '1px solid hsl(var(--border))',
+                                color: 'hsl(var(--popover-foreground))',
+                              },
+                            }}
+                          />
+                        </AIDrawerProvider>
                       </AudioVisualizerProvider>
                     </MusicPlayerProvider>
                   </WorkingDirProvider>
