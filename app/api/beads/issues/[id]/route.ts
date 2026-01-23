@@ -36,6 +36,7 @@ interface RawBeadsIssue {
   id: string
   title: string
   description?: string
+  notes?: string
   status: string
   priority: number
   issue_type?: string
@@ -90,6 +91,7 @@ function transformIssue(raw: RawBeadsIssue) {
     id: raw.id,
     title: raw.title,
     description: raw.description,
+    notes: raw.notes,
     status: raw.status,
     priority: raw.priority,
     type: raw.issue_type,
@@ -177,6 +179,7 @@ export async function GET(
  *   - priority: Priority level (1-4)
  *   - title: New title
  *   - description: New description
+ *   - notes: Issue notes/comments
  *   - labels: Array of labels to set
  *   - assignee: Assignee name
  *   - estimate: Time estimate in minutes
@@ -189,7 +192,7 @@ export async function PATCH(
 
   try {
     const body = await request.json()
-    const { workspace, status, priority, title, description, labels, assignee, estimate } = body
+    const { workspace, status, priority, title, description, notes, labels, assignee, estimate } = body
 
     const cwd = validateWorkspace(workspace)
 
@@ -217,6 +220,9 @@ export async function PATCH(
     if (labels !== undefined) {
       // Replace all labels
       args.push("--set-labels", labels.join(",") || "")
+    }
+    if (notes !== undefined) {
+      args.push("--notes", notes)
     }
 
     // Add --json for structured output
