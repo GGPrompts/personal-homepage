@@ -12,7 +12,7 @@ import { MusicPlayerProvider } from "@/components/MusicPlayerProvider"
 import { AudioVisualizerProvider } from "@/components/AudioVisualizerProvider";
 import { WorkingDirProvider } from "@/components/WorkingDirProvider";
 import { PersistentMusicDrawer } from "@/components/PersistentMusicDrawer";
-import { AIDrawerProvider } from "@/components/ai/AIDrawerProvider";
+import { AIDrawerProvider } from "@/contexts/AIDrawerContext";
 import { AIDrawer } from "@/components/ai/AIDrawer";
 import { Toaster } from "sonner";
 

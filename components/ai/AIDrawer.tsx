@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   MessageSquare,
@@ -7,11 +8,12 @@ import {
   Minimize2,
   Maximize2,
   Bot,
-  Sparkles,
+  Plus,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { useAIDrawerSafe } from "./AIDrawerProvider"
+import { Conversation } from "./Conversation"
+import { ChatInput } from "./ChatInput"
+import { useAIDrawerOptional } from "@/contexts/AIDrawerContext"
 
 // ============================================================================
 // TYPES
@@ -37,21 +39,57 @@ const DRAWER_WIDTHS = {
 // ============================================================================
 
 export function AIDrawer({ className = "" }: AIDrawerProps) {
-  const context = useAIDrawerSafe()
+  const context = useAIDrawerOptional()
+  const [inputValue, setInputValue] = React.useState('')
 
   // Don't render if context is not available (outside provider)
   if (!context) return null
 
   const {
-    state,
-    close,
-    expand,
-    minimize,
-    toggle,
-    isOpen,
-    isExpanded,
-    hasActiveConversation,
+    // Drawer state
+    drawer,
+    openDrawer,
+    closeDrawer,
+    toggleDrawer,
+    minimizeDrawer,
+    restoreDrawer,
+    // Chat state
+    activeConv,
+    isTyping,
+    isStreaming,
+    availableModels,
+    sendMessage,
+    stopStreaming,
+    handleRegenerate,
+    handleFeedback,
+    createNewConversation,
+    messagesEndRef,
+    textareaRef,
   } = context
+
+  // Computed states
+  const isOpen = drawer.isOpen
+  const isExpanded = drawer.size !== 'collapsed'
+  const hasActiveConversation = activeConv?.messages?.length > 0
+
+  // Map drawer states for animation
+  const state = drawer.isMinimized ? 'minimized' : (drawer.isOpen ? 'expanded' : 'collapsed')
+
+  // Handle sending message
+  const handleSend = async () => {
+    if (!inputValue.trim()) return
+    const content = inputValue
+    setInputValue('')
+    await sendMessage(content)
+  }
+
+  // Quick actions for empty state
+  const quickActions = [
+    { label: "Explain this code", onClick: () => setInputValue("Explain this code:") },
+    { label: "Debug an error", onClick: () => setInputValue("Help me debug this error:") },
+    { label: "Write a function", onClick: () => setInputValue("Write a function that") },
+    { label: "Review my changes", onClick: () => setInputValue("Review these code changes:") },
+  ]
 
   return (
     <>
@@ -66,7 +104,7 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
           >
             <Button
               size="icon"
-              onClick={toggle}
+              onClick={toggleDrawer}
               className="h-14 w-14 rounded-full glass border-glow shadow-lg relative"
               data-tabz-action="toggle-ai-drawer"
               data-tabz-region="ai-drawer-toggle"
@@ -99,8 +137,8 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
             {state === "minimized" && (
               <MinimizedDrawer
                 hasActiveConversation={hasActiveConversation}
-                onExpand={expand}
-                onClose={close}
+                onExpand={restoreDrawer}
+                onClose={closeDrawer}
               />
             )}
 
@@ -108,8 +146,24 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
             {state === "expanded" && (
               <ExpandedDrawer
                 hasActiveConversation={hasActiveConversation}
-                onMinimize={minimize}
-                onClose={close}
+                onMinimize={minimizeDrawer}
+                onClose={closeDrawer}
+                onNewConversation={createNewConversation}
+                // Chat props
+                messages={activeConv?.messages || []}
+                isTyping={isTyping}
+                isStreaming={isStreaming}
+                availableModels={availableModels}
+                messagesEndRef={messagesEndRef}
+                quickActions={quickActions}
+                onRegenerate={handleRegenerate}
+                onFeedback={handleFeedback}
+                // Input props
+                inputValue={inputValue}
+                onInputChange={setInputValue}
+                onSend={handleSend}
+                onStop={stopStreaming}
+                textareaRef={textareaRef}
               />
             )}
           </motion.div>
@@ -198,12 +252,44 @@ interface ExpandedDrawerProps {
   hasActiveConversation: boolean
   onMinimize: () => void
   onClose: () => void
+  onNewConversation?: () => void
+  // Chat props
+  messages: import("@/lib/ai-workspace").Message[]
+  isTyping?: boolean
+  isStreaming?: boolean
+  availableModels?: import("@/lib/ai-workspace").ModelInfo[]
+  messagesEndRef?: React.RefObject<HTMLDivElement | null>
+  quickActions?: Array<{ label: string; onClick: () => void }>
+  onRegenerate?: () => void
+  onFeedback?: (messageId: string, type: 'up' | 'down') => void
+  // Input props
+  inputValue: string
+  onInputChange: (value: string) => void
+  onSend: () => void
+  onStop?: () => void
+  textareaRef?: React.RefObject<HTMLTextAreaElement | null>
 }
 
 function ExpandedDrawer({
   hasActiveConversation,
   onMinimize,
   onClose,
+  onNewConversation,
+  // Chat props
+  messages,
+  isTyping = false,
+  isStreaming = false,
+  availableModels,
+  messagesEndRef,
+  quickActions,
+  onRegenerate,
+  onFeedback,
+  // Input props
+  inputValue,
+  onInputChange,
+  onSend,
+  onStop,
+  textareaRef,
 }: ExpandedDrawerProps) {
   return (
     <div className="h-full glass-dark border-l border-border/40 flex flex-col">
@@ -221,6 +307,18 @@ function ExpandedDrawer({
           </div>
         </div>
         <div className="flex items-center gap-1">
+          {onNewConversation && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={onNewConversation}
+              title="New conversation"
+              data-tabz-action="new-conversation"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -242,58 +340,36 @@ function ExpandedDrawer({
         </div>
       </div>
 
-      {/* Chat content area - placeholder for now */}
-      <ScrollArea className="flex-1">
-        <div className="p-4">
-          {/* Empty state */}
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="p-4 rounded-full glass border-glow mb-4">
-              <Sparkles className="h-8 w-8 text-primary terminal-glow" />
-            </div>
-            <h4 className="text-lg font-semibold mb-2 terminal-glow">
-              How can I help?
-            </h4>
-            <p className="text-sm text-muted-foreground max-w-[280px]">
-              This is a placeholder for the AI chat interface.
-              Full chat functionality will be wired in a separate task.
-            </p>
+      {/* Chat content area */}
+      <Conversation
+        messages={messages}
+        isTyping={isTyping}
+        isStreaming={isStreaming}
+        availableModels={availableModels}
+        messagesEndRef={messagesEndRef}
+        onRegenerate={onRegenerate}
+        onFeedback={onFeedback}
+        quickActions={quickActions}
+        className="flex-1"
+      />
 
-            {/* Quick action suggestions */}
-            <div className="mt-6 space-y-2 w-full">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                Quick Actions
-              </p>
-              <div className="grid gap-2">
-                {[
-                  "Explain this code",
-                  "Debug an error",
-                  "Write a function",
-                  "Review my changes",
-                ].map((action, i) => (
-                  <button
-                    key={i}
-                    className="glass text-left text-sm px-3 py-2 rounded-lg hover:border-primary/50 hover:bg-primary/5 transition-colors"
-                    onClick={() => {
-                      // Placeholder - will be wired to chat logic
-                      console.log("Quick action:", action)
-                    }}
-                  >
-                    {action}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </ScrollArea>
-
-      {/* Input area - placeholder */}
+      {/* Input area */}
       <div className="p-3 border-t border-border/40 shrink-0">
-        <div className="glass rounded-lg px-3 py-2 text-sm text-muted-foreground">
-          <span className="opacity-70">
-            Chat input will be added in a separate task...
-          </span>
-        </div>
+        <ChatInput
+          value={inputValue}
+          onChange={onInputChange}
+          onSend={onSend}
+          onStop={onStop}
+          isStreaming={isStreaming}
+          isTyping={isTyping}
+          textareaRef={textareaRef}
+          placeholder="Ask me anything..."
+          showHint={false}
+          minHeight="40px"
+          maxHeight="100px"
+          dataTabzInput="ai-drawer-message"
+          dataTabzAction="submit-ai-drawer"
+        />
       </div>
     </div>
   )
@@ -312,23 +388,24 @@ interface AIDrawerToggleProps {
  * Use this in the global header
  */
 export function AIDrawerToggle({ className = "" }: AIDrawerToggleProps) {
-  const context = useAIDrawerSafe()
+  const context = useAIDrawerOptional()
 
   // Don't render if context is not available
   if (!context) return null
 
-  const { toggle, isOpen, hasActiveConversation } = context
+  const { drawer, toggleDrawer, activeConv } = context
+  const hasActiveConversation = activeConv?.messages?.length > 0
 
   return (
     <Button
-      variant={isOpen ? "secondary" : "ghost"}
+      variant={drawer.isOpen ? "secondary" : "ghost"}
       size="icon"
-      onClick={toggle}
+      onClick={toggleDrawer}
       className={`relative ${className}`}
       data-tabz-action="toggle-ai-drawer"
     >
       <MessageSquare className="h-5 w-5" />
-      {hasActiveConversation && !isOpen && (
+      {hasActiveConversation && !drawer.isOpen && (
         <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary animate-pulse" />
       )}
     </Button>
