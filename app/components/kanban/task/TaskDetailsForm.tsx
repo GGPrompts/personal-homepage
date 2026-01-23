@@ -108,7 +108,7 @@ export function TaskDetailsForm({ task, onUpdate, className }: TaskDetailsFormPr
         <Textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="bg-black/20 border-white/10 focus:border-emerald-500/50 text-zinc-100 min-h-[100px] resize-none"
+          className="bg-black/20 border-white/10 focus:border-emerald-500/50 text-zinc-100 min-h-[200px] max-h-[400px] resize-y"
           placeholder="Add a description..."
           data-tabz-input="task-description"
         />
