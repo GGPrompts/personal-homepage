@@ -16,12 +16,30 @@ import {
   Calendar,
   MessageSquare,
   Clock,
+  TestTube2,
+  Eye,
+  Code2,
+  FileCheck,
+  Hammer,
+  Shield,
 } from "lucide-react"
 import { Task, PRIORITY_COLORS } from "../types"
 import { useBoardStore } from "../lib/store"
 import { useGraphMetricsContextSafe } from "../contexts/GraphMetricsContext"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
+
+/**
+ * Gate label configuration - maps gate: prefixed labels to icons and display names
+ */
+const GATE_CONFIG: Record<string, { icon: React.ComponentType<{ className?: string }>, label: string, color: string }> = {
+  'test-runner': { icon: TestTube2, label: 'Tests', color: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400' },
+  'visual-qa': { icon: Eye, label: 'Visual', color: 'bg-violet-500/15 border-violet-500/30 text-violet-400' },
+  'codex-review': { icon: Code2, label: 'Review', color: 'bg-amber-500/15 border-amber-500/30 text-amber-400' },
+  'docs-check': { icon: FileCheck, label: 'Docs', color: 'bg-purple-500/15 border-purple-500/30 text-purple-400' },
+  'build': { icon: Hammer, label: 'Build', color: 'bg-orange-500/15 border-orange-500/30 text-orange-400' },
+  'security': { icon: Shield, label: 'Security', color: 'bg-red-500/15 border-red-500/30 text-red-400' },
+}
 
 /**
  * Format duration between two dates in a human-readable format
@@ -104,6 +122,18 @@ export function KanbanCard({ task, isOverlay = false, isDoneColumn = false, hasT
   const closeReason = task.beadsMetadata?.closeReason
   const closedAt = task.beadsMetadata?.closedAt ?? task.updatedAt
   const duration = closedAt && task.createdAt ? formatDuration(task.createdAt, closedAt) : null
+
+  // Gate labels - filter labels starting with "gate:" and map to config
+  const gateLabels = (task.labels ?? [])
+    .filter(label => label.startsWith('gate:'))
+    .map(label => {
+      const gateName = label.replace('gate:', '')
+      return { name: gateName, config: GATE_CONFIG[gateName] }
+    })
+    .filter(gate => gate.config) // Only show gates with known config
+
+  // Non-gate labels for regular display
+  const regularLabels = (task.labels ?? []).filter(label => !label.startsWith('gate:'))
 
   // Render overlay version (shown during drag)
   if (isOverlay) {
@@ -269,8 +299,8 @@ export function KanbanCard({ task, isOverlay = false, isDoneColumn = false, hasT
             </Badge>
           )}
 
-          {/* Labels */}
-          {task.labels.slice(0, 2).map((label) => (
+          {/* Labels (excluding gate: labels) */}
+          {regularLabels.slice(0, 2).map((label) => (
             <Badge
               key={label}
               variant="outline"
@@ -279,12 +309,34 @@ export function KanbanCard({ task, isOverlay = false, isDoneColumn = false, hasT
               {label}
             </Badge>
           ))}
-          {task.labels.length > 2 && (
+          {regularLabels.length > 2 && (
             <span className="text-[10px] text-zinc-500">
-              +{task.labels.length - 2}
+              +{regularLabels.length - 2}
             </span>
           )}
         </div>
+
+        {/* Gate labels */}
+        {gateLabels.length > 0 && (
+          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+            {gateLabels.map(({ name, config }) => {
+              const IconComponent = config.icon
+              return (
+                <div
+                  key={name}
+                  className={cn(
+                    "flex items-center gap-1 px-1.5 py-0.5 rounded border",
+                    config.color
+                  )}
+                  title={`Gate: ${name}`}
+                >
+                  <IconComponent className="h-3 w-3" />
+                  <span className="text-[10px] font-medium mono">{config.label}</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
 
         {/* Git indicator */}
         {task.git?.branch && (
