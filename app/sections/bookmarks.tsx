@@ -1267,7 +1267,7 @@ export default function BookmarksSection({
                       <Pencil className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="bg-popover/95 backdrop-blur-sm">
+                  <DropdownMenuContent align="end" className="bg-popover/95 backdrop-blur-sm">
                     <DropdownMenuItem onClick={() => openEditFolder(folder)}>
                       <Pencil className="h-4 w-4 mr-2" />
                       Edit
@@ -1375,7 +1375,7 @@ export default function BookmarksSection({
                       <Pencil className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-56 bg-popover/95 backdrop-blur-sm">
+                  <DropdownMenuContent align="end" className="w-56 bg-popover/95 backdrop-blur-sm">
                     {bookmark.type === "terminal" ? (
                       <>
                         {bookmark.command && (
