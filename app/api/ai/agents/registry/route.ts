@@ -1,18 +1,21 @@
 import { NextResponse } from 'next/server'
-import { SEED_AGENTS } from '@/lib/agents/seed-agents'
+import { loadAgentsFromFiles, getAgentsDirectoryPath } from '@/lib/agents/loader'
 import type { AgentCard } from '@/lib/agents/types'
 
 /**
  * GET /api/ai/agents/registry
- * Returns all registered agents from the seed agents and any stored agents
+ * Returns all registered agents loaded from the agents/ directory
  */
 export async function GET() {
   try {
-    // Convert seed agents to full AgentCard format with IDs and timestamps
+    // Load agents from file-based configuration
+    const agentInputs = await loadAgentsFromFiles()
+
+    // Convert to full AgentCard format with IDs and timestamps
     const now = new Date().toISOString()
-    const agents: AgentCard[] = SEED_AGENTS.map((agent, index) => ({
+    const agents: AgentCard[] = agentInputs.map((agent, index) => ({
       ...agent,
-      id: `seed-${agent.name.toLowerCase().replace(/\s+/g, '-')}-${index}`,
+      id: `file-${agent.name.toLowerCase().replace(/\s+/g, '-')}-${index}`,
       created_at: now,
       updated_at: now,
     }))
@@ -20,6 +23,7 @@ export async function GET() {
     return NextResponse.json({
       agents,
       total: agents.length,
+      agentsDirectory: getAgentsDirectoryPath(),
     })
   } catch (error) {
     console.error('Failed to fetch agent registry:', error)

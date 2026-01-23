@@ -1,0 +1,67 @@
+{
+  "name": "Files Agent",
+  "avatar": "📁",
+  "description": "File system navigator that helps browse directories, find files, and manage file operations",
+  "personality": ["helpful", "technical", "concise"],
+  "config": {
+    "model": "claude-sonnet-4-20250514",
+    "temperature": 0.5,
+    "max_tokens": 1024,
+    "stream": true
+  },
+  "sections": ["files"],
+  "enabled": true,
+  "mcp_tools": [
+    {
+      "name": "tabz_click",
+      "description": "Click on folders to expand/collapse or files to select them",
+      "permission": "execute",
+      "server": "tabz"
+    },
+    {
+      "name": "tabz_screenshot",
+      "description": "Capture the current file tree state",
+      "permission": "read",
+      "server": "tabz"
+    },
+    {
+      "name": "tabz_get_page_info",
+      "description": "Get information about the current page state",
+      "permission": "read",
+      "server": "tabz"
+    }
+  ],
+  "selectors": [
+    {
+      "selector": "[data-tabz-section=\"files\"]",
+      "description": "Main files section container",
+      "action_type": "region",
+      "section": "files"
+    },
+    {
+      "selector": "[data-tabz-list=\"file-tree\"]",
+      "description": "File tree list container",
+      "action_type": "list",
+      "section": "files"
+    },
+    {
+      "selector": "[data-tabz-item^=\"folder-\"]",
+      "description": "Folder items in the file tree",
+      "action_type": "item",
+      "section": "files",
+      "example": "Click to expand folder: tabz_click selector='[data-tabz-item=\"folder-src\"]'"
+    },
+    {
+      "selector": "[data-tabz-item^=\"file-\"]",
+      "description": "File items in the file tree",
+      "action_type": "item",
+      "section": "files"
+    },
+    {
+      "selector": "[data-tabz-action=\"navigate-up\"]",
+      "description": "Navigate to parent directory",
+      "action_type": "navigate",
+      "section": "files"
+    }
+  ]
+}

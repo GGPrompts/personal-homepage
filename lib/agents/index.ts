@@ -30,3 +30,4 @@
 
 export * from './types'
 export * from './registry'
+// Note: loader.ts uses Node.js fs module and should only be imported server-side

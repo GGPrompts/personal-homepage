@@ -17,7 +17,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
   MessageSquare, Bot, Plus, X, Trash2, Code, CheckCheck,
-  Sparkles, Clock, Cpu, FolderOpen,
+  Sparkles, Cpu, FolderOpen,
   Loader2, Search, Pencil, Gauge, AlertTriangle,
   Download, ArrowRight, Settings, ChevronDown, Users,
 } from "lucide-react"
@@ -968,6 +968,56 @@ export default function AIWorkspaceSection({
                   </div>
                 )}
               </div>
+
+              {/* Agent Configuration */}
+              <Collapsible className="space-y-3">
+                <CollapsibleTrigger className="flex items-center justify-between w-full">
+                  <Label className="flex items-center gap-2">
+                    <Bot className="h-3 w-3" />
+                    Agent Configuration
+                  </Label>
+                  <ChevronDown className="h-4 w-4" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-3 pt-2">
+                  <p className="text-xs text-muted-foreground">
+                    Agents are configured via files in the <code className="bg-muted px-1 rounded">agents/</code> directory.
+                    Each agent has a <code className="bg-muted px-1 rounded">CLAUDE.md</code> (system prompt) and <code className="bg-muted px-1 rounded">agent.json</code> (config).
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full glass"
+                    onClick={async () => {
+                      try {
+                        const res = await fetch('/api/ai/agents/directory')
+                        const data = await res.json()
+                        if (data.path) {
+                          // Try to open in file manager via API, fallback to showing path
+                          const openRes = await fetch('/api/system/open-folder', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ path: data.path }),
+                          })
+                          if (!openRes.ok) {
+                            // Fallback: copy path to clipboard
+                            await navigator.clipboard.writeText(data.path)
+                            alert(`Path copied to clipboard:\n${data.path}`)
+                          }
+                        }
+                      } catch (error) {
+                        console.error('Failed to open agents folder:', error)
+                      }
+                    }}
+                    data-tabz-action="open-agents-folder"
+                  >
+                    <FolderOpen className="h-3 w-3 mr-2" />
+                    Open Agents Folder
+                  </Button>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{agentRegistry?.agents?.length || 0} agents loaded</span>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
 
               {/* Temperature - Only for Docker models */}
               {selectedModel?.backend === 'docker' && (

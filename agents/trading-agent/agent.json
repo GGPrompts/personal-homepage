@@ -1,0 +1,69 @@
+{
+  "name": "Trading Assistant",
+  "avatar": "📈",
+  "description": "Stock trading assistant that helps with portfolio management, market analysis, and executing trades",
+  "personality": ["analytical", "concise", "technical", "helpful"],
+  "config": {
+    "model": "claude-sonnet-4-20250514",
+    "temperature": 0.3,
+    "max_tokens": 2048,
+    "stream": true
+  },
+  "sections": ["stocks"],
+  "enabled": true,
+  "mcp_tools": [
+    {
+      "name": "tabz_click",
+      "description": "Click buttons to buy/sell stocks or navigate the interface",
+      "permission": "execute",
+      "server": "tabz"
+    },
+    {
+      "name": "tabz_fill",
+      "description": "Fill in stock search and order quantity fields",
+      "permission": "write",
+      "server": "tabz"
+    },
+    {
+      "name": "tabz_screenshot",
+      "description": "Capture the current stocks display for analysis",
+      "permission": "read",
+      "server": "tabz"
+    },
+    {
+      "name": "tabz_get_page_info",
+      "description": "Get information about current stock prices and portfolio",
+      "permission": "read",
+      "server": "tabz"
+    }
+  ],
+  "selectors": [
+    {
+      "selector": "[data-tabz-section=\"stocks\"]",
+      "description": "Main stocks section container",
+      "action_type": "region",
+      "section": "stocks"
+    },
+    {
+      "selector": "[data-tabz-input=\"stock-search\"]",
+      "description": "Stock search input field",
+      "action_type": "input",
+      "section": "stocks",
+      "example": "Search for stock: tabz_fill selector='[data-tabz-input=\"stock-search\"]' value='AAPL'"
+    },
+    {
+      "selector": "[data-tabz-action=\"buy\"]",
+      "description": "Buy stock button",
+      "action_type": "click",
+      "section": "stocks",
+      "example": "Execute buy order: tabz_click selector='[data-tabz-action=\"buy\"]'"
+    },
+    {
+      "selector": "[data-tabz-action=\"sell\"]",
+      "description": "Sell stock button",
+      "action_type": "click",
+      "section": "stocks",
+      "example": "Execute sell order: tabz_click selector='[data-tabz-action=\"sell\"]'"
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "name": "Research Librarian",
+  "avatar": "📚",
+  "description": "Research assistant that helps find, organize, and manage bookmarks across personal and Chrome collections",
+  "personality": ["helpful", "detailed", "analytical", "concise"],
+  "config": {
+    "model": "claude-sonnet-4-20250514",
+    "temperature": 0.5,
+    "max_tokens": 1024,
+    "stream": true
+  },
+  "sections": ["bookmarks", "search-hub"],
+  "enabled": true,
+  "mcp_tools": [
+    {
+      "name": "tabz_click",
+      "description": "Click bookmarks to open them or navigate between views",
+      "permission": "execute",
+      "server": "tabz"
+    },
+    {
+      "name": "tabz_fill",
+      "description": "Fill in bookmark search fields",
+      "permission": "write",
+      "server": "tabz"
+    },
+    {
+      "name": "tabz_screenshot",
+      "description": "Capture the current bookmark view",
+      "permission": "read",
+      "server": "tabz"
+    },
+    {
+      "name": "tabz_get_page_info",
+      "description": "Get information about available bookmarks",
+      "permission": "read",
+      "server": "tabz"
+    }
+  ],
+  "selectors": [
+    {
+      "selector": "[data-tabz-section=\"bookmarks\"]",
+      "description": "Personal bookmarks section container",
+      "action_type": "region",
+      "section": "bookmarks"
+    },
+    {
+      "selector": "[data-tabz-list=\"bookmark-list\"]",
+      "description": "Personal bookmark list container",
+      "action_type": "list",
+      "section": "bookmarks"
+    },
+    {
+      "selector": "[data-tabz-item^=\"bookmark-\"]",
+      "description": "Individual bookmark items",
+      "action_type": "item",
+      "section": "bookmarks",
+      "example": "Click bookmark: tabz_click selector='[data-tabz-item=\"bookmark-0\"]'"
+    },
+    {
+      "selector": "[data-tabz-action=\"spawn-terminal\"]",
+      "description": "Run terminal bookmark command",
+      "action_type": "command",
+      "section": "bookmarks"
+    },
+    {
+      "selector": "[data-tabz-action=\"search-bookmarks\"]",
+      "description": "Switch to Chrome bookmarks tab",
+      "action_type": "navigate",
+      "section": "search-hub"
+    },
+    {
+      "selector": "[data-tabz-input=\"bookmark-search\"]",
+      "description": "Chrome bookmark search input",
+      "action_type": "input",
+      "section": "search-hub",
+      "example": "Search Chrome bookmarks: tabz_fill selector='[data-tabz-input=\"bookmark-search\"]' value='github'"
+    },
+    {
+      "selector": "[data-tabz-list=\"bookmark-results\"]",
+      "description": "Chrome bookmark search results container",
+      "action_type": "list",
+      "section": "search-hub"
+    },
+    {
+      "selector": "[data-tabz-action=\"open-bookmark\"]",
+      "description": "Open a bookmark in new tab",
+      "action_type": "click",
+      "section": "search-hub"
+    }
+  ]
+}

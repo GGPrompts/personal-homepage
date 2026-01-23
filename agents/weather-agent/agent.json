@@ -1,0 +1,43 @@
+{
+  "name": "Weather Agent",
+  "avatar": "🌤️",
+  "description": "Weather information assistant that helps with forecasts, conditions, and weather-related queries",
+  "personality": ["helpful", "concise", "friendly"],
+  "config": {
+    "model": "claude-sonnet-4-20250514",
+    "temperature": 0.7,
+    "max_tokens": 1024,
+    "stream": true
+  },
+  "sections": ["weather"],
+  "enabled": true,
+  "mcp_tools": [
+    {
+      "name": "tabz_click",
+      "description": "Click elements on the page to refresh data or navigate",
+      "permission": "execute",
+      "server": "tabz"
+    },
+    {
+      "name": "tabz_screenshot",
+      "description": "Capture the current weather display",
+      "permission": "read",
+      "server": "tabz"
+    }
+  ],
+  "selectors": [
+    {
+      "selector": "[data-tabz-section=\"weather\"]",
+      "description": "Main weather section container",
+      "action_type": "region",
+      "section": "weather"
+    },
+    {
+      "selector": "[data-tabz-action=\"refresh\"]",
+      "description": "Refresh weather data",
+      "action_type": "click",
+      "section": "weather",
+      "example": "Click to update weather: tabz_click selector='[data-tabz-action=\"refresh\"]'"
+    }
+  ]
+}
