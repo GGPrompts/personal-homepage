@@ -1,8 +1,9 @@
 "use client"
 
+import * as React from "react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import {
   GripVertical,
   GitBranch,
@@ -22,12 +23,23 @@ import {
   FileCheck,
   Hammer,
   Shield,
+  Wand2,
+  Loader2,
+  Save,
+  X,
+  RefreshCw,
 } from "lucide-react"
 import { Task, PRIORITY_COLORS } from "../types"
 import { useBoardStore } from "../lib/store"
 import { useGraphMetricsContextSafe } from "../contexts/GraphMetricsContext"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import {
+  usePromptGeneration,
+  extractPromptFromNotes,
+  PROMPT_SECTION_HEADER,
+} from "@/hooks/usePromptGeneration"
 
 /**
  * Gate label configuration - maps gate: prefixed labels to icons and display names
@@ -70,14 +82,136 @@ interface KanbanCardProps {
   isDoneColumn?: boolean
   /** Whether this task has a transcript available */
   hasTranscript?: boolean
+  /** Workspace path for beads API calls */
+  workspace?: string
+  /** Initial notes from beads (for detecting existing prompts) */
+  initialNotes?: string
 }
 
-export function KanbanCard({ task, isOverlay = false, isDoneColumn = false, hasTranscript = false }: KanbanCardProps) {
+export function KanbanCard({
+  task,
+  isOverlay = false,
+  isDoneColumn = false,
+  hasTranscript = false,
+  workspace,
+  initialNotes,
+}: KanbanCardProps) {
   const setSelectedTask = useBoardStore((state) => state.setSelectedTask)
   const graphMetrics = useGraphMetricsContextSafe()
 
   // Get graph-computed metrics for this task
   const taskMetrics = graphMetrics?.getMetrics(task.id)
+
+  // Prompt generation state
+  const [isEditingPrompt, setIsEditingPrompt] = React.useState(false)
+  const [promptDraft, setPromptDraft] = React.useState("")
+  const [savedPrompt, setSavedPrompt] = React.useState<string | null>(() =>
+    extractPromptFromNotes(initialNotes)
+  )
+  const [currentNotes, setCurrentNotes] = React.useState(initialNotes || "")
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = React.useState(false)
+
+  const {
+    generatePrompt,
+    savePrompt,
+    isGenerating,
+    isSaving,
+    error: promptError,
+    clearError,
+  } = usePromptGeneration({ workspace })
+
+  // Check if task has a saved prompt
+  const hasPrompt = savedPrompt !== null
+
+  // Handle generate prompt click
+  const handleGenerateClick = React.useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation()
+      clearError()
+
+      // If already has prompt, show confirmation
+      if (hasPrompt && !showRegenerateConfirm) {
+        setShowRegenerateConfirm(true)
+        return
+      }
+
+      setShowRegenerateConfirm(false)
+
+      // First, fetch current notes if we don't have them
+      if (!currentNotes && workspace) {
+        try {
+          const res = await fetch(
+            `/api/beads/issues/${encodeURIComponent(task.id)}?workspace=${encodeURIComponent(workspace)}`
+          )
+          if (res.ok) {
+            const data = await res.json()
+            if (data.issue?.notes) {
+              setCurrentNotes(data.issue.notes)
+            }
+          }
+        } catch {
+          // Continue even if fetch fails
+        }
+      }
+
+      const prompt = await generatePrompt(task.id)
+      if (prompt) {
+        setPromptDraft(prompt)
+        setIsEditingPrompt(true)
+      }
+    },
+    [
+      task.id,
+      hasPrompt,
+      showRegenerateConfirm,
+      currentNotes,
+      workspace,
+      generatePrompt,
+      clearError,
+    ]
+  )
+
+  // Handle save prompt
+  const handleSavePrompt = React.useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation()
+      const success = await savePrompt(task.id, promptDraft, currentNotes)
+      if (success) {
+        setSavedPrompt(promptDraft)
+        setIsEditingPrompt(false)
+        // Update current notes with the new prompt
+        const headerIndex = currentNotes.indexOf(PROMPT_SECTION_HEADER)
+        if (headerIndex === -1) {
+          setCurrentNotes(
+            currentNotes.trim()
+              ? `${currentNotes.trim()}\n\n${PROMPT_SECTION_HEADER}\n\n${promptDraft.trim()}`
+              : `${PROMPT_SECTION_HEADER}\n\n${promptDraft.trim()}`
+          )
+        }
+      }
+    },
+    [task.id, promptDraft, currentNotes, savePrompt]
+  )
+
+  // Handle cancel edit
+  const handleCancelEdit = React.useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsEditingPrompt(false)
+    setPromptDraft("")
+    setShowRegenerateConfirm(false)
+  }, [])
+
+  // Handle edit existing prompt
+  const handleEditPrompt = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      if (savedPrompt) {
+        setPromptDraft(savedPrompt)
+        setIsEditingPrompt(true)
+      }
+    },
+    [savedPrompt]
+  )
 
   const {
     attributes,
@@ -380,6 +514,172 @@ export function KanbanCard({ task, isOverlay = false, isDoneColumn = false, hasT
         {task.estimate && !isDoneColumn && (
           <div className="text-[10px] text-zinc-600 mt-1.5 mono">
             Est: {task.estimate}
+          </div>
+        )}
+
+        {/* Prompt Generation UI - hidden in done column and overlays */}
+        {!isDoneColumn && !isOverlay && (
+          <div className="mt-2">
+            {/* Inline Prompt Editor */}
+            <AnimatePresence mode="wait">
+              {isEditingPrompt && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="border border-zinc-700/50 rounded-md bg-zinc-900/50 p-2"
+                  onClick={(e) => e.stopPropagation()}
+                  data-tabz-region="prompt-editor"
+                >
+                  <textarea
+                    value={promptDraft}
+                    onChange={(e) => setPromptDraft(e.target.value)}
+                    className="w-full h-24 text-xs bg-transparent text-zinc-200 border-0 resize-none focus:outline-none focus:ring-0 placeholder:text-zinc-600 mono"
+                    placeholder="Generated prompt will appear here..."
+                    data-tabz-input="prompt-editor"
+                  />
+                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-zinc-800/50">
+                    {promptError && (
+                      <span className="text-[10px] text-red-400 truncate max-w-[60%]">
+                        {promptError}
+                      </span>
+                    )}
+                    <div className="flex items-center gap-1 ml-auto">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleCancelEdit}
+                        className="h-6 px-2 text-[10px] text-zinc-400 hover:text-zinc-200"
+                        data-tabz-action="cancel-prompt"
+                      >
+                        <X className="h-3 w-3 mr-1" />
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={handleSavePrompt}
+                        disabled={isSaving || !promptDraft.trim()}
+                        className="h-6 px-2 text-[10px] bg-cyan-600 hover:bg-cyan-500"
+                        data-tabz-action="save-prompt"
+                      >
+                        {isSaving ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <Save className="h-3 w-3 mr-1" />
+                        )}
+                        Save
+                      </Button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Regenerate Confirmation */}
+            <AnimatePresence mode="wait">
+              {showRegenerateConfirm && !isEditingPrompt && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.1 }}
+                  className="flex items-center gap-2 p-2 mt-1 border border-amber-500/30 rounded-md bg-amber-500/10"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="text-[10px] text-amber-400">
+                    Regenerate? Existing prompt will be replaced.
+                  </span>
+                  <div className="flex items-center gap-1 ml-auto">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setShowRegenerateConfirm(false)
+                      }}
+                      className="h-5 px-2 text-[10px] text-zinc-400"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={handleGenerateClick}
+                      disabled={isGenerating}
+                      className="h-5 px-2 text-[10px] bg-amber-600 hover:bg-amber-500"
+                    >
+                      {isGenerating ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        "Regenerate"
+                      )}
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Prompt Status / Generate Button */}
+            {!isEditingPrompt && !showRegenerateConfirm && (
+              <div className="flex items-center gap-1.5 mt-1">
+                {hasPrompt ? (
+                  // Has saved prompt - show indicator and edit/regenerate buttons
+                  <>
+                    <div
+                      className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30 cursor-pointer hover:bg-cyan-500/25 transition-colors"
+                      onClick={handleEditPrompt}
+                      title="Click to edit prompt"
+                      data-tabz-action="edit-prompt"
+                    >
+                      <FileText className="h-3 w-3 text-cyan-400" />
+                      <span className="text-[10px] font-medium text-cyan-400 mono">
+                        Has Prompt
+                      </span>
+                    </div>
+                    <button
+                      onClick={handleGenerateClick}
+                      disabled={isGenerating}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-zinc-700/50"
+                      title="Regenerate prompt"
+                      data-tabz-action="regenerate-prompt"
+                    >
+                      {isGenerating ? (
+                        <Loader2 className="h-3 w-3 text-zinc-400 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3 w-3 text-zinc-500 hover:text-zinc-300" />
+                      )}
+                    </button>
+                  </>
+                ) : (
+                  // No prompt - show generate button on hover
+                  <button
+                    onClick={handleGenerateClick}
+                    disabled={isGenerating}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 px-1.5 py-0.5 rounded bg-zinc-800/50 hover:bg-zinc-700/50 border border-zinc-700/30 hover:border-zinc-600/50"
+                    title="Generate worker prompt"
+                    data-tabz-action="generate-prompt"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="h-3 w-3 text-violet-400 animate-spin" />
+                        <span className="text-[10px] text-zinc-400 mono">
+                          Generating...
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="h-3 w-3 text-violet-400" />
+                        <span className="text-[10px] text-zinc-400 mono">
+                          Generate Prompt
+                        </span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

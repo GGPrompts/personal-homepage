@@ -24,6 +24,8 @@ interface KanbanColumnProps {
   hasTranscript?: (taskId: string) => boolean
   /** Column description for tooltip */
   description?: string
+  /** Workspace path for beads API calls */
+  workspace?: string
 }
 
 export function KanbanColumn({
@@ -32,6 +34,7 @@ export function KanbanColumn({
   isDoneColumn = false,
   hasTranscript,
   description,
+  workspace,
 }: KanbanColumnProps) {
   // Droppable for receiving tasks
   const { setNodeRef, isOver } = useDroppable({
@@ -126,6 +129,7 @@ export function KanbanColumn({
                       task={task}
                       isDoneColumn={isDoneColumn}
                       hasTranscript={hasTranscript?.(task.id)}
+                      workspace={workspace}
                     />
                   ))
                 )}

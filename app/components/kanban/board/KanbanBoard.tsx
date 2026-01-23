@@ -341,6 +341,7 @@ export function KanbanBoard({ workspace }: KanbanBoardProps) {
                       isDoneColumn={isDoneColumn}
                       hasTranscript={hasTranscript}
                       description={column.description}
+                      workspace={workspace}
                     />
                   )
                 })}
