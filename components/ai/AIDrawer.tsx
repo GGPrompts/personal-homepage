@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
 import {
   MessageSquare,
   X,
@@ -47,11 +47,102 @@ const DRAWER_WIDTHS = {
 } as const
 
 // ============================================================================
+// ANIMATION VARIANTS
+// ============================================================================
+
+// Snappy spring for drawer movement
+const drawerSpring = {
+  type: "spring" as const,
+  stiffness: 400,
+  damping: 35,
+  mass: 0.8,
+}
+
+// Quick transition for micro-interactions
+const quickTransition = {
+  duration: 0.15,
+  ease: [0.4, 0, 0.2, 1] as const,
+}
+
+// FAB button variants
+const fabVariants = {
+  hidden: {
+    opacity: 0,
+    scale: 0.6,
+    y: 20,
+  },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: {
+      ...drawerSpring,
+      stiffness: 500,
+      damping: 30,
+    },
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.6,
+    y: 20,
+    transition: quickTransition,
+  },
+  tap: {
+    scale: 0.92,
+  },
+  hover: {
+    scale: 1.05,
+  },
+}
+
+// Backdrop variants
+const backdropVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { duration: 0.2 },
+  },
+  exit: {
+    opacity: 0,
+    transition: { duration: 0.15 },
+  },
+}
+
+// Panel variants for reduced motion
+const panelVariantsReduced = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.15 } },
+  exit: { opacity: 0, transition: { duration: 0.1 } },
+}
+
+// Staggered quick action variants
+const quickActionsContainerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+      delayChildren: 0.1,
+    },
+  },
+}
+
+const quickActionItemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: "spring" as const, stiffness: 400, damping: 30 },
+  },
+}
+
+// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
 export function AIDrawer({ className = "" }: AIDrawerProps) {
   const context = useAIDrawerSafe()
+  const shouldReduceMotion = useReducedMotion()
   const { user, getGitHubToken } = useAuth()
   const userAvatarUrl = user?.user_metadata?.avatar_url || null
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
@@ -164,64 +255,107 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
   return (
     <>
       {/* Floating toggle button - visible when drawer is collapsed */}
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {state === "collapsed" && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
+            variants={fabVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            whileHover={shouldReduceMotion ? undefined : "hover"}
+            whileTap={shouldReduceMotion ? undefined : "tap"}
             className="fixed bottom-24 right-4 z-40"
           >
             <Button
               size="icon"
               onClick={toggle}
-              className="h-14 w-14 rounded-full glass border-glow shadow-lg relative"
+              className="h-14 w-14 rounded-full glass border-glow shadow-lg relative transition-shadow hover:shadow-xl hover:shadow-primary/20"
               data-tabz-action="toggle-ai-drawer"
               data-tabz-region="ai-drawer-toggle"
             >
               <MessageSquare className="h-6 w-6" />
               {hasActiveConversation && (
-                <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-primary animate-pulse" />
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-primary"
+                >
+                  <span className="absolute inset-0 rounded-full bg-primary animate-ping opacity-75" />
+                </motion.span>
               )}
             </Button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Main drawer panel */}
+      {/* Backdrop overlay for expanded state (mobile) */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ x: DRAWER_WIDTHS.expanded, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: DRAWER_WIDTHS.expanded, opacity: 0 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            variants={backdropVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm md:hidden"
+            onClick={close}
+            aria-hidden="true"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Main drawer panel */}
+      <AnimatePresence mode="wait">
+        {isOpen && (
+          <motion.div
+            initial={shouldReduceMotion
+              ? panelVariantsReduced.hidden
+              : { x: DRAWER_WIDTHS.expanded, opacity: 0 }
+            }
+            animate={shouldReduceMotion
+              ? panelVariantsReduced.visible
+              : { x: 0, opacity: 1, width: isExpanded ? DRAWER_WIDTHS.expanded : DRAWER_WIDTHS.minimized }
+            }
+            exit={shouldReduceMotion
+              ? panelVariantsReduced.exit
+              : { x: DRAWER_WIDTHS.expanded, opacity: 0 }
+            }
+            transition={shouldReduceMotion ? quickTransition : drawerSpring}
             className={`fixed top-0 right-0 bottom-0 z-50 flex flex-col ${className}`}
-            style={{
-              width: isExpanded ? DRAWER_WIDTHS.expanded : DRAWER_WIDTHS.minimized,
-            }}
+            style={shouldReduceMotion ? { width: isExpanded ? DRAWER_WIDTHS.expanded : DRAWER_WIDTHS.minimized } : undefined}
             data-tabz-region="ai-drawer"
             data-tabz-section="ai-drawer"
           >
-            {/* Minimized state - just a header bar */}
-            {state === "minimized" && (
-              <MinimizedDrawer
-                hasActiveConversation={hasActiveConversation}
-                onExpand={expand}
-                onClose={close}
-                isGenerating={isTyping || isStreaming}
-              />
-            )}
+            <AnimatePresence mode="wait">
+              {/* Minimized state - just a header bar */}
+              {state === "minimized" && (
+                <MinimizedDrawer
+                  hasActiveConversation={hasActiveConversation}
+                  onExpand={expand}
+                  onClose={close}
+                  isGenerating={isTyping || isStreaming}
+                />
+              )}
 
-            {/* Expanded state - full chat interface */}
-            {state === "expanded" && (
-              <div className="h-full glass-dark border-l border-border/40 flex flex-col">
+              {/* Expanded state - full chat interface */}
+              {state === "expanded" && (
+              <motion.div
+                key="expanded"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={quickTransition}
+                className="h-full glass-dark border-l border-border/40 flex flex-col"
+              >
                 {/* Header */}
                 <div className="p-3 border-b border-border/40 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="p-1.5 rounded-lg bg-primary/10 border border-primary/20 shrink-0">
+                    <motion.div
+                      className="p-1.5 rounded-lg bg-primary/10 border border-primary/20 shrink-0"
+                      whileHover={shouldReduceMotion ? undefined : { scale: 1.05 }}
+                      whileTap={shouldReduceMotion ? undefined : { scale: 0.95 }}
+                    >
                       <Bot className="h-4 w-4 text-primary terminal-glow" />
-                    </div>
+                    </motion.div>
                     <div className="min-w-0">
                       <h3 className="text-sm font-semibold terminal-glow truncate">
                         {activeConv.title.length > 20 ? activeConv.title.slice(0, 20) + '...' : activeConv.title}
@@ -247,15 +381,17 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={createNewConversation}
-                            data-tabz-action="new-conversation"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
+                          <motion.div whileHover={shouldReduceMotion ? undefined : { scale: 1.1 }} whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 transition-colors hover:bg-primary/20 hover:text-primary"
+                              onClick={createNewConversation}
+                              data-tabz-action="new-conversation"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </motion.div>
                         </TooltipTrigger>
                         <TooltipContent>New conversation</TooltipContent>
                       </Tooltip>
@@ -263,14 +399,16 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button
-                            variant={showConversations ? 'secondary' : 'ghost'}
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => setShowConversations(!showConversations)}
-                          >
-                            <MessageSquare className="h-4 w-4" />
-                          </Button>
+                          <motion.div whileHover={shouldReduceMotion ? undefined : { scale: 1.1 }} whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}>
+                            <Button
+                              variant={showConversations ? 'secondary' : 'ghost'}
+                              size="icon"
+                              className="h-7 w-7 transition-colors hover:bg-primary/20 hover:text-primary"
+                              onClick={() => setShowConversations(!showConversations)}
+                            >
+                              <MessageSquare className="h-4 w-4" />
+                            </Button>
+                          </motion.div>
                         </TooltipTrigger>
                         <TooltipContent>Conversations</TooltipContent>
                       </Tooltip>
@@ -278,36 +416,42 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button
-                            variant={showSettings ? 'secondary' : 'ghost'}
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => setShowSettings(!showSettings)}
-                          >
-                            <Settings className="h-4 w-4" />
-                          </Button>
+                          <motion.div whileHover={shouldReduceMotion ? undefined : { scale: 1.1 }} whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}>
+                            <Button
+                              variant={showSettings ? 'secondary' : 'ghost'}
+                              size="icon"
+                              className="h-7 w-7 transition-colors hover:bg-primary/20 hover:text-primary"
+                              onClick={() => setShowSettings(!showSettings)}
+                            >
+                              <Settings className="h-4 w-4" />
+                            </Button>
+                          </motion.div>
                         </TooltipTrigger>
                         <TooltipContent>Settings</TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={minimize}
-                      data-tabz-action="minimize-ai-drawer"
-                    >
-                      <Minimize2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={close}
-                      data-tabz-action="close-ai-drawer"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                    <motion.div whileHover={shouldReduceMotion ? undefined : { scale: 1.1 }} whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 transition-colors hover:bg-primary/20 hover:text-primary"
+                        onClick={minimize}
+                        data-tabz-action="minimize-ai-drawer"
+                      >
+                        <Minimize2 className="h-4 w-4" />
+                      </Button>
+                    </motion.div>
+                    <motion.div whileHover={shouldReduceMotion ? undefined : { scale: 1.1 }} whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 transition-colors hover:bg-destructive/20 hover:text-destructive"
+                        onClick={close}
+                        data-tabz-action="close-ai-drawer"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </motion.div>
                   </div>
                 </div>
 
@@ -454,10 +598,21 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                   <div className="p-3 space-y-3">
                     {activeConv.messages.length === 0 ? (
                       /* Empty state */
-                      <div className="flex flex-col items-center justify-center py-8 text-center">
-                        <div className="p-3 rounded-full glass border-glow mb-3">
+                      <motion.div
+                        className="flex flex-col items-center justify-center py-8 text-center"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                      >
+                        <motion.div
+                          className="p-3 rounded-full glass border-glow mb-3"
+                          initial={{ scale: 0.8, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          transition={{ delay: 0.1, type: "spring", stiffness: 400, damping: 20 }}
+                          whileHover={shouldReduceMotion ? undefined : { scale: 1.05, boxShadow: "0 0 30px hsl(var(--primary) / 0.4)" }}
+                        >
                           <Sparkles className="h-6 w-6 text-primary terminal-glow" />
-                        </div>
+                        </motion.div>
                         <h4 className="text-sm font-semibold mb-1 terminal-glow">
                           How can I help?
                         </h4>
@@ -470,24 +625,32 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                           <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
                             Quick Actions
                           </p>
-                          <div className="grid gap-1.5">
+                          <motion.div
+                            className="grid gap-1.5"
+                            variants={quickActionsContainerVariants}
+                            initial="hidden"
+                            animate="visible"
+                          >
                             {[
                               "Explain this code",
                               "Debug an error",
                               "Write a function",
                               "Review my changes",
                             ].map((action, i) => (
-                              <button
+                              <motion.button
                                 key={i}
+                                variants={quickActionItemVariants}
+                                whileHover={shouldReduceMotion ? undefined : { scale: 1.02, x: 4 }}
+                                whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
                                 className="glass text-left text-xs px-3 py-2 rounded-lg hover:border-primary/50 hover:bg-primary/5 transition-colors"
                                 onClick={() => handleQuickAction(action)}
                               >
                                 {action}
-                              </button>
+                              </motion.button>
                             ))}
-                          </div>
+                          </motion.div>
                         </div>
-                      </div>
+                      </motion.div>
                     ) : (
                       <>
                         {activeConv.messages.map(message => (
@@ -529,8 +692,9 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                     className="text-sm"
                   />
                 </div>
-              </div>
+              </motion.div>
             )}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>
@@ -556,13 +720,24 @@ function MinimizedDrawer({
   isGenerating = false,
 }: MinimizedDrawerProps) {
   return (
-    <div className="h-full glass-dark border-l border-border/40 flex flex-col">
+    <motion.div
+      key="minimized"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={quickTransition}
+      className="h-full glass-dark border-l border-border/40 flex flex-col"
+    >
       {/* Header */}
       <div className="p-3 border-b border-border/40 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-primary/10 border border-primary/20">
+          <motion.div
+            className="p-1.5 rounded-lg bg-primary/10 border border-primary/20"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
             <Bot className="h-4 w-4 text-primary terminal-glow" />
-          </div>
+          </motion.div>
           <div>
             <h3 className="text-sm font-semibold terminal-glow">AI Chat</h3>
             {isGenerating ? (
@@ -581,43 +756,53 @@ function MinimizedDrawer({
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={onExpand}
-            data-tabz-action="expand-ai-drawer"
-          >
-            <Maximize2 className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={onClose}
-            data-tabz-action="close-ai-drawer"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 transition-colors hover:bg-primary/20 hover:text-primary"
+              onClick={onExpand}
+              data-tabz-action="expand-ai-drawer"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </Button>
+          </motion.div>
+          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 transition-colors hover:bg-destructive/20 hover:text-destructive"
+              onClick={onClose}
+              data-tabz-action="close-ai-drawer"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </motion.div>
         </div>
       </div>
 
       {/* Click to expand area */}
-      <button
-        className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-4 hover:bg-primary/5 transition-colors"
+      <motion.button
+        className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-4 transition-colors"
         onClick={onExpand}
+        whileHover={{ backgroundColor: "hsl(var(--primary) / 0.05)" }}
+        whileTap={{ scale: 0.98 }}
       >
-        <div className="p-3 rounded-full glass">
+        <motion.div
+          className="p-3 rounded-full glass"
+          whileHover={{ scale: 1.05, boxShadow: "0 0 20px hsl(var(--primary) / 0.3)" }}
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        >
           <MessageSquare className="h-6 w-6 text-primary" />
-        </div>
+        </motion.div>
         <div>
           <p className="text-sm font-medium">Click to expand</p>
           <p className="text-xs text-muted-foreground">
             Chat with AI assistants
           </p>
         </div>
-      </button>
-    </div>
+      </motion.button>
+    </motion.div>
   )
 }
 
