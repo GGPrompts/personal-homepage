@@ -100,6 +100,7 @@ import { MusicPlayerSection } from "./sections/music-player"
 import dynamic from "next/dynamic"
 import { useLoginTrigger } from "@/hooks/useLoginTrigger"
 import { useMusicPlayerSafe } from "@/components/MusicPlayerProvider"
+import { AIDrawerToggle } from "@/components/ai/AIDrawer"
 
 // Lazy-loaded sections
 const VideoPlayerSection = dynamic(() => import("./sections/video-player"), {
@@ -977,18 +978,20 @@ export default function PersonalHomepage() {
   return (
     <TooltipProvider>
       <div className="min-h-screen relative z-10">
-        {/* Mobile Menu Button */}
-        <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-          <SheetTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="fixed top-4 left-4 z-50 lg:hidden glass"
-              data-tabz-action="toggle-mobile-menu"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
+        {/* Mobile Header Buttons */}
+        <div className="fixed top-4 left-4 right-4 z-50 lg:hidden flex justify-between pointer-events-none">
+          {/* Mobile Menu Button */}
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="glass pointer-events-auto"
+                data-tabz-action="toggle-mobile-menu"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
           <SheetContent side="left" className="w-72 glass-dark border-r-border/20 p-0" data-tabz-container="mobile-sidebar">
             <VisuallyHidden>
               <SheetTitle>Navigation Menu</SheetTitle>
@@ -1017,7 +1020,11 @@ export default function PersonalHomepage() {
               clearWorkingDir={clearWorkingDir}
             />
           </SheetContent>
-        </Sheet>
+          </Sheet>
+
+          {/* AI Drawer Toggle - mobile */}
+          <AIDrawerToggle className="glass pointer-events-auto" />
+        </div>
 
         <div className="flex h-screen">
           {/* Desktop Sidebar */}
