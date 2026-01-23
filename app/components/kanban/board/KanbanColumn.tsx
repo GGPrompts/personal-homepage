@@ -1,25 +1,19 @@
 'use client'
 
-import { useState, useMemo } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Info, ChevronDown } from 'lucide-react'
+import { Info } from 'lucide-react'
 import { Column, Task } from '../types'
 import { cn } from '@/lib/utils'
 import { KanbanCard } from './KanbanCard'
-import { Button } from '@/components/ui/button'
+import { DoneList } from './DoneList'
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-
-/** Number of items to show initially in Done column for performance */
-const DONE_COLUMN_INITIAL_ITEMS = 20
-/** Number of items to load when clicking "Show more" */
-const DONE_COLUMN_LOAD_MORE_COUNT = 30
 
 interface KanbanColumnProps {
   column: Column
@@ -48,27 +42,7 @@ export function KanbanColumn({
     },
   })
 
-  // Performance optimization: limit visible items in Done column
-  const [visibleCount, setVisibleCount] = useState(DONE_COLUMN_INITIAL_ITEMS)
-
-  // Determine which tasks to render (all for normal columns, limited for Done)
-  const { visibleTasks, hasMore, hiddenCount } = useMemo(() => {
-    if (!isDoneColumn || tasks.length <= DONE_COLUMN_INITIAL_ITEMS) {
-      return { visibleTasks: tasks, hasMore: false, hiddenCount: 0 }
-    }
-    const visible = tasks.slice(0, visibleCount)
-    return {
-      visibleTasks: visible,
-      hasMore: visibleCount < tasks.length,
-      hiddenCount: tasks.length - visibleCount,
-    }
-  }, [tasks, visibleCount, isDoneColumn])
-
-  const handleShowMore = () => {
-    setVisibleCount((prev) => Math.min(prev + DONE_COLUMN_LOAD_MORE_COUNT, tasks.length))
-  }
-
-  const taskIds = visibleTasks.map((task) => task.id)
+  const taskIds = tasks.map((task) => task.id)
 
   // Column color indicator (extract color from class)
   const colorClass = column.color || 'border-t-zinc-500'
@@ -137,37 +111,26 @@ export function KanbanColumn({
 
         <div className="flex-1 min-h-0 overflow-y-auto scrollbar-visible">
           <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
-            <div className="p-2 pb-4 space-y-2">
-              {tasks.length === 0 ? (
-                <div className="text-center py-12 text-zinc-600 text-xs mono">
-                  <p>No issues</p>
-                </div>
-              ) : (
-                <>
-                  {visibleTasks.map((task) => (
+            {isDoneColumn ? (
+              <DoneList tasks={tasks} hasTranscript={hasTranscript} />
+            ) : (
+              <div className="p-2 pb-4 space-y-2">
+                {tasks.length === 0 ? (
+                  <div className="text-center py-12 text-zinc-600 text-xs mono">
+                    <p>No issues</p>
+                  </div>
+                ) : (
+                  tasks.map((task) => (
                     <KanbanCard
                       key={task.id}
                       task={task}
                       isDoneColumn={isDoneColumn}
                       hasTranscript={hasTranscript?.(task.id)}
                     />
-                  ))}
-                  {/* Show more button for Done column with many items */}
-                  {isDoneColumn && hasMore && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleShowMore}
-                      className="w-full mt-2 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                    >
-                      <ChevronDown className="h-4 w-4 mr-2" />
-                      Show {Math.min(DONE_COLUMN_LOAD_MORE_COUNT, hiddenCount)} more
-                      <span className="ml-1 text-zinc-600">({hiddenCount} hidden)</span>
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
+                  ))
+                )}
+              </div>
+            )}
           </SortableContext>
         </div>
       </div>
