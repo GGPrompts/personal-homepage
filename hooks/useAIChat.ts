@@ -107,16 +107,16 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null)
   const abortControllerRef = React.useRef<AbortController | null>(null)
 
-  // Fallback conversation for SSR or empty state
-  const fallbackConv: Conversation = React.useMemo(() => ({
-    id: activeConvId,
+  // Default conversation for SSR when conversations array is empty
+  const defaultConv: Conversation = React.useMemo(() => ({
+    id: generateId(),
     title: 'New Conversation',
     messages: [],
     createdAt: new Date(),
     updatedAt: new Date(),
-  }), [activeConvId])
+  }), [])
 
-  const activeConv = conversations.find(c => c.id === activeConvId) || conversations[0] || fallbackConv
+  const activeConv = conversations.find(c => c.id === activeConvId) || conversations[0] || defaultConv
 
   // ============================================================================
   // EFFECTS

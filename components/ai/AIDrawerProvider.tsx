@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { createContext, useContext, useState, useCallback, useEffect } from "react"
+import { useAIChat, type UseAIChatReturn } from "@/hooks/useAIChat"
 
 // ============================================================================
 // TYPES
@@ -9,7 +10,7 @@ import { createContext, useContext, useState, useCallback, useEffect } from "rea
 
 export type AIDrawerState = "collapsed" | "minimized" | "expanded"
 
-export interface AIDrawerContextType {
+export interface AIDrawerContextType extends UseAIChatReturn {
   /** Current drawer state: collapsed (hidden), minimized (header bar), expanded (full chat) */
   state: AIDrawerState
   /** Open the drawer (to minimized state by default) */
@@ -30,6 +31,16 @@ export interface AIDrawerContextType {
   hasActiveConversation: boolean
   /** Set whether there's an active conversation (for indicator) */
   setHasActiveConversation: (value: boolean) => void
+  /** Open drawer and send a message */
+  openWithMessage: (content: string, options?: { projectPath?: string | null }) => Promise<void>
+  /** Input value for the chat */
+  inputValue: string
+  /** Set input value */
+  setInputValue: (value: string) => void
+  /** Selected project path for context */
+  selectedProjectPath: string | null
+  /** Set selected project path */
+  setSelectedProjectPath: (path: string | null) => void
 }
 
 const AIDrawerContext = createContext<AIDrawerContextType | null>(null)
@@ -64,6 +75,7 @@ export function useAIDrawerSafe() {
 
 const STORAGE_KEY_STATE = "ai-drawer-state"
 const STORAGE_KEY_HAS_CONVERSATION = "ai-drawer-has-conversation"
+const STORAGE_KEY_PROJECT_PATH = "ai-drawer-project-path"
 
 // ============================================================================
 // PROVIDER
@@ -79,6 +91,9 @@ export function AIDrawerProvider({
   children,
   defaultState = "collapsed",
 }: AIDrawerProviderProps) {
+  // Use the chat hook for all chat functionality
+  const chat = useAIChat()
+
   // Load initial state from localStorage
   const [state, setState] = useState<AIDrawerState>(() => {
     if (typeof window === "undefined") return defaultState
@@ -94,6 +109,15 @@ export function AIDrawerProvider({
     return localStorage.getItem(STORAGE_KEY_HAS_CONVERSATION) === "true"
   })
 
+  // Input state for the drawer
+  const [inputValue, setInputValue] = useState("")
+
+  // Project path state
+  const [selectedProjectPath, setSelectedProjectPath] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null
+    return localStorage.getItem(STORAGE_KEY_PROJECT_PATH)
+  })
+
   // Persist state changes to localStorage
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_STATE, state)
@@ -102,6 +126,20 @@ export function AIDrawerProvider({
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_HAS_CONVERSATION, String(hasActiveConversation))
   }, [hasActiveConversation])
+
+  useEffect(() => {
+    if (selectedProjectPath) {
+      localStorage.setItem(STORAGE_KEY_PROJECT_PATH, selectedProjectPath)
+    } else {
+      localStorage.removeItem(STORAGE_KEY_PROJECT_PATH)
+    }
+  }, [selectedProjectPath])
+
+  // Update hasActiveConversation based on chat state
+  useEffect(() => {
+    const hasMessages = chat.activeConv.messages.length > 0
+    setHasActiveConversation(hasMessages)
+  }, [chat.activeConv.messages.length])
 
   // Derived states
   const isOpen = state !== "collapsed"
@@ -137,7 +175,21 @@ export function AIDrawerProvider({
     })
   }, [])
 
+  // Open drawer with a message
+  const openWithMessage = useCallback(async (
+    content: string,
+    options?: { projectPath?: string | null }
+  ) => {
+    setState("expanded")
+    // Small delay to let drawer animation start
+    await new Promise(resolve => setTimeout(resolve, 50))
+    await chat.sendMessage(content, { projectPath: options?.projectPath ?? selectedProjectPath })
+  }, [chat, selectedProjectPath])
+
   const value: AIDrawerContextType = {
+    // Spread all chat functionality
+    ...chat,
+    // Drawer state
     state,
     open,
     close,
@@ -148,6 +200,13 @@ export function AIDrawerProvider({
     isExpanded,
     hasActiveConversation,
     setHasActiveConversation,
+    openWithMessage,
+    // Input state
+    inputValue,
+    setInputValue,
+    // Project state
+    selectedProjectPath,
+    setSelectedProjectPath,
   }
 
   return (
