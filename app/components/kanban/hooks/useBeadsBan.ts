@@ -131,15 +131,15 @@ async function checkTranscriptExists(
   }
 }
 
-async function updateIssueStatus(
+async function updateIssue(
   id: string,
-  status: BeadsStatus,
+  updates: { status?: BeadsStatus; labels?: string[] },
   workspace?: string
 ): Promise<void> {
   const res = await fetch(`/api/beads/issues/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status, workspace }),
+    body: JSON.stringify({ ...updates, workspace }),
   })
   if (!res.ok) {
     const error = await res.json()
@@ -219,10 +219,9 @@ function getColumnForIssue(issue: BeadsApiIssue): BeadsBanColumnId {
     return 'in-progress'
   }
 
-  // Open issues: check if they're "ready" (have description/prepared prompt)
-  // For now, we consider issues with a description as "ready"
-  // and those without as "backlog"
-  if (issue.description && issue.description.trim().length > 0) {
+  // Open issues: check for 'ready' label
+  const hasReadyLabel = issue.labels?.includes('ready') ?? false
+  if (hasReadyLabel) {
     return 'ready'
   }
 
@@ -388,9 +387,39 @@ export function useBeadsBan({
       }
 
       const newStatus = statusMap[targetColumn]
+      const currentLabels = task.labels ?? []
+      const sourceColumn = task.columnId as BeadsBanColumnId
+
+      // Handle ready label when moving between backlog and ready
+      let newLabels: string[] | undefined
+      if (sourceColumn === 'backlog' && targetColumn === 'ready') {
+        // Moving to Ready: add 'ready' label
+        if (!currentLabels.includes('ready')) {
+          newLabels = [...currentLabels, 'ready']
+        }
+      } else if (sourceColumn === 'ready' && targetColumn === 'backlog') {
+        // Moving to Backlog: remove 'ready' label
+        newLabels = currentLabels.filter((l) => l !== 'ready')
+      }
 
       try {
-        await updateIssueStatus(taskId, newStatus, workspaceRef.current)
+        const updates: { status?: BeadsStatus; labels?: string[] } = {}
+
+        // Only update status if it actually changed
+        if (newStatus !== task.beadsMetadata?.beadsStatus) {
+          updates.status = newStatus
+        }
+
+        // Update labels if changed
+        if (newLabels !== undefined) {
+          updates.labels = newLabels
+        }
+
+        // Only call API if there are updates
+        if (Object.keys(updates).length > 0) {
+          await updateIssue(taskId, updates, workspaceRef.current)
+        }
+
         // Refresh to get updated state
         await refresh()
         return true
