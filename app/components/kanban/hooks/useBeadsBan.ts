@@ -33,22 +33,22 @@ export const BEADSBAN_COLUMNS: BeadsBanColumn[] = [
     description: 'Open issues not yet prepared for work',
   },
   {
+    id: 'blocked',
+    title: 'Blocked',
+    color: 'border-t-red-500',
+    description: 'Waiting on dependencies',
+  },
+  {
     id: 'ready',
     title: 'Ready',
     color: 'border-t-cyan-500',
-    description: 'Issues ready to work (no blockers)',
+    description: 'Has prompt, ready to spawn',
   },
   {
     id: 'in-progress',
     title: 'In Progress',
     color: 'border-t-amber-500',
     description: 'Currently being worked on',
-  },
-  {
-    id: 'blocked',
-    title: 'Blocked',
-    color: 'border-t-red-500',
-    description: 'Waiting on dependencies',
   },
   {
     id: 'done',
