@@ -1,10 +1,41 @@
 "use client"
 
 import * as React from "react"
-import { motion } from "framer-motion"
+import { motion, useReducedMotion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Send, StopCircle } from "lucide-react"
+
+// ============================================================================
+// ANIMATION CONSTANTS
+// ============================================================================
+
+// Send button spring animation
+const sendButtonVariants = {
+  idle: { scale: 1 },
+  hover: { scale: 1.05 },
+  tap: { scale: 0.92 },
+  disabled: { scale: 1, opacity: 0.5 },
+}
+
+// Stop button pulse animation
+const stopButtonVariants = {
+  pulse: {
+    scale: [1, 1.05, 1],
+    transition: {
+      duration: 1,
+      repeat: Infinity,
+      ease: "easeInOut" as const,
+    },
+  },
+}
+
+// Icon animation when sending
+const sendIconVariants = {
+  idle: { x: 0, y: 0 },
+  hover: { x: 2, y: -2 },
+  tap: { x: 4, y: -4 },
+}
 
 // ============================================================================
 // TYPES
@@ -66,6 +97,8 @@ export function ChatInput({
 }: ChatInputProps) {
   const internalRef = React.useRef<HTMLTextAreaElement>(null)
   const effectiveRef = textareaRef || internalRef
+  const [isFocused, setIsFocused] = React.useState(false)
+  const shouldReduceMotion = useReducedMotion()
 
   // Auto-resize textarea
   React.useEffect(() => {
@@ -89,15 +122,27 @@ export function ChatInput({
   return (
     <div className={`${className}`}>
       <div className="flex gap-2">
-        <div className="flex-1 relative min-w-0">
+        <motion.div
+          className="flex-1 relative min-w-0"
+          animate={{
+            scale: isFocused && !shouldReduceMotion ? 1.01 : 1,
+          }}
+          transition={{ type: "spring" as const, stiffness: 500, damping: 30 }}
+        >
           <Textarea
             ref={effectiveRef as React.RefObject<HTMLTextAreaElement>}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
             placeholder={isStreaming ? "Wait for response..." : placeholder}
             disabled={isStreaming}
-            className="resize-none glass text-sm sm:text-base"
+            className={`resize-none glass text-sm sm:text-base transition-all duration-200 ${
+              isFocused
+                ? 'ring-2 ring-primary/50 border-primary/50 shadow-lg shadow-primary/10'
+                : ''
+            }`}
             style={{
               minHeight: `clamp(${minHeight}, auto, ${maxHeight})`,
               maxHeight: maxHeight,
@@ -105,39 +150,62 @@ export function ChatInput({
             rows={1}
             data-tabz-input={dataTabzInput}
           />
-        </div>
+        </motion.div>
 
         {isStreaming && onStop ? (
           <motion.div
-            animate={{ scale: [1, 1.05, 1] }}
-            transition={{ duration: 1, repeat: Infinity }}
+            variants={stopButtonVariants}
+            animate="pulse"
           >
             <Button
               size="icon"
               variant="destructive"
-              className="h-[44px] w-[44px] sm:h-[52px] sm:w-[52px] shrink-0"
+              className="h-[44px] w-[44px] sm:h-[52px] sm:w-[52px] shrink-0 transition-shadow hover:shadow-lg hover:shadow-destructive/30"
               onClick={onStop}
             >
               <StopCircle className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
           </motion.div>
         ) : (
-          <Button
-            size="icon"
-            className="h-[44px] w-[44px] sm:h-[52px] sm:w-[52px] border-glow shrink-0"
-            onClick={onSend}
-            disabled={!canSend}
-            data-tabz-action={dataTabzAction}
+          <motion.div
+            variants={sendButtonVariants}
+            initial="idle"
+            animate={canSend ? "idle" : "disabled"}
+            whileHover={canSend && !shouldReduceMotion ? "hover" : undefined}
+            whileTap={canSend && !shouldReduceMotion ? "tap" : undefined}
           >
-            <Send className="h-4 w-4 sm:h-5 sm:w-5" />
-          </Button>
+            <Button
+              size="icon"
+              className={`h-[44px] w-[44px] sm:h-[52px] sm:w-[52px] border-glow shrink-0 transition-all duration-200 ${
+                canSend ? 'hover:shadow-lg hover:shadow-primary/30' : ''
+              }`}
+              onClick={onSend}
+              disabled={!canSend}
+              data-tabz-action={dataTabzAction}
+            >
+              <motion.div
+                variants={sendIconVariants}
+                initial="idle"
+                animate="idle"
+                whileHover={canSend && !shouldReduceMotion ? "hover" : undefined}
+                whileTap={canSend && !shouldReduceMotion ? "tap" : undefined}
+              >
+                <Send className="h-4 w-4 sm:h-5 sm:w-5" />
+              </motion.div>
+            </Button>
+          </motion.div>
         )}
       </div>
 
       {showHint && (
-        <p className="text-xs text-muted-foreground mt-2 text-center hidden sm:block">
+        <motion.p
+          className="text-xs text-muted-foreground mt-2 text-center hidden sm:block"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+        >
           Press Enter to send &middot; Shift+Enter for new line
-        </p>
+        </motion.p>
       )}
     </div>
   )
