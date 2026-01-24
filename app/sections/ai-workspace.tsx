@@ -844,7 +844,7 @@ export default function AIWorkspaceSection({
         <div className="flex-1 overflow-hidden min-h-0">
           <ScrollArea className="h-full">
             <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-4xl mx-auto w-full box-border">
-              {activeConv.messages.length === 0 ? (
+              {activeConv.messages.length === 0 && !activeConv.agentId ? (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
