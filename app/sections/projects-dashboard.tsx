@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
+import { ArrowLeft } from "lucide-react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   useReactTable,
@@ -96,6 +96,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Card, CardContent } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import ProjectOverview from "@/components/projects/ProjectOverview"
+import ProjectCommands from "@/components/projects/ProjectCommands"
+import ProjectKanban from "@/components/projects/ProjectKanban"
+import ProjectLinks from "@/components/projects/ProjectLinks"
+import ProjectSourceControl from "@/components/projects/ProjectSourceControl"
 import { useAuth } from "@/components/AuthProvider"
 import { AuthModal } from "@/components/AuthModal"
 import { useTerminalExtension } from "@/hooks/useTerminalExtension"
@@ -255,6 +261,9 @@ export default function ProjectsDashboard({
     }
   }, [techFilter])
 
+  // Selected project for inline detail view
+  const [selectedProjectSlug, setSelectedProjectSlug] = React.useState<string | null>(null)
+
   // Batch prompt modal state
   const [batchPromptOpen, setBatchPromptOpen] = React.useState(false)
   const [batchPrompt, setBatchPrompt] = React.useState("")
@@ -329,6 +338,12 @@ export default function ProjectsDashboard({
   const projects = React.useMemo(() => {
     return mergeProjects(githubData?.repos || [], localData?.projects || [])
   }, [githubData?.repos, localData?.projects])
+
+  // Find selected project for detail view
+  const selectedProject = React.useMemo(() => {
+    if (!selectedProjectSlug) return null
+    return projects.find((p) => p.slug === selectedProjectSlug) || null
+  }, [projects, selectedProjectSlug])
 
   // Get unique tech stacks for filter
   const allTechStacks = React.useMemo(() => {
@@ -420,12 +435,12 @@ export default function ProjectsDashboard({
               )}
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <Link
-                    href={`/projects/${project.slug}`}
-                    className="font-medium truncate hover:text-primary hover:underline"
+                  <button
+                    onClick={() => setSelectedProjectSlug(project.slug)}
+                    className="font-medium truncate hover:text-primary hover:underline text-left"
                   >
                     {project.name}
-                  </Link>
+                  </button>
                   <Badge variant={badge.variant} className="text-[10px] px-1.5 py-0">
                     {badge.label}
                   </Badge>
@@ -759,19 +774,18 @@ export default function ProjectsDashboard({
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
-                asChild
+                onClick={() => setSelectedProjectSlug(project.slug)}
+                title="View Details"
                 data-tabz-action="view-details"
               >
-                <Link href={`/projects/${project.slug}`} title="View Details">
-                  <Info className="h-4 w-4" />
-                </Link>
+                <Info className="h-4 w-4" />
               </Button>
             </div>
           )
         },
       },
     ],
-    [terminalAvailable, handleLaunchTerminal, isPinned, togglePinned, metaConfigured, metaSyncing, onNavigateToSection, workingDir]
+    [terminalAvailable, handleLaunchTerminal, isPinned, togglePinned, metaConfigured, metaSyncing, onNavigateToSection, workingDir, setSelectedProjectSlug]
   )
 
   // TanStack Table instance
@@ -829,6 +843,60 @@ export default function ProjectsDashboard({
         </div>
         <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
       </>
+    )
+  }
+
+  // Render project detail view when a project is selected
+  if (selectedProject) {
+    return (
+      <div className="h-full flex flex-col p-6" data-tabz-section="projects">
+        {/* Back button and header */}
+        <div className="flex items-center gap-4 mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedProjectSlug(null)}
+            className="flex items-center gap-2"
+            data-tabz-action="back-to-list"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Back to Projects</span>
+          </Button>
+        </div>
+
+        {/* Project detail with tabs */}
+        <div className="flex-1 overflow-auto">
+          <Tabs defaultValue="overview" className="space-y-6">
+            <TabsList className="glass">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="source-control">Source Control</TabsTrigger>
+              <TabsTrigger value="commands">Commands</TabsTrigger>
+              <TabsTrigger value="kanban">Kanban</TabsTrigger>
+              <TabsTrigger value="links">Links</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview">
+              <ProjectOverview project={selectedProject} />
+            </TabsContent>
+
+            <TabsContent value="source-control">
+              <ProjectSourceControl project={selectedProject} />
+            </TabsContent>
+
+            <TabsContent value="commands">
+              <ProjectCommands project={selectedProject} />
+            </TabsContent>
+
+            <TabsContent value="kanban">
+              <ProjectKanban project={selectedProject} />
+            </TabsContent>
+
+            <TabsContent value="links">
+              <ProjectLinks project={selectedProject} />
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
     )
   }
 
