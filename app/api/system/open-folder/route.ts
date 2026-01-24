@@ -48,9 +48,19 @@ export async function POST(request: NextRequest) {
       command = 'explorer'
       args = [path]
     } else {
-      // Linux - try common file managers
-      command = 'xdg-open'
-      args = [path]
+      // Linux/WSL - check if we're in WSL and use explorer.exe, otherwise xdg-open
+      const isWSL = process.env.WSL_DISTRO_NAME ||
+                   require('fs').existsSync('/proc/sys/fs/binfmt_misc/WSLInterop')
+      if (isWSL) {
+        // Convert Linux path to Windows UNC path: /home/user -> \\wsl$\Ubuntu\home\user
+        const distro = process.env.WSL_DISTRO_NAME || 'Ubuntu'
+        const winPath = `\\\\wsl$\\${distro}${path.replace(/\//g, '\\')}`
+        command = 'explorer.exe'
+        args = [winPath]
+      } else {
+        command = 'xdg-open'
+        args = [path]
+      }
     }
 
     // Spawn the process detached so it doesn't block
