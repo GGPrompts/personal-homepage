@@ -60,6 +60,7 @@ export interface Conversation {
   settings?: ConversationSettings
   claudeSessionId?: string | null
   usage?: TokenUsage | null  // Actual token usage from Claude CLI (when available)
+  agentId?: string | null  // Which agent was selected for this conversation
 }
 
 // Settings stored per-conversation

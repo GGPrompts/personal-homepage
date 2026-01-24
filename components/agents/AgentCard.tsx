@@ -307,7 +307,7 @@ export function AgentCard({
           )}
         </div>
 
-        {/* Name and description */}
+        {/* Name, description and traits */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-medium text-white truncate">{agent.name}</span>
@@ -318,6 +318,22 @@ export function AgentCard({
             )}
           </div>
           <p className="text-xs text-white/60 truncate">{agent.description}</p>
+          {/* Personality traits in compact mode */}
+          {agent.personality.length > 0 && (
+            <div className="flex items-center gap-1 mt-1 flex-wrap">
+              {agent.personality.slice(0, 3).map((trait) => (
+                <span
+                  key={trait}
+                  className={cn(
+                    'text-[9px] px-1.5 py-0 rounded-full border capitalize',
+                    PERSONALITY_COLORS[trait]
+                  )}
+                >
+                  {trait}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Section badges (compact - show count) */}
