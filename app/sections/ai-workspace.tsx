@@ -1102,17 +1102,8 @@ export default function AIWorkspaceSection({
                         const res = await fetch('/api/ai/agents/directory')
                         const data = await res.json()
                         if (data.path) {
-                          // Try to open in file manager via API, fallback to showing path
-                          const openRes = await fetch('/api/system/open-folder', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ path: data.path }),
-                          })
-                          if (!openRes.ok) {
-                            // Fallback: copy path to clipboard
-                            await navigator.clipboard.writeText(data.path)
-                            alert(`Path copied to clipboard:\n${data.path}`)
-                          }
+                          // Navigate to Files page with agents folder path
+                          window.location.hash = `#/files?path=${encodeURIComponent(data.path)}&dir=true`
                         }
                       } catch (error) {
                         console.error('Failed to open agents folder:', error)
