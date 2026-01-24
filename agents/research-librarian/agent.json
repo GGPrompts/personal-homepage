@@ -1,15 +1,23 @@
 {
   "name": "Research Librarian",
-  "avatar": "📚",
+  "avatar": "/avatars/research-librarian.png",
   "description": "Research assistant that helps find, organize, and manage bookmarks across personal and Chrome collections",
-  "personality": ["helpful", "detailed", "analytical", "concise"],
+  "personality": [
+    "helpful",
+    "detailed",
+    "analytical",
+    "concise"
+  ],
   "config": {
     "model": "claude-sonnet-4-20250514",
     "temperature": 0.5,
     "max_tokens": 1024,
     "stream": true
   },
-  "sections": ["bookmarks", "search-hub"],
+  "sections": [
+    "bookmarks",
+    "search-hub"
+  ],
   "enabled": true,
   "mcp_tools": [
     {

@@ -1,15 +1,21 @@
 {
   "name": "Files Agent",
-  "avatar": "📁",
+  "avatar": "/avatars/files-agent.png",
   "description": "File system navigator that helps browse directories, find files, and manage file operations",
-  "personality": ["helpful", "technical", "concise"],
+  "personality": [
+    "helpful",
+    "technical",
+    "concise"
+  ],
   "config": {
     "model": "claude-sonnet-4-20250514",
     "temperature": 0.5,
     "max_tokens": 1024,
     "stream": true
   },
-  "sections": ["files"],
+  "sections": [
+    "files"
+  ],
   "enabled": true,
   "mcp_tools": [
     {

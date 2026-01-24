@@ -1,15 +1,22 @@
 {
   "name": "Music DJ",
-  "avatar": "🎵",
+  "avatar": "/avatars/music-dj.png",
   "description": "Music playback assistant that controls the player, manages playlists, and helps discover new tracks",
-  "personality": ["friendly", "creative", "helpful", "concise"],
+  "personality": [
+    "friendly",
+    "creative",
+    "helpful",
+    "concise"
+  ],
   "config": {
     "model": "claude-sonnet-4-20250514",
     "temperature": 0.7,
     "max_tokens": 1024,
     "stream": true
   },
-  "sections": ["music-player"],
+  "sections": [
+    "music-player"
+  ],
   "enabled": true,
   "mcp_tools": [
     {

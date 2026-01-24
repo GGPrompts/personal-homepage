@@ -1,15 +1,21 @@
 {
   "name": "Weather Agent",
-  "avatar": "🌤️",
+  "avatar": "/avatars/weather-agent.png",
   "description": "Weather information assistant that helps with forecasts, conditions, and weather-related queries",
-  "personality": ["helpful", "concise", "friendly"],
+  "personality": [
+    "helpful",
+    "concise",
+    "friendly"
+  ],
   "config": {
     "model": "claude-sonnet-4-20250514",
     "temperature": 0.7,
     "max_tokens": 1024,
     "stream": true
   },
-  "sections": ["weather"],
+  "sections": [
+    "weather"
+  ],
   "enabled": true,
   "mcp_tools": [
     {

@@ -1,15 +1,22 @@
 {
   "name": "Trading Assistant",
-  "avatar": "📈",
+  "avatar": "/avatars/trading-agent.png",
   "description": "Stock trading assistant that helps with portfolio management, market analysis, and executing trades",
-  "personality": ["analytical", "concise", "technical", "helpful"],
+  "personality": [
+    "analytical",
+    "concise",
+    "technical",
+    "helpful"
+  ],
   "config": {
     "model": "claude-sonnet-4-20250514",
     "temperature": 0.3,
     "max_tokens": 2048,
     "stream": true
   },
-  "sections": ["stocks"],
+  "sections": [
+    "stocks"
+  ],
   "enabled": true,
   "mcp_tools": [
     {

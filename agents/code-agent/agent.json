@@ -1,15 +1,22 @@
 {
   "name": "Code Agent",
-  "avatar": "💻",
+  "avatar": "/avatars/code-agent.png",
   "description": "Programming assistant for the AI Workspace that helps with code generation, debugging, and technical questions",
-  "personality": ["technical", "detailed", "analytical", "helpful"],
+  "personality": [
+    "technical",
+    "detailed",
+    "analytical",
+    "helpful"
+  ],
   "config": {
     "model": "claude-sonnet-4-20250514",
     "temperature": 0.3,
     "max_tokens": 4096,
     "stream": true
   },
-  "sections": ["ai-workspace"],
+  "sections": [
+    "ai-workspace"
+  ],
   "enabled": true,
   "mcp_tools": [
     {
