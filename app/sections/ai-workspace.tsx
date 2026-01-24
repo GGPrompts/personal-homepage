@@ -748,7 +748,11 @@ export default function AIWorkspaceSection({
                   <div className="space-y-2 sm:space-y-4">
                     <div className="inline-flex p-2 sm:p-4 rounded-full glass border-glow">
                       {selectedAgent ? (
-                        <span className="text-2xl sm:text-4xl">{selectedAgent.avatar}</span>
+                        selectedAgent.avatar.startsWith('/') ? (
+                          <img src={selectedAgent.avatar} alt={selectedAgent.name} className="h-8 w-8 sm:h-12 sm:w-12 rounded-full object-cover" />
+                        ) : (
+                          <span className="text-2xl sm:text-4xl">{selectedAgent.avatar}</span>
+                        )
                       ) : (
                         <Sparkles className="h-6 w-6 sm:h-12 sm:w-12 text-primary terminal-glow" />
                       )}
