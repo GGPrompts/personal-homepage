@@ -16,11 +16,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
-  MessageSquare, Bot, Plus, X, Trash2, Code, CheckCheck,
-  Sparkles, Cpu, FolderOpen,
-  Loader2, Search, Pencil, Gauge, AlertTriangle,
-  Download, ArrowRight, Settings, ChevronDown, Users,
+  MessageSquare, Bot, Plus, X, Trash2, Cpu, FolderOpen,
+  Loader2, Pencil, Gauge, AlertTriangle,
+  Download, ArrowRight, Settings, ChevronDown, Users, Save, Circle,
 } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Dialog,
   DialogContent,
@@ -50,18 +50,30 @@ import { ChatMessage, TypingIndicator } from "@/components/ai/ChatMessage"
 import { ChatInput } from "@/components/ai/ChatInput"
 
 // ============================================================================
-// REACT-DEPENDENT CONSTANTS (kept here due to Lucide icon imports)
+// HELPER FUNCTIONS
 // ============================================================================
 
-// Icon mapping for prompt categories
-const PROMPT_CATEGORY_ICONS: Record<string, typeof Code> = {
-  Debug: Code,
-  Learn: Sparkles,
-  Create: Code,
-  Review: CheckCheck,
-  Explore: FolderOpen,
-  Search: Search,
-  Info: Sparkles,
+/**
+ * Check if a string is an emoji (simple heuristic)
+ */
+function isEmoji(str: string): boolean {
+  const emojiRegex = /^[\p{Emoji}\u200d]+$/u
+  return emojiRegex.test(str) && str.length <= 8
+}
+
+/**
+ * Check if a string is a URL or path (for avatar rendering)
+ */
+function isAvatarUrl(str: string): boolean {
+  // Check for absolute paths (served by Next.js from public/)
+  if (str.startsWith('/')) return true
+  // Check for full URLs
+  try {
+    new URL(str)
+    return true
+  } catch {
+    return false
+  }
 }
 
 // ============================================================================
@@ -299,10 +311,6 @@ export default function AIWorkspaceSection({
     setInputValue('')
   }
 
-  const handleSuggestedPrompt = (prompt: string) => {
-    sendMessage(prompt, { projectPath: selectedProjectPath })
-  }
-
   const handleExportConversation = () => {
     const markdown = exportConversationToMarkdown(activeConv)
     const filename = `${activeConv.title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${new Date().toISOString().split('T')[0]}.md`
@@ -317,7 +325,43 @@ export default function AIWorkspaceSection({
       systemPrompt: agent.system_prompt,
       temperature: agent.config.temperature,
     }))
+    // Also update the active conversation's agentId for persistence
+    setConversations(prev => prev.map(conv =>
+      conv.id === activeConvId
+        ? { ...conv, agentId: agent.id, updatedAt: new Date() }
+        : conv
+    ))
     setShowAgentGallery(false)
+  }
+
+  // Start a new conversation with a specific agent (from landing page gallery)
+  const handleStartChatWithAgent = (agent: AgentCard) => {
+    setSelectedAgent(agent)
+    // Update settings with agent's config
+    setSettings(prev => ({
+      ...prev,
+      systemPrompt: agent.system_prompt,
+      temperature: agent.config.temperature,
+    }))
+
+    // Create a new conversation with this agent
+    const newConv: Conversation = {
+      id: generateId(),
+      title: `Chat with ${agent.name}`,
+      messages: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      model: settings.model,
+      projectPath: selectedProjectPath,
+      agentId: agent.id,
+      settings: {
+        systemPrompt: agent.system_prompt,
+        temperature: agent.config.temperature,
+      },
+    }
+
+    setConversations(prev => [newConv, ...prev])
+    setActiveConvId(newConv.id)
   }
 
   const handleClearAgent = () => {
@@ -363,6 +407,19 @@ export default function AIWorkspaceSection({
   const dismissContextWarning = () => {
     setContextWarningDismissed(prev => new Set(prev).add(activeConvId))
   }
+
+  // Get agent by ID from registry
+  const getAgentById = React.useCallback((agentId: string | null | undefined) => {
+    if (!agentId || !agentRegistry?.agents) return null
+    return agentRegistry.agents.find(a => a.id === agentId) || null
+  }, [agentRegistry])
+
+  // Determine if a conversation is persistent (JSONL saved)
+  // Claude backend saves to JSONL, others are session-only
+  const isConversationPersistent = React.useCallback((conv: Conversation) => {
+    const modelInfo = availableModels.find(m => m.id === conv.model)
+    return modelInfo?.backend === 'claude'
+  }, [availableModels])
 
   // Calculate token usage
   const CONTEXT_LIMIT = 200000
@@ -423,76 +480,124 @@ export default function AIWorkspaceSection({
 
             <div className="flex-1 overflow-y-auto overflow-x-hidden">
               <div className="p-4 space-y-2" data-tabz-list="conversations">
-                {conversations.map(conv => (
-                  <Card
-                    key={conv.id}
-                    className={`glass cursor-pointer transition-all group max-w-full ${
-                      conv.id === activeConvId ? 'border-primary/60 border-glow' : ''
-                    }`}
-                    onClick={() => setActiveConvId(conv.id)}
-                    data-tabz-item={`conversation-${conv.id}`}
-                  >
-                    <CardContent className="p-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-sm font-medium truncate terminal-glow">
-                              {conv.title}
-                            </h4>
-                            {generatingConvs[conv.id] && (
-                              <motion.div
-                                animate={{ opacity: [0.5, 1, 0.5] }}
-                                transition={{ duration: 1.2, repeat: Infinity }}
-                                className="flex items-center gap-1 shrink-0"
-                              >
-                                <Loader2 className="h-3 w-3 text-primary animate-spin" />
-                              </motion.div>
-                            )}
-                          </div>
-                          <div className="mt-1 space-y-0.5">
-                            <p className="text-xs text-muted-foreground">
-                              {conv.messages.length} messages
-                              {generatingConvs[conv.id] && (
-                                <span className="text-primary ml-1">generating</span>
-                              )}
-                            </p>
-                            {conv.model && (
-                              <div className="flex items-center gap-1 overflow-hidden">
-                                <Cpu className="h-3 w-3 text-muted-foreground shrink-0" />
-                                <p className="text-xs text-muted-foreground truncate">
-                                  {availableModels.find(m => m.id === conv.model)?.name || conv.model}
-                                </p>
-                              </div>
-                            )}
-                            {conv.projectPath && (
-                              <div className="flex items-center gap-1 overflow-hidden">
-                                <FolderOpen className="h-3 w-3 text-muted-foreground shrink-0" />
-                                <p className="text-xs text-muted-foreground truncate">
-                                  {conv.projectPath.split('/').pop()}
-                                </p>
-                              </div>
-                            )}
-                            <p className="text-xs text-muted-foreground">
-                              {conv.updatedAt.toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
+                {conversations.map(conv => {
+                  const convAgent = getAgentById(conv.agentId)
+                  const isPersistent = isConversationPersistent(conv)
 
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            deleteConversation(conv.id)
-                          }}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                  return (
+                    <Card
+                      key={conv.id}
+                      className={`glass cursor-pointer transition-all group max-w-full ${
+                        conv.id === activeConvId ? 'border-primary/60 border-glow' : ''
+                      }`}
+                      onClick={() => setActiveConvId(conv.id)}
+                      data-tabz-item={`conversation-${conv.id}`}
+                    >
+                      <CardContent className="p-3">
+                        <div className="flex items-start gap-2">
+                          {/* Agent Avatar */}
+                          {convAgent && (
+                            <Avatar className="h-8 w-8 shrink-0 ring-1 ring-white/10">
+                              {isAvatarUrl(convAgent.avatar) ? (
+                                <AvatarImage src={convAgent.avatar} alt={convAgent.name} />
+                              ) : null}
+                              <AvatarFallback className="text-sm bg-primary/20">
+                                {isEmoji(convAgent.avatar)
+                                  ? convAgent.avatar
+                                  : convAgent.name.charAt(0)}
+                              </AvatarFallback>
+                            </Avatar>
+                          )}
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm font-medium truncate terminal-glow">
+                                {conv.title}
+                              </h4>
+                              {generatingConvs[conv.id] && (
+                                <motion.div
+                                  animate={{ opacity: [0.5, 1, 0.5] }}
+                                  transition={{ duration: 1.2, repeat: Infinity }}
+                                  className="flex items-center gap-1 shrink-0"
+                                >
+                                  <Loader2 className="h-3 w-3 text-primary animate-spin" />
+                                </motion.div>
+                              )}
+                            </div>
+                            <div className="mt-1 space-y-0.5">
+                              {/* Agent name if available */}
+                              {convAgent && (
+                                <p className="text-xs text-primary/80 font-medium">
+                                  {convAgent.name}
+                                </p>
+                              )}
+                              <div className="flex items-center gap-2">
+                                <p className="text-xs text-muted-foreground">
+                                  {conv.messages.length} messages
+                                  {generatingConvs[conv.id] && (
+                                    <span className="text-primary ml-1">generating</span>
+                                  )}
+                                </p>
+                                {/* Persistence indicator */}
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className={`flex items-center ${
+                                        isPersistent ? 'text-emerald-400' : 'text-muted-foreground'
+                                      }`}>
+                                        {isPersistent ? (
+                                          <Save className="h-3 w-3" />
+                                        ) : (
+                                          <Circle className="h-3 w-3" />
+                                        )}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right">
+                                      {isPersistent
+                                        ? 'Persistent (JSONL saved)'
+                                        : 'Session only (localStorage)'}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                              {conv.model && (
+                                <div className="flex items-center gap-1 overflow-hidden">
+                                  <Cpu className="h-3 w-3 text-muted-foreground shrink-0" />
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {availableModels.find(m => m.id === conv.model)?.name || conv.model}
+                                  </p>
+                                </div>
+                              )}
+                              {conv.projectPath && (
+                                <div className="flex items-center gap-1 overflow-hidden">
+                                  <FolderOpen className="h-3 w-3 text-muted-foreground shrink-0" />
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {conv.projectPath.split('/').pop()}
+                                  </p>
+                                </div>
+                              )}
+                              <p className="text-xs text-muted-foreground">
+                                {conv.updatedAt.toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              deleteConversation(conv.id)
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
               </div>
             </div>
           </motion.div>
@@ -743,67 +848,16 @@ export default function AIWorkspaceSection({
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="text-center py-4 sm:py-12 space-y-4 sm:space-y-8"
+                  className="h-full"
                 >
-                  <div className="space-y-2 sm:space-y-4">
-                    <div className="inline-flex p-2 sm:p-4 rounded-full glass border-glow">
-                      {selectedAgent ? (
-                        selectedAgent.avatar.startsWith('/') ? (
-                          <img src={selectedAgent.avatar} alt={selectedAgent.name} className="h-8 w-8 sm:h-12 sm:w-12 rounded-full object-cover" />
-                        ) : (
-                          <span className="text-2xl sm:text-4xl">{selectedAgent.avatar}</span>
-                        )
-                      ) : (
-                        <Sparkles className="h-6 w-6 sm:h-12 sm:w-12 text-primary terminal-glow" />
-                      )}
-                    </div>
-                    <h3 className="text-lg sm:text-2xl font-bold font-mono gradient-text-theme terminal-glow">
-                      {selectedAgent ? `I'm ${selectedAgent.name}` : 'How can I help you today?'}
-                    </h3>
-                    <p className="text-xs sm:text-base text-muted-foreground max-w-md mx-auto px-2">
-                      {selectedAgent ? selectedAgent.description : 'Choose a prompt or ask anything'}
-                    </p>
-                    {selectedAgent && (
-                      <div className="flex items-center justify-center gap-2 flex-wrap">
-                        {selectedAgent.personality.slice(0, 3).map((trait) => (
-                          <Badge key={trait} variant="outline" className="text-xs capitalize">
-                            {trait}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 max-w-2xl mx-auto px-2">
-                    {(settings.suggestedPrompts || DEFAULT_SUGGESTED_PROMPTS).map((prompt, idx) => {
-                      const Icon = PROMPT_CATEGORY_ICONS[prompt.category] || Sparkles
-                      return (
-                        <motion.div
-                          key={idx}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: idx * 0.05 }}
-                        >
-                          <Card
-                            className="glass hover:border-glow cursor-pointer transition-all group"
-                            onClick={() => handleSuggestedPrompt(prompt.text)}
-                          >
-                            <CardContent className="p-2 sm:p-4 flex items-start gap-2 sm:gap-3">
-                              <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors shrink-0">
-                                <Icon className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-                              </div>
-                              <div className="flex-1 text-left min-w-0">
-                                <Badge variant="secondary" className="mb-1 sm:mb-2 text-[10px] sm:text-xs">
-                                  {prompt.category}
-                                </Badge>
-                                <p className="text-xs sm:text-sm line-clamp-2">{prompt.text}</p>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </motion.div>
-                      )
-                    })}
-                  </div>
+                  {/* Agent-first landing page */}
+                  <AgentGallery
+                    agents={agentRegistry?.agents || []}
+                    selectedAgentId={selectedAgent?.id}
+                    onSelectAgent={handleStartChatWithAgent}
+                    isLoading={agentsLoading}
+                    className="h-full"
+                  />
                 </motion.div>
               ) : (
                 <>
