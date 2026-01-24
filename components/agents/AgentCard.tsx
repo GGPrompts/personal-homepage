@@ -65,6 +65,9 @@ function isEmoji(str: string): boolean {
  * Check if a string is a URL
  */
 function isUrl(str: string): boolean {
+  // Check for absolute paths (served by Next.js from public/)
+  if (str.startsWith('/')) return true
+  // Check for full URLs
   try {
     new URL(str)
     return true
