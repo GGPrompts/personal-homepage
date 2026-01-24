@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import {
   Plug,
   FileCode,
@@ -8,7 +8,7 @@ import {
   Github,
 } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { FilesProvider } from '@/app/contexts/FilesContext'
+import { FilesProvider, useFilesContext } from '@/app/contexts/FilesContext'
 import { FileTree } from '@/app/components/files/FileTree'
 import { FileViewer } from '@/app/components/files/FileViewer'
 import { PluginList } from '@/app/components/files/PluginList'
@@ -20,16 +20,27 @@ import { useAuth } from '@/components/AuthProvider'
 interface FilesSectionProps {
   activeSubItem?: string | null
   onSubItemHandled?: () => void
+  initialPath?: string | null
+  onInitialPathConsumed?: () => void
 }
 
 type FileSource = 'local' | 'github'
 
-function FilesSectionContent({ activeSubItem, onSubItemHandled }: FilesSectionProps) {
+function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onInitialPathConsumed }: FilesSectionProps) {
   const { workingDir } = useWorkingDirectory()
   const { user, getGitHubToken } = useAuth()
+  const { navigateTreeTo } = useFilesContext()
 
   const [activeTab, setActiveTab] = useState<string>('files')
   const [fileSource, setFileSource] = useState<FileSource>('local')
+
+  // Handle initial path navigation from external sources
+  useEffect(() => {
+    if (initialPath) {
+      navigateTreeTo(initialPath)
+      onInitialPathConsumed?.()
+    }
+  }, [initialPath, navigateTreeTo, onInitialPathConsumed])
 
   // GitHub state
   const [token, setToken] = useState<string | null>(null)

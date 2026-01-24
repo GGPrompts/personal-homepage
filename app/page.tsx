@@ -842,6 +842,7 @@ export default function PersonalHomepage() {
   const [activeSection, setActiveSection] = React.useState<Section>("home")
   const [activeSubItem, setActiveSubItem] = React.useState<string | null>(null)
   const [aiWorkspaceProject, setAiWorkspaceProject] = React.useState<string | null>(null)
+  const [filesNavigationPath, setFilesNavigationPath] = React.useState<string | null>(null)
   const [sectionRestored, setSectionRestored] = React.useState(false)
 
   // Restore active section from localStorage after mount (avoids hydration mismatch)
@@ -915,7 +916,12 @@ export default function PersonalHomepage() {
         if (!isLocal) {
           return <LocalOnlyOverlay sectionName="AI Workspace" description="This feature streams from local AI CLIs (Claude, Gemini, Codex) that require localhost to run." />
         }
-        return <AIWorkspaceSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} initialProjectPath={aiWorkspaceProject} onProjectPathConsumed={() => setAiWorkspaceProject(null)} defaultWorkingDir={workingDir} />
+        return <AIWorkspaceSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} initialProjectPath={aiWorkspaceProject} onProjectPathConsumed={() => setAiWorkspaceProject(null)} defaultWorkingDir={workingDir} onNavigateToSection={(section, path) => {
+          if (section === 'files' && path) {
+            setFilesNavigationPath(path)
+          }
+          setActiveSection(section as Section)
+        }} />
       case "stocks":
         return <StocksDashboard activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("settings")} />
       case "crypto":
@@ -949,7 +955,7 @@ export default function PersonalHomepage() {
         if (!isLocal) {
           return <LocalOnlyOverlay sectionName="Files" description="This feature browses local files and manages Claude Code plugins, requiring localhost access." />
         }
-        return <FilesSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+        return <FilesSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} initialPath={filesNavigationPath} onInitialPathConsumed={() => setFilesNavigationPath(null)} />
       case "analytics":
         if (!isLocal) {
           return <LocalOnlyOverlay sectionName="Analytics" description="This feature displays Claude Code usage analytics from local sessions." />

@@ -86,12 +86,14 @@ export default function AIWorkspaceSection({
   initialProjectPath,
   onProjectPathConsumed,
   defaultWorkingDir,
+  onNavigateToSection,
 }: {
   activeSubItem?: string | null
   onSubItemHandled?: () => void
   initialProjectPath?: string | null
   onProjectPathConsumed?: () => void
   defaultWorkingDir?: string | null
+  onNavigateToSection?: (section: string, path?: string) => void
 }) {
   // Auth for user avatar
   const { user } = useAuth()
@@ -1101,9 +1103,9 @@ export default function AIWorkspaceSection({
                       try {
                         const res = await fetch('/api/ai/agents/directory')
                         const data = await res.json()
-                        if (data.path) {
-                          // Navigate to Files page with agents folder path
-                          window.location.hash = `#/files?path=${encodeURIComponent(data.path)}&dir=true`
+                        if (data.path && onNavigateToSection) {
+                          // Navigate to Files section with agents folder path
+                          onNavigateToSection('files', data.path)
                         }
                       } catch (error) {
                         console.error('Failed to open agents folder:', error)
