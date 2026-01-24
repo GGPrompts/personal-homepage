@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import Image from "next/image"
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
 import {
   MessageSquare,
@@ -20,6 +19,7 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { useAIDrawerSafe } from "./AIDrawerProvider"
 import { ChatMessage, TypingIndicator } from "./ChatMessage"
 import { ChatInput } from "./ChatInput"
@@ -867,19 +867,14 @@ export function AIDrawerToggle({ className = "", currentSection }: AIDrawerToggl
   const renderIcon = () => {
     if (matchingAgent) {
       const avatarIsUrl = isAvatarUrl(matchingAgent.avatar)
-      if (avatarIsUrl) {
-        return (
-          <Image
-            src={matchingAgent.avatar}
-            alt={matchingAgent.name}
-            width={20}
-            height={20}
-            className="h-5 w-5 rounded-full object-cover"
-          />
-        )
-      }
-      // Emoji avatar
-      return <span className="text-sm">{matchingAgent.avatar}</span>
+      return (
+        <Avatar className="h-5 w-5">
+          {avatarIsUrl && <AvatarImage src={matchingAgent.avatar} alt={matchingAgent.name} />}
+          <AvatarFallback className="text-xs bg-transparent">
+            {matchingAgent.avatar}
+          </AvatarFallback>
+        </Avatar>
+      )
     }
     // Fallback to generic icon
     return <MessageSquare className="h-5 w-5" />
