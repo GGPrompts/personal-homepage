@@ -49,6 +49,32 @@ import { useAIChat } from "@/hooks/useAIChat"
 import { ChatMessage, TypingIndicator } from "@/components/ai/ChatMessage"
 import { ChatInput } from "@/components/ai/ChatInput"
 
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Check if a string is an emoji (simple heuristic)
+ */
+function isEmoji(str: string): boolean {
+  const emojiRegex = /^[\p{Emoji}\u200d]+$/u
+  return emojiRegex.test(str) && str.length <= 8
+}
+
+/**
+ * Check if a string is a URL or path (for avatar rendering)
+ */
+function isAvatarUrl(str: string): boolean {
+  // Check for absolute paths (served by Next.js from public/)
+  if (str.startsWith('/')) return true
+  // Check for full URLs
+  try {
+    new URL(str)
+    return true
+  } catch {
+    return false
+  }
+}
 
 // ============================================================================
 // MAIN COMPONENT
@@ -299,6 +325,12 @@ export default function AIWorkspaceSection({
       systemPrompt: agent.system_prompt,
       temperature: agent.config.temperature,
     }))
+    // Also update the active conversation's agentId for persistence
+    setConversations(prev => prev.map(conv =>
+      conv.id === activeConvId
+        ? { ...conv, agentId: agent.id, updatedAt: new Date() }
+        : conv
+    ))
     setShowAgentGallery(false)
   }
 
@@ -466,13 +498,13 @@ export default function AIWorkspaceSection({
                           {/* Agent Avatar */}
                           {convAgent && (
                             <Avatar className="h-8 w-8 shrink-0 ring-1 ring-white/10">
-                              {convAgent.avatar.startsWith('/') ? (
+                              {isAvatarUrl(convAgent.avatar) ? (
                                 <AvatarImage src={convAgent.avatar} alt={convAgent.name} />
                               ) : null}
                               <AvatarFallback className="text-sm bg-primary/20">
-                                {convAgent.avatar.startsWith('/')
-                                  ? convAgent.name.charAt(0)
-                                  : convAgent.avatar}
+                                {isEmoji(convAgent.avatar)
+                                  ? convAgent.avatar
+                                  : convAgent.name.charAt(0)}
                               </AvatarFallback>
                             </Avatar>
                           )}

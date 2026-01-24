@@ -1,12 +1,10 @@
 "use client"
 
-import { useState } from "react"
 import {
   FolderGit2,
   Terminal,
   Code,
   Github,
-  FolderOpen,
   GitBranch,
   Star,
   GitFork,
@@ -16,18 +14,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet"
 import { useTerminalExtension } from "@/hooks/useTerminalExtension"
 import { getStatusBadge, getGitStatusBadge, type Project } from "@/lib/projects"
-import { FilesProvider } from "@/app/contexts/FilesContext"
-import { FileTree } from "@/app/components/files/FileTree"
-import { FileViewer } from "@/app/components/files/FileViewer"
 
 interface ProjectOverviewProps {
   project: Project
@@ -36,7 +24,6 @@ interface ProjectOverviewProps {
 export default function ProjectOverview({ project }: ProjectOverviewProps) {
   const { available: terminalAvailable, runCommand } = useTerminalExtension()
   const statusBadge = getStatusBadge(project)
-  const [fileDrawerOpen, setFileDrawerOpen] = useState(false)
 
   // Format relative time
   const formatRelativeTime = (dateStr: string | undefined) => {
@@ -107,16 +94,6 @@ export default function ProjectOverview({ project }: ProjectOverviewProps) {
               >
                 <Code className="h-4 w-4 mr-2" />
                 VS Code
-              </Button>
-            )}
-            {project.local && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setFileDrawerOpen(true)}
-              >
-                <FolderOpen className="h-4 w-4 mr-2" />
-                Browse Files
               </Button>
             )}
             {project.github && (
@@ -311,33 +288,6 @@ export default function ProjectOverview({ project }: ProjectOverviewProps) {
         </Card>
       )}
 
-      {/* File Browser Drawer */}
-      <Sheet open={fileDrawerOpen} onOpenChange={setFileDrawerOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-2xl lg:max-w-4xl p-0 flex flex-col">
-          <SheetHeader className="px-6 py-4 border-b border-border shrink-0">
-            <SheetTitle className="terminal-glow">Browse Files</SheetTitle>
-            <SheetDescription className="font-mono text-xs truncate">
-              {project.local?.path}
-            </SheetDescription>
-          </SheetHeader>
-          <FilesProvider>
-            <div className="flex-1 flex min-h-0">
-              {/* File Tree Panel */}
-              <div className="w-64 border-r border-border shrink-0 overflow-hidden">
-                <FileTree
-                  basePath={project.local?.path || "~"}
-                  maxDepth={3}
-                  showHidden={false}
-                />
-              </div>
-              {/* File Viewer Panel */}
-              <div className="flex-1 min-w-0 overflow-hidden">
-                <FileViewer />
-              </div>
-            </div>
-          </FilesProvider>
-        </SheetContent>
-      </Sheet>
     </div>
   )
 }
