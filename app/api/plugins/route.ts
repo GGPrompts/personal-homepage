@@ -8,10 +8,21 @@
 import { promises as fs } from 'fs'
 import * as path from 'path'
 import { homedir } from 'os'
+import { NextRequest } from 'next/server'
 
 const homeDir = homedir()
 const claudeSettingsPath = path.join(homeDir, '.claude', 'settings.json')
 const claudeInstalledPluginsPath = path.join(homeDir, '.claude', 'plugins', 'installed_plugins.json')
+
+/**
+ * Expand ~ to home directory
+ */
+function expandTilde(p: string): string {
+  if (p.startsWith('~')) {
+    return path.join(homeDir, p.slice(1))
+  }
+  return p
+}
 
 interface ComponentFile {
   name: string
@@ -149,9 +160,13 @@ interface Plugin {
   componentFiles: ComponentFiles
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Read installed plugins
+    const { searchParams } = new URL(request.url)
+    const workingDir = searchParams.get('workingDir')
+    const expandedWorkingDir = workingDir ? expandTilde(workingDir) : null
+
+    // Read installed plugins from global location
     let installedPlugins: InstalledPlugins = {}
     try {
       const data = await fs.readFile(claudeInstalledPluginsPath, 'utf-8')
@@ -161,6 +176,27 @@ export async function GET() {
       const nodeErr = err as NodeJS.ErrnoException
       if (nodeErr.code !== 'ENOENT') {
         console.error('[API] Error reading installed plugins:', nodeErr.message)
+      }
+    }
+
+    // If workingDir provided, also check project-scoped plugins
+    if (expandedWorkingDir && expandedWorkingDir !== homeDir) {
+      const projectPluginsPath = path.join(expandedWorkingDir, '.claude', 'plugins', 'installed_plugins.json')
+      try {
+        const data = await fs.readFile(projectPluginsPath, 'utf-8')
+        const parsed = JSON.parse(data)
+        // Merge project plugins with global plugins
+        if (parsed.plugins) {
+          installedPlugins.plugins = {
+            ...installedPlugins.plugins,
+            ...parsed.plugins
+          }
+        }
+      } catch (err: unknown) {
+        const nodeErr = err as NodeJS.ErrnoException
+        if (nodeErr.code !== 'ENOENT') {
+          console.error('[API] Error reading project plugins:', nodeErr.message)
+        }
       }
     }
 
@@ -174,6 +210,19 @@ export async function GET() {
       const nodeErr = err as NodeJS.ErrnoException
       if (nodeErr.code !== 'ENOENT') {
         console.error('[API] Error reading claude settings:', nodeErr.message)
+      }
+    }
+
+    // Also check project-scoped settings if workingDir provided
+    if (expandedWorkingDir && expandedWorkingDir !== homeDir) {
+      const projectSettingsPath = path.join(expandedWorkingDir, '.claude', 'settings.json')
+      try {
+        const data = await fs.readFile(projectSettingsPath, 'utf-8')
+        const parsed: Settings = JSON.parse(data)
+        // Merge project settings (project overrides global)
+        enabledPlugins = { ...enabledPlugins, ...parsed.enabledPlugins }
+      } catch {
+        // Project settings don't exist, that's fine
       }
     }
 

@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react'
 import { useFilesContext, Plugin, OutdatedPlugin } from '@/app/contexts/FilesContext'
+import { useWorkingDirectory } from '@/hooks/useWorkingDirectory'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -294,6 +295,7 @@ export function PluginList() {
     pluginsData, pluginsLoading, loadPlugins, togglePlugin, openFile,
     pluginHealth, pluginHealthLoading, loadPluginHealth, updatePlugin, updateAllPlugins, pruneCache
   } = useFilesContext()
+  const { workingDir } = useWorkingDirectory()
   const [togglingPlugins, setTogglingPlugins] = useState<Set<string>>(new Set())
   const [updatingPlugins, setUpdatingPlugins] = useState<Set<string>>(new Set())
   const [updatingAll, setUpdatingAll] = useState(false)
@@ -307,11 +309,11 @@ export function PluginList() {
   const [pruning, setPruning] = useState(false)
   const [pruneResult, setPruneResult] = useState<{ removed: number; freedMB: string } | null>(null)
 
-  // Load plugins and health check on mount
+  // Load plugins and health check on mount and when workingDir changes
   useEffect(() => {
-    loadPlugins()
+    loadPlugins(workingDir)
     loadPluginHealth()
-  }, [loadPlugins, loadPluginHealth])
+  }, [loadPlugins, loadPluginHealth, workingDir])
 
   // Check if a plugin is outdated
   const isPluginOutdated = (pluginId: string): OutdatedPlugin | undefined => {
@@ -482,7 +484,7 @@ export function PluginList() {
               )}
             </button>
             <button
-              onClick={() => loadPlugins()}
+              onClick={() => loadPlugins(workingDir)}
               className="p-1 hover:bg-white/10 rounded transition-colors"
               title="Refresh"
             >

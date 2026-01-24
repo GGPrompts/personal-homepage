@@ -139,7 +139,7 @@ interface FilesContextType {
   // Plugins
   pluginsData: PluginsData | null
   pluginsLoading: boolean
-  loadPlugins: () => Promise<void>
+  loadPlugins: (workingDir?: string) => Promise<void>
   togglePlugin: (pluginId: string, enabled: boolean) => Promise<boolean>
 
   // Plugin health
@@ -368,10 +368,15 @@ export function FilesProvider({ children }: { children: ReactNode }) {
   }, [favorites])
 
   // Load plugins data from backend
-  const loadPlugins = useCallback(async () => {
+  const loadPlugins = useCallback(async (workingDir?: string) => {
     setPluginsLoading(true)
     try {
-      const response = await fetch('/api/plugins')
+      const params = new URLSearchParams()
+      if (workingDir) {
+        params.set('workingDir', workingDir)
+      }
+      const url = `/api/plugins${params.toString() ? `?${params.toString()}` : ''}`
+      const response = await fetch(url)
       if (!response.ok) {
         throw new Error('Failed to load plugins')
       }

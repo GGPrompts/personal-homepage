@@ -23,6 +23,7 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import { useFilesContext, Plugin } from '@/app/contexts/FilesContext'
+import { useWorkingDirectory } from '@/hooks/useWorkingDirectory'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -125,6 +126,7 @@ export function AgentGallery({ className, onOpenFile }: AgentGalleryProps) {
     togglePlugin,
     openFile,
   } = useFilesContext()
+  const { workingDir } = useWorkingDirectory()
 
   const [togglingPlugins, setTogglingPlugins] = useState<Set<string>>(new Set())
   const [showRestartHint, setShowRestartHint] = useState(false)
@@ -142,10 +144,10 @@ export function AgentGallery({ className, onOpenFile }: AgentGalleryProps) {
   const [sortBy, setSortBy] = useState<SortOption>('name')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
-  // Load plugins on mount
+  // Load plugins on mount and when workingDir changes
   useEffect(() => {
-    loadPlugins()
-  }, [loadPlugins])
+    loadPlugins(workingDir)
+  }, [loadPlugins, workingDir])
 
   // Handle toggle
   const handleToggle = async (pluginId: string, enabled: boolean) => {
@@ -294,7 +296,7 @@ export function AgentGallery({ className, onOpenFile }: AgentGalleryProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => loadPlugins()}
+                  onClick={() => loadPlugins(workingDir)}
                   className="border-white/10"
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />

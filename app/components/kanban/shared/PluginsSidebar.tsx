@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { PluginCard, Plugin } from './PluginCard'
+import { useWorkingDirectory } from '@/hooks/useWorkingDirectory'
 
 interface PluginsApiResponse {
   success: boolean
@@ -56,11 +57,17 @@ const COMPONENT_ICONS: Record<string, { icon: typeof Terminal; color: string }> 
 export function PluginsSidebar({ className }: PluginsSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const { workingDir } = useWorkingDirectory()
 
   const { data, isLoading, error, refetch } = useQuery<PluginsApiResponse>({
-    queryKey: ['plugins'],
+    queryKey: ['plugins', workingDir],
     queryFn: async () => {
-      const res = await fetch('/api/plugins')
+      const params = new URLSearchParams()
+      if (workingDir) {
+        params.set('workingDir', workingDir)
+      }
+      const url = `/api/plugins${params.toString() ? `?${params.toString()}` : ''}`
+      const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to fetch plugins')
       return res.json()
     },
