@@ -267,6 +267,7 @@ export function AgentCard({
           'glass-dark cursor-pointer',
           'transition-all duration-200',
           'hover:bg-white/10',
+          'w-full overflow-hidden',
           isSelected && 'ring-2 ring-cyan-400/50 bg-white/10',
           !agent.enabled && 'opacity-50',
           className

@@ -202,7 +202,7 @@ export function AgentGallery({
             className={cn(
               viewMode === 'grid'
                 ? 'grid grid-cols-1 sm:grid-cols-2 gap-3'
-                : 'flex flex-col gap-2'
+                : 'flex flex-col gap-2 w-full overflow-hidden'
             )}
             layout
           >
