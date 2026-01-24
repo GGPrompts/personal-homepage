@@ -1,8 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { createContext, useContext, useState, useCallback, useEffect } from "react"
+import { createContext, useContext, useState, useCallback, useEffect, useMemo } from "react"
 import { useAIChat, type UseAIChatReturn } from "@/hooks/useAIChat"
+import { useQuery } from "@tanstack/react-query"
+import type { AgentCard } from "@/lib/agents/types"
 
 // ============================================================================
 // TYPES
@@ -41,6 +43,22 @@ export interface AIDrawerContextType extends UseAIChatReturn {
   selectedProjectPath: string | null
   /** Set selected project path */
   setSelectedProjectPath: (path: string | null) => void
+  /** Current section/page for contextual agent selection */
+  currentSection: string | null
+  /** Set current section */
+  setCurrentSection: (section: string | null) => void
+  /** Selected agent ID (null for default/no agent) */
+  selectedAgentId: string | null
+  /** Set selected agent */
+  setSelectedAgentId: (agentId: string | null) => void
+  /** Recommended agent based on current section (auto-selected) */
+  recommendedAgent: AgentCard | null
+  /** All available agents */
+  availableAgents: AgentCard[]
+  /** Whether agents are loading */
+  agentsLoading: boolean
+  /** Whether the selected agent was auto-selected based on section */
+  isAgentAutoSelected: boolean
 }
 
 const AIDrawerContext = createContext<AIDrawerContextType | null>(null)
@@ -76,6 +94,7 @@ export function useAIDrawerSafe() {
 const STORAGE_KEY_STATE = "ai-drawer-state"
 const STORAGE_KEY_HAS_CONVERSATION = "ai-drawer-has-conversation"
 const STORAGE_KEY_PROJECT_PATH = "ai-drawer-project-path"
+const STORAGE_KEY_SELECTED_AGENT = "ai-drawer-selected-agent"
 
 // ============================================================================
 // PROVIDER
@@ -118,6 +137,60 @@ export function AIDrawerProvider({
     return localStorage.getItem(STORAGE_KEY_PROJECT_PATH)
   })
 
+  // Current section for contextual agent selection
+  const [currentSection, setCurrentSection] = useState<string | null>(null)
+
+  // Selected agent ID (null means use recommended or default)
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null
+    return localStorage.getItem(STORAGE_KEY_SELECTED_AGENT)
+  })
+
+  // Track if user has manually selected an agent (to prevent auto-selection override)
+  const [userHasSelectedAgent, setUserHasSelectedAgent] = useState(false)
+
+  // Fetch available agents
+  const { data: agentsData, isLoading: agentsLoading } = useQuery<{ agents: AgentCard[] }>({
+    queryKey: ['agents-registry'],
+    queryFn: async () => {
+      const res = await fetch('/api/ai/agents/registry')
+      if (!res.ok) throw new Error('Failed to fetch agents')
+      return res.json()
+    },
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+  })
+
+  // Get enabled agents
+  const availableAgents = useMemo(() => {
+    return agentsData?.agents?.filter(a => a.enabled) ?? []
+  }, [agentsData?.agents])
+
+  // Find recommended agent based on current section
+  const recommendedAgent = useMemo(() => {
+    if (!currentSection || availableAgents.length === 0) return null
+    return availableAgents.find(
+      agent => agent.sections?.includes(currentSection)
+    ) ?? null
+  }, [currentSection, availableAgents])
+
+  // Auto-select agent when section changes (only if user hasn't manually selected)
+  useEffect(() => {
+    if (!userHasSelectedAgent && recommendedAgent) {
+      setSelectedAgentId(recommendedAgent.id)
+    }
+  }, [recommendedAgent, userHasSelectedAgent])
+
+  // Determine if current selection is auto-selected
+  const isAgentAutoSelected = useMemo(() => {
+    return !userHasSelectedAgent && selectedAgentId === recommendedAgent?.id
+  }, [userHasSelectedAgent, selectedAgentId, recommendedAgent?.id])
+
+  // Wrapper for setSelectedAgentId that tracks manual selection
+  const handleSetSelectedAgentId = useCallback((agentId: string | null) => {
+    setSelectedAgentId(agentId)
+    setUserHasSelectedAgent(true)
+  }, [])
+
   // Persist state changes to localStorage
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_STATE, state)
@@ -134,6 +207,15 @@ export function AIDrawerProvider({
       localStorage.removeItem(STORAGE_KEY_PROJECT_PATH)
     }
   }, [selectedProjectPath])
+
+  // Persist selected agent
+  useEffect(() => {
+    if (selectedAgentId) {
+      localStorage.setItem(STORAGE_KEY_SELECTED_AGENT, selectedAgentId)
+    } else {
+      localStorage.removeItem(STORAGE_KEY_SELECTED_AGENT)
+    }
+  }, [selectedAgentId])
 
   // Update hasActiveConversation based on chat state
   useEffect(() => {
@@ -207,6 +289,15 @@ export function AIDrawerProvider({
     // Project state
     selectedProjectPath,
     setSelectedProjectPath,
+    // Agent selection
+    currentSection,
+    setCurrentSection,
+    selectedAgentId,
+    setSelectedAgentId: handleSetSelectedAgentId,
+    recommendedAgent,
+    availableAgents,
+    agentsLoading,
+    isAgentAutoSelected,
   }
 
   return (
