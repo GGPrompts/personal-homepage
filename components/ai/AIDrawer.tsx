@@ -153,6 +153,7 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const [showSettings, setShowSettings] = React.useState(false)
   const [showConversations, setShowConversations] = React.useState(false)
+  const [agentPickerOpen, setAgentPickerOpen] = React.useState(false)
 
   // Don't render if context is not available (outside provider)
   if (!context) return null
@@ -368,7 +369,7 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                 <div className="p-3 border-b border-border/40 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     {/* Agent Picker Dropdown */}
-                    <DropdownMenu>
+                    <DropdownMenu open={agentPickerOpen} onOpenChange={setAgentPickerOpen}>
                       <DropdownMenuTrigger asChild>
                         <motion.button
                           className="flex items-center gap-1.5 p-1.5 rounded-lg bg-primary/10 border border-primary/20 shrink-0 hover:bg-primary/20 transition-colors"
@@ -394,7 +395,10 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                       <DropdownMenuContent align="start" className="w-64">
                         {/* No agent / default option */}
                         <DropdownMenuItem
-                          onClick={() => setSelectedAgentId(null)}
+                          onClick={() => {
+                            setSelectedAgentId(null)
+                            setAgentPickerOpen(false)
+                          }}
                           className="flex items-center gap-2"
                         >
                           <Bot className="h-4 w-4" />
@@ -416,7 +420,10 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                             return (
                               <DropdownMenuItem
                                 key={agent.id}
-                                onClick={() => setSelectedAgentId(agent.id)}
+                                onClick={() => {
+                                  setSelectedAgentId(agent.id)
+                                  setAgentPickerOpen(false)
+                                }}
                                 className="flex items-center gap-2"
                               >
                                 <Avatar className="h-5 w-5 shrink-0">
