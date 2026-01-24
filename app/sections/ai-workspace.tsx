@@ -859,6 +859,58 @@ export default function AIWorkspaceSection({
                     className="h-full"
                   />
                 </motion.div>
+              ) : activeConv.messages.length === 0 && activeConv.agentId ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-col items-center justify-center h-full py-12"
+                >
+                  {/* Empty state with agent selected - show sample prompts */}
+                  {(() => {
+                    const agent = getAgentById(activeConv.agentId)
+                    return (
+                      <div className="text-center space-y-6 max-w-2xl">
+                        {agent && (
+                          <div className="flex flex-col items-center gap-3">
+                            <Avatar className="h-16 w-16 ring-2 ring-primary/20">
+                              {isAvatarUrl(agent.avatar) ? (
+                                <AvatarImage src={agent.avatar} alt={agent.name} />
+                              ) : null}
+                              <AvatarFallback className="text-2xl bg-primary/20">
+                                {isEmoji(agent.avatar) ? agent.avatar : agent.name.charAt(0)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <h3 className="text-lg font-semibold terminal-glow">{agent.name}</h3>
+                              <p className="text-sm text-muted-foreground">{agent.description}</p>
+                            </div>
+                          </div>
+                        )}
+                        <p className="text-muted-foreground">
+                          Start a conversation or try one of these prompts:
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {(settings.suggestedPrompts || DEFAULT_SUGGESTED_PROMPTS).slice(0, 4).map((prompt, idx) => (
+                            <Button
+                              key={idx}
+                              variant="outline"
+                              className="glass h-auto py-3 px-4 text-left justify-start"
+                              onClick={() => {
+                                setInputValue(prompt.text)
+                                textareaRef.current?.focus()
+                              }}
+                            >
+                              <div className="flex flex-col items-start gap-1">
+                                <Badge variant="secondary" className="text-xs">{prompt.category}</Badge>
+                                <span className="text-sm">{prompt.text}</span>
+                              </div>
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </motion.div>
               ) : (
                 <>
                   {/* Context Warning Banner */}
