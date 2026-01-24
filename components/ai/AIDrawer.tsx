@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { useAIDrawerSafe } from "./AIDrawerProvider"
 import { ChatMessage, TypingIndicator } from "./ChatMessage"
 import { ChatInput } from "./ChatInput"
@@ -26,6 +27,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useAuth } from "@/components/AuthProvider"
 import { mergeProjects, type LocalProject, type GitHubRepo } from "@/lib/projects"
 import { useAllProjectsMeta } from "@/hooks/useProjectMeta"
+import type { AgentCard } from "@/lib/agents/types"
 
 // ============================================================================
 // TYPES
@@ -812,21 +814,73 @@ function MinimizedDrawer({
 
 interface AIDrawerToggleProps {
   className?: string
+  /** Current section/page to show contextual agent avatar */
+  currentSection?: string
+}
+
+/**
+ * Check if a string is a path-based URL (absolute path or full URL)
+ */
+function isAvatarUrl(str: string): boolean {
+  if (str.startsWith('/')) return true
+  try {
+    new URL(str)
+    return true
+  } catch {
+    return false
+  }
 }
 
 /**
  * Toggle button to open/close the AI drawer
  * Use this in the global header
+ * Shows contextual agent avatar based on current section
  */
-export function AIDrawerToggle({ className = "" }: AIDrawerToggleProps) {
+export function AIDrawerToggle({ className = "", currentSection }: AIDrawerToggleProps) {
   const context = useAIDrawerSafe()
+
+  // Fetch agents to find matching one for current section
+  const { data: agentsData } = useQuery<{ agents: AgentCard[] }>({
+    queryKey: ['agents-registry'],
+    queryFn: async () => {
+      const res = await fetch('/api/ai/agents/registry')
+      if (!res.ok) throw new Error('Failed to fetch agents')
+      return res.json()
+    },
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+  })
+
+  // Find agent matching current section
+  const matchingAgent = React.useMemo(() => {
+    if (!currentSection || !agentsData?.agents) return null
+    return agentsData.agents.find(
+      (agent) => agent.enabled && agent.sections?.includes(currentSection)
+    ) || null
+  }, [currentSection, agentsData?.agents])
 
   // Don't render if context is not available
   if (!context) return null
 
   const { toggle, isOpen, hasActiveConversation } = context
 
-  return (
+  // Render avatar or fallback icon
+  const renderIcon = () => {
+    if (matchingAgent) {
+      const avatarIsUrl = isAvatarUrl(matchingAgent.avatar)
+      return (
+        <Avatar className="h-5 w-5">
+          {avatarIsUrl && <AvatarImage src={matchingAgent.avatar} alt={matchingAgent.name} />}
+          <AvatarFallback className="text-xs bg-transparent">
+            {matchingAgent.avatar}
+          </AvatarFallback>
+        </Avatar>
+      )
+    }
+    // Fallback to generic icon
+    return <MessageSquare className="h-5 w-5" />
+  }
+
+  const buttonContent = (
     <Button
       variant={isOpen ? "secondary" : "ghost"}
       size="icon"
@@ -834,12 +888,30 @@ export function AIDrawerToggle({ className = "" }: AIDrawerToggleProps) {
       className={`relative ${className}`}
       data-tabz-action="toggle-ai-drawer"
     >
-      <MessageSquare className="h-5 w-5" />
+      {renderIcon()}
       {hasActiveConversation && !isOpen && (
         <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary animate-pulse" />
       )}
     </Button>
   )
+
+  // Wrap with tooltip if there's a matching agent
+  if (matchingAgent) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            {buttonContent}
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            <p>{matchingAgent.name}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
+
+  return buttonContent
 }
 
 export default AIDrawer

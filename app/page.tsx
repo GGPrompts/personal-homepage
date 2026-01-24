@@ -1023,7 +1023,7 @@ export default function PersonalHomepage() {
           </Sheet>
 
           {/* AI Drawer Toggle - mobile */}
-          <AIDrawerToggle className="glass pointer-events-auto" />
+          <AIDrawerToggle className="glass pointer-events-auto" currentSection={activeSection} />
         </div>
 
         <div className="flex h-screen">
