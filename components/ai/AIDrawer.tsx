@@ -14,10 +14,14 @@ import {
   Settings,
   FolderOpen,
   Loader2,
+  ChevronDown,
+  Check,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { useAIDrawerSafe } from "./AIDrawerProvider"
@@ -27,7 +31,6 @@ import { useQuery } from "@tanstack/react-query"
 import { useAuth } from "@/components/AuthProvider"
 import { mergeProjects, type LocalProject, type GitHubRepo } from "@/lib/projects"
 import { useAllProjectsMeta } from "@/hooks/useProjectMeta"
-import type { AgentCard } from "@/lib/agents/types"
 
 // ============================================================================
 // TYPES
@@ -188,7 +191,20 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
     setInputValue,
     selectedProjectPath,
     setSelectedProjectPath,
+    // Agent selection
+    selectedAgentId,
+    setSelectedAgentId,
+    recommendedAgent,
+    availableAgents,
+    agentsLoading,
+    isAgentAutoSelected,
   } = context
+
+  // Get the currently selected agent
+  const selectedAgent = React.useMemo(() => {
+    if (!selectedAgentId) return null
+    return availableAgents.find(a => a.id === selectedAgentId) ?? null
+  }, [selectedAgentId, availableAgents])
 
   // Fetch local projects
   const { data: localProjects } = useQuery({
@@ -350,15 +366,89 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
               >
                 {/* Header */}
                 <div className="p-3 border-b border-border/40 flex items-center justify-between shrink-0">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <motion.div
-                      className="p-1.5 rounded-lg bg-primary/10 border border-primary/20 shrink-0"
-                      whileHover={shouldReduceMotion ? undefined : { scale: 1.05 }}
-                      whileTap={shouldReduceMotion ? undefined : { scale: 0.95 }}
-                    >
-                      <Bot className="h-4 w-4 text-primary terminal-glow" />
-                    </motion.div>
-                    <div className="min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    {/* Agent Picker Dropdown */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <motion.button
+                          className="flex items-center gap-1.5 p-1.5 rounded-lg bg-primary/10 border border-primary/20 shrink-0 hover:bg-primary/20 transition-colors"
+                          whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+                          whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+                          data-tabz-action="open-agent-picker"
+                        >
+                          {selectedAgent ? (
+                            <Avatar className="h-5 w-5">
+                              {isAvatarUrl(selectedAgent.avatar) && (
+                                <AvatarImage src={selectedAgent.avatar} alt={selectedAgent.name} />
+                              )}
+                              <AvatarFallback className="text-xs bg-transparent">
+                                {selectedAgent.avatar}
+                              </AvatarFallback>
+                            </Avatar>
+                          ) : (
+                            <Bot className="h-4 w-4 text-primary terminal-glow" />
+                          )}
+                          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                        </motion.button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-64">
+                        {/* No agent / default option */}
+                        <DropdownMenuItem
+                          onClick={() => setSelectedAgentId(null)}
+                          className="flex items-center gap-2"
+                        >
+                          <Bot className="h-4 w-4" />
+                          <span className="flex-1">Default Assistant</span>
+                          {!selectedAgentId && <Check className="h-4 w-4 text-primary" />}
+                        </DropdownMenuItem>
+
+                        {availableAgents.length > 0 && <DropdownMenuSeparator />}
+
+                        {agentsLoading ? (
+                          <DropdownMenuItem disabled>
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Loading agents...
+                          </DropdownMenuItem>
+                        ) : (
+                          availableAgents.map(agent => {
+                            const isSelected = selectedAgentId === agent.id
+                            const isRecommended = recommendedAgent?.id === agent.id
+                            return (
+                              <DropdownMenuItem
+                                key={agent.id}
+                                onClick={() => setSelectedAgentId(agent.id)}
+                                className="flex items-center gap-2"
+                              >
+                                <Avatar className="h-5 w-5 shrink-0">
+                                  {isAvatarUrl(agent.avatar) && (
+                                    <AvatarImage src={agent.avatar} alt={agent.name} />
+                                  )}
+                                  <AvatarFallback className="text-xs bg-transparent">
+                                    {agent.avatar}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-sm truncate">{agent.name}</span>
+                                    {isRecommended && (
+                                      <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-primary/10 text-primary border-primary/30">
+                                        Recommended
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {agent.description}
+                                  </p>
+                                </div>
+                                {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
+                              </DropdownMenuItem>
+                            )
+                          })
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <div className="min-w-0 flex-1">
                       <h3 className="text-sm font-semibold terminal-glow truncate">
                         {activeConv.title.length > 20 ? activeConv.title.slice(0, 20) + '...' : activeConv.title}
                       </h3>
@@ -371,6 +461,13 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                           >
                             Generating...
                           </motion.span>
+                        ) : selectedAgent ? (
+                          <span className="truncate flex items-center gap-1">
+                            {selectedAgent.name}
+                            {isAgentAutoSelected && (
+                              <span className="text-primary/60">(auto)</span>
+                            )}
+                          </span>
                         ) : (
                           <span className="truncate">
                             {availableModels.find(m => m.id === (activeConv.model || settings.model))?.name || 'Loading...'}
@@ -839,24 +936,15 @@ function isAvatarUrl(str: string): boolean {
 export function AIDrawerToggle({ className = "", currentSection }: AIDrawerToggleProps) {
   const context = useAIDrawerSafe()
 
-  // Fetch agents to find matching one for current section
-  const { data: agentsData } = useQuery<{ agents: AgentCard[] }>({
-    queryKey: ['agents-registry'],
-    queryFn: async () => {
-      const res = await fetch('/api/ai/agents/registry')
-      if (!res.ok) throw new Error('Failed to fetch agents')
-      return res.json()
-    },
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
-  })
+  // Sync currentSection to context when it changes
+  React.useEffect(() => {
+    if (context && currentSection) {
+      context.setCurrentSection(currentSection)
+    }
+  }, [context, currentSection])
 
-  // Find agent matching current section
-  const matchingAgent = React.useMemo(() => {
-    if (!currentSection || !agentsData?.agents) return null
-    return agentsData.agents.find(
-      (agent) => agent.enabled && agent.sections?.includes(currentSection)
-    ) || null
-  }, [currentSection, agentsData?.agents])
+  // Use recommended agent from context (or fall back to local lookup)
+  const matchingAgent = context?.recommendedAgent ?? null
 
   // Don't render if context is not available
   if (!context) return null
