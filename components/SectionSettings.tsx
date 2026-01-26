@@ -49,6 +49,7 @@ import {
   Video,
   BarChart3,
   Beaker,
+  GitBranch,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -92,6 +93,7 @@ const sectionMeta: Record<ToggleableSection, { label: string; icon: React.Elemen
   profile: { label: "Profile", icon: User, description: "Account & sync" },
   kanban: { label: "Kanban", icon: LayoutGrid, description: "Visual task board" },
   "music-player": { label: "Music Player", icon: Music, description: "Synthwave music player" },
+  flowchart: { label: "Flowchart", icon: GitBranch, description: "Workflow designer" },
 }
 
 // Sortable section item component
