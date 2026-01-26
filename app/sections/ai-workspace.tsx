@@ -338,25 +338,40 @@ export default function AIWorkspaceSection({
 
   // Start a new conversation with a specific agent (from landing page gallery)
   const handleStartChatWithAgent = (agent: AgentCard) => {
-    setSelectedAgent(agent)
-    // Update settings with agent's config
-    setSettings(prev => ({
-      ...prev,
-      systemPrompt: agent.system_prompt,
-      temperature: agent.config.temperature,
-    }))
+    // Handle vanilla Claude (no agent) specially
+    const isVanilla = agent.id === '__vanilla__'
 
-    // Create a new conversation with this agent
+    if (isVanilla) {
+      setSelectedAgent(null)
+      setSettings(prev => ({
+        ...prev,
+        systemPrompt: '',
+        temperature: 0.7,
+      }))
+    } else {
+      setSelectedAgent(agent)
+      // Update settings with agent's config
+      setSettings(prev => ({
+        ...prev,
+        systemPrompt: agent.system_prompt,
+        temperature: agent.config.temperature,
+      }))
+    }
+
+    // Create a new conversation (with or without agent)
     const newConv: Conversation = {
       id: generateId(),
-      title: `Chat with ${agent.name}`,
+      title: isVanilla ? 'New Conversation' : `Chat with ${agent.name}`,
       messages: [],
       createdAt: new Date(),
       updatedAt: new Date(),
       model: settings.model,
       projectPath: selectedProjectPath,
-      agentId: agent.id,
-      settings: {
+      agentId: isVanilla ? undefined : agent.id,
+      settings: isVanilla ? {
+        systemPrompt: '',
+        temperature: 0.7,
+      } : {
         systemPrompt: agent.system_prompt,
         temperature: agent.config.temperature,
       },

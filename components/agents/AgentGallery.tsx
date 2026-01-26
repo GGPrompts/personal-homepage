@@ -58,9 +58,30 @@ export function AgentGallery({
     return Array.from(sections).sort()
   }, [agents])
 
+  // Virtual "vanilla Claude" agent for starting without a custom agent
+  const vanillaClaudeAgent: AgentCardType = React.useMemo(() => ({
+    id: '__vanilla__',
+    name: 'Claude',
+    description: 'Start a conversation with Claude without any custom agent configuration',
+    avatar: '🤖',
+    system_prompt: '',
+    personality: ['helpful'],
+    sections: [],
+    enabled: true,
+    mcp_tools: [],
+    selectors: [],
+    config: {
+      model: 'sonnet',
+      temperature: 0.7,
+      max_tokens: 8192,
+    },
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }), [])
+
   // Filter agents based on search and section
   const filteredAgents = React.useMemo(() => {
-    return agents.filter((agent) => {
+    const filtered = agents.filter((agent) => {
       // Search filter
       const searchLower = searchQuery.toLowerCase()
       const matchesSearch =
@@ -77,7 +98,20 @@ export function AgentGallery({
       // Only show enabled agents by default
       return matchesSearch && matchesSection && agent.enabled
     })
-  }, [agents, searchQuery, activeSection])
+
+    // Add vanilla Claude at the start if it matches the search
+    const vanillaMatchesSearch = !searchQuery ||
+      'claude'.includes(searchQuery.toLowerCase()) ||
+      'vanilla'.includes(searchQuery.toLowerCase()) ||
+      vanillaClaudeAgent.description.toLowerCase().includes(searchQuery.toLowerCase())
+
+    // Only show vanilla option when no section filter is active
+    if (vanillaMatchesSearch && !activeSection) {
+      return [vanillaClaudeAgent, ...filtered]
+    }
+
+    return filtered
+  }, [agents, searchQuery, activeSection, vanillaClaudeAgent])
 
   // Handle section filter change
   const handleSectionFilter = (section: string | null) => {

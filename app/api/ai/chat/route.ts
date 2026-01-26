@@ -269,13 +269,16 @@ export async function POST(request: NextRequest) {
               }
             }
 
-            // Accumulate clean text for JSONL storage
+            // Accumulate clean text for JSONL storage (without event markers)
             if (text) {
               fullResponse += text
+            }
 
-              // Send content chunk
+            // Send content chunk with RAW value (preserving event markers for client-side parsing)
+            // The client needs the event markers to render tool uses
+            if (value) {
               const data = JSON.stringify({
-                content: text,
+                content: value,
                 done: false,
                 model: backend,
                 conversationId: convId
