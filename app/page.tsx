@@ -18,7 +18,6 @@ import {
   ArrowUp,
   ArrowDown,
   Zap,
-  FileText,
   CheckCircle2,
   Search,
   TrendingUp,
@@ -76,7 +75,6 @@ import { LocalOnlyOverlay, LocalOnlyBadge, EnvironmentBadge } from "@/components
 import WeatherDashboard from "./sections/weather"
 import DailyFeedSection from "./sections/daily-feed"
 import ApiPlaygroundSection from "./sections/api-playground"
-import QuickNotesSection from "./sections/quick-notes"
 import BookmarksSection from "./sections/bookmarks"
 import SearchHubSection from "./sections/search-hub"
 import AIWorkspaceSection from "./sections/ai-workspace"
@@ -132,7 +130,6 @@ const navigationItems: NavigationItem[] = [
   { id: "feed", label: "Daily Feed", icon: Newspaper, description: "Aggregated content" },
   { id: "market-pulse", label: "Market Pulse", icon: TrendingUp, description: "Tech salary & job trends" },
   { id: "api-playground", label: "API Playground", icon: Zap, description: "Test & debug APIs" },
-  { id: "notes", label: "Docs Editor", icon: FileText, description: "GitHub-synced documentation" },
   { id: "bookmarks", label: "Bookmarks", icon: Bookmark, description: "Quick links" },
   { id: "search", label: "Search Hub", icon: Search, description: "Search, AI & Image" },
   { id: "ai-workspace", label: "AI Workspace", icon: MessageSquare, description: "Chat with AI models" },
@@ -746,7 +743,6 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
             feed: null, // Handled above
             "market-pulse": { icon: TrendingUp, label: "Market Pulse", description: "Tech salary & job trends" },
             "api-playground": { icon: Zap, label: "API Playground", description: "Test and debug API requests" },
-            notes: { icon: FileText, label: "Docs Editor", description: "GitHub-synced documentation" },
             bookmarks: { icon: Bookmark, label: "Bookmarks", description: "Organized quick links" },
             search: { icon: Search, label: "Search Hub", description: "Multi-engine web search" },
             "ai-workspace": { icon: MessageSquare, label: "AI Workspace", description: "Chat with Claude & local models" },
@@ -906,8 +902,6 @@ export default function PersonalHomepage() {
         return <MarketPulseSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "api-playground":
         return <ApiPlaygroundSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
-      case "notes":
-        return <QuickNotesSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("profile")} />
       case "bookmarks":
         return <BookmarksSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("profile")} />
       case "search":

@@ -32,7 +32,17 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
   const { navigateTreeTo } = useFilesContext()
 
   const [activeTab, setActiveTab] = useState<string>('files')
-  const [fileSource, setFileSource] = useState<FileSource>('local')
+  const [fileSource, setFileSource] = useState<FileSource>(() => {
+    // Check if coming from Projects page with GitHub context
+    if (typeof window !== 'undefined') {
+      const initialSource = localStorage.getItem('files-initial-source')
+      if (initialSource === 'github') {
+        localStorage.removeItem('files-initial-source')
+        return 'github'
+      }
+    }
+    return 'local'
+  })
 
   // Handle initial path navigation from external sources
   useEffect(() => {

@@ -737,9 +737,10 @@ export default function ProjectsDashboard({
                         size="icon"
                         className="h-8 w-8"
                         onClick={() => {
-                          // Set the repo for Quick Notes and navigate
+                          // Set the repo and source for Files section and navigate
                           localStorage.setItem("github-notes-repo", project.github!.full_name)
-                          onNavigateToSection("notes")
+                          localStorage.setItem("files-initial-source", "github")
+                          onNavigateToSection("files")
                         }}
                         data-tabz-action="open-docs"
                       >
