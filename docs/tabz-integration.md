@@ -235,7 +235,6 @@ All interactive elements have `data-tabz-*` attributes for reliable MCP tool tar
 | `[data-tabz-section="weather"][data-tabz-action="navigate"]` | Go to Weather |
 | `[data-tabz-section="bookmarks"][data-tabz-action="navigate"]` | Go to Bookmarks |
 | `[data-tabz-section="ai-workspace"][data-tabz-action="navigate"]` | Go to AI Workspace |
-| `[data-tabz-section="setup"][data-tabz-action="navigate"]` | Go to Setup Wizard |
 | `[data-tabz-action="toggle-sidebar"]` | Collapse/expand sidebar |
 | `[data-tabz-action="toggle-mobile-menu"]` | Open mobile menu |
 | `[data-tabz-container="main"]` | Main content area |
@@ -345,20 +344,6 @@ All interactive elements have `data-tabz-*` attributes for reliable MCP tool tar
 | `[data-tabz-item^="bookmark-"]` | Individual bookmark results |
 | `[data-tabz-action="open-bookmark"]` | Open bookmark button |
 
-### Setup Wizard Section
-
-| Selector | Purpose |
-|----------|---------|
-| `[data-tabz-section="setup"]` | Setup container |
-| `[data-tabz-step="api-keys"]` | API keys step |
-| `[data-tabz-step="sections"]` | Sections step |
-| `[data-tabz-step="tabz"]` | TabzChrome step |
-| `[data-tabz-step="import-export"]` | Import/export step |
-| `[data-tabz-input="finnhub-api-key"]` | Finnhub key input |
-| `[data-tabz-input="anthropic-api-key"]` | Anthropic key input |
-| `[data-tabz-button="test-finnhub"]` | Test Finnhub button |
-| `[data-tabz-button="test-tabz-spawn"]` | Test spawn button |
-
 ### Common Automation Patterns
 
 **Navigate to a Section:**
@@ -414,18 +399,6 @@ tabz_click('[data-tabz-item="bookmark-0"]')
 tabz_click('[data-tabz-section="tasks"][data-tabz-action="navigate"]')
 tabz_fill('[data-tabz-input="new-task"]', 'Review pull request #42')
 tabz_click('[data-tabz-action="add-task"]')
-```
-
-**Configure via Setup Wizard:**
-
-```python
-tabz_click('[data-tabz-section="setup"][data-tabz-action="navigate"]')
-# Fill in API keys
-tabz_fill('[data-tabz-input="finnhub-api-key"]', 'your-key')
-tabz_click('[data-tabz-button="test-finnhub"]')
-# Navigate to TabzChrome step
-tabz_click('[data-tabz-step="tabz"]')
-tabz_click('[data-tabz-button="test-tabz-spawn"]')
 ```
 
 **Quick Terminal Spawn (Direct API):**
