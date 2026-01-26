@@ -692,6 +692,8 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
         messages: [],
         title: 'New Conversation',
         updatedAt: new Date(),
+        claudeSessionId: null, // Reset session to start fresh
+        usage: null, // Clear token usage
       }
     }))
   }, [activeConvId])
