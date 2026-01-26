@@ -3,11 +3,12 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import {
   Plug,
-  FileCode,
   HardDrive,
   Github,
+  PanelRightClose,
+  PanelRightOpen,
 } from 'lucide-react'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs' // Tabs still used for local/github toggle
 import { FilesProvider, useFilesContext } from '@/app/contexts/FilesContext'
 import { FileTree } from '@/app/components/files/FileTree'
 import { FileViewer } from '@/app/components/files/FileViewer'
@@ -16,6 +17,7 @@ import { GitHubFileTree } from '@/app/components/files/GitHubFileTree'
 import { GitHubFileViewer } from '@/app/components/files/GitHubFileViewer'
 import { useWorkingDirectory } from '@/hooks/useWorkingDirectory'
 import { useAuth } from '@/components/AuthProvider'
+import { cn } from '@/lib/utils'
 
 interface FilesSectionProps {
   activeSubItem?: string | null
@@ -31,7 +33,7 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
   const { user, getGitHubToken } = useAuth()
   const { navigateTreeTo } = useFilesContext()
 
-  const [activeTab, setActiveTab] = useState<string>('files')
+  const [showPlugins, setShowPlugins] = useState<boolean>(true)
   const [fileSource, setFileSource] = useState<FileSource>(() => {
     // Check if coming from Projects page with GitHub context
     if (typeof window !== 'undefined') {
@@ -135,76 +137,70 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
         </div>
       </div>
 
-      {/* Main content area */}
+      {/* Main content area - File viewer */}
       <div className="flex-1 flex flex-col min-w-0">
         <div className="glass-dark rounded-lg border border-border h-full flex flex-col overflow-hidden">
-          {fileSource === 'local' ? (
-            // Local file mode - tabs for Files/Plugins
-            <Tabs
-              value={activeTab}
-              onValueChange={setActiveTab}
-              className="h-full flex flex-col"
-            >
-              {/* Tab list */}
-              <div className="px-4 pt-3 pb-0 border-b border-border/50 bg-background/30 flex-shrink-0">
-                <TabsList className="bg-muted/50">
-                  <TabsTrigger
-                    value="files"
-                    className="data-[state=active]:bg-primary/20 gap-1.5"
-                    data-tabz-action="tab-files"
-                  >
-                    <FileCode className="h-4 w-4" />
-                    Files
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="plugins"
-                    className="data-[state=active]:bg-primary/20 gap-1.5"
-                    data-tabz-action="tab-plugins"
-                  >
-                    <Plug className="h-4 w-4" />
-                    Plugins
-                  </TabsTrigger>
-                </TabsList>
+          {/* Header with plugins toggle */}
+          <div className="px-4 py-2 border-b border-border/50 bg-background/30 flex-shrink-0 flex items-center justify-between">
+            <span className="text-sm font-medium text-muted-foreground">
+              {fileSource === 'local' ? 'File Viewer' : 'GitHub Viewer'}
+            </span>
+            {fileSource === 'local' && (
+              <button
+                onClick={() => setShowPlugins(!showPlugins)}
+                className={cn(
+                  'flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors',
+                  showPlugins
+                    ? 'bg-primary/20 text-primary'
+                    : 'hover:bg-white/10 text-muted-foreground'
+                )}
+                data-tabz-action="toggle-plugins"
+                title={showPlugins ? 'Hide plugins panel' : 'Show plugins panel'}
+              >
+                {showPlugins ? (
+                  <PanelRightClose className="h-3.5 w-3.5" />
+                ) : (
+                  <PanelRightOpen className="h-3.5 w-3.5" />
+                )}
+                <Plug className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* File content */}
+          <div className="flex-1 overflow-hidden p-2">
+            {fileSource === 'local' ? (
+              <FileViewer />
+            ) : token && repo ? (
+              <GitHubFileViewer
+                token={token}
+                repo={repo}
+                selectedFile={selectedGitHubFile}
+                onFileDeleted={handleGitHubFileDeleted}
+                className="h-full"
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center text-muted-foreground">
+                <div className="flex flex-col items-center gap-3">
+                  <Github className="h-12 w-12 opacity-50" />
+                  <span className="text-sm">
+                    {!token ? 'Sign in to GitHub to browse files' : 'Select a repository in the sidebar'}
+                  </span>
+                </div>
               </div>
-
-              {/* Tab content */}
-              <TabsContent value="files" className="flex-1 mt-0 overflow-hidden">
-                <div className="h-full p-2">
-                  <FileViewer />
-                </div>
-              </TabsContent>
-
-              <TabsContent value="plugins" className="flex-1 mt-0 overflow-hidden">
-                <div className="h-full p-2">
-                  <PluginList />
-                </div>
-              </TabsContent>
-            </Tabs>
-          ) : (
-            // GitHub mode - single file viewer
-            <div className="h-full p-2">
-              {token && repo ? (
-                <GitHubFileViewer
-                  token={token}
-                  repo={repo}
-                  selectedFile={selectedGitHubFile}
-                  onFileDeleted={handleGitHubFileDeleted}
-                  className="h-full"
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  <div className="flex flex-col items-center gap-3">
-                    <Github className="h-12 w-12 opacity-50" />
-                    <span className="text-sm">
-                      {!token ? 'Sign in to GitHub to browse files' : 'Select a repository in the sidebar'}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Right sidebar - Plugins panel (only for local files) */}
+      {fileSource === 'local' && showPlugins && (
+        <div className="w-full lg:w-80 xl:w-96 flex-shrink-0 lg:h-full">
+          <div className="glass-dark rounded-lg border border-border h-full overflow-hidden">
+            <PluginList />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

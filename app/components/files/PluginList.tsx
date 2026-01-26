@@ -22,7 +22,6 @@ import { useWorkingDirectory } from '@/hooks/useWorkingDirectory'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
@@ -419,43 +418,43 @@ export function PluginList() {
 
   if (pluginsLoading) {
     return (
-      <Card className="glass-dark h-full flex flex-col">
-        <CardHeader className="pb-2 border-b border-border/30">
-          <CardTitle className="text-sm font-semibold">Plugins</CardTitle>
-        </CardHeader>
-        <CardContent className="flex-1 flex items-center justify-center">
+      <div className="h-full flex flex-col">
+        <div className="px-4 py-3 border-b border-border/30">
+          <span className="text-sm font-semibold">Plugins</span>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
           <div className="flex items-center gap-2 text-muted-foreground">
             <RefreshCw className="w-4 h-4 animate-spin" />
             <span>Loading...</span>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     )
   }
 
   if (!pluginsData || pluginsData.totalPlugins === 0) {
     return (
-      <Card className="glass-dark h-full flex flex-col">
-        <CardHeader className="pb-2 border-b border-border/30">
-          <CardTitle className="text-sm font-semibold">Plugins</CardTitle>
-        </CardHeader>
-        <CardContent className="flex-1 flex items-center justify-center p-4">
+      <div className="h-full flex flex-col">
+        <div className="px-4 py-3 border-b border-border/30">
+          <span className="text-sm font-semibold">Plugins</span>
+        </div>
+        <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center text-muted-foreground">
             <Plug className="w-8 h-8 mx-auto mb-2 opacity-50" />
             <p>No plugins installed</p>
             <p className="text-xs mt-1">Use <code className="bg-white/10 px-1 rounded">/plugin add &lt;url&gt;</code> to add a marketplace</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     )
   }
 
   return (
-    <Card className="glass-dark h-full flex flex-col">
+    <div className="h-full flex flex-col">
       {/* Header */}
-      <CardHeader className="pb-2 border-b border-border/30">
+      <div className="px-4 py-3 border-b border-border/30">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-semibold">Plugins</CardTitle>
+          <span className="text-sm font-semibold">Plugins</span>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">
               {pluginsData.enabledCount}/{pluginsData.totalPlugins} enabled
@@ -492,9 +491,9 @@ export function PluginList() {
             </button>
           </div>
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Filter tabs */}
         <div className="flex items-center gap-1 px-3 py-2 border-b border-border/30">
           {(['all', 'enabled', 'disabled'] as PluginFilter[]).map(f => (
@@ -792,7 +791,7 @@ export function PluginList() {
             ))
           )}
         </ScrollArea>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
