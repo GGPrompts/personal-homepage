@@ -16,6 +16,9 @@ import {
   Loader2,
   ChevronDown,
   Check,
+  PanelRightClose,
+  PanelRight,
+  PanelRightOpen,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -24,7 +27,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
-import { useAIDrawerSafe } from "./AIDrawerProvider"
+import { useAIDrawerSafe, DRAWER_WIDTH_VALUES } from "./AIDrawerProvider"
 import { ChatMessage, TypingIndicator } from "./ChatMessage"
 import { ChatInput } from "./ChatInput"
 import { useQuery } from "@tanstack/react-query"
@@ -48,7 +51,6 @@ interface AIDrawerProps {
 const DRAWER_WIDTHS = {
   collapsed: 0,
   minimized: 320, // Width of minimized header bar
-  expanded: 420, // Full expanded width
 } as const
 
 // ============================================================================
@@ -199,7 +201,13 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
     availableAgents,
     agentsLoading,
     isAgentAutoSelected,
+    // Width
+    drawerWidth,
+    cycleDrawerWidth,
   } = context
+
+  // Get the expanded width from preference
+  const expandedWidth = DRAWER_WIDTH_VALUES[drawerWidth]
 
   // Get the currently selected agent
   const selectedAgent = React.useMemo(() => {
@@ -328,19 +336,19 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
           <motion.div
             initial={shouldReduceMotion
               ? panelVariantsReduced.hidden
-              : { x: DRAWER_WIDTHS.expanded, opacity: 0 }
+              : { x: expandedWidth, opacity: 0 }
             }
             animate={shouldReduceMotion
               ? panelVariantsReduced.visible
-              : { x: 0, opacity: 1, width: isExpanded ? DRAWER_WIDTHS.expanded : DRAWER_WIDTHS.minimized }
+              : { x: 0, opacity: 1, width: isExpanded ? expandedWidth : DRAWER_WIDTHS.minimized }
             }
             exit={shouldReduceMotion
               ? panelVariantsReduced.exit
-              : { x: DRAWER_WIDTHS.expanded, opacity: 0 }
+              : { x: expandedWidth, opacity: 0 }
             }
             transition={shouldReduceMotion ? quickTransition : drawerSpring}
             className={`fixed top-0 right-0 bottom-0 z-50 flex flex-col ${className}`}
-            style={shouldReduceMotion ? { width: isExpanded ? DRAWER_WIDTHS.expanded : DRAWER_WIDTHS.minimized } : undefined}
+            style={shouldReduceMotion ? { width: isExpanded ? expandedWidth : DRAWER_WIDTHS.minimized } : undefined}
             data-tabz-region="ai-drawer"
             data-tabz-section="ai-drawer"
           >
@@ -534,6 +542,32 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                           </motion.div>
                         </TooltipTrigger>
                         <TooltipContent>Settings</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <motion.div whileHover={shouldReduceMotion ? undefined : { scale: 1.1 }} whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 transition-colors hover:bg-primary/20 hover:text-primary"
+                              onClick={cycleDrawerWidth}
+                              data-tabz-action="cycle-drawer-width"
+                            >
+                              {drawerWidth === 'narrow' ? (
+                                <PanelRightClose className="h-4 w-4" />
+                              ) : drawerWidth === 'default' ? (
+                                <PanelRight className="h-4 w-4" />
+                              ) : (
+                                <PanelRightOpen className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </motion.div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {drawerWidth === 'narrow' ? 'Narrow' : drawerWidth === 'default' ? 'Default' : 'Wide'} width (click to cycle)
+                        </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                     <motion.div whileHover={shouldReduceMotion ? undefined : { scale: 1.1 }} whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}>

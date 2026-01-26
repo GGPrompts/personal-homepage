@@ -11,6 +11,13 @@ import type { AgentCard } from "@/lib/agents/types"
 // ============================================================================
 
 export type AIDrawerState = "collapsed" | "minimized" | "expanded"
+export type AIDrawerWidth = "narrow" | "default" | "wide"
+
+export const DRAWER_WIDTH_VALUES: Record<AIDrawerWidth, number> = {
+  narrow: 360,
+  default: 480,
+  wide: 640,
+}
 
 export interface AIDrawerContextType extends UseAIChatReturn {
   /** Current drawer state: collapsed (hidden), minimized (header bar), expanded (full chat) */
@@ -59,6 +66,12 @@ export interface AIDrawerContextType extends UseAIChatReturn {
   agentsLoading: boolean
   /** Whether the selected agent was auto-selected based on section */
   isAgentAutoSelected: boolean
+  /** Current drawer width preference */
+  drawerWidth: AIDrawerWidth
+  /** Set drawer width */
+  setDrawerWidth: (width: AIDrawerWidth) => void
+  /** Cycle to next width preset */
+  cycleDrawerWidth: () => void
 }
 
 const AIDrawerContext = createContext<AIDrawerContextType | null>(null)
@@ -95,6 +108,7 @@ const STORAGE_KEY_STATE = "ai-drawer-state"
 const STORAGE_KEY_HAS_CONVERSATION = "ai-drawer-has-conversation"
 const STORAGE_KEY_PROJECT_PATH = "ai-drawer-project-path"
 const STORAGE_KEY_SELECTED_AGENT = "ai-drawer-selected-agent"
+const STORAGE_KEY_WIDTH = "ai-drawer-width"
 
 // ============================================================================
 // PROVIDER
@@ -148,6 +162,16 @@ export function AIDrawerProvider({
 
   // Track if user has manually selected an agent (to prevent auto-selection override)
   const [userHasSelectedAgent, setUserHasSelectedAgent] = useState(false)
+
+  // Drawer width preference
+  const [drawerWidth, setDrawerWidthState] = useState<AIDrawerWidth>(() => {
+    if (typeof window === "undefined") return "default"
+    const saved = localStorage.getItem(STORAGE_KEY_WIDTH)
+    if (saved === "narrow" || saved === "default" || saved === "wide") {
+      return saved
+    }
+    return "default"
+  })
 
   // Fetch available agents
   const { data: agentsData, isLoading: agentsLoading } = useQuery<{ agents: AgentCard[] }>({
@@ -216,6 +240,26 @@ export function AIDrawerProvider({
       localStorage.removeItem(STORAGE_KEY_SELECTED_AGENT)
     }
   }, [selectedAgentId])
+
+  // Persist drawer width
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_WIDTH, drawerWidth)
+  }, [drawerWidth])
+
+  // Width actions
+  const setDrawerWidth = useCallback((width: AIDrawerWidth) => {
+    setDrawerWidthState(width)
+  }, [])
+
+  const cycleDrawerWidth = useCallback(() => {
+    setDrawerWidthState((current) => {
+      switch (current) {
+        case "narrow": return "default"
+        case "default": return "wide"
+        case "wide": return "narrow"
+      }
+    })
+  }, [])
 
   // Update hasActiveConversation based on chat state
   useEffect(() => {
@@ -298,6 +342,10 @@ export function AIDrawerProvider({
     availableAgents,
     agentsLoading,
     isAgentAutoSelected,
+    // Width
+    drawerWidth,
+    setDrawerWidth,
+    cycleDrawerWidth,
   }
 
   return (
