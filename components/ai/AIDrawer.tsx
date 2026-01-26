@@ -977,6 +977,12 @@ function isAvatarUrl(str: string): boolean {
 export function AIDrawerToggle({ className = "", currentSection }: AIDrawerToggleProps) {
   const context = useAIDrawerSafe()
 
+  // Track if component has mounted (for hydration-safe rendering)
+  const [mounted, setMounted] = React.useState(false)
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
   // Sync currentSection to context when it changes
   React.useEffect(() => {
     if (context && currentSection) {
@@ -1018,7 +1024,7 @@ export function AIDrawerToggle({ className = "", currentSection }: AIDrawerToggl
       data-tabz-action="toggle-ai-drawer"
     >
       {renderIcon()}
-      {hasActiveConversation && !isOpen && (
+      {mounted && hasActiveConversation && !isOpen && (
         <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary animate-pulse" />
       )}
     </Button>
