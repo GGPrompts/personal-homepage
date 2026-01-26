@@ -17,6 +17,7 @@ import ProjectCommands from "@/components/projects/ProjectCommands"
 import ProjectKanban from "@/components/projects/ProjectKanban"
 import ProjectLinks from "@/components/projects/ProjectLinks"
 import ProjectSourceControl from "@/components/projects/ProjectSourceControl"
+import ProjectAgents from "@/components/projects/ProjectAgents"
 
 export default function ProjectDetailPage() {
   const params = useParams()
@@ -95,6 +96,7 @@ export default function ProjectDetailPage() {
           <TabsTrigger value="commands">Commands</TabsTrigger>
           <TabsTrigger value="kanban">Kanban</TabsTrigger>
           <TabsTrigger value="links">Links</TabsTrigger>
+          <TabsTrigger value="agents">Agents</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -115,6 +117,10 @@ export default function ProjectDetailPage() {
 
         <TabsContent value="links">
           <ProjectLinks project={project} />
+        </TabsContent>
+
+        <TabsContent value="agents">
+          <ProjectAgents project={project} />
         </TabsContent>
       </Tabs>
     </div>
