@@ -257,6 +257,7 @@ export function AIDrawerProvider({
         case "narrow": return "default"
         case "default": return "wide"
         case "wide": return "narrow"
+        default: return current
       }
     })
   }, [])
@@ -302,6 +303,7 @@ export function AIDrawerProvider({
   }, [])
 
   // Open drawer with a message
+  // TODO: [code-review] sendMessage promise not caught - verify error handling in chat.sendMessage
   const openWithMessage = useCallback(async (
     content: string,
     options?: { projectPath?: string | null }

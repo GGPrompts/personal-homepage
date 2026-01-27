@@ -101,6 +101,7 @@ export function ChatInput({
   const shouldReduceMotion = useReducedMotion()
 
   // Auto-resize textarea
+  // TODO: [code-review] effectiveRef in dependency array may cause unnecessary re-runs - consider removing
   React.useEffect(() => {
     const textarea = effectiveRef.current
     if (textarea) {

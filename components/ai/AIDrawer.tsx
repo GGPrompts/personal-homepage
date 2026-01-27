@@ -216,6 +216,7 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
   }, [selectedAgentId, availableAgents])
 
   // Fetch local projects
+  // TODO: [code-review] Consider adding console.error before returning [] on fetch failure
   const { data: localProjects } = useQuery({
     queryKey: ['local-projects'],
     queryFn: async () => {
@@ -228,6 +229,7 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
   })
 
   // Fetch GitHub projects
+  // TODO: [code-review] Consider adding console.error for token missing and fetch failure cases
   const { data: githubProjects } = useQuery({
     queryKey: ['github-projects-for-ai-drawer'],
     queryFn: async () => {
@@ -484,8 +486,9 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                             )}
                           </span>
                         ) : (
+                          // TODO: [code-review] availableModels accessed without null check - verify it's always an array
                           <span className="truncate">
-                            {availableModels.find(m => m.id === (activeConv.model || settings.model))?.name || 'Loading...'}
+                            {availableModels?.find(m => m.id === (activeConv.model || settings.model))?.name || 'Loading...'}
                           </span>
                         )}
                       </div>

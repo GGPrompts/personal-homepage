@@ -455,9 +455,9 @@ export function ChatMessage({
             {renderContent(message.content)}
           </div>
 
-          <div className="flex items-center gap-2 mt-2 text-xs opacity-60">
+          <div className="flex items-center gap-2 mt-2 text-xs opacity-60" suppressHydrationWarning>
             <Clock className="h-3 w-3" />
-            {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            <span suppressHydrationWarning>{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
             {!isUser && modelColors && modelName && (
               <>
                 <span className="opacity-50">&middot;</span>
