@@ -9,6 +9,7 @@ import {
   type ModelInfo,
   type BackendStatus,
   type GeneratingConversations,
+  type TokenUsage,
   generateId,
   parseClaudeEvents,
   loadConversations,
@@ -17,6 +18,7 @@ import {
   setGenerating,
   clearGenerating,
   isGenerating,
+  accumulateUsage,
   GENERATING_STORAGE_KEY,
 } from "@/lib/ai-workspace"
 
@@ -492,10 +494,17 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
             if (chunk.done) {
               setConversations(prev => prev.map(conv => {
                 if (conv.id !== activeConvId) return conv
+
+                // Accumulate usage data for accurate context tracking
+                const newCumulativeUsage = chunk.usage
+                  ? accumulateUsage(conv.cumulativeUsage ?? null, chunk.usage as TokenUsage)
+                  : conv.cumulativeUsage
+
                 return {
                   ...conv,
                   ...(chunk.claudeSessionId && { claudeSessionId: chunk.claudeSessionId }),
                   ...(chunk.usage && { usage: chunk.usage }),
+                  ...(newCumulativeUsage && { cumulativeUsage: newCumulativeUsage }),
                 }
               }))
             }
@@ -694,6 +703,7 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
         updatedAt: new Date(),
         claudeSessionId: null, // Reset session to start fresh
         usage: null, // Clear token usage
+        cumulativeUsage: null, // Clear cumulative tracking
       }
     }))
   }, [activeConvId])

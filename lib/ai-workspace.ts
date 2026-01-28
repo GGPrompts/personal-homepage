@@ -49,6 +49,57 @@ export interface TokenUsage {
   totalTokens: number
 }
 
+// Cumulative token usage across a session (accumulated from all API calls)
+export interface CumulativeUsage {
+  // Running totals
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheCreationTokens: number
+  // Computed context estimate (input + cache)
+  contextTokens: number
+  // Number of messages that contributed to this total
+  messageCount: number
+  // Last updated timestamp
+  lastUpdated: Date
+}
+
+// Helper to accumulate usage from a message into cumulative total
+export function accumulateUsage(
+  cumulative: CumulativeUsage | null,
+  messageUsage: TokenUsage
+): CumulativeUsage {
+  const prev = cumulative || {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    contextTokens: 0,
+    messageCount: 0,
+    lastUpdated: new Date()
+  }
+
+  // For context tracking, input_tokens represents current context size
+  // cacheReadTokens are tokens read from cache (efficient reuse)
+  // cacheCreationTokens are tokens being cached for future use
+  // The effective context size is approximately input_tokens + cacheReadTokens
+  const newInputTokens = prev.inputTokens + messageUsage.inputTokens
+  const newCacheRead = prev.cacheReadTokens + (messageUsage.cacheReadTokens || 0)
+  const newCacheCreation = prev.cacheCreationTokens + (messageUsage.cacheCreationTokens || 0)
+
+  return {
+    inputTokens: newInputTokens,
+    outputTokens: prev.outputTokens + messageUsage.outputTokens,
+    cacheReadTokens: newCacheRead,
+    cacheCreationTokens: newCacheCreation,
+    // Context is the current input context window being used
+    // Latest input_tokens reflects current context size (not cumulative)
+    contextTokens: messageUsage.inputTokens + (messageUsage.cacheReadTokens || 0),
+    messageCount: prev.messageCount + 1,
+    lastUpdated: new Date()
+  }
+}
+
 export interface Conversation {
   id: string
   title: string
@@ -59,7 +110,8 @@ export interface Conversation {
   projectPath?: string | null
   settings?: ConversationSettings
   claudeSessionId?: string | null
-  usage?: TokenUsage | null  // Actual token usage from Claude CLI (when available)
+  usage?: TokenUsage | null  // Latest message token usage from Claude CLI (when available)
+  cumulativeUsage?: CumulativeUsage | null  // Cumulative token usage across all messages
   agentId?: string | null  // Which agent was selected for this conversation
 }
 
@@ -255,6 +307,8 @@ export function loadConversations(): Conversation[] {
           messages: conv.messages.map((msg: any) => ({
             ...msg,
             timestamp: new Date(msg.timestamp),
+            // Migration: strip any event markers from old corrupted messages
+            content: msg.content?.replace(/__CLAUDE_EVENT__.*?__END_EVENT__/g, '').replace(/\n{3,}/g, '\n\n') || '',
           })),
         }
       })

@@ -10,6 +10,9 @@ import { readFile } from 'fs/promises'
 import { homedir } from 'os'
 import { join } from 'path'
 
+// Force dynamic rendering - this route reads user files
+export const dynamic = 'force-dynamic'
+
 interface DailyActivity {
   date: string
   messageCount: number

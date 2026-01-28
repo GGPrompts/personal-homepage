@@ -1,37 +1,39 @@
 # AI Workspace
 
-Multi-model AI chat interface with project context.
+Multi-model AI chat interface with project context, powered by CLI tools.
 
 ## Files
 - `app/sections/ai-workspace.tsx` - Main component
 - `lib/ai-workspace.ts` - Types and utilities
-- `app/api/chat/route.ts` - Chat API proxy
+- `hooks/useAIChat.ts` - Chat state management
+- `app/api/ai/chat/route.ts` - Chat API (routes to CLI backends)
 
 ## Features
-- Multiple AI backends:
-  - Claude (Sonnet, Opus, Haiku)
-  - OpenAI GPT-4
-  - OpenRouter models
+- **CLI-based backends** (subscription-based, no API keys):
+  - Claude Code CLI (Sonnet, Opus, Haiku) - full tool use, JSONL persistence
+  - Codex CLI (OpenAI)
+  - Gemini CLI
+  - Docker models (for local experimentation)
 - Conversation management:
+  - Persistent JSONL storage (Claude backend)
   - Create/rename/delete
   - Export to markdown
-  - Pin conversations
 - Project context:
-  - Attach local project
+  - Attach local project as working directory
   - Include codebase context
-- Tool use display
-- Token counting
-- Suggested prompts
-- Settings per conversation:
-  - Model selection
-  - Temperature
-  - Max tokens
+- Tool use display with real-time status
+- **Accurate token tracking** via Claude CLI usage data:
+  - Cumulative context tracking across messages
+  - Input/output/cache token breakdown
+  - Real-time context percentage indicator
+  - Automatic fallback to estimation for non-Claude backends
+- Agent system with specialized prompts
 - Streaming responses
 
 ## Integration
-- **Auth**: API keys in Settings
-- **Projects**: Context from Projects Dashboard
+- **Projects**: Working directory context from Projects Dashboard
 - **TabzChrome**: Bi-directional messaging
+- **Agents**: Specialized AI personas from `agents/` directory
 
 ## TabzChrome Selectors
 - `data-tabz-section="ai-workspace"` - Container
@@ -47,7 +49,8 @@ Multi-model AI chat interface with project context.
 - `data-tabz-list="messages"` - Message thread
 
 ## Configuration
-API keys required in Settings:
-- `anthropic-api-key` - Claude
-- `openai-api-key` - GPT models
-- `openrouter-api-key` - OpenRouter
+No API keys required - uses CLI tools with your existing subscriptions:
+- **Claude**: Requires Claude Code CLI (`claude`) and Claude Max/Pro subscription
+- **Codex**: Requires Codex CLI (`codex`)
+- **Gemini**: Requires Gemini CLI (`gemini`)
+- **Docker**: Local models via Docker Desktop (temperature/system prompt configurable)

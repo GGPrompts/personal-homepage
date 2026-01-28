@@ -208,6 +208,23 @@ export default function AIWorkspaceSection({
     })
   }, [localProjects, githubProjects, isPinned])
 
+  // Compute effective working directory with fallback chain:
+  // 1. User-selected project path (explicit selection)
+  // 2. Agent's workingDir (if agent has one configured)
+  // 3. Global defaultWorkingDir (from sidebar)
+  const effectiveWorkingDir = React.useMemo(() => {
+    if (selectedProjectPath) {
+      return { path: selectedProjectPath, source: 'selected' as const }
+    }
+    if (selectedAgent?.workingDir) {
+      return { path: selectedAgent.workingDir, source: 'agent' as const }
+    }
+    if (defaultWorkingDir) {
+      return { path: defaultWorkingDir, source: 'global' as const }
+    }
+    return null
+  }, [selectedProjectPath, selectedAgent?.workingDir, defaultWorkingDir])
+
   // Handle URL query param for project selection
   React.useEffect(() => {
     const projectParam = searchParams.get('project')
@@ -309,7 +326,7 @@ export default function AIWorkspaceSection({
 
   const handleSend = () => {
     if (!inputValue.trim()) return
-    sendMessage(inputValue, { projectPath: selectedProjectPath })
+    sendMessage(inputValue, { projectPath: effectiveWorkingDir?.path || null })
     setInputValue('')
   }
 
@@ -358,6 +375,12 @@ export default function AIWorkspaceSection({
       }))
     }
 
+    // Compute effective working dir for this conversation
+    // Priority: agent.workingDir > defaultWorkingDir > selectedProjectPath
+    const convWorkingDir = isVanilla
+      ? (defaultWorkingDir || selectedProjectPath)
+      : (agent.workingDir || defaultWorkingDir || selectedProjectPath)
+
     // Create a new conversation (with or without agent)
     const newConv: Conversation = {
       id: generateId(),
@@ -366,7 +389,7 @@ export default function AIWorkspaceSection({
       createdAt: new Date(),
       updatedAt: new Date(),
       model: settings.model,
-      projectPath: selectedProjectPath,
+      projectPath: convWorkingDir,
       agentId: isVanilla ? undefined : agent.id,
       settings: isVanilla ? {
         systemPrompt: '',
@@ -438,19 +461,31 @@ export default function AIWorkspaceSection({
     return modelInfo?.backend === 'claude'
   }, [availableModels])
 
-  // Calculate token usage
+  // Calculate token usage - prefer cumulative data from actual API responses
   const CONTEXT_LIMIT = 200000
   const WARNING_THRESHOLD = 0.7
   const DANGER_THRESHOLD = 0.9
 
-  const hasActualUsage = activeConv.usage && activeConv.usage.totalTokens > 0
+  // Use cumulative usage for accurate context tracking (contextTokens = current context window)
+  // Falls back to latest message usage, then to estimation
+  const hasCumulativeUsage = activeConv.cumulativeUsage && activeConv.cumulativeUsage.contextTokens > 0
+  const hasMessageUsage = activeConv.usage && activeConv.usage.totalTokens > 0
+  const hasActualUsage = hasCumulativeUsage || hasMessageUsage
 
-  let totalTokens: number
-  if (hasActualUsage) {
-    // Use actual token count from Claude CLI
-    totalTokens = activeConv.usage!.totalTokens
+  let contextTokens: number
+  let usageSource: 'cumulative' | 'message' | 'estimated'
+
+  if (hasCumulativeUsage) {
+    // Best: use cumulative contextTokens (input + cache read from latest response)
+    // This represents the actual current context window size
+    contextTokens = activeConv.cumulativeUsage!.contextTokens
+    usageSource = 'cumulative'
+  } else if (hasMessageUsage) {
+    // Good: use latest message total tokens as approximation
+    contextTokens = activeConv.usage!.totalTokens
+    usageSource = 'message'
   } else {
-    // Estimate tokens from message content only (no arbitrary baseline)
+    // Fallback: estimate tokens from message content
     // ~4 chars per token is a rough estimate for English text
     const messageTokens = activeConv.messages.reduce((sum, msg) => {
       const contentTokens = Math.ceil(msg.content.length / 4)
@@ -459,11 +494,11 @@ export default function AIWorkspaceSection({
       return sum + contentTokens + toolTokens
     }, 0)
     // Only add minimal overhead for system prompt/formatting (~500 tokens)
-    // Don't inflate with a large baseline - let actual usage data drive accuracy
-    totalTokens = messageTokens > 0 ? messageTokens + 500 : 0
+    contextTokens = messageTokens > 0 ? messageTokens + 500 : 0
+    usageSource = 'estimated'
   }
 
-  const contextUsage = totalTokens / CONTEXT_LIMIT
+  const contextUsage = contextTokens / CONTEXT_LIMIT
   const contextPercentage = Math.min(Math.round(contextUsage * 100), 100)
   const contextStatus = contextUsage >= DANGER_THRESHOLD ? 'danger'
     : contextUsage >= WARNING_THRESHOLD ? 'warning'
@@ -695,15 +730,42 @@ export default function AIWorkspaceSection({
                         </TooltipTrigger>
                         <TooltipContent side="bottom" className="max-w-xs">
                           <p className="font-medium text-xs">
-                            Context: {hasActualUsage ? '' : '~'}{totalTokens.toLocaleString()} tokens
+                            Context: {usageSource === 'estimated' ? '~' : ''}{contextTokens.toLocaleString()} tokens
                             <span className={`ml-1.5 text-[10px] px-1 py-0.5 rounded ${
-                              hasActualUsage
+                              usageSource === 'cumulative'
                                 ? 'bg-emerald-500/20 text-emerald-400'
+                                : usageSource === 'message'
+                                ? 'bg-blue-500/20 text-blue-400'
                                 : 'bg-muted text-muted-foreground'
                             }`}>
-                              {hasActualUsage ? 'actual' : 'est'}
+                              {usageSource === 'cumulative' ? 'tracked' : usageSource === 'message' ? 'actual' : 'est'}
                             </span>
                           </p>
+                          {/* Show cumulative stats when available */}
+                          {activeConv.cumulativeUsage && (
+                            <div className="text-[10px] text-muted-foreground mt-1 space-y-0.5">
+                              <div className="flex justify-between gap-2">
+                                <span>Input:</span>
+                                <span className="font-mono">{activeConv.cumulativeUsage.inputTokens.toLocaleString()}</span>
+                              </div>
+                              <div className="flex justify-between gap-2">
+                                <span>Output:</span>
+                                <span className="font-mono">{activeConv.cumulativeUsage.outputTokens.toLocaleString()}</span>
+                              </div>
+                              {(activeConv.cumulativeUsage.cacheReadTokens > 0 || activeConv.cumulativeUsage.cacheCreationTokens > 0) && (
+                                <div className="flex justify-between gap-2">
+                                  <span>Cache:</span>
+                                  <span className="font-mono">
+                                    {activeConv.cumulativeUsage.cacheReadTokens.toLocaleString()}r / {activeConv.cumulativeUsage.cacheCreationTokens.toLocaleString()}c
+                                  </span>
+                                </div>
+                              )}
+                              <div className="flex justify-between gap-2 border-t border-border/40 pt-0.5 mt-0.5">
+                                <span>Messages tracked:</span>
+                                <span className="font-mono">{activeConv.cumulativeUsage.messageCount}</span>
+                              </div>
+                            </div>
+                          )}
                           <div className="w-32 h-1.5 bg-muted rounded-full mt-1.5 overflow-hidden">
                             <div
                               className={`h-full rounded-full transition-all ${
@@ -733,30 +795,64 @@ export default function AIWorkspaceSection({
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <TabzConnectionStatus size="sm" className="hidden sm:flex" />
 
-            {availableProjects.length > 0 && (
-              <Select
-                value={selectedProjectPath || "none"}
-                onValueChange={(value) => setSelectedProjectPath(value === "none" ? null : value)}
-              >
-                <SelectTrigger className="w-[140px] sm:w-[180px] h-9 glass text-xs" data-tabz-input="project-selector">
-                  <FolderOpen className="h-3 w-3 mr-1 shrink-0" />
-                  <SelectValue placeholder="No project" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">
-                    <span className="text-muted-foreground">No project context</span>
-                  </SelectItem>
-                  {availableProjects.map(project => (
-                    <SelectItem key={project.local!.path} value={project.local!.path}>
-                      <span className="flex items-center gap-1">
-                        {isPinned(project.slug) && <span className="text-amber-500">*</span>}
-                        {project.name}
+            {/* Working Directory Indicator */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Select
+                    value={selectedProjectPath || "none"}
+                    onValueChange={(value) => setSelectedProjectPath(value === "none" ? null : value)}
+                  >
+                    <SelectTrigger
+                      className={`w-[140px] sm:w-[180px] h-9 glass text-xs ${
+                        effectiveWorkingDir ? 'border-primary/30' : ''
+                      }`}
+                      data-tabz-input="project-selector"
+                    >
+                      <FolderOpen className={`h-3 w-3 mr-1 shrink-0 ${
+                        effectiveWorkingDir ? 'text-primary' : 'text-muted-foreground'
+                      }`} />
+                      <span className="truncate">
+                        {effectiveWorkingDir
+                          ? effectiveWorkingDir.path.split('/').pop()
+                          : 'No project'}
                       </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">
+                        <span className="text-muted-foreground">
+                          {effectiveWorkingDir && effectiveWorkingDir.source !== 'selected'
+                            ? `Use ${effectiveWorkingDir.source} default`
+                            : 'No project context'}
+                        </span>
+                      </SelectItem>
+                      {availableProjects.map(project => (
+                        <SelectItem key={project.local!.path} value={project.local!.path}>
+                          <span className="flex items-center gap-1">
+                            {isPinned(project.slug) && <span className="text-amber-500">*</span>}
+                            {project.name}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs">
+                  {effectiveWorkingDir ? (
+                    <div className="text-xs">
+                      <div className="font-medium">Working directory</div>
+                      <div className="text-muted-foreground truncate">{effectiveWorkingDir.path}</div>
+                      <div className="text-muted-foreground/70 mt-1">
+                        Source: {effectiveWorkingDir.source === 'selected' ? 'manually selected' :
+                                effectiveWorkingDir.source === 'agent' ? 'agent config' : 'global setting'}
+                      </div>
+                    </div>
+                  ) : (
+                    <span>Select a project for context</span>
+                  )}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             {/* Agent Gallery Button */}
             <Dialog open={showAgentGallery} onOpenChange={setShowAgentGallery}>
@@ -860,34 +956,20 @@ export default function AIWorkspaceSection({
         {/* Messages Area */}
         <div className="flex-1 overflow-hidden min-h-0">
           <ScrollArea className="h-full">
-            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-4xl mx-auto w-full box-border">
-              {activeConv.messages.length === 0 && !activeConv.agentId ? (
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-4xl mx-auto w-full box-border" key={activeConvId}>
+              {activeConv.messages.length === 0 ? (
                 <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="h-full"
-                >
-                  {/* Agent-first landing page */}
-                  <AgentGallery
-                    agents={agentRegistry?.agents || []}
-                    selectedAgentId={selectedAgent?.id}
-                    onSelectAgent={handleStartChatWithAgent}
-                    isLoading={agentsLoading}
-                    className="h-full"
-                  />
-                </motion.div>
-              ) : activeConv.messages.length === 0 && activeConv.agentId ? (
-                <motion.div
+                  key="empty-state"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="flex flex-col items-center justify-center h-full py-12"
                 >
-                  {/* Empty state with agent selected - show sample prompts */}
+                  {/* Empty state - show agent info (if selected) and suggested prompts */}
                   {(() => {
-                    const agent = getAgentById(activeConv.agentId)
+                    const agent = activeConv.agentId ? getAgentById(activeConv.agentId) : null
                     return (
                       <div className="text-center space-y-6 max-w-2xl">
-                        {agent && (
+                        {agent ? (
                           <div className="flex flex-col items-center gap-3">
                             <Avatar className="h-16 w-16 ring-2 ring-primary/20">
                               {isAvatarUrl(agent.avatar) ? (
@@ -902,9 +984,21 @@ export default function AIWorkspaceSection({
                               <p className="text-sm text-muted-foreground">{agent.description}</p>
                             </div>
                           </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center ring-2 ring-primary/20">
+                              <MessageSquare className="h-8 w-8 text-primary/60" />
+                            </div>
+                            <div>
+                              <h3 className="text-lg font-semibold terminal-glow">Start a conversation</h3>
+                              <p className="text-sm text-muted-foreground">
+                                Type a message below or select an agent from the header
+                              </p>
+                            </div>
+                          </div>
                         )}
                         <p className="text-muted-foreground">
-                          Start a conversation or try one of these prompts:
+                          Try one of these prompts:
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {(settings.suggestedPrompts || DEFAULT_SUGGESTED_PROMPTS).slice(0, 4).map((prompt, idx) => (
