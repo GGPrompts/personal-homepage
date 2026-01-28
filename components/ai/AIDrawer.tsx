@@ -155,8 +155,17 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
   const [showConversations, setShowConversations] = React.useState(false)
   const [agentPickerOpen, setAgentPickerOpen] = React.useState(false)
 
+  // Hydration-safe: don't render drawer until mounted to avoid server/client mismatch
+  const [mounted, setMounted] = React.useState(false)
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
   // Don't render if context is not available (outside provider)
   if (!context) return null
+
+  // Don't render drawer content until mounted (prevents hydration mismatch)
+  if (!mounted) return null
 
   const {
     state,

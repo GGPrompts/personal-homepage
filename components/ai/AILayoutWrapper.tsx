@@ -58,11 +58,16 @@ export function AILayoutWrapper({ children }: AILayoutWrapperProps) {
   // This prevents hydration mismatch
   const marginRight = mounted && isDesktop ? drawerWidth : 0
 
+  // Use stable values for SSR, then update after mount
+  const drawerOpen = mounted && context?.isOpen ? "true" : "false"
+  const drawerState = mounted ? (context?.state || "collapsed") : "collapsed"
+
   return (
     <div
       className="ai-layout-wrapper min-h-screen"
-      data-drawer-open={context?.isOpen ? "true" : "false"}
-      data-drawer-state={context?.state || "collapsed"}
+      data-drawer-open={drawerOpen}
+      data-drawer-state={drawerState}
+      suppressHydrationWarning
     >
       {/* Main content area that responds to drawer state on desktop */}
       <div
