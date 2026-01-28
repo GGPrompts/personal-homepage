@@ -19,6 +19,9 @@ export const DRAWER_WIDTH_VALUES: Record<AIDrawerWidth, number> = {
   wide: 640,
 }
 
+// Minimized header bar width
+export const MINIMIZED_WIDTH = 320
+
 export interface AIDrawerContextType extends UseAIChatReturn {
   /** Current drawer state: collapsed (hidden), minimized (header bar), expanded (full chat) */
   state: AIDrawerState
@@ -72,6 +75,8 @@ export interface AIDrawerContextType extends UseAIChatReturn {
   setDrawerWidth: (width: AIDrawerWidth) => void
   /** Cycle to next width preset */
   cycleDrawerWidth: () => void
+  /** Computed current width in pixels (0 if collapsed, MINIMIZED_WIDTH if minimized, expanded width otherwise) */
+  currentWidthPx: number
 }
 
 const AIDrawerContext = createContext<AIDrawerContextType | null>(null)
@@ -137,10 +142,8 @@ export function AIDrawerProvider({
     return defaultState
   })
 
-  const [hasActiveConversation, setHasActiveConversation] = useState(() => {
-    if (typeof window === "undefined") return false
-    return localStorage.getItem(STORAGE_KEY_HAS_CONVERSATION) === "true"
-  })
+  // Initialize to false for stable hydration - will be updated by useEffect based on chat state
+  const [hasActiveConversation, setHasActiveConversation] = useState(false)
 
   // Input state for the drawer
   const [inputValue, setInputValue] = useState("")
@@ -272,6 +275,13 @@ export function AIDrawerProvider({
   const isOpen = state !== "collapsed"
   const isExpanded = state === "expanded"
 
+  // Compute current width in pixels based on state
+  const currentWidthPx = useMemo(() => {
+    if (state === "collapsed") return 0
+    if (state === "minimized") return MINIMIZED_WIDTH
+    return DRAWER_WIDTH_VALUES[drawerWidth]
+  }, [state, drawerWidth])
+
   // Actions
   const open = useCallback(() => {
     setState("minimized")
@@ -348,6 +358,7 @@ export function AIDrawerProvider({
     drawerWidth,
     setDrawerWidth,
     cycleDrawerWidth,
+    currentWidthPx,
   }
 
   return (

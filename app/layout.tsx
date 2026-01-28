@@ -14,6 +14,7 @@ import { WorkingDirProvider } from "@/components/WorkingDirProvider";
 import { PersistentMusicDrawer } from "@/components/PersistentMusicDrawer";
 import { AIDrawerProvider } from "@/components/ai/AIDrawerProvider";
 import { AIDrawer } from "@/components/ai/AIDrawer";
+import { AILayoutWrapper } from "@/components/ai/AILayoutWrapper";
 import { Toaster } from "sonner";
 
 const inter = Inter({
@@ -50,7 +51,9 @@ export default function RootLayout({
                       <AudioVisualizerProvider>
                         <AIDrawerProvider>
                           <MasterBackground />
-                          {children}
+                          <AILayoutWrapper>
+                            {children}
+                          </AILayoutWrapper>
                           <AIDrawer />
                           <PersistentMusicDrawer />
                           <Toaster

@@ -27,7 +27,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
-import { useAIDrawerSafe, DRAWER_WIDTH_VALUES } from "./AIDrawerProvider"
+import { useAIDrawerSafe, DRAWER_WIDTH_VALUES, MINIMIZED_WIDTH } from "./AIDrawerProvider"
 import { ChatMessage, TypingIndicator } from "./ChatMessage"
 import { ChatInput } from "./ChatInput"
 import { useQuery } from "@tanstack/react-query"
@@ -48,10 +48,8 @@ interface AIDrawerProps {
 // CONSTANTS
 // ============================================================================
 
-const DRAWER_WIDTHS = {
-  collapsed: 0,
-  minimized: 320, // Width of minimized header bar
-} as const
+// Use shared constant from provider for minimized width
+const DRAWER_MINIMIZED_WIDTH = MINIMIZED_WIDTH
 
 // ============================================================================
 // ANIMATION VARIANTS
@@ -342,7 +340,7 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
             }
             animate={shouldReduceMotion
               ? panelVariantsReduced.visible
-              : { x: 0, opacity: 1, width: isExpanded ? expandedWidth : DRAWER_WIDTHS.minimized }
+              : { x: 0, opacity: 1, width: isExpanded ? expandedWidth : DRAWER_MINIMIZED_WIDTH }
             }
             exit={shouldReduceMotion
               ? panelVariantsReduced.exit
@@ -350,7 +348,7 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
             }
             transition={shouldReduceMotion ? quickTransition : drawerSpring}
             className={`fixed top-0 right-0 bottom-0 z-50 flex flex-col ${className}`}
-            style={shouldReduceMotion ? { width: isExpanded ? expandedWidth : DRAWER_WIDTHS.minimized } : undefined}
+            style={shouldReduceMotion ? { width: isExpanded ? expandedWidth : DRAWER_MINIMIZED_WIDTH } : undefined}
             data-tabz-region="ai-drawer"
             data-tabz-section="ai-drawer"
           >
