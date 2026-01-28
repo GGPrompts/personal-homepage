@@ -151,6 +151,8 @@ export interface AgentCard {
   workingDir?: string
   /** Execution mode: 'dev' for project context, 'user' for isolated user context */
   mode?: AgentMode
+  /** Pre-built CLI spawn command args (takes precedence over individual settings) */
+  spawnCommand?: string[]
 }
 
 // ============================================================================
@@ -269,6 +271,7 @@ export const AgentCardSchema = z.object({
   profileId: z.string().optional(),
   workingDir: z.string().optional(),
   mode: AgentModeSchema.optional(),
+  spawnCommand: z.array(z.string()).optional(),
 })
 
 /**

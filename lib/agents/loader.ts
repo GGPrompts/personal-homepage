@@ -48,6 +48,7 @@ interface AgentJsonConfig {
   pluginPath?: string
   profileId?: string
   mode?: 'dev' | 'user'
+  spawnCommand?: string[]
 }
 
 /**
@@ -86,6 +87,7 @@ export async function loadAgentFromDirectory(agentDir: string): Promise<CreateAg
       pluginPath: config.pluginPath,
       profileId: config.profileId,
       mode: config.mode,
+      spawnCommand: config.spawnCommand,
       workingDir: agentDir, // Set agent's directory for 'user' mode isolation
     }
 

@@ -4,7 +4,7 @@
  */
 
 import { spawn } from 'child_process'
-import type { CodexSettings } from './types'
+import type { CodexSettings, ChatSettings } from './types'
 import type { ModelContext } from './conversation'
 
 /**
@@ -14,7 +14,8 @@ import type { ModelContext } from './conversation'
 export async function streamCodex(
   context: ModelContext,
   settings?: CodexSettings,
-  cwd?: string
+  cwd?: string,
+  chatSettings?: ChatSettings
 ): Promise<ReadableStream<string>> {
   // Build the prompt with system context and conversation history
   const parts: string[] = []
@@ -39,19 +40,26 @@ export async function streamCodex(
 
   const args = ['exec']
 
-  // Model selection
-  const model = settings?.model || 'gpt-5'
-  args.push('-m', model)
+  // Check if we have a pre-built spawn command (takes precedence)
+  if (chatSettings?.spawnCommand && chatSettings.spawnCommand.length > 0) {
+    // Use pre-built spawn command args
+    args.push(...chatSettings.spawnCommand)
+  } else {
+    // Build from individual settings (backwards compatibility)
+    // Model selection
+    const model = settings?.model || 'gpt-5'
+    args.push('-m', model)
 
-  // Reasoning effort
-  const effort = settings?.reasoningEffort || 'high'
-  args.push('-c', `model_reasoning_effort="${effort}"`)
+    // Reasoning effort
+    const effort = settings?.reasoningEffort || 'high'
+    args.push('-c', `model_reasoning_effort="${effort}"`)
 
-  // Sandbox mode
-  const sandbox = settings?.sandbox || 'read-only'
-  args.push('--sandbox', sandbox)
+    // Sandbox mode
+    const sandbox = settings?.sandbox || 'read-only'
+    args.push('--sandbox', sandbox)
+  }
 
-  // The prompt
+  // Always add the prompt last
   args.push(fullPrompt)
 
   const codex = spawn('codex', args, {

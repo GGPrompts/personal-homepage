@@ -129,40 +129,47 @@ export async function streamClaude(
     args.push('--resume', sessionId)
   }
 
-  if (systemPrompt) {
-    args.push('--append-system-prompt', systemPrompt)
+  // Check if we have a pre-built spawn command (takes precedence)
+  if (settings?.spawnCommand && settings.spawnCommand.length > 0) {
+    // Use pre-built spawn command args
+    args.push(...settings.spawnCommand)
+  } else {
+    // Build from individual settings (backwards compatibility)
+    if (systemPrompt) {
+      args.push('--append-system-prompt', systemPrompt)
+    }
+
+    // Add Claude-specific model
+    if (settings?.claudeModel) {
+      args.push('--model', settings.claudeModel)
+    }
+
+    // Add agent (from ~/.claude/agents/)
+    if (settings?.claudeAgent) {
+      args.push('--agent', settings.claudeAgent)
+    }
+
+    // Add additional directories
+    if (settings?.additionalDirs && settings.additionalDirs.length > 0) {
+      args.push('--add-dir', ...settings.additionalDirs)
+    }
+
+    // Add tool permissions
+    if (settings?.allowedTools && settings.allowedTools.length > 0) {
+      args.push('--allowed-tools', ...settings.allowedTools)
+    }
+
+    if (settings?.disallowedTools && settings.disallowedTools.length > 0) {
+      args.push('--disallowed-tools', ...settings.disallowedTools)
+    }
+
+    // Add permission mode
+    if (settings?.permissionMode) {
+      args.push('--permission-mode', settings.permissionMode)
+    }
   }
 
-  // Add Claude-specific model
-  if (settings?.claudeModel) {
-    args.push('--model', settings.claudeModel)
-  }
-
-  // Add agent (from ~/.claude/agents/)
-  if (settings?.claudeAgent) {
-    args.push('--agent', settings.claudeAgent)
-  }
-
-  // Add additional directories
-  if (settings?.additionalDirs && settings.additionalDirs.length > 0) {
-    args.push('--add-dir', ...settings.additionalDirs)
-  }
-
-  // Add tool permissions
-  if (settings?.allowedTools && settings.allowedTools.length > 0) {
-    args.push('--allowed-tools', ...settings.allowedTools)
-  }
-
-  if (settings?.disallowedTools && settings.disallowedTools.length > 0) {
-    args.push('--disallowed-tools', ...settings.disallowedTools)
-  }
-
-  // Add permission mode
-  if (settings?.permissionMode) {
-    args.push('--permission-mode', settings.permissionMode)
-  }
-
-  // Add the prompt as the last argument
+  // Always add the prompt as the last argument
   args.push(lastUserMessage.content)
 
   // Determine working directory based on agent mode

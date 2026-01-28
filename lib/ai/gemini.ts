@@ -36,11 +36,28 @@ export async function streamGemini(
   // The full prompt for Gemini
   const fullPrompt = parts.join('\n\n')
 
-  const args = ['-p', fullPrompt]
+  const args: string[] = []
 
-  // Add Gemini model if specified
-  if (settings?.geminiModel) {
-    args.push('--model', settings.geminiModel)
+  // Check if we have a pre-built spawn command (takes precedence)
+  if (settings?.spawnCommand && settings.spawnCommand.length > 0) {
+    // Use pre-built spawn command args
+    args.push(...settings.spawnCommand)
+  } else {
+    // Build from individual settings (backwards compatibility)
+    args.push('-p', fullPrompt)
+
+    // Add Gemini model if specified
+    if (settings?.geminiModel) {
+      args.push('--model', settings.geminiModel)
+    }
+  }
+
+  // If using spawnCommand, we still need to add the prompt
+  if (settings?.spawnCommand && settings.spawnCommand.length > 0) {
+    // Check if -p is not already in spawnCommand, add prompt
+    if (!settings.spawnCommand.includes('-p')) {
+      args.push('-p', fullPrompt)
+    }
   }
 
   const gemini = spawn('gemini', args, {
