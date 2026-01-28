@@ -92,7 +92,7 @@ describe('useSectionPreferences utilities', () => {
 
     it('has core sections visible by default', () => {
       expect(DEFAULT_VISIBILITY.weather).toBe(true)
-      expect(DEFAULT_VISIBILITY.notes).toBe(true)
+      expect(DEFAULT_VISIBILITY.tasks).toBe(true)
       expect(DEFAULT_VISIBILITY.bookmarks).toBe(true)
     })
   })
@@ -118,7 +118,7 @@ describe('useSectionPreferences utilities', () => {
 
     it('assigns sections to expected categories', () => {
       expect(DEFAULT_CATEGORY_ASSIGNMENTS.weather).toBe('information')
-      expect(DEFAULT_CATEGORY_ASSIGNMENTS.notes).toBe('productivity')
+      expect(DEFAULT_CATEGORY_ASSIGNMENTS.tasks).toBe('productivity')
       expect(DEFAULT_CATEGORY_ASSIGNMENTS.stocks).toBe('finance')
       expect(DEFAULT_CATEGORY_ASSIGNMENTS['github-activity']).toBe('development')
     })
