@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { execFile } from "child_process"
-import { promisify } from "util"
-
-const execFileAsync = promisify(execFile)
 
 export const dynamic = "force-dynamic"
+
+// TabzChrome backend server URL
+const TABZ_BACKEND_URL = process.env.TABZ_BACKEND_URL || "http://localhost:8129"
 
 interface ChromeBookmark {
   id: string
@@ -23,70 +22,68 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Call mcp-cli to search bookmarks using execFile for security
-    // (avoids shell injection by passing args as array, not string interpolation)
-    const jsonArgs = JSON.stringify({
-      query,
-      limit: Math.min(Math.max(limit, 1), 100),
-      response_format: "json",
+    // Call TabzChrome backend HTTP API directly
+    const url = new URL(`${TABZ_BACKEND_URL}/api/browser/bookmarks/search`)
+    url.searchParams.set("query", query)
+    url.searchParams.set("limit", String(Math.min(Math.max(limit, 1), 100)))
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(10000),
     })
 
-    const claudePath = process.env.CLAUDE_PATH || "/home/marci/.local/bin/claude"
-    const { stdout } = await execFileAsync(
-      claudePath,
-      ["--mcp-cli", "call", "tabz/tabz_search_bookmarks", jsonArgs],
-      { encoding: "utf-8", timeout: 10000 }
-    )
+    const result = await response.json()
 
-    // Parse the MCP response
-    const response = JSON.parse(stdout)
+    // Handle error responses from TabzChrome backend
+    if (!response.ok || result.error) {
+      const errorMessage = result.error || `HTTP ${response.status}`
 
-    // Handle MCP response format
-    if (response.error) {
+      // Check for WebSocket not available error (Chrome extension not connected)
+      if (errorMessage.includes("WebSocket broadcast not available")) {
+        return NextResponse.json(
+          {
+            error: "TabzChrome extension not connected to backend.",
+            hint: "Make sure Chrome is running with the TabzChrome extension enabled.",
+          },
+          { status: 503 }
+        )
+      }
+
       return NextResponse.json(
-        { error: response.error.message || "MCP error" },
-        { status: 500 }
+        { error: errorMessage },
+        { status: response.status >= 400 ? response.status : 500 }
       )
     }
 
-    // Extract bookmarks from the response content
-    let bookmarks: ChromeBookmark[] = []
-    if (response.content) {
-      // MCP tools return content array with text items
-      for (const item of response.content) {
-        if (item.type === "text" && item.text) {
-          try {
-            const parsed = JSON.parse(item.text)
-            if (Array.isArray(parsed)) {
-              bookmarks = parsed
-            } else if (parsed.bookmarks) {
-              bookmarks = parsed.bookmarks
-            }
-          } catch {
-            // Not JSON, might be markdown format
-          }
-        }
-      }
-    }
+    // Extract bookmarks from the response
+    // TabzChrome backend returns { success: true, bookmarks: [...] }
+    const bookmarks: ChromeBookmark[] = result.bookmarks || []
 
     return NextResponse.json({ results: bookmarks, query })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to search bookmarks"
 
-    // Check if it's an MCP session error (no active Claude Code session)
+    // Check for connection errors (TabzChrome backend not running)
     if (
-      message.includes("not found") ||
-      message.includes("Is Claude Code running") ||
-      message.includes("MCP state file") ||
-      message.includes("endpoint file")
+      message.includes("ECONNREFUSED") ||
+      message.includes("fetch failed") ||
+      message.includes("network")
     ) {
-      // Don't log expected errors when Claude isn't running
       return NextResponse.json(
         {
-          error: "Chrome bookmark search requires an active Claude Code session with TabzChrome MCP.",
-          hint: "Start Claude Code in a terminal to enable this feature.",
+          error: "TabzChrome backend not running.",
+          hint: "Start the TabzChrome backend server on port 8129.",
         },
         { status: 503 }
+      )
+    }
+
+    // Check for timeout
+    if (message.includes("timeout") || message.includes("TimeoutError")) {
+      return NextResponse.json(
+        { error: "Request timed out - TabzChrome backend may be unresponsive." },
+        { status: 504 }
       )
     }
 

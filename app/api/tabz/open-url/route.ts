@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { execFile } from "child_process"
-import { promisify } from "util"
-
-const execFileAsync = promisify(execFile)
 
 export const dynamic = "force-dynamic"
+
+// TabzChrome backend server URL
+const TABZ_BACKEND_URL = process.env.TABZ_BACKEND_URL || "http://localhost:8129"
 
 interface OpenUrlRequest {
   url: string
@@ -22,79 +21,66 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "URL is required" }, { status: 400 })
     }
 
-    // Call mcp-cli to open URL using execFile for security
-    // (avoids shell injection by passing args as array, not string interpolation)
-    const jsonArgs = JSON.stringify({
-      url,
-      newTab,
-      background,
-      reuseExisting,
+    // Call TabzChrome backend HTTP API directly
+    const response = await fetch(`${TABZ_BACKEND_URL}/api/browser/open-url`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url,
+        newTab,
+        background,
+        reuseExisting,
+      }),
+      signal: AbortSignal.timeout(10000),
     })
 
-    const claudePath = process.env.CLAUDE_PATH || "/home/marci/.local/bin/claude"
-    const { stdout } = await execFileAsync(
-      claudePath,
-      ["--mcp-cli", "call", "tabz/tabz_open_url", jsonArgs],
-      { encoding: "utf-8", timeout: 10000 }
-    )
+    const result = await response.json()
 
-    // Parse the MCP response
-    const response = JSON.parse(stdout)
+    // Handle error responses from TabzChrome backend
+    if (!response.ok || result.error) {
+      const errorMessage = result.error || `HTTP ${response.status}`
 
-    // Handle MCP response format
-    if (response.error) {
-      return NextResponse.json(
-        { error: response.error.message || "MCP error" },
-        { status: 500 }
-      )
-    }
-
-    // Extract result from response content
-    let result = { success: false, url: "", tabId: null as number | null }
-    if (response.content) {
-      for (const item of response.content) {
-        if (item.type === "text" && item.text) {
-          try {
-            const parsed = JSON.parse(item.text)
-            if (parsed.success !== undefined) {
-              result = parsed
-            }
-          } catch {
-            // Not JSON, check for success indicators in text
-            if (item.text.includes("success") || item.text.includes("opened")) {
-              result.success = true
-            }
-          }
-        }
+      // Check for WebSocket not available error (Chrome extension not connected)
+      if (errorMessage.includes("WebSocket broadcast not available")) {
+        return NextResponse.json(
+          {
+            error: "TabzChrome extension not connected to backend.",
+            hint: "Make sure Chrome is running with the TabzChrome extension enabled.",
+          },
+          { status: 503 }
+        )
       }
+
+      return NextResponse.json(
+        { error: errorMessage },
+        { status: response.status >= 400 ? response.status : 500 }
+      )
     }
 
     return NextResponse.json(result)
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to open URL"
 
-    // Check if it's an MCP session error (no active Claude Code session)
+    // Check for connection errors (TabzChrome backend not running)
     if (
-      message.includes("not found") ||
-      message.includes("Is Claude Code running") ||
-      message.includes("MCP state file") ||
-      message.includes("endpoint file")
+      message.includes("ECONNREFUSED") ||
+      message.includes("fetch failed") ||
+      message.includes("network")
     ) {
-      // Don't log expected errors when Claude isn't running
       return NextResponse.json(
         {
-          error: "Opening URLs via TabzChrome requires an active Claude Code session.",
-          hint: "URLs will open in a new browser tab instead.",
+          error: "TabzChrome backend not running.",
+          hint: "Start the TabzChrome backend server on port 8129.",
         },
         { status: 503 }
       )
     }
 
-    // Check for "URL not allowed" error
-    if (message.includes("not allowed")) {
+    // Check for timeout
+    if (message.includes("timeout") || message.includes("TimeoutError")) {
       return NextResponse.json(
-        { error: "URL domain not allowed by TabzChrome" },
-        { status: 403 }
+        { error: "Request timed out - TabzChrome backend may be unresponsive." },
+        { status: 504 }
       )
     }
 

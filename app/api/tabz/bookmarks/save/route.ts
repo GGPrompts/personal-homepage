@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { execFile } from "child_process"
-import { promisify } from "util"
-
-const execFileAsync = promisify(execFile)
 
 export const dynamic = "force-dynamic"
+
+// TabzChrome backend server URL
+const TABZ_BACKEND_URL = process.env.TABZ_BACKEND_URL || "http://localhost:8129"
 
 interface SaveBookmarkRequest {
   url: string
@@ -24,65 +23,66 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Call mcp-cli to save bookmark using execFile for security
-    // (avoids shell injection by passing args as array, not string interpolation)
-    const jsonArgs = JSON.stringify({
-      url,
-      title,
-      parentId,
+    // Call TabzChrome backend HTTP API directly
+    const response = await fetch(`${TABZ_BACKEND_URL}/api/browser/bookmarks/create`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url,
+        title,
+        parentId,
+      }),
+      signal: AbortSignal.timeout(10000),
     })
 
-    const claudePath = process.env.CLAUDE_PATH || "/home/marci/.local/bin/claude"
-    const { stdout } = await execFileAsync(
-      claudePath,
-      ["--mcp-cli", "call", "tabz/tabz_save_bookmark", jsonArgs],
-      { encoding: "utf-8", timeout: 10000 }
-    )
+    const result = await response.json()
 
-    // Parse the MCP response
-    const response = JSON.parse(stdout)
+    // Handle error responses from TabzChrome backend
+    if (!response.ok || result.error) {
+      const errorMessage = result.error || `HTTP ${response.status}`
 
-    // Handle MCP response format
-    if (response.error) {
-      return NextResponse.json(
-        { error: response.error.message || "MCP error" },
-        { status: 500 }
-      )
-    }
-
-    // Extract result from response content
-    let result = { success: false, bookmark: null as unknown }
-    if (response.content) {
-      for (const item of response.content) {
-        if (item.type === "text" && item.text) {
-          try {
-            const parsed = JSON.parse(item.text)
-            if (parsed.success !== undefined) {
-              result = parsed
-            }
-          } catch {
-            // Not JSON
-          }
-        }
+      // Check for WebSocket not available error (Chrome extension not connected)
+      if (errorMessage.includes("WebSocket broadcast not available")) {
+        return NextResponse.json(
+          {
+            error: "TabzChrome extension not connected to backend.",
+            hint: "Make sure Chrome is running with the TabzChrome extension enabled.",
+          },
+          { status: 503 }
+        )
       }
-    }
 
-    if (result.success) {
-      return NextResponse.json(result)
-    } else {
       return NextResponse.json(
-        { error: "Failed to save bookmark" },
-        { status: 500 }
+        { error: errorMessage },
+        { status: response.status >= 400 ? response.status : 500 }
       )
     }
+
+    return NextResponse.json(result)
   } catch (error) {
     console.error("Error saving bookmark:", error)
     const message = error instanceof Error ? error.message : "Failed to save bookmark"
 
-    if (message.includes("ENOENT") || message.includes("not found")) {
+    // Check for connection errors (TabzChrome backend not running)
+    if (
+      message.includes("ECONNREFUSED") ||
+      message.includes("fetch failed") ||
+      message.includes("network")
+    ) {
       return NextResponse.json(
-        { error: "mcp-cli not available. Make sure MCP is configured." },
+        {
+          error: "TabzChrome backend not running.",
+          hint: "Start the TabzChrome backend server on port 8129.",
+        },
         { status: 503 }
+      )
+    }
+
+    // Check for timeout
+    if (message.includes("timeout") || message.includes("TimeoutError")) {
+      return NextResponse.json(
+        { error: "Request timed out - TabzChrome backend may be unresponsive." },
+        { status: 504 }
       )
     }
 
