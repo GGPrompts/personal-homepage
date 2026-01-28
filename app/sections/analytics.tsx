@@ -225,17 +225,28 @@ function formatNumber(num: number): string {
   return num.toString()
 }
 
-function formatDuration(startTime: string, endTime?: string): string {
+function formatDuration(startTime: string, endTime?: string, messageCount?: number): string {
   const start = new Date(startTime)
   const end = endTime ? new Date(endTime) : new Date()
   const diffMs = end.getTime() - start.getTime()
   const diffMins = Math.floor(diffMs / 60000)
+
+  // If duration is 0 but we have messages, estimate ~2 mins per message
+  if (diffMins === 0 && messageCount && messageCount > 0) {
+    const estimatedMins = messageCount * 2
+    const hours = Math.floor(estimatedMins / 60)
+    const mins = estimatedMins % 60
+    if (hours > 0) return `~${hours}h ${mins}m`
+    return `~${estimatedMins}m`
+  }
+
   const diffHours = Math.floor(diffMins / 60)
   const remainingMins = diffMins % 60
 
   if (diffHours > 0) {
     return `${diffHours}h ${remainingMins}m`
   }
+  if (diffMins === 0) return "—"
   return `${diffMins}m`
 }
 
@@ -323,12 +334,12 @@ function TokenUsageChart({ data, timeRange }: { data: TokenUsage[]; timeRange: "
               style={{ transformOrigin: "bottom" }}
             >
               {/* Tooltip */}
-              <div className="absolute bottom-full mb-2 hidden group-hover:block z-10">
-                <div className="bg-popover border border-border rounded-lg px-3 py-2 text-xs whitespace-nowrap shadow-lg">
-                  <p className="font-medium">{new Date(day.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</p>
-                  <p className="text-blue-500">Input: {formatNumber(day.inputTokens)}</p>
-                  <p className="text-emerald-500">Output: {formatNumber(day.outputTokens)}</p>
-                  <p className="text-muted-foreground">Total: {formatNumber(total)}</p>
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 pointer-events-none">
+                <div className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs whitespace-nowrap shadow-xl">
+                  <p className="font-medium text-white">{new Date(day.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</p>
+                  <p className="text-blue-400">Input: {formatNumber(day.inputTokens)}</p>
+                  <p className="text-emerald-400">Output: {formatNumber(day.outputTokens)}</p>
+                  <p className="text-zinc-400">Total: {formatNumber(total)}</p>
                 </div>
               </div>
 
@@ -911,7 +922,7 @@ function SessionCard({
                 <p className="text-muted-foreground">Duration</p>
                 <p className="font-medium flex items-center gap-1">
                   <Timer className="h-3 w-3" />
-                  {formatDuration(session.startTime, session.endTime)}
+                  {formatDuration(session.startTime, session.endTime, session.messageCount)}
                 </p>
               </div>
               <div>
