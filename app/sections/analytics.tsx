@@ -225,20 +225,14 @@ function formatNumber(num: number): string {
   return num.toString()
 }
 
-function formatDuration(startTime: string, endTime?: string, messageCount?: number): string {
+function formatDuration(startTime: string, endTime?: string): string {
   const start = new Date(startTime)
   const end = endTime ? new Date(endTime) : new Date()
   const diffMs = end.getTime() - start.getTime()
   const diffMins = Math.floor(diffMs / 60000)
 
-  // If duration is 0 but we have messages, estimate ~2 mins per message
-  if (diffMins === 0 && messageCount && messageCount > 0) {
-    const estimatedMins = messageCount * 2
-    const hours = Math.floor(estimatedMins / 60)
-    const mins = estimatedMins % 60
-    if (hours > 0) return `~${hours}h ${mins}m`
-    return `~${estimatedMins}m`
-  }
+  // If same start/end time, it's a daily summary - show dash
+  if (diffMins === 0) return "—"
 
   const diffHours = Math.floor(diffMins / 60)
   const remainingMins = diffMins % 60
@@ -246,7 +240,6 @@ function formatDuration(startTime: string, endTime?: string, messageCount?: numb
   if (diffHours > 0) {
     return `${diffHours}h ${remainingMins}m`
   }
-  if (diffMins === 0) return "—"
   return `${diffMins}m`
 }
 
@@ -922,7 +915,7 @@ function SessionCard({
                 <p className="text-muted-foreground">Duration</p>
                 <p className="font-medium flex items-center gap-1">
                   <Timer className="h-3 w-3" />
-                  {formatDuration(session.startTime, session.endTime, session.messageCount)}
+                  {formatDuration(session.startTime, session.endTime)}
                 </p>
               </div>
               <div>
