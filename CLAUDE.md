@@ -39,12 +39,11 @@ Next.js 15 personal dashboard with accordion sidebar navigation. Features weathe
 | Profile | `app/sections/profile.tsx` | [docs/sections/profile.md](docs/sections/profile.md) |
 | Projects | `app/sections/projects-dashboard.tsx` | [docs/sections/projects-dashboard.md](docs/sections/projects-dashboard.md) |
 | Prompts Playground | `app/sections/prompts-playground.tsx` | [docs/sections/prompts-playground.md](docs/sections/prompts-playground.md) |
-| Quick Notes | `app/sections/quick-notes.tsx` | [docs/sections/quick-notes.md](docs/sections/quick-notes.md) |
 | Search Hub | `app/sections/search-hub.tsx` | [docs/sections/search-hub.md](docs/sections/search-hub.md) |
+| Scratchpad | `app/sections/tasks.tsx` | Tasks + Notes tabs (see below) |
 | Settings | `app/sections/settings.tsx` | [docs/sections/settings.md](docs/sections/settings.md) |
 | SpaceX | `app/sections/spacex-tracker.tsx` | [docs/sections/spacex-tracker.md](docs/sections/spacex-tracker.md) |
 | Stocks | `app/sections/stocks-dashboard.tsx` | [docs/sections/stocks-dashboard.md](docs/sections/stocks-dashboard.md) |
-| Tasks | `app/sections/tasks.tsx` | [docs/sections/tasks.md](docs/sections/tasks.md) |
 | Video Player | `app/sections/video-player.tsx` | [docs/sections/video-player.md](docs/sections/video-player.md) |
 | Weather | `app/sections/weather.tsx` | [docs/sections/weather.md](docs/sections/weather.md) |
 
@@ -123,6 +122,21 @@ git push                     # MUST succeed before ending
 ```
 
 Include issue ID in commits: `git commit -m "Fix bug (bd-abc)"`
+
+## Local Data Storage
+
+Some sections store data locally on the filesystem:
+
+| Data | Location | API |
+|------|----------|-----|
+| Quick Notes | `~/.config/homepage/quicknotes.json` | `/api/quicknotes` |
+| Claude Stats | `~/.claude/stats-cache.json` | `/api/claude-stats` |
+| Section Preferences | localStorage `section-preferences` | - |
+| Tasks | localStorage `quick-tasks` | - |
+
+The Scratchpad section (`app/sections/tasks.tsx`) has two tabs:
+- **Tasks**: Simple todos stored in localStorage
+- **Notes**: Quick notes stored at `~/.config/homepage/quicknotes.json` via `/api/quicknotes`
 
 ## Quick Reference
 
