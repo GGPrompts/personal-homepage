@@ -878,14 +878,14 @@ export default function AIWorkspaceSection({
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              <DialogContent className="max-w-3xl max-h-[80vh] glass-dark">
+              <DialogContent className="max-w-3xl max-h-[80vh] glass-dark overflow-hidden">
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-2">
                     <Users className="h-5 w-5 text-primary" />
                     Select AI Agent
                   </DialogTitle>
                 </DialogHeader>
-                <div className="h-[60vh]">
+                <div className="h-[60vh] overflow-hidden min-w-0 w-full">
                   <AgentGallery
                     agents={agentRegistry?.agents || []}
                     selectedAgentId={selectedAgent?.id}

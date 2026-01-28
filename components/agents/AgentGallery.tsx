@@ -7,7 +7,6 @@ import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { AgentCard } from './AgentCard'
 import type { AgentCard as AgentCardType } from '@/lib/agents/types'
 
@@ -132,7 +131,7 @@ export function AgentGallery({
   }
 
   return (
-    <div className={cn('flex flex-col h-full', className)} data-tabz-region="agent-gallery">
+    <div className={cn('flex flex-col h-full w-full overflow-hidden', className)} data-tabz-region="agent-gallery">
       {/* Header with search and controls */}
       <div className="space-y-3 pb-4 border-b border-border/40">
         {/* Title and view toggle */}
@@ -208,7 +207,7 @@ export function AgentGallery({
       </div>
 
       {/* Agents list/grid */}
-      <ScrollArea className="flex-1 mt-4">
+      <div className="flex-1 mt-4 min-w-0 overflow-y-auto overflow-x-hidden">
         {filteredAgents.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
@@ -234,11 +233,11 @@ export function AgentGallery({
         ) : (
           <motion.div
             className={cn(
+              'w-full',
               viewMode === 'grid'
                 ? 'grid grid-cols-1 sm:grid-cols-2 gap-3'
-                : 'flex flex-col gap-2 w-full overflow-hidden'
+                : 'flex flex-col gap-2'
             )}
-            layout
           >
             <AnimatePresence mode="popLayout">
               {filteredAgents.map((agent, index) => (
@@ -248,7 +247,7 @@ export function AgentGallery({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ delay: index * 0.05 }}
-                  layout
+                  className="w-full"
                 >
                   <AgentCard
                     agent={agent}
@@ -261,7 +260,7 @@ export function AgentGallery({
             </AnimatePresence>
           </motion.div>
         )}
-      </ScrollArea>
+      </div>
     </div>
   )
 }
