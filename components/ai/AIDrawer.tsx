@@ -362,13 +362,18 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
             data-tabz-section="ai-drawer"
           >
             <AnimatePresence mode="wait">
-              {/* Minimized state - just a header bar */}
+              {/* Minimized state - conversation list sidebar */}
               {state === "minimized" && (
                 <MinimizedDrawer
                   hasActiveConversation={hasActiveConversation}
                   onExpand={expand}
                   onClose={close}
                   isGenerating={isTyping || isStreaming}
+                  conversations={conversations}
+                  activeConvId={activeConvId}
+                  onSelectConversation={setActiveConvId}
+                  onNewConversation={createNewConversation}
+                  generatingConvs={generatingConvs}
                 />
               )}
 
@@ -856,11 +861,23 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
 // MINIMIZED DRAWER
 // ============================================================================
 
+interface ConversationItem {
+  id: string
+  title: string
+  messages: { role: string; content: string }[]
+  updatedAt: Date
+}
+
 interface MinimizedDrawerProps {
   hasActiveConversation: boolean
   onExpand: () => void
   onClose: () => void
   isGenerating?: boolean
+  conversations: ConversationItem[]
+  activeConvId: string
+  onSelectConversation: (id: string) => void
+  onNewConversation: () => void
+  generatingConvs: Record<string, { startedAt: number; model: string }>
 }
 
 function MinimizedDrawer({
@@ -868,6 +885,11 @@ function MinimizedDrawer({
   onExpand,
   onClose,
   isGenerating = false,
+  conversations,
+  activeConvId,
+  onSelectConversation,
+  onNewConversation,
+  generatingConvs,
 }: MinimizedDrawerProps) {
   return (
     <motion.div
@@ -898,10 +920,10 @@ function MinimizedDrawer({
               >
                 Generating...
               </motion.p>
-            ) : hasActiveConversation ? (
-              <p className="text-xs text-muted-foreground">Conversation active</p>
             ) : (
-              <p className="text-xs text-muted-foreground">Start chatting</p>
+              <p className="text-xs text-muted-foreground">
+                {conversations.length} conversation{conversations.length !== 1 ? 's' : ''}
+              </p>
             )}
           </div>
         </div>
@@ -931,27 +953,68 @@ function MinimizedDrawer({
         </div>
       </div>
 
-      {/* Click to expand area */}
-      <motion.button
-        className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-4 transition-colors"
-        onClick={onExpand}
-        whileHover={{ backgroundColor: "hsl(var(--primary) / 0.05)" }}
-        whileTap={{ scale: 0.98 }}
-      >
-        <motion.div
-          className="p-3 rounded-full glass"
-          whileHover={{ scale: 1.05, boxShadow: "0 0 20px hsl(var(--primary) / 0.3)" }}
-          transition={{ type: "spring", stiffness: 400, damping: 25 }}
-        >
-          <MessageSquare className="h-6 w-6 text-primary" />
-        </motion.div>
-        <div>
-          <p className="text-sm font-medium">Click to expand</p>
-          <p className="text-xs text-muted-foreground">
-            Chat with AI assistants
-          </p>
+      {/* Conversation list */}
+      <ScrollArea className="flex-1">
+        <div className="p-2 space-y-1">
+          {/* New conversation button */}
+          <motion.button
+            className="w-full flex items-center gap-2 p-2 rounded-md text-left text-xs transition-colors hover:bg-primary/10 border border-dashed border-border/60 hover:border-primary/40"
+            onClick={() => {
+              onNewConversation()
+              onExpand()
+            }}
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
+          >
+            <Plus className="h-3.5 w-3.5 text-primary" />
+            <span className="text-muted-foreground">New conversation</span>
+          </motion.button>
+
+          {/* Conversation items */}
+          {conversations.map(conv => {
+            const isActive = conv.id === activeConvId
+            const isConvGenerating = !!generatingConvs[conv.id]
+            const lastMessage = conv.messages[conv.messages.length - 1]
+            const preview = lastMessage?.content?.slice(0, 60) || 'No messages'
+
+            return (
+              <motion.button
+                key={conv.id}
+                className={`w-full flex flex-col gap-0.5 p-2 rounded-md text-left text-xs transition-colors ${
+                  isActive
+                    ? 'bg-primary/20 border border-primary/40'
+                    : 'hover:bg-muted/50 border border-transparent'
+                }`}
+                onClick={() => {
+                  onSelectConversation(conv.id)
+                  onExpand()
+                }}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+              >
+                <div className="flex items-center gap-1.5 w-full">
+                  <MessageSquare className="h-3 w-3 text-muted-foreground shrink-0" />
+                  <span className="font-medium truncate flex-1">{conv.title}</span>
+                  {isConvGenerating && (
+                    <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />
+                  )}
+                </div>
+                <p className="text-[10px] text-muted-foreground truncate pl-4.5">
+                  {preview.length >= 60 ? preview + '...' : preview}
+                </p>
+              </motion.button>
+            )
+          })}
+
+          {conversations.length === 0 && (
+            <div className="text-center py-6 text-xs text-muted-foreground">
+              <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-30" />
+              <p>No conversations yet</p>
+              <p className="text-[10px] mt-1">Click above to start</p>
+            </div>
+          )}
         </div>
-      </motion.button>
+      </ScrollArea>
     </motion.div>
   )
 }
