@@ -866,6 +866,35 @@ interface ConversationItem {
   title: string
   messages: { role: string; content: string }[]
   updatedAt: Date
+  model?: string
+  projectPath?: string | null
+}
+
+/** Format relative time (e.g., "2h ago", "3d ago") */
+function formatRelativeTime(date: Date): string {
+  const now = new Date()
+  const diffMs = now.getTime() - new Date(date).getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return 'now'
+  if (diffMins < 60) return `${diffMins}m`
+  if (diffHours < 24) return `${diffHours}h`
+  if (diffDays < 7) return `${diffDays}d`
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+/** Get short model name (e.g., "opus" from "claude-opus-4-5-20251101") */
+function getShortModelName(model?: string): string | null {
+  if (!model) return null
+  // Extract the model type from Claude model names
+  if (model.includes('opus')) return 'opus'
+  if (model.includes('sonnet')) return 'sonnet'
+  if (model.includes('haiku')) return 'haiku'
+  // For other models, take the first part
+  const parts = model.split('-')
+  return parts[0] || model
 }
 
 interface MinimizedDrawerProps {
@@ -974,13 +1003,14 @@ function MinimizedDrawer({
           {conversations.map(conv => {
             const isActive = conv.id === activeConvId
             const isConvGenerating = !!generatingConvs[conv.id]
-            const lastMessage = conv.messages[conv.messages.length - 1]
-            const preview = lastMessage?.content?.slice(0, 60) || 'No messages'
+            const shortModel = getShortModelName(conv.model)
+            const timeAgo = formatRelativeTime(conv.updatedAt)
+            const projectName = conv.projectPath?.split('/').pop()
 
             return (
               <motion.button
                 key={conv.id}
-                className={`w-full flex flex-col gap-0.5 p-2 rounded-md text-left text-xs transition-colors ${
+                className={`w-full flex flex-col gap-1 p-2 rounded-md text-left text-xs transition-colors ${
                   isActive
                     ? 'bg-primary/20 border border-primary/40'
                     : 'hover:bg-muted/50 border border-transparent'
@@ -992,6 +1022,7 @@ function MinimizedDrawer({
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.99 }}
               >
+                {/* Title row */}
                 <div className="flex items-center gap-1.5 w-full">
                   <MessageSquare className="h-3 w-3 text-muted-foreground shrink-0" />
                   <span className="font-medium truncate flex-1">{conv.title}</span>
@@ -999,9 +1030,28 @@ function MinimizedDrawer({
                     <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />
                   )}
                 </div>
-                <p className="text-[10px] text-muted-foreground truncate pl-4.5">
-                  {preview.length >= 60 ? preview + '...' : preview}
-                </p>
+
+                {/* Meta row: model, time, project */}
+                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground pl-4.5">
+                  {shortModel && (
+                    <span className="px-1 py-0.5 rounded bg-muted/50 font-medium">
+                      {shortModel}
+                    </span>
+                  )}
+                  <span>{timeAgo}</span>
+                  {projectName && (
+                    <>
+                      <span className="text-border">·</span>
+                      <span className="flex items-center gap-0.5 truncate">
+                        <FolderOpen className="h-2.5 w-2.5 shrink-0" />
+                        <span className="truncate">{projectName}</span>
+                      </span>
+                    </>
+                  )}
+                  {!shortModel && !projectName && (
+                    <span>{conv.messages.length} msg{conv.messages.length !== 1 ? 's' : ''}</span>
+                  )}
+                </div>
               </motion.button>
             )
           })}
