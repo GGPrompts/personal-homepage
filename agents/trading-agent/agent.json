@@ -18,6 +18,7 @@
     "stocks"
   ],
   "enabled": true,
+  "mode": "user",
   "mcp_tools": [
     {
       "name": "tabz_click",

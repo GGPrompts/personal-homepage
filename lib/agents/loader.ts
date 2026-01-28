@@ -47,6 +47,7 @@ interface AgentJsonConfig {
   }>
   pluginPath?: string
   profileId?: string
+  mode?: 'dev' | 'user'
 }
 
 /**
@@ -84,6 +85,7 @@ export async function loadAgentFromDirectory(agentDir: string): Promise<CreateAg
       enabled: config.enabled,
       pluginPath: config.pluginPath,
       profileId: config.profileId,
+      mode: config.mode,
     }
 
     return agent

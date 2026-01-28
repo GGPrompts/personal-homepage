@@ -165,13 +165,21 @@ export async function streamClaude(
   // Add the prompt as the last argument
   args.push(lastUserMessage.content)
 
+  // Determine working directory based on agent mode
+  // - 'user' mode: Use home directory to escape project context (no CLAUDE.md, no .beads/)
+  // - 'dev' mode (default): Use provided cwd or process.cwd() for full dev context
+  let effectiveCwd = cwd || process.cwd()
+  if (settings?.agentMode === 'user') {
+    effectiveCwd = homedir()
+  }
+
   const claude = spawn(CLAUDE_BIN, args, {
     env: {
       ...process.env,
       // Remove ANTHROPIC_API_KEY to force subscription auth
       ANTHROPIC_API_KEY: undefined
     },
-    cwd: cwd || process.cwd(),
+    cwd: effectiveCwd,
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: false
   })

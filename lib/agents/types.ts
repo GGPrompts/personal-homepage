@@ -30,6 +30,13 @@ export type SelectorActionType =
 export type MCPToolPermission = 'read' | 'write' | 'execute'
 
 /**
+ * Agent execution mode
+ * - 'dev': Agent runs in project context (gets CLAUDE.md, beads, etc.)
+ * - 'user': Agent runs in isolated context (home directory, no dev tooling)
+ */
+export type AgentMode = 'dev' | 'user'
+
+/**
  * Agent personality traits for consistent behavior
  */
 export type AgentPersonalityTrait =
@@ -140,6 +147,10 @@ export interface AgentCard {
   pluginPath?: string
   /** TabzChrome profile ID for pre-configured terminal spawning (optional) */
   profileId?: string
+  /** Working directory for this agent (falls back to global workingDir if not set) */
+  workingDir?: string
+  /** Execution mode: 'dev' for project context, 'user' for isolated user context */
+  mode?: AgentMode
 }
 
 // ============================================================================
@@ -185,6 +196,11 @@ export const SelectorActionTypeSchema = z.enum([
  * Zod schema for MCPToolPermission
  */
 export const MCPToolPermissionSchema = z.enum(['read', 'write', 'execute'])
+
+/**
+ * Zod schema for AgentMode
+ */
+export const AgentModeSchema = z.enum(['dev', 'user'])
 
 /**
  * Zod schema for AgentPersonalityTrait
@@ -251,6 +267,8 @@ export const AgentCardSchema = z.object({
   updated_at: z.string().datetime(),
   pluginPath: z.string().optional(),
   profileId: z.string().optional(),
+  workingDir: z.string().optional(),
+  mode: AgentModeSchema.optional(),
 })
 
 /**

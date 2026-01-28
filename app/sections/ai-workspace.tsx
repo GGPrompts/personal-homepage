@@ -338,11 +338,12 @@ export default function AIWorkspaceSection({
 
   const handleSelectAgent = (agent: AgentCard) => {
     setSelectedAgent(agent)
-    // Update settings with agent's system prompt
+    // Update settings with agent's system prompt and mode
     setSettings(prev => ({
       ...prev,
       systemPrompt: agent.system_prompt,
       temperature: agent.config.temperature,
+      agentMode: agent.mode, // Pass agent mode for context isolation
     }))
     // Also update the active conversation's agentId for persistence
     setConversations(prev => prev.map(conv =>
@@ -364,14 +365,16 @@ export default function AIWorkspaceSection({
         ...prev,
         systemPrompt: '',
         temperature: 0.7,
+        agentMode: undefined, // Clear agent mode for vanilla Claude
       }))
     } else {
       setSelectedAgent(agent)
-      // Update settings with agent's config
+      // Update settings with agent's config and mode
       setSettings(prev => ({
         ...prev,
         systemPrompt: agent.system_prompt,
         temperature: agent.config.temperature,
+        agentMode: agent.mode, // Pass agent mode for context isolation
       }))
     }
 
