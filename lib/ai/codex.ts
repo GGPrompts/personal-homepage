@@ -4,14 +4,8 @@
  */
 
 import { spawn } from 'child_process'
-import type { ChatSettings } from './types'
+import type { CodexSettings } from './types'
 import type { ModelContext } from './conversation'
-
-interface CodexSettings extends ChatSettings {
-  model?: string              // Default: gpt-5
-  reasoningEffort?: 'low' | 'medium' | 'high'
-  sandbox?: 'read-only' | 'full' | 'off'
-}
 
 /**
  * Stream chat completions from Codex CLI

@@ -1,179 +1,55 @@
 // ============================================================================
-// AI WORKSPACE - TYPES, CONSTANTS & UTILITIES
+// AI WORKSPACE - CONSTANTS & UTILITIES
+// Types are imported from @/lib/ai/types (single source of truth)
 // ============================================================================
 
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
+// Re-export all types from the single source of truth
+export type {
+  MessageRole,
+  AIBackend,
+  PermissionMode,
+  ChatMessage,
+  ToolUse,
+  Message,
+  TokenUsage,
+  CumulativeUsage,
+  ClaudeSettings,
+  CodexSettings,
+  GeminiSettings,
+  DockerSettings,
+  SuggestedPrompt,
+  ChatSettings,
+  ConversationSettings,
+  Conversation,
+  Model,
+  ModelInfo,
+  BackendStatus,
+  ChatRequest,
+  StreamChunk,
+  ClaudeStreamEvent,
+  TextBlock,
+  ToolUseBlock,
+  ToolResultBlock,
+  ContentBlock,
+  ClaudeUsage,
+  ClaudeRawStreamEvent,
+  ClaudeStreamResult,
+  GeneratingState,
+  GeneratingConversations,
+  ClaudeAgent,
+} from '@/lib/ai/types'
 
-export type MessageRole = 'user' | 'assistant' | 'system'
-export type AIBackend = 'claude' | 'gemini' | 'codex' | 'docker' | 'mock'
-
-// Tool use tracking
-export interface ToolUse {
-  id: string
-  name: string
-  input?: string
-  status: 'running' | 'complete'
-}
-
-export interface Message {
-  id: string
-  role: MessageRole
-  content: string
-  timestamp: Date
-  feedback?: 'up' | 'down'
-  isStreaming?: boolean
-  model?: AIBackend  // Which model generated this response
-  toolUses?: ToolUse[]  // Tool uses in this message
-}
-
-// Claude stream event types (matching lib/ai/claude.ts)
-export interface ClaudeStreamEvent {
-  type: 'text' | 'tool_start' | 'tool_input' | 'tool_end' | 'heartbeat' | 'error' | 'done'
-  content?: string
-  tool?: {
-    id: string
-    name: string
-    input?: string
-  }
-  error?: string
-  sessionId?: string
-}
-
-export interface TokenUsage {
-  inputTokens: number
-  outputTokens: number
-  cacheReadTokens?: number
-  cacheCreationTokens?: number
-  totalTokens: number
-}
-
-// Cumulative token usage across a session (accumulated from all API calls)
-export interface CumulativeUsage {
-  // Running totals
-  inputTokens: number
-  outputTokens: number
-  cacheReadTokens: number
-  cacheCreationTokens: number
-  // Computed context estimate (input + cache)
-  contextTokens: number
-  // Number of messages that contributed to this total
-  messageCount: number
-  // Last updated timestamp
-  lastUpdated: Date
-}
-
-// Helper to accumulate usage from a message into cumulative total
-export function accumulateUsage(
-  cumulative: CumulativeUsage | null,
-  messageUsage: TokenUsage
-): CumulativeUsage {
-  const prev = cumulative || {
-    inputTokens: 0,
-    outputTokens: 0,
-    cacheReadTokens: 0,
-    cacheCreationTokens: 0,
-    contextTokens: 0,
-    messageCount: 0,
-    lastUpdated: new Date()
-  }
-
-  // For context tracking, input_tokens represents current context size
-  // cacheReadTokens are tokens read from cache (efficient reuse)
-  // cacheCreationTokens are tokens being cached for future use
-  // The effective context size is approximately input_tokens + cacheReadTokens
-  const newInputTokens = prev.inputTokens + messageUsage.inputTokens
-  const newCacheRead = prev.cacheReadTokens + (messageUsage.cacheReadTokens || 0)
-  const newCacheCreation = prev.cacheCreationTokens + (messageUsage.cacheCreationTokens || 0)
-
-  return {
-    inputTokens: newInputTokens,
-    outputTokens: prev.outputTokens + messageUsage.outputTokens,
-    cacheReadTokens: newCacheRead,
-    cacheCreationTokens: newCacheCreation,
-    // Context is the current input context window being used
-    // Latest input_tokens reflects current context size (not cumulative)
-    contextTokens: messageUsage.inputTokens + (messageUsage.cacheReadTokens || 0),
-    messageCount: prev.messageCount + 1,
-    lastUpdated: new Date()
-  }
-}
-
-export interface Conversation {
-  id: string
-  title: string
-  messages: Message[]
-  createdAt: Date
-  updatedAt: Date
-  model?: string
-  projectPath?: string | null
-  settings?: ConversationSettings
-  claudeSessionId?: string | null
-  usage?: TokenUsage | null  // Latest message token usage from Claude CLI (when available)
-  cumulativeUsage?: CumulativeUsage | null  // Cumulative token usage across all messages
-  agentId?: string | null  // Which agent was selected for this conversation
-}
-
-// Settings stored per-conversation
-export interface ConversationSettings {
-  systemPrompt?: string
-  // Claude CLI specific options
-  claudeModel?: string
-  additionalDirs?: string[]
-  allowedTools?: string[]
-  disallowedTools?: string[]
-  permissionMode?: 'acceptEdits' | 'bypassPermissions' | 'default' | 'plan'
-  // Docker model options (only applicable for docker backend)
-  temperature?: number
-  maxTokens?: number
-}
-
-export interface SuggestedPrompt {
-  text: string
-  category: string
-}
-
-export interface ChatSettings {
-  model: string
-  temperature: number
-  maxTokens: number
-  systemPrompt: string
-  suggestedPrompts?: SuggestedPrompt[]
-  // Claude CLI specific options
-  additionalDirs?: string[]
-  claudeModel?: string
-  claudeAgent?: string  // --agent flag
-  allowedTools?: string[]
-  disallowedTools?: string[]
-  permissionMode?: 'acceptEdits' | 'bypassPermissions' | 'default' | 'plan'
-  // Gemini CLI specific options
-  geminiModel?: string
-  // Codex CLI specific options
-  codexModel?: string
-  reasoningEffort?: 'low' | 'medium' | 'high'
-  sandbox?: 'read-only' | 'full' | 'off'
-}
-
-export interface ModelInfo {
-  id: string
-  name: string
-  backend: AIBackend
-  description?: string
-}
-
-export interface BackendStatus {
-  backend: string
-  available: boolean
-  error?: string
-}
-
-export interface GeneratingState {
-  startedAt: number
-  model: string
-}
-
-export type GeneratingConversations = Record<string, GeneratingState>
+// Import types needed for internal use
+import type {
+  AIBackend,
+  SuggestedPrompt,
+  ChatSettings,
+  Conversation,
+  TokenUsage,
+  CumulativeUsage,
+  ClaudeStreamEvent,
+  GeneratingConversations,
+} from '@/lib/ai/types'
 
 // ============================================================================
 // CONSTANTS
@@ -227,9 +103,9 @@ export const MOCK_RESPONSES: Record<string, string> = {
 
   component: "Here's a modern React component with TypeScript:\n\n```tsx\nimport React, { useState } from 'react';\n\ninterface UserCardProps {\n  name: string;\n  role: string;\n  avatarUrl?: string;\n  onContact?: () => void;\n}\n\nexport function UserCard({ \n  name, \n  role, \n  avatarUrl, \n  onContact \n}: UserCardProps) {\n  const [isHovered, setIsHovered] = useState(false);\n\n  return (\n    <div \n      className=\"glass rounded-lg p-6\"\n      onMouseEnter={() => setIsHovered(true)}\n      onMouseLeave={() => setIsHovered(false)}\n    >\n      <div className=\"flex items-center gap-4\">\n        <img \n          src={avatarUrl || '/default-avatar.png'} \n          alt={name}\n          className=\"w-16 h-16 rounded-full\"\n        />\n        \n        <div className=\"flex-1\">\n          <h3 className=\"text-lg font-semibold terminal-glow\">{name}</h3>\n          <p className=\"text-sm text-muted-foreground\">{role}</p>\n        </div>\n        \n        {onContact && (\n          <button\n            onClick={onContact}\n            className=\"px-4 py-2 bg-primary text-primary-foreground rounded-md\"\n          >\n            Contact\n          </button>\n        )}\n      </div>\n    </div>\n  );\n}\n```",
 
-  review: "I'll review your code for best practices. Here are key areas I look for:\n\n**✅ Good Practices:**\n```typescript\n// 1. Descriptive naming\nconst calculateUserAge = (birthDate: Date) => {...}\n\n// 2. Single responsibility\nfunction validateEmail(email: string): boolean {...}\nfunction sendEmail(to: string, subject: string) {...}\n\n// 3. Early returns\nfunction processUser(user: User | null) {\n  if (!user) return null;\n  if (!user.isActive) return null;\n  \n  return processActiveUser(user);\n}\n\n// 4. Type safety\ninterface Config {\n  apiKey: string;\n  timeout: number;\n}\n```\n\nShare your code and I'll provide specific feedback!",
+  review: "I'll review your code for best practices. Here are key areas I look for:\n\n**Good Practices:**\n```typescript\n// 1. Descriptive naming\nconst calculateUserAge = (birthDate: Date) => {...}\n\n// 2. Single responsibility\nfunction validateEmail(email: string): boolean {...}\nfunction sendEmail(to: string, subject: string) {...}\n\n// 3. Early returns\nfunction processUser(user: User | null) {\n  if (!user) return null;\n  if (!user.isActive) return null;\n  \n  return processActiveUser(user);\n}\n\n// 4. Type safety\ninterface Config {\n  apiKey: string;\n  timeout: number;\n}\n```\n\nShare your code and I'll provide specific feedback!",
 
-  default: "I'm here to help! I can assist with:\n\n🐛 **Debugging** - Fix errors and issues in your code\n📚 **Learning** - Explain concepts and best practices\n⚡ **Coding** - Generate components and functions\n✅ **Review** - Analyze code quality\n\nNote: This is a mock response. In Phase 2, I'll connect to real AI backends.\n\nWhat would you like to work on?"
+  default: "I'm here to help! I can assist with:\n\n**Debugging** - Fix errors and issues in your code\n**Learning** - Explain concepts and best practices\n**Coding** - Generate components and functions\n**Review** - Analyze code quality\n\nNote: This is a mock response. In Phase 2, I'll connect to real AI backends.\n\nWhat would you like to work on?"
 }
 
 export const GENERATING_STORAGE_KEY = 'ai-workspace-generating'
@@ -241,6 +117,42 @@ const GENERATING_STALE_THRESHOLD = 10 * 60 * 1000 // 10 minutes
 
 export function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+}
+
+// Helper to accumulate usage from a message into cumulative total
+export function accumulateUsage(
+  cumulative: CumulativeUsage | null,
+  messageUsage: TokenUsage
+): CumulativeUsage {
+  const prev = cumulative || {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    contextTokens: 0,
+    messageCount: 0,
+    lastUpdated: new Date()
+  }
+
+  // For context tracking, input_tokens represents current context size
+  // cacheReadTokens are tokens read from cache (efficient reuse)
+  // cacheCreationTokens are tokens being cached for future use
+  // The effective context size is approximately input_tokens + cacheReadTokens
+  const newInputTokens = prev.inputTokens + messageUsage.inputTokens
+  const newCacheRead = prev.cacheReadTokens + (messageUsage.cacheReadTokens || 0)
+  const newCacheCreation = prev.cacheCreationTokens + (messageUsage.cacheCreationTokens || 0)
+
+  return {
+    inputTokens: newInputTokens,
+    outputTokens: prev.outputTokens + messageUsage.outputTokens,
+    cacheReadTokens: newCacheRead,
+    cacheCreationTokens: newCacheCreation,
+    // Context is the current input context window being used
+    // Latest input_tokens reflects current context size (not cumulative)
+    contextTokens: messageUsage.inputTokens + (messageUsage.cacheReadTokens || 0),
+    messageCount: prev.messageCount + 1,
+    lastUpdated: new Date()
+  }
 }
 
 // Parse Claude events from content that may contain __CLAUDE_EVENT__<JSON>__END_EVENT__ markers

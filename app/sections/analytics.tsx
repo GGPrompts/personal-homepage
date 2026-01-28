@@ -52,6 +52,7 @@ interface TokenUsage {
   cacheRead: number
   cacheWrite: number
   totalTokens?: number
+  isLive?: boolean
 }
 
 interface ModelUsage {
@@ -78,6 +79,10 @@ interface ClaudeStatsData {
   lastComputedDate: string
   firstSessionDate?: string
   hourCounts?: Record<string, number>
+  liveData?: {
+    lastUpdated: string
+    tokensByModel: Record<string, number>
+  }
 }
 
 interface Session {
@@ -312,28 +317,42 @@ function TokenUsageChart({ data, timeRange }: { data: TokenUsage[]; timeRange: "
               {/* Tooltip */}
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 pointer-events-none">
                 <div className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs whitespace-nowrap shadow-xl">
-                  <p className="font-medium text-white">{new Date(day.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</p>
+                  <p className="font-medium text-white flex items-center gap-2">
+                    {new Date(day.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                    {day.isLive && (
+                      <span className="px-1.5 py-0.5 bg-green-500/20 text-green-400 text-[10px] rounded font-medium">
+                        LIVE
+                      </span>
+                    )}
+                  </p>
                   <p className="text-blue-400">Input: {formatNumber(day.inputTokens)}</p>
                   <p className="text-emerald-400">Output: {formatNumber(day.outputTokens)}</p>
                   <p className="text-zinc-400">Total: {formatNumber(total)}</p>
                 </div>
               </div>
 
+              {/* Live indicator dot */}
+              {day.isLive && (
+                <div className="absolute -top-1 left-1/2 -translate-x-1/2">
+                  <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                </div>
+              )}
+
               {/* Bars - using pixel heights for proper scaling */}
               <div className="w-full flex flex-col gap-0.5 justify-end" style={{ height: CHART_HEIGHT }}>
                 <div
-                  className="w-full bg-blue-500/70 rounded-t-sm transition-all hover:bg-blue-500"
+                  className={`w-full rounded-t-sm transition-all ${day.isLive ? "bg-blue-400/80 hover:bg-blue-400" : "bg-blue-500/70 hover:bg-blue-500"}`}
                   style={{ height: Math.max(inputHeight, day.inputTokens > 0 ? 2 : 0) }}
                 />
                 <div
-                  className="w-full bg-emerald-500/70 rounded-b-sm transition-all hover:bg-emerald-500"
+                  className={`w-full rounded-b-sm transition-all ${day.isLive ? "bg-emerald-400/80 hover:bg-emerald-400" : "bg-emerald-500/70 hover:bg-emerald-500"}`}
                   style={{ height: Math.max(outputHeight, day.outputTokens > 0 ? 2 : 0) }}
                 />
               </div>
 
               {/* Day label */}
-              <span className="text-[10px] text-muted-foreground">
-                {new Date(day.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "narrow" })}
+              <span className={`text-[10px] ${day.isLive ? "text-green-400 font-medium" : "text-muted-foreground"}`}>
+                {day.isLive ? "Today" : new Date(day.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "narrow" })}
               </span>
             </motion.div>
           )
@@ -831,7 +850,15 @@ export default function AnalyticsSection({ activeSubItem, onSubItemHandled }: An
 
       {/* Footer */}
       <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <p>Last updated: {timeAgo(analytics.lastUpdated)}</p>
+        <div className="flex items-center gap-3">
+          <p>Last updated: {timeAgo(analytics.lastUpdated)}</p>
+          {analytics.claudeStats?.liveData && (
+            <span className="flex items-center gap-1.5 px-2 py-0.5 bg-green-500/10 text-green-500 rounded-full">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+              Live data active
+            </span>
+          )}
+        </div>
         <Button variant="ghost" size="sm" onClick={handleClearData} className="gap-2 text-red-500 hover:text-red-600">
           <Trash2 className="h-3 w-3" />
           Clear Data

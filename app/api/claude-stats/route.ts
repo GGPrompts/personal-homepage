@@ -1,6 +1,7 @@
 /**
  * Claude Code Stats API
  * Reads usage statistics from ~/.claude/stats-cache.json
+ * Now includes real-time data from session logs for current day
  *
  * GET /api/claude-stats - Get Claude Code usage statistics
  */
@@ -9,6 +10,7 @@ import { NextRequest } from 'next/server'
 import { readFile } from 'fs/promises'
 import { homedir } from 'os'
 import { join } from 'path'
+import { getTodayUsage, needsLiveData, type LiveUsageData } from '@/lib/claude-logs'
 
 // Force dynamic rendering - this route reads user files
 export const dynamic = 'force-dynamic'
@@ -64,6 +66,7 @@ export interface ClaudeStatsResponse {
       cacheRead: number
       cacheWrite: number
       totalTokens: number
+      isLive?: boolean
     }>
     modelUsage: Record<string, ModelUsage>
     totalSessions: number
@@ -72,6 +75,10 @@ export interface ClaudeStatsResponse {
     lastComputedDate: string
     firstSessionDate?: string
     hourCounts?: Record<string, number>
+    liveData?: {
+      lastUpdated: string
+      tokensByModel: Record<string, number>
+    }
   }
   error?: string
 }
@@ -102,10 +109,21 @@ export async function GET(_request: NextRequest): Promise<Response> {
     const totalOutputAllModels = Object.values(statsData.modelUsage).reduce((sum, m) => sum + m.outputTokens, 0)
     const overallInputOutputRatio = totalOutputAllModels > 0 ? totalInputAllModels / totalOutputAllModels : 1
 
+    // Define type for daily token usage including optional isLive flag
+    type DailyTokenEntry = {
+      date: string
+      inputTokens: number
+      outputTokens: number
+      cacheRead: number
+      cacheWrite: number
+      totalTokens: number
+      isLive?: boolean
+    }
+
     // Process daily token usage - combine model tokens by day
     // The dailyModelTokens contains output tokens per model per day
     // We estimate input tokens using the overall input/output ratio
-    const dailyTokenUsage = statsData.dailyModelTokens.map(day => {
+    const dailyTokenUsage: DailyTokenEntry[] = statsData.dailyModelTokens.map(day => {
       const totalOutputForDay = Object.values(day.tokensByModel).reduce((sum, t) => sum + t, 0)
 
       // Use overall ratio to estimate input (more stable than per-model ratios)
@@ -121,17 +139,52 @@ export async function GET(_request: NextRequest): Promise<Response> {
       }
     })
 
+    // Check if we need real-time data for today
+    let liveData: LiveUsageData | null = null
+    let dailyActivity = [...statsData.dailyActivity]
+
+    if (needsLiveData(statsData.lastComputedDate)) {
+      liveData = await getTodayUsage()
+
+      if (liveData) {
+        // Add today's live token data
+        dailyTokenUsage.push({
+          date: liveData.date,
+          inputTokens: liveData.inputTokens,
+          outputTokens: liveData.outputTokens,
+          cacheRead: liveData.cacheRead,
+          cacheWrite: liveData.cacheWrite,
+          totalTokens: liveData.inputTokens + liveData.outputTokens,
+          isLive: true
+        })
+
+        // Add today's live activity data
+        dailyActivity.push({
+          date: liveData.date,
+          messageCount: liveData.messageCount,
+          sessionCount: liveData.sessionCount,
+          toolCallCount: liveData.toolCallCount
+        })
+      }
+    }
+
     const response: ClaudeStatsResponse = {
       success: true,
       data: {
         dailyTokenUsage,
         modelUsage: statsData.modelUsage,
-        totalSessions: statsData.totalSessions,
-        totalMessages: statsData.totalMessages,
-        dailyActivity: statsData.dailyActivity,
-        lastComputedDate: statsData.lastComputedDate,
+        totalSessions: statsData.totalSessions + (liveData?.sessionCount || 0),
+        totalMessages: statsData.totalMessages + (liveData?.messageCount || 0),
+        dailyActivity,
+        lastComputedDate: liveData ? liveData.date : statsData.lastComputedDate,
         firstSessionDate: statsData.firstSessionDate,
-        hourCounts: statsData.hourCounts
+        hourCounts: statsData.hourCounts,
+        ...(liveData && {
+          liveData: {
+            lastUpdated: liveData.lastUpdated,
+            tokensByModel: liveData.tokensByModel
+          }
+        })
       }
     }
 

@@ -1,60 +1,30 @@
 /**
  * AI Chat Types for Claude CLI Integration
+ * Re-exports common types from @/lib/ai/types and adds kanban-specific types
  */
 
-// Content block types from Claude CLI stream-json
-export interface TextBlock {
-  type: 'text'
-  text: string
-}
+// Re-export common types from the single source of truth
+export type {
+  ChatMessage,
+  ClaudeStreamEvent,
+  ClaudeStreamResult,
+  TextBlock,
+  ToolUseBlock,
+  ToolResultBlock,
+  ContentBlock,
+  ClaudeUsage,
+  ClaudeRawStreamEvent,
+  TokenUsage,
+} from '@/lib/ai/types'
 
-export interface ToolUseBlock {
-  type: 'tool_use'
-  id: string
-  name: string
-  input: Record<string, unknown>
-}
+// Import for local use
+import type { ClaudeSettings as BaseClaudeSettings } from '@/lib/ai/types'
 
-export interface ToolResultBlock {
-  type: 'tool_result'
-  tool_use_id: string
-  content: string
-  is_error?: boolean
-}
+// ============================================================================
+// KANBAN-SPECIFIC STREAM CHUNK
+// (Extends base StreamChunk with usage info for kanban UI)
+// ============================================================================
 
-export type ContentBlock = TextBlock | ToolUseBlock | ToolResultBlock
-
-export interface ClaudeUsage {
-  input_tokens: number
-  output_tokens: number
-  cache_read_input_tokens?: number
-  cache_creation_input_tokens?: number
-}
-
-export interface ClaudeStreamEvent {
-  type: 'system' | 'assistant' | 'result' | 'error' | 'content_block_start' | 'content_block_delta' | 'content_block_stop' | 'message_start' | 'message_stop'
-  subtype?: string
-  session_id?: string
-  message?: {
-    content: ContentBlock[]
-  }
-  index?: number
-  content_block?: ContentBlock
-  result?: string
-  is_error?: boolean
-  usage?: ClaudeUsage
-  delta?: {
-    type: 'text_delta' | 'input_json_delta'
-    text?: string
-    partial_json?: string
-  }
-  error?: {
-    type: string
-    message: string
-  }
-}
-
-// Stream chunk types for the client
 export interface StreamChunk {
   type: 'text' | 'tool_start' | 'tool_input' | 'tool_end' | 'heartbeat' | 'error' | 'done'
   content?: string
@@ -74,18 +44,11 @@ export interface StreamChunk {
   }
 }
 
-export interface ClaudeStreamResult {
-  stream: ReadableStream<string>
-  getSessionId: () => string | null
-}
+// ============================================================================
+// KANBAN-SPECIFIC CLAUDE SETTINGS
+// (Per-task settings, subset of full ClaudeSettings)
+// ============================================================================
 
-// Chat message for API requests
-export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system'
-  content: string
-}
-
-// Per-task Claude settings
 export interface ClaudeSettings {
   // System prompt
   systemPrompt?: string
@@ -110,15 +73,23 @@ export interface ClaudeSettings {
   disallowedTools?: string[]
 }
 
-// API request types
+// ============================================================================
+// KANBAN CHAT REQUEST
+// (Simplified request for task chat)
+// ============================================================================
+
 export interface ChatRequest {
-  messages: ChatMessage[]
+  messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>
   settings?: ClaudeSettings
   sessionId?: string  // For multi-turn conversations
   taskId?: string     // For tracking
 }
 
-// Available Claude agents (will be populated from filesystem)
+// ============================================================================
+// CLAUDE AGENT DEFINITION
+// ============================================================================
+
+/** Available Claude agents (will be populated from filesystem) */
 export interface ClaudeAgent {
   name: string
   description?: string
