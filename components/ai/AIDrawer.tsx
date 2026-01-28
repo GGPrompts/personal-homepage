@@ -1025,9 +1025,13 @@ export function AIDrawerToggle({ className = "", currentSection }: AIDrawerToggl
     return <MessageSquare className="h-5 w-5" />
   }
 
+  // Use ghost variant on server, then sync to actual state after mount
+  // This prevents hydration mismatch from localStorage-persisted isOpen state
+  const buttonVariant = mounted && isOpen ? "secondary" : "ghost"
+
   const buttonContent = (
     <Button
-      variant={isOpen ? "secondary" : "ghost"}
+      variant={buttonVariant}
       size="icon"
       onClick={toggle}
       className={`relative ${className}`}
