@@ -933,7 +933,7 @@ export default function PersonalHomepage() {
       case "disasters":
         return <DisastersMonitor activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "tasks":
-        return <TasksSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("profile")} />
+        return <TasksSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "projects":
         if (!isLocal) {
           return <LocalOnlyOverlay sectionName="Projects" description="This feature scans your local ~/projects/ directory and requires localhost to access the file system." />

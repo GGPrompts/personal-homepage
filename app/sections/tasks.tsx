@@ -17,9 +17,6 @@ import {
   User,
   Inbox,
   RotateCw,
-  AlertCircle,
-  Github,
-  Settings,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,11 +29,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  SelectSeparator,
 } from "@/components/ui/select"
-import { getFile, saveFile, type GitHubError } from "@/lib/github"
-import { useAuth } from "@/components/AuthProvider"
-import { AuthModal } from "@/components/AuthModal"
 
 // ============================================================================
 // TYPES
@@ -48,11 +41,6 @@ interface Task {
   completed: boolean
   createdAt: string
   completedAt?: string
-}
-
-interface GitHubRepo {
-  name: string
-  full_name: string
 }
 
 interface QuickNote {
@@ -73,7 +61,6 @@ interface NotesData {
 // ============================================================================
 
 const STORAGE_KEY = "quick-tasks"
-const NOTES_FILE = "quicknotes.json"
 
 const DEFAULT_NOTES_DATA: NotesData = {
   version: 1,
@@ -248,120 +235,68 @@ function NoteItem({
 }
 
 // ============================================================================
-// NOTES TAB COMPONENT (GitHub Storage)
+// NOTES TAB COMPONENT (Local Storage)
 // ============================================================================
 
-function NotesTab({ onNavigateToSettings }: { onNavigateToSettings?: () => void }) {
+function NotesTab() {
   const queryClient = useQueryClient()
-  const { user, getGitHubToken } = useAuth()
   const [newNoteText, setNewNoteText] = React.useState("")
   const [selectedProject, setSelectedProject] = React.useState("general")
-  const [showAuthModal, setShowAuthModal] = React.useState(false)
   const inputRef = React.useRef<HTMLInputElement>(null)
 
-  // GitHub config
-  const [token, setToken] = React.useState<string | null>(null)
-  const [repo, setRepo] = React.useState<string | null>(null)
-  const [fileSha, setFileSha] = React.useState<string | null>(null)
-
-  // Load token and repo
-  React.useEffect(() => {
-    const loadToken = async () => {
-      const authToken = await getGitHubToken()
-      setToken(authToken)
-    }
-    loadToken()
-    const savedRepo = localStorage.getItem("github-notes-repo")
-    setRepo(savedRepo)
-  }, [user, getGitHubToken])
-
-  // Fetch notes from GitHub
+  // Fetch notes from local API
   const {
     data: notesData,
     isLoading: notesLoading,
-    error: notesError,
-    refetch,
   } = useQuery({
-    queryKey: ["quicknotes", repo],
+    queryKey: ["quicknotes-local"],
     queryFn: async () => {
-      if (!token || !repo) return DEFAULT_NOTES_DATA
-      try {
-        const result = await getFile(token, repo, NOTES_FILE)
-        setFileSha(result.sha)
-        return JSON.parse(result.content) as NotesData
-      } catch (err) {
-        const githubError = err as GitHubError
-        if (githubError.status === 404) {
-          // File doesn't exist yet
-          setFileSha(null)
-          return DEFAULT_NOTES_DATA
-        }
-        throw err
-      }
+      const res = await fetch("/api/quicknotes")
+      if (!res.ok) return DEFAULT_NOTES_DATA
+      return res.json() as Promise<NotesData>
     },
-    enabled: !!token && !!repo,
-    staleTime: 30 * 1000,
+    staleTime: 10 * 1000,
   })
 
-  // Fetch GitHub repos for the selector
-  const { data: reposData } = useQuery({
-    queryKey: ["projects-github"],
-    queryFn: async () => {
-      if (!token) return { repos: [], count: 0 }
-      const res = await fetch("/api/projects/github", {
-        headers: { Authorization: `Bearer ${token}` },
+  // Add note mutation
+  const addMutation = useMutation({
+    mutationFn: async (note: { project: string; text: string }) => {
+      const res = await fetch("/api/quicknotes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(note),
       })
-      if (!res.ok) return { repos: [], count: 0 }
-      return res.json() as Promise<{ repos: GitHubRepo[]; count: number }>
+      if (!res.ok) throw new Error("Failed to add note")
+      return res.json()
     },
-    enabled: !!token,
-    staleTime: 5 * 60 * 1000,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quicknotes-local"] })
+    },
   })
 
-  // Save mutation
-  const saveMutation = useMutation({
-    mutationFn: async (data: NotesData) => {
-      if (!token || !repo) throw new Error("Not configured")
-      const content = JSON.stringify(data, null, 2)
-      const result = await saveFile(token, repo, NOTES_FILE, content, fileSha, "Update quick notes")
-      setFileSha(result.sha)
-      return data
+  // Delete note mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/quicknotes?id=${id}`, { method: "DELETE" })
+      if (!res.ok) throw new Error("Failed to delete note")
+      return res.json()
     },
-    onSuccess: (data) => {
-      queryClient.setQueryData(["quicknotes", repo], data)
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quicknotes-local"] })
     },
   })
 
   const handleAddNote = () => {
     const text = newNoteText.trim()
-    if (!text || !notesData) return
+    if (!text) return
 
-    const newNote: QuickNote = {
-      id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      project: selectedProject,
-      text,
-      createdAt: new Date().toISOString(),
-    }
-
-    const updatedData: NotesData = {
-      ...notesData,
-      notes: [newNote, ...notesData.notes],
-    }
-
-    saveMutation.mutate(updatedData)
+    addMutation.mutate({ project: selectedProject, text })
     setNewNoteText("")
     inputRef.current?.focus()
   }
 
   const handleDeleteNote = (id: string) => {
-    if (!notesData) return
-
-    const updatedData: NotesData = {
-      ...notesData,
-      notes: notesData.notes.filter((n) => n.id !== id),
-    }
-
-    saveMutation.mutate(updatedData)
+    deleteMutation.mutate(id)
   }
 
   // Group notes by project
@@ -391,44 +326,8 @@ function NotesTab({ onNavigateToSettings }: { onNavigateToSettings?: () => void 
     return <FolderGit2 className="h-4 w-4" />
   }
 
-  const totalNotes = notesData?.notes.length || 0
-  const repos = reposData?.repos || []
-  const isConfigured = !!token && !!repo
-
-  // Not logged in state
-  if (!user) {
-    return (
-      <Card className="glass p-8 text-center">
-        <Github className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-        <h3 className="text-lg font-medium mb-2">Sign in to use Notes</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          Notes are synced to your GitHub repository
-        </p>
-        <Button onClick={() => setShowAuthModal(true)}>
-          <Github className="h-4 w-4 mr-2" />
-          Sign in with GitHub
-        </Button>
-        <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
-      </Card>
-    )
-  }
-
-  // Repo not configured state
-  if (!repo) {
-    return (
-      <Card className="glass p-8 text-center">
-        <Settings className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-        <h3 className="text-lg font-medium mb-2">Configure Notes Repository</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          Select a GitHub repo to sync your notes
-        </p>
-        <Button variant="outline" onClick={onNavigateToSettings}>
-          <Settings className="h-4 w-4 mr-2" />
-          Go to Settings
-        </Button>
-      </Card>
-    )
-  }
+  const totalNotes = notesData?.notes?.length || 0
+  const isSaving = addMutation.isPending || deleteMutation.isPending
 
   return (
     <div className="space-y-6">
@@ -437,7 +336,7 @@ function NotesTab({ onNavigateToSettings }: { onNavigateToSettings?: () => void 
         <div className="flex flex-col sm:flex-row gap-3">
           <Select value={selectedProject} onValueChange={setSelectedProject}>
             <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="Select project" />
+              <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="general">
@@ -452,15 +351,6 @@ function NotesTab({ onNavigateToSettings }: { onNavigateToSettings?: () => void 
                   Personal
                 </div>
               </SelectItem>
-              {repos.length > 0 && <SelectSeparator />}
-              {repos.map((repo) => (
-                <SelectItem key={repo.full_name} value={repo.name}>
-                  <div className="flex items-center gap-2">
-                    <FolderGit2 className="h-4 w-4" />
-                    {repo.name}
-                  </div>
-                </SelectItem>
-              ))}
             </SelectContent>
           </Select>
           <form
@@ -476,15 +366,15 @@ function NotesTab({ onNavigateToSettings }: { onNavigateToSettings?: () => void 
               value={newNoteText}
               onChange={(e) => setNewNoteText(e.target.value)}
               className="flex-1"
-              disabled={saveMutation.isPending}
+              disabled={isSaving}
             />
-            <Button type="submit" disabled={!newNoteText.trim() || saveMutation.isPending || !isConfigured}>
-              {saveMutation.isPending ? (
+            <Button type="submit" disabled={!newNoteText.trim() || isSaving}>
+              {isSaving ? (
                 <RotateCw className="h-4 w-4 animate-spin" />
               ) : (
                 <Plus className="h-4 w-4 mr-2" />
               )}
-              {!saveMutation.isPending && "Add"}
+              {!isSaving && "Add"}
             </Button>
           </form>
         </div>
@@ -739,13 +629,10 @@ function TasksTab() {
 export default function TasksSection({
   activeSubItem,
   onSubItemHandled,
-  onNavigateToSettings,
 }: {
   activeSubItem?: string | null
   onSubItemHandled?: () => void
-  onNavigateToSettings?: () => void
 }) {
-  const { user, getGitHubToken } = useAuth()
   const [activeTab, setActiveTab] = React.useState("tasks")
 
   // Handle sub-item navigation
@@ -763,33 +650,15 @@ export default function TasksSection({
     }
   }, [activeSubItem, onSubItemHandled])
 
-  // Get repo config for notes count
-  const [token, setToken] = React.useState<string | null>(null)
-  const [repo, setRepo] = React.useState<string | null>(null)
-
-  React.useEffect(() => {
-    const loadToken = async () => {
-      const authToken = await getGitHubToken()
-      setToken(authToken)
-    }
-    loadToken()
-    setRepo(localStorage.getItem("github-notes-repo"))
-  }, [user, getGitHubToken])
-
-  // Count notes for badge (from GitHub)
+  // Count notes for badge (from local API)
   const { data: notesData } = useQuery({
-    queryKey: ["quicknotes", repo],
+    queryKey: ["quicknotes-local"],
     queryFn: async () => {
-      if (!token || !repo) return DEFAULT_NOTES_DATA
-      try {
-        const result = await getFile(token, repo, NOTES_FILE)
-        return JSON.parse(result.content) as NotesData
-      } catch {
-        return DEFAULT_NOTES_DATA
-      }
+      const res = await fetch("/api/quicknotes")
+      if (!res.ok) return DEFAULT_NOTES_DATA
+      return res.json() as Promise<NotesData>
     },
-    enabled: !!token && !!repo,
-    staleTime: 30 * 1000,
+    staleTime: 10 * 1000,
   })
 
   const notesCount = notesData?.notes?.length || 0
@@ -824,7 +693,7 @@ export default function TasksSection({
           </TabsContent>
 
           <TabsContent value="notes">
-            <NotesTab onNavigateToSettings={onNavigateToSettings} />
+            <NotesTab />
           </TabsContent>
         </Tabs>
       </div>
