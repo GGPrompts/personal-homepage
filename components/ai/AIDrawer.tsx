@@ -30,10 +30,9 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { useAIDrawerSafe, DRAWER_WIDTH_VALUES, MINIMIZED_WIDTH } from "./AIDrawerProvider"
 import { ChatMessage, TypingIndicator } from "./ChatMessage"
 import { ChatInput } from "./ChatInput"
-import { useQuery } from "@tanstack/react-query"
 import { useAuth } from "@/components/AuthProvider"
-import { mergeProjects, type LocalProject, type GitHubRepo } from "@/lib/projects"
-import { useAllProjectsMeta } from "@/hooks/useProjectMeta"
+import { useProjects } from "@/hooks/useProjects"
+import { isAvatarUrl } from "@/lib/ai/utils"
 
 // ============================================================================
 // TYPES
@@ -148,7 +147,7 @@ const quickActionItemVariants = {
 export function AIDrawer({ className = "" }: AIDrawerProps) {
   const context = useAIDrawerSafe()
   const shouldReduceMotion = useReducedMotion()
-  const { user, getGitHubToken } = useAuth()
+  const { user } = useAuth()
   const userAvatarUrl = user?.user_metadata?.avatar_url || null
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const [showSettings, setShowSettings] = React.useState(false)
@@ -219,54 +218,8 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
     return availableAgents.find(a => a.id === selectedAgentId) ?? null
   }, [selectedAgentId, availableAgents])
 
-  // Fetch local projects
-  // TODO: [code-review] Consider adding console.error before returning [] on fetch failure
-  const { data: localProjects } = useQuery({
-    queryKey: ['local-projects'],
-    queryFn: async () => {
-      const res = await fetch('/api/projects/local')
-      if (!res.ok) return []
-      const data = await res.json()
-      return (data.projects || []) as LocalProject[]
-    },
-    staleTime: 5 * 60 * 1000,
-  })
-
-  // Fetch GitHub projects
-  // TODO: [code-review] Consider adding console.error for token missing and fetch failure cases
-  const { data: githubProjects } = useQuery({
-    queryKey: ['github-projects-for-ai-drawer'],
-    queryFn: async () => {
-      const token = await getGitHubToken()
-      if (!token) return []
-      const res = await fetch('/api/projects/github', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!res.ok) return []
-      const data = await res.json()
-      return (data.repos || []) as GitHubRepo[]
-    },
-    staleTime: 5 * 60 * 1000,
-  })
-
-  // Get pinned status
-  const { isPinned } = useAllProjectsMeta()
-
-  // Get all projects with local paths (for cwd), with pinned at top
-  const availableProjects = React.useMemo(() => {
-    if (!Array.isArray(localProjects) || !Array.isArray(githubProjects)) return []
-
-    const merged = mergeProjects(githubProjects, localProjects)
-    const projectsWithLocalPath = merged.filter(p => p.local?.path)
-
-    return projectsWithLocalPath.sort((a, b) => {
-      const aPinned = isPinned(a.slug)
-      const bPinned = isPinned(b.slug)
-      if (aPinned && !bPinned) return -1
-      if (!aPinned && bPinned) return 1
-      return a.name.localeCompare(b.name)
-    })
-  }, [localProjects, githubProjects, isPinned])
+  // Use shared hook for projects
+  const { projects: availableProjects, isPinned } = useProjects()
 
   // Auto-scroll to bottom when new messages arrive
   React.useEffect(() => {
@@ -1077,19 +1030,6 @@ interface AIDrawerToggleProps {
   className?: string
   /** Current section/page to show contextual agent avatar */
   currentSection?: string
-}
-
-/**
- * Check if a string is a path-based URL (absolute path or full URL)
- */
-function isAvatarUrl(str: string): boolean {
-  if (str.startsWith('/')) return true
-  try {
-    new URL(str)
-    return true
-  } catch {
-    return false
-  }
 }
 
 /**

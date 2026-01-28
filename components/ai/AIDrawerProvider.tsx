@@ -3,7 +3,7 @@
 import * as React from "react"
 import { createContext, useContext, useState, useCallback, useEffect, useMemo } from "react"
 import { useAIChat, type UseAIChatReturn } from "@/hooks/useAIChat"
-import { useQuery } from "@tanstack/react-query"
+import { useAgents } from "@/hooks/useAgents"
 import type { AgentCard } from "@/lib/agents/types"
 
 // ============================================================================
@@ -176,29 +176,17 @@ export function AIDrawerProvider({
     return "default"
   })
 
-  // Fetch available agents
-  const { data: agentsData, isLoading: agentsLoading } = useQuery<{ agents: AgentCard[] }>({
-    queryKey: ['agents-registry'],
-    queryFn: async () => {
-      const res = await fetch('/api/ai/agents/registry')
-      if (!res.ok) throw new Error('Failed to fetch agents')
-      return res.json()
-    },
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
-  })
-
-  // Get enabled agents
-  const availableAgents = useMemo(() => {
-    return agentsData?.agents?.filter(a => a.enabled) ?? []
-  }, [agentsData?.agents])
+  // Use shared hook for agents
+  const {
+    agents: availableAgents,
+    isLoading: agentsLoading,
+    findForSection,
+  } = useAgents()
 
   // Find recommended agent based on current section
   const recommendedAgent = useMemo(() => {
-    if (!currentSection || availableAgents.length === 0) return null
-    return availableAgents.find(
-      agent => agent.sections?.includes(currentSection)
-    ) ?? null
-  }, [currentSection, availableAgents])
+    return findForSection(currentSection)
+  }, [currentSection, findForSection])
 
   // Auto-select agent when section changes (only if user hasn't manually selected)
   useEffect(() => {

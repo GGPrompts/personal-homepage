@@ -30,12 +30,12 @@ import {
 } from "@/components/ui/dialog"
 import { AgentGallery } from "@/components/agents/AgentGallery"
 import type { AgentCard } from "@/lib/agents/types"
-import { useQuery } from "@tanstack/react-query"
 import { useSearchParams } from "next/navigation"
-import { useAllProjectsMeta } from "@/hooks/useProjectMeta"
 import { useTabzBridge } from "@/hooks/useTabzBridge"
 import { TabzConnectionStatus } from "@/components/TabzConnectionStatus"
-import { mergeProjects, type LocalProject, type GitHubRepo } from "@/lib/projects"
+import { useAgents } from "@/hooks/useAgents"
+import { useProjects } from "@/hooks/useProjects"
+import { isEmoji, isAvatarUrl } from "@/lib/ai/utils"
 import {
   type Conversation,
   DEFAULT_SUGGESTED_PROMPTS,
@@ -48,33 +48,6 @@ import {
 import { useAIChat } from "@/hooks/useAIChat"
 import { ChatMessage, TypingIndicator } from "@/components/ai/ChatMessage"
 import { ChatInput } from "@/components/ai/ChatInput"
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-/**
- * Check if a string is an emoji (simple heuristic)
- */
-function isEmoji(str: string): boolean {
-  const emojiRegex = /^[\p{Emoji}\u200d]+$/u
-  return emojiRegex.test(str) && str.length <= 8
-}
-
-/**
- * Check if a string is a URL or path (for avatar rendering)
- */
-function isAvatarUrl(str: string): boolean {
-  // Check for absolute paths (served by Next.js from public/)
-  if (str.startsWith('/')) return true
-  // Check for full URLs
-  try {
-    new URL(str)
-    return true
-  } catch {
-    return false
-  }
-}
 
 // ============================================================================
 // MAIN COMPONENT
@@ -148,65 +121,10 @@ export default function AIWorkspaceSection({
 
   const selectedModel = availableModels.find(m => m.id === settings.model)
   const searchParams = useSearchParams()
-  const { getGitHubToken } = useAuth()
 
-  // Fetch local projects
-  const { data: localProjects } = useQuery({
-    queryKey: ['local-projects'],
-    queryFn: async () => {
-      const res = await fetch('/api/projects/local')
-      if (!res.ok) return []
-      const data = await res.json()
-      return (data.projects || []) as LocalProject[]
-    },
-    staleTime: 5 * 60 * 1000,
-  })
-
-  // Fetch GitHub projects
-  const { data: githubProjects } = useQuery({
-    queryKey: ['github-projects-for-ai'],
-    queryFn: async () => {
-      const token = await getGitHubToken()
-      if (!token) return []
-      const res = await fetch('/api/projects/github', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!res.ok) return []
-      const data = await res.json()
-      return (data.repos || []) as GitHubRepo[]
-    },
-    staleTime: 5 * 60 * 1000,
-  })
-
-  // Fetch agent registry for agent gallery
-  const { data: agentRegistry, isLoading: agentsLoading } = useQuery({
-    queryKey: ['agent-registry'],
-    queryFn: async () => {
-      const res = await fetch('/api/ai/agents/registry')
-      if (!res.ok) return { agents: [] }
-      return res.json() as Promise<{ agents: AgentCard[] }>
-    },
-    staleTime: 5 * 60 * 1000,
-  })
-
-  // Get pinned status
-  const { isPinned } = useAllProjectsMeta()
-
-  // Get all projects with local paths (for cwd), with pinned at top
-  const availableProjects = React.useMemo(() => {
-    if (!Array.isArray(localProjects) || !Array.isArray(githubProjects)) return []
-
-    const merged = mergeProjects(githubProjects, localProjects)
-    const projectsWithLocalPath = merged.filter(p => p.local?.path)
-
-    return projectsWithLocalPath.sort((a, b) => {
-      const aPinned = isPinned(a.slug)
-      const bPinned = isPinned(b.slug)
-      if (aPinned && !bPinned) return -1
-      if (!aPinned && bPinned) return 1
-      return a.name.localeCompare(b.name)
-    })
-  }, [localProjects, githubProjects, isPinned])
+  // Use shared hooks for agents and projects
+  const { agents: registryAgents, isLoading: agentsLoading, getById: getAgentById } = useAgents()
+  const { projects: availableProjects, isPinned } = useProjects()
 
   // Compute effective working directory with fallback chain:
   // 1. User-selected project path (explicit selection)
@@ -258,22 +176,6 @@ export default function AIWorkspaceSection({
     }
   }, [defaultWorkingDir, availableProjects, selectedProjectPath, initialProjectPath])
 
-  // Fetch available agents on mount
-  React.useEffect(() => {
-    async function fetchAgents() {
-      try {
-        const response = await fetch('/api/ai/agents')
-        const data = await response.json()
-        if (data.agents) {
-          setAvailableAgents(data.agents)
-        }
-      } catch (error) {
-        console.error('Failed to fetch agents:', error)
-      }
-    }
-
-    fetchAgents()
-  }, [])
 
   // Restore model and project context when switching conversations
   React.useEffect(() => {
@@ -344,6 +246,7 @@ export default function AIWorkspaceSection({
       systemPrompt: agent.system_prompt,
       temperature: agent.config.temperature,
       agentMode: agent.mode, // Pass agent mode for context isolation
+      agentDir: agent.workingDir, // Pass agent directory for 'user' mode (hooks disabled)
     }))
     // Also update the active conversation's agentId for persistence
     setConversations(prev => prev.map(conv =>
@@ -366,6 +269,7 @@ export default function AIWorkspaceSection({
         systemPrompt: '',
         temperature: 0.7,
         agentMode: undefined, // Clear agent mode for vanilla Claude
+        agentDir: undefined, // Clear agent directory for vanilla Claude
       }))
     } else {
       setSelectedAgent(agent)
@@ -375,6 +279,7 @@ export default function AIWorkspaceSection({
         systemPrompt: agent.system_prompt,
         temperature: agent.config.temperature,
         agentMode: agent.mode, // Pass agent mode for context isolation
+        agentDir: agent.workingDir, // Pass agent directory for 'user' mode (hooks disabled)
       }))
     }
 
@@ -450,12 +355,6 @@ export default function AIWorkspaceSection({
   const dismissContextWarning = () => {
     setContextWarningDismissed(prev => new Set(prev).add(activeConvId))
   }
-
-  // Get agent by ID from registry
-  const getAgentById = React.useCallback((agentId: string | null | undefined) => {
-    if (!agentId || !agentRegistry?.agents) return null
-    return agentRegistry.agents.find(a => a.id === agentId) || null
-  }, [agentRegistry])
 
   // Determine if a conversation is persistent (JSONL saved)
   // Claude backend saves to JSONL, others are session-only
@@ -890,7 +789,7 @@ export default function AIWorkspaceSection({
                 </DialogHeader>
                 <div className="h-[60vh] overflow-hidden min-w-0 w-full">
                   <AgentGallery
-                    agents={agentRegistry?.agents || []}
+                    agents={registryAgents}
                     selectedAgentId={selectedAgent?.id}
                     onSelectAgent={handleSelectAgent}
                     isLoading={agentsLoading}
@@ -1229,7 +1128,7 @@ export default function AIWorkspaceSection({
                     Open Agents Folder
                   </Button>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{agentRegistry?.agents?.length || 0} agents loaded</span>
+                    <span>{registryAgents.length} agents loaded</span>
                   </div>
                 </CollapsibleContent>
               </Collapsible>
