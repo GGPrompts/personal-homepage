@@ -166,11 +166,20 @@ export async function streamClaude(
   args.push(lastUserMessage.content)
 
   // Determine working directory based on agent mode
-  // - 'user' mode: Use home directory to escape project context (no CLAUDE.md, no .beads/)
+  // - 'user' mode: Use agent's directory (no beads hooks, gets agent's CLAUDE.md)
   // - 'dev' mode (default): Use provided cwd or process.cwd() for full dev context
   let effectiveCwd = cwd || process.cwd()
   if (settings?.agentMode === 'user') {
-    effectiveCwd = homedir()
+    if (settings?.agentDir) {
+      // Use agent's directory - has .claude/settings.json that disables hooks
+      // and includes the agent's CLAUDE.md for personality
+      effectiveCwd = settings.agentDir.startsWith('/')
+        ? settings.agentDir
+        : join(process.cwd(), settings.agentDir)
+    } else {
+      // Fallback to home directory if no agentDir specified
+      effectiveCwd = homedir()
+    }
   }
 
   const claude = spawn(CLAUDE_BIN, args, {

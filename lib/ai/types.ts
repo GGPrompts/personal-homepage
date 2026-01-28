@@ -241,6 +241,7 @@ export interface ChatSettings {
   disallowedTools?: string[]              // Use claude.disallowedTools
   permissionMode?: PermissionMode         // Use claude.permissionMode
   agentMode?: 'dev' | 'user'              // Agent context isolation mode
+  agentDir?: string                        // Agent directory for 'user' mode (e.g., 'agents/music-dj')
   geminiModel?: string                    // Use gemini.model
   codexModel?: string                     // Use codex.model
   reasoningEffort?: 'low' | 'medium' | 'high'  // Use codex.reasoningEffort

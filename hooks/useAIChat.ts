@@ -403,6 +403,7 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
             disallowedTools: convSettings.disallowedTools ?? settings.disallowedTools,
             permissionMode: convSettings.permissionMode ?? settings.permissionMode,
             agentMode: settings.agentMode, // Pass agent mode for context isolation
+            agentDir: settings.agentDir, // Pass agent directory for 'user' mode (hooks disabled)
           },
           cwd: effectiveProjectPath || undefined,
           claudeSessionId: activeConv.claudeSessionId || undefined

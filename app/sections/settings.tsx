@@ -16,7 +16,6 @@ import {
   RotateCcw,
   Loader2,
   ExternalLink,
-  Bot,
   Key,
   Server,
   RefreshCw,
@@ -434,9 +433,6 @@ function ApiKeysTab() {
   // Client-side API key states
   const [finnhubKey, setFinnhubKey] = React.useState(() => getStoredApiKey("finnhub-api-key"))
   const [alphaVantageKey, setAlphaVantageKey] = React.useState(() => getStoredApiKey("alpha-vantage-api-key"))
-  const [anthropicKey, setAnthropicKey] = React.useState(() => getStoredApiKey("anthropic-api-key"))
-  const [openaiKey, setOpenaiKey] = React.useState(() => getStoredApiKey("openai-api-key"))
-  const [googleAiKey, setGoogleAiKey] = React.useState(() => getStoredApiKey("google-ai-key"))
   const [spotifyClientId, setSpotifyClientId] = React.useState(() => getStoredApiKey("spotify-client-id"))
   const [youtubeKey, setYoutubeKey] = React.useState(() => getStoredApiKey("youtube-api-key"))
 
@@ -454,18 +450,6 @@ function ApiKeysTab() {
   React.useEffect(() => {
     setStoredApiKey("alpha-vantage-api-key", alphaVantageKey)
   }, [alphaVantageKey])
-
-  React.useEffect(() => {
-    setStoredApiKey("anthropic-api-key", anthropicKey)
-  }, [anthropicKey])
-
-  React.useEffect(() => {
-    setStoredApiKey("openai-api-key", openaiKey)
-  }, [openaiKey])
-
-  React.useEffect(() => {
-    setStoredApiKey("google-ai-key", googleAiKey)
-  }, [googleAiKey])
 
   React.useEffect(() => {
     setStoredApiKey("spotify-client-id", spotifyClientId)
@@ -555,33 +539,6 @@ function ApiKeysTab() {
       note: "Free tier: 25 requests/day, 5/min",
     },
     {
-      id: "anthropic",
-      name: "Anthropic (Claude)",
-      description: "AI chat and code assistance in AI Workspace",
-      storageKey: "anthropic-api-key",
-      icon: Bot,
-      docsUrl: "https://console.anthropic.com/settings/keys",
-      note: "Required for AI Workspace and Jobs sections",
-    },
-    {
-      id: "openai",
-      name: "OpenAI",
-      description: "GPT models for AI Workspace",
-      storageKey: "openai-api-key",
-      icon: Bot,
-      docsUrl: "https://platform.openai.com/api-keys",
-      note: "Optional, enables GPT models in AI Workspace",
-    },
-    {
-      id: "google-ai",
-      name: "Google AI (Gemini)",
-      description: "Gemini models for AI Workspace",
-      storageKey: "google-ai-key",
-      icon: Bot,
-      docsUrl: "https://aistudio.google.com/app/apikey",
-      note: "Optional, enables Gemini models in AI Workspace",
-    },
-    {
       id: "spotify",
       name: "Spotify",
       description: "Stream music with Web Playback SDK (requires Premium)",
@@ -607,9 +564,6 @@ function ApiKeysTab() {
     switch (id) {
       case "finnhub": return finnhubKey
       case "alpha-vantage": return alphaVantageKey
-      case "anthropic": return anthropicKey
-      case "openai": return openaiKey
-      case "google-ai": return googleAiKey
       case "spotify": return spotifyClientId
       case "youtube": return youtubeKey
       default: return ""
@@ -620,9 +574,6 @@ function ApiKeysTab() {
     switch (id) {
       case "finnhub": setFinnhubKey(value); break
       case "alpha-vantage": setAlphaVantageKey(value); break
-      case "anthropic": setAnthropicKey(value); break
-      case "openai": setOpenaiKey(value); break
-      case "google-ai": setGoogleAiKey(value); break
       case "spotify": setSpotifyClientId(value); break
       case "youtube": setYoutubeKey(value); break
     }
@@ -1419,9 +1370,6 @@ function ImportExportTab() {
       apiKeys: {
         finnhub: getStoredApiKey("finnhub-api-key") ? "***configured***" : null,
         alphaVantage: getStoredApiKey("alpha-vantage-api-key") ? "***configured***" : null,
-        anthropic: getStoredApiKey("anthropic-api-key") ? "***configured***" : null,
-        openai: getStoredApiKey("openai-api-key") ? "***configured***" : null,
-        googleAi: getStoredApiKey("google-ai-key") ? "***configured***" : null,
       },
       sections: {
         visibility,
