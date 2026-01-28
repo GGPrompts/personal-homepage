@@ -90,6 +90,7 @@ interface Session {
   totalTokens: number
   messageCount: number
   toolCalls: number
+  sessionCount?: number
 }
 
 interface ConversationStats {
@@ -225,24 +226,6 @@ function formatNumber(num: number): string {
   return num.toString()
 }
 
-function formatDuration(startTime: string, endTime?: string): string {
-  const start = new Date(startTime)
-  const end = endTime ? new Date(endTime) : new Date()
-  const diffMs = end.getTime() - start.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-
-  // If same start/end time, it's a daily summary - show dash
-  if (diffMins === 0) return "—"
-
-  const diffHours = Math.floor(diffMins / 60)
-  const remainingMins = diffMins % 60
-
-  if (diffHours > 0) {
-    return `${diffHours}h ${remainingMins}m`
-  }
-  return `${diffMins}m`
-}
-
 function timeAgo(timestamp: string): string {
   const seconds = Math.floor((Date.now() - new Date(timestamp).getTime()) / 1000)
   if (seconds < 60) return "just now"
@@ -329,7 +312,7 @@ function TokenUsageChart({ data, timeRange }: { data: TokenUsage[]; timeRange: "
               {/* Tooltip */}
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 pointer-events-none">
                 <div className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs whitespace-nowrap shadow-xl">
-                  <p className="font-medium text-white">{new Date(day.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</p>
+                  <p className="font-medium text-white">{new Date(day.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</p>
                   <p className="text-blue-400">Input: {formatNumber(day.inputTokens)}</p>
                   <p className="text-emerald-400">Output: {formatNumber(day.outputTokens)}</p>
                   <p className="text-zinc-400">Total: {formatNumber(total)}</p>
@@ -350,7 +333,7 @@ function TokenUsageChart({ data, timeRange }: { data: TokenUsage[]; timeRange: "
 
               {/* Day label */}
               <span className="text-[10px] text-muted-foreground">
-                {new Date(day.date).toLocaleDateString("en-US", { weekday: "narrow" })}
+                {new Date(day.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "narrow" })}
               </span>
             </motion.div>
           )
@@ -409,12 +392,13 @@ export default function AnalyticsSection({ activeSubItem, onSubItemHandled }: An
           id: `session-${day.date}-${i}`,
           name: `Day ${day.date}`,
           project: "All Projects",
-          startTime: new Date(day.date).toISOString(),
-          endTime: new Date(day.date).toISOString(),
+          startTime: new Date(day.date + "T12:00:00").toISOString(),
+          endTime: new Date(day.date + "T12:00:00").toISOString(),
           status: "completed" as const,
           totalTokens: claudeStats.dailyTokenUsage.find(t => t.date === day.date)?.totalTokens || 0,
           messageCount: day.messageCount,
           toolCalls: day.toolCallCount,
+          sessionCount: day.sessionCount,
         }))
 
         const realData: StoredAnalytics = {
@@ -563,12 +547,13 @@ export default function AnalyticsSection({ activeSubItem, onSubItemHandled }: An
         id: `session-${day.date}-${i}`,
         name: `Day ${day.date}`,
         project: "All Projects",
-        startTime: new Date(day.date).toISOString(),
-        endTime: new Date(day.date).toISOString(),
+        startTime: new Date(day.date + "T12:00:00").toISOString(),
+        endTime: new Date(day.date + "T12:00:00").toISOString(),
         status: "completed" as const,
         totalTokens: claudeStats.dailyTokenUsage.find(t => t.date === day.date)?.totalTokens || 0,
         messageCount: day.messageCount,
         toolCalls: day.toolCallCount,
+        sessionCount: day.sessionCount,
       }))
 
       const realData: StoredAnalytics = {
@@ -912,10 +897,10 @@ function SessionCard({
             <Separator className="my-3" />
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
-                <p className="text-muted-foreground">Duration</p>
+                <p className="text-muted-foreground">Sessions</p>
                 <p className="font-medium flex items-center gap-1">
                   <Timer className="h-3 w-3" />
-                  {formatDuration(session.startTime, session.endTime)}
+                  {session.sessionCount ?? "—"}
                 </p>
               </div>
               <div>
