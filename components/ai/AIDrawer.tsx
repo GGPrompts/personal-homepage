@@ -164,9 +164,6 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
   // Don't render if context is not available (outside provider)
   if (!context) return null
 
-  // Don't render drawer content until mounted (prevents hydration mismatch)
-  if (!mounted) return null
-
   const {
     state,
     close,
@@ -287,6 +284,9 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
   const handleQuickAction = (prompt: string) => {
     sendMessage(prompt, { projectPath: selectedProjectPath })
   }
+
+  // Don't render until mounted to prevent hydration mismatch with localStorage state
+  if (!mounted) return null
 
   return (
     <>
