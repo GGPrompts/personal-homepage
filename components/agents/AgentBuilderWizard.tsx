@@ -22,6 +22,8 @@ import {
   ChevronUp,
   Play,
   BookOpen,
+  Plus,
+  X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -64,6 +66,7 @@ import {
   getFlagsByCategory,
   CATEGORY_LABELS,
   getExecutableName,
+  buildFlagString,
   type CLIFlag,
 } from '@/lib/ai/cli-flags'
 import { AgentCard } from './AgentCard'
@@ -629,24 +632,65 @@ interface SpawnStepProps {
   setWorkingDir: (dir: string) => void
   pluginPath: string
   setPluginPath: (path: string) => void
-  profileId: string
-  setProfileId: (id: string) => void
   spawnCommand: string[]
   setSpawnCommand: (cmd: string[]) => void
 }
 
 /**
- * CLI Flag Reference Panel - Collapsible panel showing available flags for the selected backend
+ * Parsed flag entry in the command builder
  */
-function CLIFlagReference({ backend }: { backend: AIBackend }) {
-  const [isOpen, setIsOpen] = React.useState(false)
+interface CommandFlag {
+  id: string
+  name: string
+  value?: string
+}
+
+/**
+ * CLI Flag Reference Panel - Interactive panel for adding flags to spawn command
+ */
+function CLIFlagReference({
+  backend,
+  onAddFlag,
+  existingFlags,
+}: {
+  backend: AIBackend
+  onAddFlag: (flag: CLIFlag, value?: string) => void
+  existingFlags: CommandFlag[]
+}) {
+  const [isOpen, setIsOpen] = React.useState(true)
+  const [pendingFlag, setPendingFlag] = React.useState<CLIFlag | null>(null)
+  const [pendingValue, setPendingValue] = React.useState('')
   const flagsByCategory = React.useMemo(() => getFlagsByCategory(backend), [backend])
 
-  const copyFlag = (flag: CLIFlag) => {
-    const text = flag.example || `--${flag.name}`
-    navigator.clipboard.writeText(text)
-    toast.success(`Copied: ${text}`)
+  const handleFlagClick = (flag: CLIFlag) => {
+    // Boolean flags can be added directly
+    if (flag.type === 'boolean') {
+      onAddFlag(flag)
+      toast.success(`Added --${flag.name}`)
+      return
+    }
+
+    // Other flags need a value - show input
+    setPendingFlag(flag)
+    setPendingValue(flag.defaultValue?.toString() || '')
   }
+
+  const handleAddPendingFlag = () => {
+    if (pendingFlag && pendingValue.trim()) {
+      onAddFlag(pendingFlag, pendingValue.trim())
+      toast.success(`Added --${pendingFlag.name} ${pendingValue.trim()}`)
+      setPendingFlag(null)
+      setPendingValue('')
+    }
+  }
+
+  const handleCancelPending = () => {
+    setPendingFlag(null)
+    setPendingValue('')
+  }
+
+  const isFlagAlreadyAdded = (flagName: string) =>
+    existingFlags.some(f => f.name === flagName)
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -658,7 +702,7 @@ function CLIFlagReference({ backend }: { backend: AIBackend }) {
         >
           <span className="flex items-center gap-2">
             <BookOpen className="h-4 w-4" />
-            CLI Flag Reference
+            Add CLI Flags
           </span>
           {isOpen ? (
             <ChevronUp className="h-4 w-4" />
@@ -668,6 +712,63 @@ function CLIFlagReference({ backend }: { backend: AIBackend }) {
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="pt-2">
+        {/* Pending flag value input */}
+        {pendingFlag && (
+          <div className="mb-3 p-3 rounded-lg bg-primary/10 border border-primary/30 space-y-2">
+            <div className="flex items-center justify-between">
+              <code className="text-sm font-mono text-primary">--{pendingFlag.name}</code>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={handleCancelPending}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">{pendingFlag.description}</p>
+            {pendingFlag.type === 'enum' && pendingFlag.values ? (
+              <Select value={pendingValue} onValueChange={setPendingValue}>
+                <SelectTrigger className="glass text-sm">
+                  <SelectValue placeholder="Select value" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pendingFlag.values.map((v) => (
+                    <SelectItem key={v} value={v}>
+                      {v}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                value={pendingValue}
+                onChange={(e) => setPendingValue(e.target.value)}
+                placeholder={pendingFlag.example?.replace(`--${pendingFlag.name} `, '') || 'Enter value'}
+                className="glass text-sm font-mono"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleAddPendingFlag()
+                  } else if (e.key === 'Escape') {
+                    handleCancelPending()
+                  }
+                }}
+                autoFocus
+              />
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={handleCancelPending}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleAddPendingFlag} disabled={!pendingValue.trim()}>
+                <Plus className="h-3 w-3 mr-1" />
+                Add
+              </Button>
+            </div>
+          </div>
+        )}
+
         <ScrollArea className="h-[200px] rounded-lg border border-border/50 bg-muted/30 p-3">
           <div className="space-y-4">
             {Object.entries(flagsByCategory).map(([category, flags]) => (
@@ -676,36 +777,48 @@ function CLIFlagReference({ backend }: { backend: AIBackend }) {
                   {CATEGORY_LABELS[category] || category}
                 </h5>
                 <div className="space-y-1.5">
-                  {flags.map((flag) => (
-                    <div
-                      key={flag.name}
-                      className="group flex items-start gap-2 p-1.5 rounded hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => copyFlag(flag)}
-                      title="Click to copy"
-                    >
-                      <code className="text-xs font-mono text-primary shrink-0">
-                        --{flag.name}
-                        {flag.alias && <span className="text-muted-foreground"> (-{flag.alias})</span>}
-                      </code>
-                      <span className="text-[10px] text-muted-foreground flex-1">
-                        {flag.description}
-                      </span>
-                      {flag.type === 'enum' && flag.values && (
-                        <Badge variant="outline" className="text-[9px] shrink-0">
-                          {flag.values.slice(0, 3).join(' | ')}
-                          {flag.values.length > 3 && '...'}
-                        </Badge>
-                      )}
-                      <Copy className="h-3 w-3 opacity-0 group-hover:opacity-50 shrink-0" />
-                    </div>
-                  ))}
+                  {flags.map((flag) => {
+                    const isAdded = isFlagAlreadyAdded(flag.name)
+                    return (
+                      <div
+                        key={flag.name}
+                        className={cn(
+                          'group flex items-start gap-2 p-1.5 rounded transition-colors',
+                          isAdded
+                            ? 'bg-primary/10 opacity-60'
+                            : 'hover:bg-muted/50 cursor-pointer'
+                        )}
+                        onClick={() => !isAdded && handleFlagClick(flag)}
+                        title={isAdded ? 'Already added' : 'Click to add'}
+                      >
+                        <code className="text-xs font-mono text-primary shrink-0">
+                          --{flag.name}
+                          {flag.alias && <span className="text-muted-foreground"> (-{flag.alias})</span>}
+                        </code>
+                        <span className="text-[10px] text-muted-foreground flex-1">
+                          {flag.description}
+                        </span>
+                        {flag.type === 'enum' && flag.values && (
+                          <Badge variant="outline" className="text-[9px] shrink-0">
+                            {flag.values.slice(0, 3).join(' | ')}
+                            {flag.values.length > 3 && '...'}
+                          </Badge>
+                        )}
+                        {isAdded ? (
+                          <Check className="h-3 w-3 text-primary shrink-0" />
+                        ) : (
+                          <Plus className="h-3 w-3 opacity-0 group-hover:opacity-70 shrink-0" />
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             ))}
           </div>
         </ScrollArea>
         <p className="text-[10px] text-muted-foreground mt-2 text-center">
-          Click any flag to copy it. These are {getExecutableName(backend)} print-mode flags.
+          Click flags to add them to your command. {getExecutableName(backend)} CLI reference.
         </p>
       </CollapsibleContent>
     </Collapsible>
@@ -719,13 +832,61 @@ function SpawnStep({
   setWorkingDir,
   pluginPath,
   setPluginPath,
-  profileId,
-  setProfileId,
   spawnCommand,
   setSpawnCommand,
 }: SpawnStepProps) {
+  // Parse spawnCommand into structured flags for display
+  const [commandFlags, setCommandFlags] = React.useState<CommandFlag[]>(() => {
+    const flags: CommandFlag[] = []
+    let i = 0
+    while (i < spawnCommand.length) {
+      const arg = spawnCommand[i]
+      if (arg.startsWith('--')) {
+        const name = arg.slice(2)
+        const nextArg = spawnCommand[i + 1]
+        // Check if next arg is a value (not another flag)
+        if (nextArg && !nextArg.startsWith('--')) {
+          flags.push({ id: `${name}-${Date.now()}-${i}`, name, value: nextArg })
+          i += 2
+        } else {
+          // Boolean flag
+          flags.push({ id: `${name}-${Date.now()}-${i}`, name })
+          i += 1
+        }
+      } else if (arg.startsWith('-') && arg.length === 2) {
+        // Short flag like -m
+        const nextArg = spawnCommand[i + 1]
+        if (nextArg && !nextArg.startsWith('-')) {
+          flags.push({ id: `${arg}-${Date.now()}-${i}`, name: arg.slice(1), value: nextArg })
+          i += 2
+        } else {
+          flags.push({ id: `${arg}-${Date.now()}-${i}`, name: arg.slice(1) })
+          i += 1
+        }
+      } else {
+        // Skip non-flag args (like the executable name)
+        i += 1
+      }
+    }
+    return flags
+  })
+
   const [rawCommand, setRawCommand] = React.useState(spawnCommand.join(' '))
-  const [useRawMode, setUseRawMode] = React.useState(spawnCommand.length > 0)
+  const [useRawMode, setUseRawMode] = React.useState(false)
+
+  // Sync commandFlags to spawnCommand array
+  React.useEffect(() => {
+    if (!useRawMode) {
+      const args: string[] = []
+      for (const flag of commandFlags) {
+        args.push(`--${flag.name}`)
+        if (flag.value !== undefined) {
+          args.push(flag.value)
+        }
+      }
+      setSpawnCommand(args)
+    }
+  }, [commandFlags, setSpawnCommand, useRawMode])
 
   // Sync raw command with spawnCommand array
   const handleRawCommandChange = (value: string) => {
@@ -745,10 +906,34 @@ function SpawnStep({
     setSpawnCommand(args)
   }
 
-  // Build command preview from individual fields
+  // Add a flag to the command
+  const handleAddFlag = (flag: CLIFlag, value?: string) => {
+    const newFlag: CommandFlag = {
+      id: `${flag.name}-${Date.now()}`,
+      name: flag.name,
+      value: value,
+    }
+    setCommandFlags([...commandFlags, newFlag])
+  }
+
+  // Remove a flag from the command
+  const handleRemoveFlag = (flagId: string) => {
+    setCommandFlags(commandFlags.filter(f => f.id !== flagId))
+  }
+
+  // Build full command preview string
   const buildCommandPreview = () => {
     const parts = [getExecutableName(backend)]
     if (pluginPath) parts.push(`--plugin-dir "${pluginPath}"`)
+    for (const flag of commandFlags) {
+      if (flag.value !== undefined) {
+        // Quote values with spaces
+        const quotedValue = flag.value.includes(' ') ? `"${flag.value}"` : flag.value
+        parts.push(`--${flag.name} ${quotedValue}`)
+      } else {
+        parts.push(`--${flag.name}`)
+      }
+    }
     return parts.join(' ')
   }
 
@@ -780,6 +965,7 @@ function SpawnStep({
         <Label htmlFor="working-dir" className="flex items-center gap-2">
           <FolderOpen className="h-4 w-4" />
           Working Directory
+          <Badge variant="outline" className="text-[9px] ml-1">Optional</Badge>
         </Label>
         <Input
           id="working-dir"
@@ -799,6 +985,7 @@ function SpawnStep({
         <Label htmlFor="plugin-path" className="flex items-center gap-2">
           <Plug className="h-4 w-4" />
           Plugin Directory
+          <Badge variant="outline" className="text-[9px] ml-1">Optional</Badge>
         </Label>
         <Input
           id="plugin-path"
@@ -810,20 +997,7 @@ function SpawnStep({
         />
       </div>
 
-      {/* TabzChrome Profile */}
-      <div className="space-y-2">
-        <Label htmlFor="profile-id">TabzChrome Profile</Label>
-        <Input
-          id="profile-id"
-          value={profileId}
-          onChange={(e) => setProfileId(e.target.value)}
-          placeholder="e.g., agent-default"
-          className="glass text-sm"
-          data-tabz-input="profile-id"
-        />
-      </div>
-
-      {/* Spawn Command Editor */}
+      {/* Command Builder */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label className="flex items-center gap-2">
@@ -831,10 +1005,15 @@ function SpawnStep({
             Spawn Command
           </Label>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] text-muted-foreground">Raw mode</span>
+            <span className="text-[10px] text-muted-foreground">Raw edit</span>
             <Switch
               checked={useRawMode}
-              onCheckedChange={setUseRawMode}
+              onCheckedChange={(checked) => {
+                setUseRawMode(checked)
+                if (checked) {
+                  setRawCommand(buildCommandPreview())
+                }
+              }}
               className="scale-75"
             />
           </div>
@@ -850,23 +1029,71 @@ function SpawnStep({
               data-tabz-input="spawn-command"
             />
             <p className="text-[10px] text-muted-foreground">
-              Enter the full spawn command. This overrides individual field settings.
+              Edit the full spawn command directly. Toggle off raw mode to use the flag builder.
             </p>
           </>
         ) : (
-          <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
-            <code className="text-xs font-mono text-muted-foreground">
-              {buildCommandPreview() || `${getExecutableName(backend)}`}
-            </code>
-            <p className="text-[10px] text-muted-foreground mt-2">
-              Command is built from fields above. Enable raw mode to customize.
-            </p>
+          <div className="space-y-3">
+            {/* Active Flags */}
+            {commandFlags.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {commandFlags.map((flag) => (
+                  <div
+                    key={flag.id}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10 border border-primary/30 text-sm"
+                  >
+                    <code className="font-mono text-primary">--{flag.name}</code>
+                    {flag.value && (
+                      <span className="text-muted-foreground">{flag.value}</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFlag(flag.id)}
+                      className="ml-1 p-0.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Command Preview */}
+            <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
+              <div className="flex items-start justify-between gap-2">
+                <code className="text-xs font-mono text-foreground/80 break-all">
+                  {buildCommandPreview()}
+                </code>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 shrink-0"
+                  onClick={() => {
+                    navigator.clipboard.writeText(buildCommandPreview())
+                    toast.success('Command copied')
+                  }}
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+              {commandFlags.length === 0 && (
+                <p className="text-[10px] text-muted-foreground mt-2">
+                  Use the flag reference below to add flags to your command.
+                </p>
+              )}
+            </div>
           </div>
         )}
       </div>
 
-      {/* CLI Flag Reference */}
-      <CLIFlagReference backend={backend} />
+      {/* CLI Flag Reference - only show in builder mode */}
+      {!useRawMode && (
+        <CLIFlagReference
+          backend={backend}
+          onAddFlag={handleAddFlag}
+          existingFlags={commandFlags}
+        />
+      )}
     </div>
   )
 }
@@ -1062,7 +1289,6 @@ export function AgentBuilderWizard({
   const [suggestedPrompts, setSuggestedPrompts] = React.useState<string[]>([])
   const [enabled, setEnabled] = React.useState(initialData?.enabled ?? true)
   const [pluginPath, setPluginPath] = React.useState(initialData?.pluginPath || '')
-  const [profileId, setProfileId] = React.useState(initialData?.profileId || '')
   // Spawn command state
   const [backend, setBackend] = React.useState<AIBackend>('claude')
   const [workingDir, setWorkingDir] = React.useState(initialData?.workingDir || '')
@@ -1082,7 +1308,6 @@ export function AgentBuilderWizard({
       setSuggestedPrompts([])
       setEnabled(initialData?.enabled ?? true)
       setPluginPath(initialData?.pluginPath || '')
-      setProfileId(initialData?.profileId || '')
       setBackend('claude')
       setWorkingDir(initialData?.workingDir || '')
       setSpawnCommand(initialData?.spawnCommand || [])
@@ -1102,7 +1327,6 @@ export function AgentBuilderWizard({
     sections,
     enabled,
     pluginPath: pluginPath || undefined,
-    profileId: profileId || undefined,
     workingDir: workingDir || undefined,
     spawnCommand: spawnCommand.length > 0 ? spawnCommand : undefined,
   }
@@ -1259,8 +1483,6 @@ export function AgentBuilderWizard({
                   setWorkingDir={setWorkingDir}
                   pluginPath={pluginPath}
                   setPluginPath={setPluginPath}
-                  profileId={profileId}
-                  setProfileId={setProfileId}
                   spawnCommand={spawnCommand}
                   setSpawnCommand={setSpawnCommand}
                 />
