@@ -380,8 +380,8 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                 className="h-full glass-dark border-l border-border/40 flex flex-col"
               >
                 {/* Header */}
-                <div className="p-3 border-b border-border/40 flex items-center justify-between shrink-0">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className="p-2 sm:p-3 border-b border-border/40 flex items-center justify-between shrink-0 gap-1">
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 overflow-hidden">
                     {/* Agent Picker Dropdown */}
                     <DropdownMenu open={agentPickerOpen} onOpenChange={setAgentPickerOpen}>
                       <DropdownMenuTrigger asChild>
@@ -469,11 +469,11 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                       </DropdownMenuContent>
                     </DropdownMenu>
 
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-sm font-semibold terminal-glow truncate">
-                        {activeConv.title.length > 20 ? activeConv.title.slice(0, 20) + '...' : activeConv.title}
+                    <div className="min-w-0 flex-1 overflow-hidden">
+                      <h3 className="text-xs sm:text-sm font-semibold terminal-glow truncate">
+                        {activeConv.title}
                       </h3>
-                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                      <div className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1 truncate">
                         {(isTyping || isStreaming) ? (
                           <motion.span
                             animate={{ opacity: [0.5, 1, 0.5] }}
@@ -498,7 +498,7 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -506,11 +506,11 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 transition-colors hover:bg-primary/20 hover:text-primary"
+                              className="h-6 w-6 sm:h-7 sm:w-7 transition-colors hover:bg-primary/20 hover:text-primary"
                               onClick={createNewConversation}
                               data-tabz-action="new-conversation"
                             >
-                              <Plus className="h-4 w-4" />
+                              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                             </Button>
                           </motion.div>
                         </TooltipTrigger>
@@ -524,10 +524,10 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                             <Button
                               variant={showConversations ? 'secondary' : 'ghost'}
                               size="icon"
-                              className="h-7 w-7 transition-colors hover:bg-primary/20 hover:text-primary"
+                              className="h-6 w-6 sm:h-7 sm:w-7 transition-colors hover:bg-primary/20 hover:text-primary"
                               onClick={() => setShowConversations(!showConversations)}
                             >
-                              <MessageSquare className="h-4 w-4" />
+                              <MessageSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                             </Button>
                           </motion.div>
                         </TooltipTrigger>
@@ -541,10 +541,10 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                             <Button
                               variant={showSettings ? 'secondary' : 'ghost'}
                               size="icon"
-                              className="h-7 w-7 transition-colors hover:bg-primary/20 hover:text-primary"
+                              className="h-6 w-6 sm:h-7 sm:w-7 transition-colors hover:bg-primary/20 hover:text-primary"
                               onClick={() => setShowSettings(!showSettings)}
                             >
-                              <Settings className="h-4 w-4" />
+                              <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                             </Button>
                           </motion.div>
                         </TooltipTrigger>
@@ -558,16 +558,16 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 transition-colors hover:bg-primary/20 hover:text-primary"
+                              className="h-6 w-6 sm:h-7 sm:w-7 transition-colors hover:bg-primary/20 hover:text-primary"
                               onClick={cycleDrawerWidth}
                               data-tabz-action="cycle-drawer-width"
                             >
                               {drawerWidth === 'narrow' ? (
-                                <PanelRightClose className="h-4 w-4" />
+                                <PanelRightClose className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                               ) : drawerWidth === 'default' ? (
-                                <PanelRight className="h-4 w-4" />
+                                <PanelRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                               ) : (
-                                <PanelRightOpen className="h-4 w-4" />
+                                <PanelRightOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                               )}
                             </Button>
                           </motion.div>
@@ -581,22 +581,22 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 transition-colors hover:bg-primary/20 hover:text-primary"
+                        className="h-6 w-6 sm:h-7 sm:w-7 transition-colors hover:bg-primary/20 hover:text-primary"
                         onClick={minimize}
                         data-tabz-action="minimize-ai-drawer"
                       >
-                        <Minimize2 className="h-4 w-4" />
+                        <Minimize2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </Button>
                     </motion.div>
                     <motion.div whileHover={shouldReduceMotion ? undefined : { scale: 1.1 }} whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 transition-colors hover:bg-destructive/20 hover:text-destructive"
+                        className="h-6 w-6 sm:h-7 sm:w-7 transition-colors hover:bg-destructive/20 hover:text-destructive"
                         onClick={close}
                         data-tabz-action="close-ai-drawer"
                       >
-                        <X className="h-4 w-4" />
+                        <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </Button>
                     </motion.div>
                   </div>
@@ -804,8 +804,8 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                 )}
 
                 {/* Chat content area */}
-                <ScrollArea className="flex-1">
-                  <div className="p-3 space-y-3">
+                <ScrollArea className="flex-1 min-w-0">
+                  <div className="p-2 sm:p-3 space-y-3 overflow-hidden">
                     {activeConv.messages.length === 0 ? (
                       /* Empty state */
                       <motion.div
@@ -886,7 +886,7 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                 </ScrollArea>
 
                 {/* Input area */}
-                <div className="p-3 border-t border-border/40 shrink-0">
+                <div className="p-2 sm:p-3 border-t border-border/40 shrink-0">
                   <ChatInput
                     value={inputValue}
                     onChange={setInputValue}

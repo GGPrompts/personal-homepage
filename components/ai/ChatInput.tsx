@@ -139,13 +139,13 @@ export function ChatInput({
             onBlur={() => setIsFocused(false)}
             placeholder={isStreaming ? "Wait for response..." : placeholder}
             disabled={isStreaming}
-            className={`resize-none glass text-sm sm:text-base transition-all duration-200 ${
+            className={`resize-none glass text-xs sm:text-sm transition-all duration-200 ${
               isFocused
                 ? 'ring-2 ring-primary/50 border-primary/50 shadow-lg shadow-primary/10'
                 : ''
             }`}
             style={{
-              minHeight: `clamp(${minHeight}, auto, ${maxHeight})`,
+              minHeight: minHeight,
               maxHeight: maxHeight,
             }}
             rows={1}
@@ -161,10 +161,10 @@ export function ChatInput({
             <Button
               size="icon"
               variant="destructive"
-              className="h-[44px] w-[44px] sm:h-[52px] sm:w-[52px] shrink-0 transition-shadow hover:shadow-lg hover:shadow-destructive/30"
+              className="h-9 w-9 sm:h-[44px] sm:w-[44px] shrink-0 transition-shadow hover:shadow-lg hover:shadow-destructive/30"
               onClick={onStop}
             >
-              <StopCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+              <StopCircle className="h-4 w-4" />
             </Button>
           </motion.div>
         ) : (
@@ -177,7 +177,7 @@ export function ChatInput({
           >
             <Button
               size="icon"
-              className={`h-[44px] w-[44px] sm:h-[52px] sm:w-[52px] border-glow shrink-0 transition-all duration-200 ${
+              className={`h-9 w-9 sm:h-[44px] sm:w-[44px] border-glow shrink-0 transition-all duration-200 ${
                 canSend ? 'hover:shadow-lg hover:shadow-primary/30' : ''
               }`}
               onClick={onSend}
@@ -191,7 +191,7 @@ export function ChatInput({
                 whileHover={canSend && !shouldReduceMotion ? "hover" : undefined}
                 whileTap={canSend && !shouldReduceMotion ? "tap" : undefined}
               >
-                <Send className="h-4 w-4 sm:h-5 sm:w-5" />
+                <Send className="h-4 w-4" />
               </motion.div>
             </Button>
           </motion.div>

@@ -4,21 +4,15 @@ import * as React from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useAuth } from "@/components/AuthProvider"
 // Slider removed - settings simplified
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
-  MessageSquare, Bot, Plus, X, Trash2, Cpu, FolderOpen,
-  Loader2, Pencil, Gauge, AlertTriangle,
-  Download, ArrowRight, Settings, ChevronDown, Users, Save, Circle,
+  MessageSquare, Bot, X, Trash2, Cpu, FolderOpen,
+  Download, Settings, Users,
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -49,6 +43,9 @@ import {
 import { useAIChat } from "@/hooks/useAIChat"
 import { ChatMessage, TypingIndicator } from "@/components/ai/ChatMessage"
 import { ChatInput } from "@/components/ai/ChatInput"
+import { ConversationSidebar } from "@/components/ai/ConversationSidebar"
+import { SettingsPanel } from "@/components/ai/SettingsPanel"
+import { ContextIndicator, ContextWarningBanner, calculateContextUsage } from "@/components/ai/ContextIndicator"
 
 // ============================================================================
 // MAIN COMPONENT
@@ -448,52 +445,6 @@ export default function AIWorkspaceSection({
     return modelInfo?.backend === 'claude'
   }, [availableModels])
 
-  // Calculate token usage - prefer cumulative data from actual API responses
-  const CONTEXT_LIMIT = 200000
-  const WARNING_THRESHOLD = 0.7
-  const DANGER_THRESHOLD = 0.9
-
-  // Use cumulative usage for accurate context tracking (contextTokens = current context window)
-  // Falls back to latest message usage, then to estimation
-  const hasCumulativeUsage = activeConv.cumulativeUsage && activeConv.cumulativeUsage.contextTokens > 0
-  const hasMessageUsage = activeConv.usage && activeConv.usage.totalTokens > 0
-  const hasActualUsage = hasCumulativeUsage || hasMessageUsage
-
-  // Detect if we're waiting for first usage data (shows calculating spinner instead of 0%)
-  const isCalculatingUsage = (isTyping || isStreaming) && !hasActualUsage && activeConv.messages.length > 0
-
-  let contextTokens: number
-  let usageSource: 'cumulative' | 'message' | 'estimated'
-
-  if (hasCumulativeUsage) {
-    // Best: use cumulative contextTokens (input + cache read from latest response)
-    // This represents the actual current context window size
-    contextTokens = activeConv.cumulativeUsage!.contextTokens
-    usageSource = 'cumulative'
-  } else if (hasMessageUsage) {
-    // Good: use latest message total tokens as approximation
-    contextTokens = activeConv.usage!.totalTokens
-    usageSource = 'message'
-  } else {
-    // Fallback: estimate tokens from message content
-    // ~4 chars per token is a rough estimate for English text
-    const messageTokens = activeConv.messages.reduce((sum, msg) => {
-      const contentTokens = Math.ceil(msg.content.length / 4)
-      const toolTokens = msg.toolUses?.reduce((t, tool) =>
-        t + Math.ceil((tool.input?.length || 0) / 4) + 20, 0) || 0
-      return sum + contentTokens + toolTokens
-    }, 0)
-    // Only add minimal overhead for system prompt/formatting (~500 tokens)
-    contextTokens = messageTokens > 0 ? messageTokens + 500 : 0
-    usageSource = 'estimated'
-  }
-
-  const contextUsage = contextTokens / CONTEXT_LIMIT
-  const contextPercentage = Math.min(Math.round(contextUsage * 100), 100)
-  const contextStatus = contextUsage >= DANGER_THRESHOLD ? 'danger'
-    : contextUsage >= WARNING_THRESHOLD ? 'warning'
-    : 'ok'
-
   // ============================================================================
   // RENDER
   // ============================================================================
@@ -503,146 +454,17 @@ export default function AIWorkspaceSection({
       {/* Conversations Sidebar */}
       <AnimatePresence>
         {showSidebar && (
-          <motion.div
-            initial={{ x: -300, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -300, opacity: 0 }}
-            className="w-full lg:w-80 lg:min-w-80 lg:max-w-80 glass-dark border-r border-border/40 flex flex-col lg:relative absolute inset-y-0 left-0 z-10 overflow-hidden"
-          >
-            <div className="p-4 border-b border-border/40">
-              <Button
-                onClick={createNewConversation}
-                className="w-full border-glow"
-                data-tabz-action="new-conversation"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                New Conversation
-              </Button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto overflow-x-hidden">
-              <div className="p-4 space-y-2" data-tabz-list="conversations">
-                {conversations.map(conv => {
-                  const convAgent = getAgentById(conv.agentId)
-                  const isPersistent = isConversationPersistent(conv)
-
-                  return (
-                    <Card
-                      key={conv.id}
-                      className={`glass cursor-pointer transition-all group max-w-full ${
-                        conv.id === activeConvId ? 'border-primary/60 border-glow' : ''
-                      }`}
-                      onClick={() => setActiveConvId(conv.id)}
-                      data-tabz-item={`conversation-${conv.id}`}
-                    >
-                      <CardContent className="p-3">
-                        <div className="flex items-start gap-2">
-                          {/* Agent Avatar */}
-                          {convAgent && (
-                            <Avatar className="h-8 w-8 shrink-0 ring-1 ring-white/10">
-                              {isAvatarUrl(convAgent.avatar) ? (
-                                <AvatarImage src={convAgent.avatar} alt={convAgent.name} />
-                              ) : null}
-                              <AvatarFallback className="text-sm bg-primary/20">
-                                {isEmoji(convAgent.avatar)
-                                  ? convAgent.avatar
-                                  : convAgent.name.charAt(0)}
-                              </AvatarFallback>
-                            </Avatar>
-                          )}
-
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <h4 className="text-sm font-medium truncate terminal-glow">
-                                {conv.title}
-                              </h4>
-                              {generatingConvs[conv.id] && (
-                                <motion.div
-                                  animate={{ opacity: [0.5, 1, 0.5] }}
-                                  transition={{ duration: 1.2, repeat: Infinity }}
-                                  className="flex items-center gap-1 shrink-0"
-                                >
-                                  <Loader2 className="h-3 w-3 text-primary animate-spin" />
-                                </motion.div>
-                              )}
-                            </div>
-                            <div className="mt-1 space-y-0.5">
-                              {/* Agent name if available */}
-                              {convAgent && (
-                                <p className="text-xs text-primary/80 font-medium">
-                                  {convAgent.name}
-                                </p>
-                              )}
-                              <div className="flex items-center gap-2">
-                                <p className="text-xs text-muted-foreground">
-                                  {conv.messages.length} messages
-                                  {generatingConvs[conv.id] && (
-                                    <span className="text-primary ml-1">generating</span>
-                                  )}
-                                </p>
-                                {/* Persistence indicator */}
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className={`flex items-center ${
-                                        isPersistent ? 'text-emerald-400' : 'text-muted-foreground'
-                                      }`}>
-                                        {isPersistent ? (
-                                          <Save className="h-3 w-3" />
-                                        ) : (
-                                          <Circle className="h-3 w-3" />
-                                        )}
-                                      </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="right">
-                                      {isPersistent
-                                        ? 'Persistent (JSONL saved)'
-                                        : 'Session only (localStorage)'}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </div>
-                              {conv.model && (
-                                <div className="flex items-center gap-1 overflow-hidden">
-                                  <Cpu className="h-3 w-3 text-muted-foreground shrink-0" />
-                                  <p className="text-xs text-muted-foreground truncate">
-                                    {availableModels.find(m => m.id === conv.model)?.name || conv.model}
-                                  </p>
-                                </div>
-                              )}
-                              {conv.projectPath && (
-                                <div className="flex items-center gap-1 overflow-hidden">
-                                  <FolderOpen className="h-3 w-3 text-muted-foreground shrink-0" />
-                                  <p className="text-xs text-muted-foreground truncate">
-                                    {conv.projectPath.split('/').pop()}
-                                  </p>
-                                </div>
-                              )}
-                              <p className="text-xs text-muted-foreground">
-                                {conv.updatedAt.toLocaleDateString()}
-                              </p>
-                            </div>
-                          </div>
-
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              deleteConversation(conv.id)
-                            }}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </div>
-            </div>
-          </motion.div>
+          <ConversationSidebar
+            conversations={conversations}
+            activeConvId={activeConvId}
+            onSelectConversation={setActiveConvId}
+            onCreateNew={createNewConversation}
+            onDeleteConversation={deleteConversation}
+            generatingConvs={generatingConvs}
+            availableModels={availableModels}
+            getAgentById={getAgentById}
+            isConversationPersistent={isConversationPersistent}
+          />
         )}
       </AnimatePresence>
 
@@ -714,96 +536,11 @@ export default function AIWorkspaceSection({
                     </TooltipProvider>
                   )}
                   {/* Context Usage Indicator */}
-                  {activeConv.messages.length > 0 && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className={`hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded cursor-help ${
-                            contextStatus === 'danger'
-                              ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                              : contextStatus === 'warning'
-                              ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
-                              : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                          }`}>
-                            {isCalculatingUsage ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : contextStatus === 'danger' ? (
-                              <AlertTriangle className="h-3 w-3" />
-                            ) : (
-                              <Gauge className="h-3 w-3" />
-                            )}
-                            <span className="text-[10px] font-mono">
-                              {isCalculatingUsage ? '...' : `${contextPercentage}%`}
-                            </span>
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" className="max-w-xs">
-                          <p className="font-medium text-xs">
-                            {isCalculatingUsage ? (
-                              <>
-                                <span className="text-muted-foreground">Calculating usage...</span>
-                              </>
-                            ) : (
-                              <>
-                                Context: {usageSource === 'estimated' ? '~' : ''}{contextTokens.toLocaleString()} tokens
-                                <span className={`ml-1.5 text-[10px] px-1 py-0.5 rounded ${
-                                  usageSource === 'cumulative'
-                                    ? 'bg-emerald-500/20 text-emerald-400'
-                                    : usageSource === 'message'
-                                    ? 'bg-blue-500/20 text-blue-400'
-                                    : 'bg-muted text-muted-foreground'
-                                }`}>
-                                  {usageSource === 'cumulative' ? 'tracked' : usageSource === 'message' ? 'actual' : 'est'}
-                                </span>
-                              </>
-                            )}
-                          </p>
-                          {/* Show cumulative stats when available */}
-                          {activeConv.cumulativeUsage && (
-                            <div className="text-[10px] text-muted-foreground mt-1 space-y-0.5">
-                              <div className="flex justify-between gap-2">
-                                <span>Input:</span>
-                                <span className="font-mono">{activeConv.cumulativeUsage.inputTokens.toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between gap-2">
-                                <span>Output:</span>
-                                <span className="font-mono">{activeConv.cumulativeUsage.outputTokens.toLocaleString()}</span>
-                              </div>
-                              {(activeConv.cumulativeUsage.cacheReadTokens > 0 || activeConv.cumulativeUsage.cacheCreationTokens > 0) && (
-                                <div className="flex justify-between gap-2">
-                                  <span>Cache:</span>
-                                  <span className="font-mono">
-                                    {activeConv.cumulativeUsage.cacheReadTokens.toLocaleString()}r / {activeConv.cumulativeUsage.cacheCreationTokens.toLocaleString()}c
-                                  </span>
-                                </div>
-                              )}
-                              <div className="flex justify-between gap-2 border-t border-border/40 pt-0.5 mt-0.5">
-                                <span>Messages tracked:</span>
-                                <span className="font-mono">{activeConv.cumulativeUsage.messageCount}</span>
-                              </div>
-                            </div>
-                          )}
-                          <div className="w-32 h-1.5 bg-muted rounded-full mt-1.5 overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all ${
-                                contextStatus === 'danger' ? 'bg-red-500'
-                                : contextStatus === 'warning' ? 'bg-yellow-500'
-                                : 'bg-emerald-500'
-                              }`}
-                              style={{ width: `${contextPercentage}%` }}
-                            />
-                          </div>
-                          <p className="text-muted-foreground text-xs mt-1.5">
-                            {contextStatus === 'danger'
-                              ? 'Context nearly full! Start a new conversation soon.'
-                              : contextStatus === 'warning'
-                              ? 'Context getting full. Consider a new conversation.'
-                              : 'Plenty of context remaining.'}
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
+                  <ContextIndicator
+                    conversation={activeConv}
+                    isTyping={isTyping}
+                    isStreaming={isStreaming}
+                  />
                 </div>
               </div>
             </div>
@@ -1054,57 +791,18 @@ export default function AIWorkspaceSection({
               ) : (
                 <>
                   {/* Context Warning Banner */}
-                  {(contextStatus === 'warning' || contextStatus === 'danger') &&
-                   !contextWarningDismissed.has(activeConvId) && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={`mb-4 p-4 rounded-lg border ${
-                        contextStatus === 'danger'
-                          ? 'bg-red-500/10 border-red-500/30'
-                          : 'bg-yellow-500/10 border-yellow-500/30'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <AlertTriangle className={`h-5 w-5 mt-0.5 shrink-0 ${
-                          contextStatus === 'danger' ? 'text-red-400' : 'text-yellow-400'
-                        }`} />
-                        <div className="flex-1 min-w-0">
-                          <h4 className={`font-medium ${
-                            contextStatus === 'danger' ? 'text-red-400' : 'text-yellow-400'
-                          }`}>
-                            {contextStatus === 'danger'
-                              ? 'Context nearly full!'
-                              : 'Context getting full'}
-                          </h4>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {contextStatus === 'danger'
-                              ? `At ${contextPercentage}% capacity. Continue in a new chat with a summary to avoid losing context.`
-                              : `At ${contextPercentage}% capacity. Consider continuing in a new chat soon.`
-                            }
-                          </p>
-                          <div className="flex items-center gap-2 mt-3">
-                            <Button
-                              size="sm"
-                              variant={contextStatus === 'danger' ? 'default' : 'outline'}
-                              onClick={handleContinueInNewChat}
-                              className="gap-1"
-                            >
-                              <ArrowRight className="h-3 w-3" />
-                              Continue in new chat
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={dismissContextWarning}
-                            >
-                              Dismiss
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
+                  {(() => {
+                    const { contextStatus, contextPercentage } = calculateContextUsage(activeConv, isTyping, isStreaming)
+                    return (
+                      <ContextWarningBanner
+                        contextStatus={contextStatus}
+                        contextPercentage={contextPercentage}
+                        isDismissed={contextWarningDismissed.has(activeConvId)}
+                        onContinueInNewChat={handleContinueInNewChat}
+                        onDismiss={dismissContextWarning}
+                      />
+                    )
+                  })()}
 
                   {activeConv.messages.map(message => (
                     <ChatMessage
@@ -1149,179 +847,14 @@ export default function AIWorkspaceSection({
       {/* Settings Panel */}
       <AnimatePresence>
         {showSettings && (
-          <motion.div
-            initial={{ x: 300, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 300, opacity: 0 }}
-            className="w-full lg:w-80 glass-dark border-l border-border/40 overflow-y-auto lg:relative absolute inset-y-0 right-0 z-10"
-          >
-            <div className="p-6 space-y-6">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold terminal-glow flex items-center gap-2">
-                  <Settings className="h-4 w-4" />
-                  Settings
-                </h3>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowSettings(false)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <Separator />
-
-              <p className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
-                Agents are configured via files. Use Settings &gt; Sections to assign default agents per section.
-              </p>
-
-              {/* Agent Configuration */}
-              <Collapsible className="space-y-3" defaultOpen={!!selectedAgent}>
-                <CollapsibleTrigger className="flex items-center justify-between w-full">
-                  <Label className="flex items-center gap-2">
-                    <Bot className="h-3 w-3" />
-                    Agent Configuration
-                  </Label>
-                  <ChevronDown className="h-4 w-4" />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-3 pt-2">
-                  <p className="text-xs text-muted-foreground">
-                    Agents are configured via files in the <code className="bg-muted px-1 rounded">agents/</code> directory.
-                    Each agent has a <code className="bg-muted px-1 rounded">CLAUDE.md</code> (system prompt) and <code className="bg-muted px-1 rounded">agent.json</code> (config).
-                  </p>
-
-                  {/* Open current agent's settings if one is selected */}
-                  {selectedAgent && selectedAgent.workingDir && (
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => {
-                        if (selectedAgent.workingDir && onNavigateToSection) {
-                          onNavigateToSection('files', selectedAgent.workingDir)
-                        }
-                      }}
-                      data-tabz-action="open-agent-settings"
-                    >
-                      <Settings className="h-3 w-3 mr-2" />
-                      Open {selectedAgent.name} Settings
-                    </Button>
-                  )}
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full glass"
-                    onClick={async () => {
-                      try {
-                        const res = await fetch('/api/ai/agents/directory')
-                        const data = await res.json()
-                        if (data.path && onNavigateToSection) {
-                          // Navigate to Files section with agents folder path
-                          onNavigateToSection('files', data.path)
-                        }
-                      } catch (error) {
-                        console.error('Failed to open agents folder:', error)
-                      }
-                    }}
-                    data-tabz-action="open-agents-folder"
-                  >
-                    <FolderOpen className="h-3 w-3 mr-2" />
-                    Open Agents Folder
-                  </Button>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{registryAgents.length} agents loaded</span>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-
-              {/* Suggested Prompts */}
-              <Collapsible className="space-y-3">
-                <CollapsibleTrigger className="flex items-center justify-between w-full">
-                  <Label className="flex items-center gap-2">
-                    <Pencil className="h-3 w-3" />
-                    Quick Prompts
-                  </Label>
-                  <ChevronDown className="h-4 w-4" />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-3 pt-2">
-                  <p className="text-xs text-muted-foreground">
-                    Edit the prompts shown on new conversations. Categories: Explore, Learn, Search, Info, Debug, Create, Review
-                  </p>
-                  {(settings.suggestedPrompts || DEFAULT_SUGGESTED_PROMPTS).map((prompt, idx) => (
-                    <div key={idx} className="space-y-2 p-3 glass rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <Input
-                          value={prompt.category}
-                          onChange={(e) => {
-                            const newPrompts = [...(settings.suggestedPrompts || DEFAULT_SUGGESTED_PROMPTS)]
-                            newPrompts[idx] = { ...newPrompts[idx], category: e.target.value }
-                            setSettings({ ...settings, suggestedPrompts: newPrompts })
-                          }}
-                          className="glass w-24 text-xs"
-                          placeholder="Category"
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 shrink-0"
-                          onClick={() => {
-                            const newPrompts = (settings.suggestedPrompts || DEFAULT_SUGGESTED_PROMPTS).filter((_, i) => i !== idx)
-                            setSettings({ ...settings, suggestedPrompts: newPrompts.length > 0 ? newPrompts : undefined })
-                          }}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                      <Input
-                        value={prompt.text}
-                        onChange={(e) => {
-                          const newPrompts = [...(settings.suggestedPrompts || DEFAULT_SUGGESTED_PROMPTS)]
-                          newPrompts[idx] = { ...newPrompts[idx], text: e.target.value }
-                          setSettings({ ...settings, suggestedPrompts: newPrompts })
-                        }}
-                        className="glass text-xs"
-                        placeholder="Prompt text..."
-                      />
-                    </div>
-                  ))}
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 glass"
-                      onClick={() => {
-                        const newPrompts = [...(settings.suggestedPrompts || DEFAULT_SUGGESTED_PROMPTS), { text: '', category: 'Info' }]
-                        setSettings({ ...settings, suggestedPrompts: newPrompts })
-                      }}
-                    >
-                      <Plus className="h-3 w-3 mr-2" />
-                      Add Prompt
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="glass"
-                      onClick={() => setSettings({ ...settings, suggestedPrompts: DEFAULT_SUGGESTED_PROMPTS })}
-                    >
-                      Reset
-                    </Button>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-
-              <Separator />
-
-              <Button
-                variant="outline"
-                className="w-full glass"
-                onClick={() => setSettings(DEFAULT_SETTINGS)}
-              >
-                Reset to Defaults
-              </Button>
-            </div>
-          </motion.div>
+          <SettingsPanel
+            settings={settings}
+            onSettingsChange={setSettings}
+            selectedAgent={selectedAgent}
+            registryAgents={registryAgents}
+            onNavigateToSection={onNavigateToSection}
+            onClose={() => setShowSettings(false)}
+          />
         )}
       </AnimatePresence>
     </div>

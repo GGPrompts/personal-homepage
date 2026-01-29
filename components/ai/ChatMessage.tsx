@@ -338,9 +338,9 @@ export function ChatMessage({
         (language === 'text' && code.trim().split('\n').length <= 3 && !code.includes('{'))
 
       parts.push(
-        <div key={`code-${match.index}`} className="my-3 rounded-lg overflow-hidden border border-border/40 max-w-full" data-tabz-bridge="true">
-          <div className="bg-muted/30 px-3 sm:px-4 py-2 flex items-center justify-between gap-2">
-            <span className="text-xs text-muted-foreground font-mono">{language}</span>
+        <div key={`code-${match.index}`} className="my-3 rounded-lg overflow-hidden border border-border/40 w-full" data-tabz-bridge="true">
+          <div className="bg-muted/30 px-2 sm:px-4 py-1.5 sm:py-2 flex items-center justify-between gap-1 sm:gap-2">
+            <span className="text-[10px] sm:text-xs text-muted-foreground font-mono truncate">{language}</span>
             <div className="flex items-center gap-1">
               {isTerminalCode && onSendToTerminal && (
                 <TooltipProvider>
@@ -392,8 +392,8 @@ export function ChatMessage({
               </Button>
             </div>
           </div>
-          <pre className="p-3 sm:p-4 overflow-x-auto bg-muted/20 max-w-full">
-            <code className="text-xs sm:text-sm font-mono">{code}</code>
+          <pre className="p-2 sm:p-4 overflow-x-auto bg-muted/20 w-full">
+            <code className="text-[10px] sm:text-xs font-mono whitespace-pre">{code}</code>
           </pre>
         </div>
       )
@@ -435,11 +435,11 @@ export function ChatMessage({
         </Avatar>
       )}
 
-      <div className={`flex-1 min-w-0 max-w-[calc(100%-2rem)] sm:max-w-[85%] ${isUser ? 'flex justify-end' : ''}`}>
+      <div className={`flex-1 min-w-0 max-w-full ${isUser ? 'flex justify-end' : ''}`}>
         <div
-          className={`rounded-lg px-3 sm:px-4 py-3 overflow-hidden ${
+          className={`rounded-lg px-2 sm:px-4 py-2 sm:py-3 overflow-hidden w-full ${
             isUser
-              ? 'bg-primary text-primary-foreground ml-auto'
+              ? 'bg-primary text-primary-foreground ml-auto max-w-[90%]'
               : 'glass'
           }`}
         >
@@ -452,7 +452,7 @@ export function ChatMessage({
             </div>
           )}
 
-          <div className="prose prose-sm max-w-none dark:prose-invert break-words overflow-hidden">
+          <div className="prose prose-sm max-w-none dark:prose-invert break-words overflow-hidden [&_pre]:overflow-x-auto [&_code]:break-all">
             {renderContent(message.content)}
           </div>
 
