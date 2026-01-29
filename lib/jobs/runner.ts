@@ -6,9 +6,19 @@
 import { spawn, exec } from 'child_process'
 import { promisify } from 'util'
 import path from 'path'
+import { homedir } from 'os'
+import { existsSync } from 'fs'
 import type { PreCheck, JobStreamEvent, ProjectRunResult, JobBackend } from './types'
 
 const execAsync = promisify(exec)
+
+// Path to the Claude CLI binary - check common install locations, fall back to PATH
+const CLAUDE_PATHS = [
+  path.join(homedir(), '.local', 'bin', 'claude'),
+  path.join(homedir(), '.claude', 'local', 'claude'),
+  '/usr/local/bin/claude',
+]
+const CLAUDE_BIN = CLAUDE_PATHS.find(p => existsSync(p)) || 'claude'
 
 const DEFAULT_MAX_PARALLEL = 3
 
@@ -109,7 +119,7 @@ export async function runClaudeOnProject(
       prompt
     ]
 
-    const claude = spawn('claude', args, {
+    const claude = spawn(CLAUDE_BIN, args, {
       cwd: projectPath,
       env: {
         ...process.env,

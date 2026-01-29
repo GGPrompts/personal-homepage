@@ -9,9 +9,13 @@ import { join } from 'path'
 import { existsSync } from 'fs'
 import type { ChatMessage, ChatSettings, ClaudeSettings } from './types'
 
-// Path to the Claude CLI binary - check local install first, fall back to PATH
-const LOCAL_CLAUDE = join(homedir(), '.claude', 'local', 'claude')
-const CLAUDE_BIN = existsSync(LOCAL_CLAUDE) ? LOCAL_CLAUDE : 'claude'
+// Path to the Claude CLI binary - check common install locations, fall back to PATH
+const CLAUDE_PATHS = [
+  join(homedir(), '.local', 'bin', 'claude'),      // npm global install
+  join(homedir(), '.claude', 'local', 'claude'),   // claude local install
+  '/usr/local/bin/claude',                          // system install
+]
+const CLAUDE_BIN = CLAUDE_PATHS.find(p => existsSync(p)) || 'claude'
 
 // Content block types from Claude CLI stream-json
 interface TextBlock {
