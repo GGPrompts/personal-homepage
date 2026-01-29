@@ -318,6 +318,11 @@ export default function CalendarSection({
   // UI State
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState(new Date())
+
+  // Debug: log when selectedDate changes
+  React.useEffect(() => {
+    console.log('selectedDate state updated to:', selectedDate.toISOString())
+  }, [selectedDate])
   const [view, setView] = useState<ViewType>("month")
   const [showEventModal, setShowEventModal] = useState(false)
   const [showEventDetail, setShowEventDetail] = useState(false)
@@ -788,8 +793,10 @@ export default function CalendarSection({
           <div
             key={dateKey}
             onClick={() => {
-              console.log('Date clicked:', date.toISOString())
-              setSelectedDate(new Date(date))
+              console.log('Date clicked:', date.toISOString(), 'isSelected before:', isSelected)
+              const newDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+              console.log('Setting selectedDate to:', newDate.toISOString())
+              setSelectedDate(newDate)
             }}
             className={`
               min-h-[80px] md:min-h-[100px] p-1 md:p-2 cursor-pointer transition-all hover:bg-muted/50 hover:scale-[1.01] active:scale-[0.99]
