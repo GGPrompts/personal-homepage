@@ -4,11 +4,12 @@ import { cleanup } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
 
 // Mock ResizeObserver for components that use it (e.g., Radix ScrollArea)
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}))
+class MockResizeObserver {
+  observe = vi.fn()
+  unobserve = vi.fn()
+  disconnect = vi.fn()
+}
+global.ResizeObserver = MockResizeObserver as any
 
 // Cleanup after each test case
 afterEach(() => {

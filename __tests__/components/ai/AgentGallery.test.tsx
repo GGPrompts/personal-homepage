@@ -129,10 +129,12 @@ describe('AgentGallery', () => {
   })
 
   describe('Empty state', () => {
-    it('shows empty state when no agents', () => {
+    it('shows vanilla Claude agent when no custom agents', () => {
+      // When agents is empty, the gallery still shows the virtual "vanilla Claude" option
       renderGallery({ agents: [] })
 
-      expect(screen.getByText('No agents available')).toBeInTheDocument()
+      expect(screen.getByText('Claude')).toBeInTheDocument()
+      expect(screen.getByText(/Start a conversation with Claude/i)).toBeInTheDocument()
     })
 
     it('shows filter empty state when filters exclude all agents', async () => {
