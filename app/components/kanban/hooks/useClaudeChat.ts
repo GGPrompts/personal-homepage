@@ -4,6 +4,14 @@ import { useState, useCallback, useRef } from 'react'
 import type { ClaudeSettings, ChatMessage } from '../lib/ai/types'
 import type { Message, ToolUse } from '../types'
 
+/**
+ * Strip __CLAUDE_EVENT__...__END_EVENT__ markers from content
+ * These are used for structured event transmission but should not be displayed
+ */
+function stripClaudeEventMarkers(content: string): string {
+  return content.replace(/__CLAUDE_EVENT__.*?__END_EVENT__/g, '').replace(/\n{3,}/g, '\n\n')
+}
+
 interface UseClaudeChatOptions {
   onMessage?: (message: Omit<Message, 'id'>) => void
   onSessionId?: (sessionId: string) => void
@@ -126,7 +134,8 @@ export function useClaudeChat(options: UseClaudeChatOptions = {}): UseClaudeChat
 
             if (data.content) {
               fullContent += data.content
-              setStreamingContent(fullContent)
+              // Strip event markers before displaying to user
+              setStreamingContent(stripClaudeEventMarkers(fullContent))
             }
 
             if (data.done) {
@@ -154,11 +163,12 @@ export function useClaudeChat(options: UseClaudeChatOptions = {}): UseClaudeChat
         }
       }
 
-      // Finalize message
-      if (fullContent.trim() || toolUsesRef.current.length > 0) {
+      // Finalize message - strip event markers from persisted content
+      const cleanContent = stripClaudeEventMarkers(fullContent).trim()
+      if (cleanContent || toolUsesRef.current.length > 0) {
         onMessage?.({
           role: 'assistant',
-          content: fullContent.trim(),
+          content: cleanContent,
           timestamp: new Date(),
           model: 'claude-code',
           toolUses: toolUsesRef.current.length > 0 ? toolUsesRef.current : undefined
