@@ -153,6 +153,13 @@ export function FileTree({
       return
     }
 
+    // Skip if there's a pending navigation - let the navigation effect handle loading
+    if (pendingTreeNavigation) return
+
+    // Skip if navigation has already happened (currentPath differs from basePath)
+    // This prevents race condition when fetchGitStatus changes due to navigation
+    if (currentPath !== basePath) return
+
     // Skip if already fetching
     if (hasFetchedRef.current) return
     hasFetchedRef.current = true
