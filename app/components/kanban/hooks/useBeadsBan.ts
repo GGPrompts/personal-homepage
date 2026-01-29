@@ -100,7 +100,7 @@ async function fetchIssues(
   workspace?: string,
   status?: string
 ): Promise<BeadsListResponse> {
-  let url = '/api/beads/issues?all=true&limit=200'
+  let url = '/api/beads/issues?all=true&limit=0' // 0 = unlimited for aggregated views
   if (workspace) {
     url += `&workspace=${encodeURIComponent(workspace)}`
   }

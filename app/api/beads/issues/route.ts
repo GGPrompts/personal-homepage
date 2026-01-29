@@ -127,7 +127,7 @@ function transformIssue(raw: RawBeadsIssue) {
  *   - all: Include closed issues (default true for kanban)
  *   - status: Filter by status (open, in_progress, closed, blocked)
  *   - priority: Filter by priority (1-4)
- *   - limit: Max number of issues (default 100)
+ *   - limit: Max number of issues (default 0 = unlimited)
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
   const includeAll = searchParams.get("all") !== "false" // Default to true
   const status = searchParams.get("status")
   const priority = searchParams.get("priority")
-  const limit = searchParams.get("limit") || "100"
+  const limit = searchParams.get("limit") || "0" // 0 = unlimited
 
   try {
     // Validate workspace if provided

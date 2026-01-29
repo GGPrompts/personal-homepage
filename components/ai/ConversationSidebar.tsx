@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Plus, Trash2, Cpu, FolderOpen, Loader2, Save, Circle } from "lucide-react"
+import { Plus, Trash2, Cpu, FolderOpen, Loader2, Save, Circle, Bot } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { isEmoji, isAvatarUrl } from "@/lib/ai/utils"
 import type { Conversation, ModelInfo, GeneratingConversations } from "@/lib/ai-workspace"
@@ -95,7 +95,7 @@ export function ConversationSidebar({
                         <AvatarFallback className="text-sm bg-primary/20">
                           {isEmoji(convAgent.avatar)
                             ? convAgent.avatar
-                            : convAgent.name.charAt(0)}
+                            : <Bot className="h-4 w-4 text-primary" />}
                         </AvatarFallback>
                       </Avatar>
                     )}

@@ -996,7 +996,7 @@ function MinimizedDrawer({
                   <AvatarImage src={selectedAgent.avatar} alt={selectedAgent.name} />
                 )}
                 <AvatarFallback className="text-sm bg-primary/10">
-                  {isEmoji(selectedAgent.avatar) ? selectedAgent.avatar : selectedAgent.name.charAt(0)}
+                  {isEmoji(selectedAgent.avatar) ? selectedAgent.avatar : <Bot className="h-4 w-4 text-primary" />}
                 </AvatarFallback>
               </Avatar>
             </motion.div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Bot, GitBranch, Trash2, FileText, Gem, ScrollText, Loader2, Sparkles } from "lucide-react"
+import { Bot, GitBranch, Trash2, FileText, Gem, ScrollText, Loader2, Sparkles, Wand2 } from "lucide-react"
 import type { Task } from "../types"
 import { useBoardStore } from "../lib/store"
 import { useSyncBeadsTask } from "../hooks/useBeadsIssues"
@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { TaskDetailsForm } from "./TaskDetailsForm"
+import { TaskPromptSection } from "./TaskPromptSection"
 import { isBeadsTask } from "../lib/beads/mappers"
 
 export function TaskModal() {
@@ -184,6 +185,13 @@ export function TaskModal() {
               <FileText className="h-4 w-4" />
               Details
             </TabsTrigger>
+            {/* Show Prompt tab for open beads tasks */}
+            {taskIsFromBeads && !isClosedBeadsTask && (
+              <TabsTrigger value="prompt" className="gap-1.5">
+                <Wand2 className="h-4 w-4" />
+                Prompt
+              </TabsTrigger>
+            )}
             {/* Show Transcript tab for closed beads tasks with transcript */}
             {isClosedBeadsTask && transcript?.exists && (
               <TabsTrigger value="transcript" className="gap-1.5">
@@ -208,6 +216,23 @@ export function TaskModal() {
                 </motion.div>
               </AnimatePresence>
             </TabsContent>
+
+            {/* Prompt Tab - for open beads tasks */}
+            {taskIsFromBeads && !isClosedBeadsTask && (
+              <TabsContent value="prompt" className="mt-0 h-full">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key="prompt"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <TaskPromptSection task={task} workspace={workspace} />
+                  </motion.div>
+                </AnimatePresence>
+              </TabsContent>
+            )}
 
             {/* Transcript Tab */}
             {isClosedBeadsTask && (

@@ -238,7 +238,7 @@ function SortableItem({
                 <AvatarFallback className="text-[8px] bg-primary/20">
                   {isEmoji(currentAgent.avatar)
                     ? currentAgent.avatar
-                    : currentAgent.name.charAt(0)}
+                    : <Bot className="h-2.5 w-2.5 text-primary" />}
                 </AvatarFallback>
               </Avatar>
             ) : (
@@ -271,7 +271,7 @@ function SortableItem({
                 <AvatarFallback className="text-[8px] bg-primary/20">
                   {isEmoji(agent.avatar)
                     ? agent.avatar
-                    : agent.name.charAt(0)}
+                    : <Bot className="h-2.5 w-2.5 text-primary" />}
                 </AvatarFallback>
               </Avatar>
               {agent.name}

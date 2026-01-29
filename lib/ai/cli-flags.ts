@@ -10,7 +10,7 @@
 /**
  * Backend type identifier
  */
-export type AIBackend = 'claude' | 'codex' | 'gemini'
+export type AIBackend = 'claude' | 'codex' | 'gemini' | 'copilot'
 
 /**
  * Flag value type
@@ -366,6 +366,8 @@ export function getFlagsForBackend(backend: AIBackend): CLIFlag[] {
       return CODEX_FLAGS
     case 'gemini':
       return GEMINI_FLAGS
+    case 'copilot':
+      return [] // TODO: Add copilot flags
     default:
       return []
   }
@@ -462,6 +464,8 @@ export function getExecutableName(backend: AIBackend): string {
       return 'codex'
     case 'gemini':
       return 'gemini'
+    case 'copilot':
+      return 'github-copilot'
     default:
       return 'claude'
   }

@@ -479,7 +479,7 @@ export default function AIWorkspaceSection({
                       <AvatarImage src={agent.avatar} alt={agent.name} />
                     ) : null}
                     <AvatarFallback className="text-base bg-primary/10">
-                      {isEmoji(agent.avatar) ? agent.avatar : agent.name.charAt(0)}
+                      {isEmoji(agent.avatar) ? agent.avatar : <Bot className="h-5 w-5 text-primary" />}
                     </AvatarFallback>
                   </Avatar>
                 ) : (
@@ -729,7 +729,7 @@ export default function AIWorkspaceSection({
                                 <AvatarImage src={agent.avatar} alt={agent.name} />
                               ) : null}
                               <AvatarFallback className="text-2xl bg-primary/20">
-                                {isEmoji(agent.avatar) ? agent.avatar : agent.name.charAt(0)}
+                                {isEmoji(agent.avatar) ? agent.avatar : <Bot className="h-8 w-8 text-primary" />}
                               </AvatarFallback>
                             </Avatar>
                             <div>
