@@ -424,12 +424,19 @@ export function AIDrawerProvider({
     // Expand the drawer
     setState("expanded")
 
+    // Clear agent auto-selection - let user choose or keep existing
+    setUserHasSelectedAgent(true)
+    setSelectedAgentId(null)
+
     // Set the input with a suggested prompt if provided
     if (options?.autoPrompt) {
       setInputValue(options.autoPrompt)
+    } else if (task.beadsId) {
+      // Use beads ID as the prompt
+      setInputValue(task.beadsId)
     } else {
-      // Default prompt based on task
-      setInputValue(`Help me with this task: "${task.title}"`)
+      // Fallback to task title
+      setInputValue(task.title)
     }
   }, [createNewConversation])
 
