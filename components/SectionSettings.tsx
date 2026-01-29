@@ -50,6 +50,8 @@ import {
   BarChart3,
   Beaker,
   GitBranch,
+  Mail,
+  Calendar,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -81,6 +83,8 @@ const sectionMeta: Record<ToggleableSection, { label: string; icon: React.Elemen
   "api-playground": { label: "API Playground", icon: Zap, description: "Test & debug APIs" },
   bookmarks: { label: "Bookmarks", icon: Bookmark, description: "Quick links" },
   search: { label: "Search Hub", icon: Search, description: "Search, AI & Image" },
+  email: { label: "Email", icon: Mail, description: "Gmail inbox" },
+  calendar: { label: "Calendar", icon: Calendar, description: "Google Calendar events" },
   "ai-workspace": { label: "AI Workspace", icon: MessageSquare, description: "Chat with AI models" },
   stocks: { label: "Paper Trading", icon: TrendingUp, description: "Practice stock trading" },
   crypto: { label: "Crypto", icon: Bitcoin, description: "Live cryptocurrency prices" },

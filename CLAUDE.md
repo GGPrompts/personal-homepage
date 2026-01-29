@@ -25,9 +25,11 @@ Next.js 15 personal dashboard with accordion sidebar navigation. Features weathe
 | Analytics | `app/sections/analytics.tsx` | [docs/sections/analytics.md](docs/sections/analytics.md) |
 | API Playground | `app/sections/api-playground.tsx` | [docs/sections/api-playground.md](docs/sections/api-playground.md) |
 | Bookmarks | `app/sections/bookmarks.tsx` | [docs/sections/bookmarks.md](docs/sections/bookmarks.md) |
+| Calendar | `app/sections/calendar.tsx` | [docs/sections/calendar.md](docs/sections/calendar.md) |
 | Crypto | `app/sections/crypto-dashboard.tsx` | [docs/sections/crypto-dashboard.md](docs/sections/crypto-dashboard.md) |
 | Daily Feed | `app/sections/daily-feed.tsx` | [docs/sections/daily-feed.md](docs/sections/daily-feed.md) |
 | Disasters | `app/sections/disasters-monitor.tsx` | [docs/sections/disasters-monitor.md](docs/sections/disasters-monitor.md) |
+| Email | `app/sections/email.tsx` | [docs/sections/email.md](docs/sections/email.md) |
 | Files | `app/sections/files.tsx` | [docs/sections/files.md](docs/sections/files.md) |
 | Flowchart | `app/sections/flowchart.tsx` | [docs/sections/flowchart.md](docs/sections/flowchart.md) |
 | GitHub Activity | `app/sections/github-activity.tsx` | [docs/sections/github-activity.md](docs/sections/github-activity.md) |
