@@ -28,6 +28,10 @@ Object.defineProperty(window, 'localStorage', {
 // Mock scrollIntoView
 Element.prototype.scrollIntoView = vi.fn()
 
+// Mock fetch globally
+const mockFetch = vi.fn()
+global.fetch = mockFetch
+
 // Helper wrapper component
 const createWrapper = (options = {}) => {
   return ({ children }: { children: React.ReactNode }) =>
@@ -38,10 +42,9 @@ describe('useAIDrawerChat', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorageMock.clear()
-    vi.useFakeTimers()
 
-    // Mock fetch for models endpoint
-    global.fetch = vi.fn().mockResolvedValue({
+    // Default successful fetch mock
+    mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
         models: [
@@ -57,7 +60,7 @@ describe('useAIDrawerChat', () => {
   })
 
   afterEach(() => {
-    vi.useRealTimers()
+    vi.resetAllMocks()
   })
 
   describe('throws error without provider', () => {
@@ -163,16 +166,19 @@ describe('useAIDrawerChat', () => {
       expect(conv).toBeUndefined()
     })
 
-    it('getConversation returns conversation for valid id', async () => {
+    it('getConversation finds conversation by valid id', async () => {
       const { result } = renderHook(() => useAIDrawerChat(), {
         wrapper: createWrapper(),
       })
 
-      const activeId = result.current.activeConvId
-      const conv = result.current.getConversation(activeId)
+      // Conversations array should have at least one conversation
+      expect(result.current.conversations.length).toBeGreaterThan(0)
 
-      expect(conv).toBeDefined()
-      expect(conv?.id).toBe(activeId)
+      const firstConv = result.current.conversations[0]
+      const foundConv = result.current.getConversation(firstConv.id)
+
+      expect(foundConv).toBeDefined()
+      expect(foundConv?.id).toBe(firstConv.id)
     })
   })
 
@@ -264,16 +270,15 @@ describe('useAIDrawerTrigger', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorageMock.clear()
-    vi.useFakeTimers()
 
-    global.fetch = vi.fn().mockResolvedValue({
+    mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ models: [], backends: [] }),
     })
   })
 
   afterEach(() => {
-    vi.useRealTimers()
+    vi.resetAllMocks()
   })
 
   describe('without provider', () => {

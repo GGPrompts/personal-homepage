@@ -120,7 +120,9 @@ describe('AgentCard', () => {
     it('renders personality traits', () => {
       renderCard()
 
-      expect(screen.getByText('helpful')).toBeInTheDocument()
+      // Note: "helpful" appears twice - once as primary trait tagline and once in traits list
+      const helpfulElements = screen.getAllByText('helpful')
+      expect(helpfulElements.length).toBeGreaterThanOrEqual(1)
       expect(screen.getByText('concise')).toBeInTheDocument()
       expect(screen.getByText('technical')).toBeInTheDocument()
     })
@@ -386,11 +388,14 @@ describe('AgentCard', () => {
         agent: createMockAgent({ personality: ['helpful', 'technical', 'creative'] }),
       })
 
-      const helpfulBadge = screen.getByText('helpful')
+      // Note: "helpful" appears twice - once as tagline (no color class) and once in traits list (with color class)
+      const helpfulBadges = screen.getAllByText('helpful')
+      const coloredHelpfulBadge = helpfulBadges.find(el => el.classList.contains('text-green-400'))
+      expect(coloredHelpfulBadge).toBeDefined()
+
       const technicalBadge = screen.getByText('technical')
       const creativeBadge = screen.getByText('creative')
 
-      expect(helpfulBadge).toHaveClass('text-green-400')
       expect(technicalBadge).toHaveClass('text-cyan-400')
       expect(creativeBadge).toHaveClass('text-pink-400')
     })

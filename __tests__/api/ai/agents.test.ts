@@ -2,30 +2,35 @@
  * Tests for AI Agents API Route
  * app/api/ai/agents/route.ts
  */
-import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-// Create mock functions before vi.mock
-const mockReaddir = vi.fn()
-const mockReadFile = vi.fn()
-const mockHomedir = vi.fn(() => '/home/testuser')
+// Mock fs/promises for file system operations - use hoisted factory functions
+vi.mock('fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs/promises')>()
+  return {
+    ...actual,
+    readdir: vi.fn(),
+    readFile: vi.fn(),
+  }
+})
 
-// Mock fs/promises for file system operations
-vi.mock('fs/promises', () => ({
-  readdir: mockReaddir,
-  readFile: mockReadFile,
-}))
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('os')>()
+  return {
+    ...actual,
+    homedir: vi.fn(() => '/home/testuser'),
+  }
+})
 
-vi.mock('os', () => ({
-  homedir: mockHomedir,
-}))
-
-// Import after mocking
+// Import mocked modules and the route handler
+import * as fsPromises from 'fs/promises'
+import * as os from 'os'
 import { GET } from '@/app/api/ai/agents/route'
 
 describe('AI Agents API Route', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockHomedir.mockReturnValue('/home/testuser')
+    vi.mocked(os.homedir).mockReturnValue('/home/testuser')
   })
 
   afterEach(() => {
@@ -34,7 +39,7 @@ describe('AI Agents API Route', () => {
 
   describe('GET /api/ai/agents', () => {
     it('returns empty array when no agents directory exists', async () => {
-      mockReaddir.mockRejectedValue(new Error('ENOENT'))
+      vi.mocked(fsPromises.readdir).mockRejectedValue(new Error('ENOENT'))
 
       const response = await GET()
       const data = await response.json()
@@ -44,7 +49,7 @@ describe('AI Agents API Route', () => {
     })
 
     it('returns empty array when directory is empty', async () => {
-      mockReaddir.mockResolvedValue([])
+      vi.mocked(fsPromises.readdir).mockResolvedValue([])
 
       const response = await GET()
       const data = await response.json()
@@ -54,14 +59,14 @@ describe('AI Agents API Route', () => {
     })
 
     it('lists agents from markdown files', async () => {
-      mockReaddir.mockResolvedValue([
+      vi.mocked(fsPromises.readdir).mockResolvedValue([
         'researcher.md',
         'coder.md',
         'README.txt', // Should be skipped
-      ])
+      ] as any)
 
-      mockReadFile.mockImplementation(async (filePath: string) => {
-        if (filePath.includes('researcher.md')) {
+      vi.mocked(fsPromises.readFile).mockImplementation(async (filePath: any) => {
+        if (String(filePath).includes('researcher.md')) {
           return `---
 name: Research Assistant
 description: Helps with research tasks
@@ -72,7 +77,7 @@ model: claude-sonnet-4
 
 You are a research assistant.`
         }
-        if (filePath.includes('coder.md')) {
+        if (String(filePath).includes('coder.md')) {
           return `---
 name: "Code Helper"
 description: 'Assists with coding'
@@ -101,8 +106,8 @@ description: 'Assists with coding'
     })
 
     it('uses filename as name when no frontmatter name', async () => {
-      mockReaddir.mockResolvedValue(['simple-agent.md'])
-      mockReadFile.mockResolvedValue('# Just markdown, no frontmatter')
+      vi.mocked(fsPromises.readdir).mockResolvedValue(['simple-agent.md'] as any)
+      vi.mocked(fsPromises.readFile).mockResolvedValue('# Just markdown, no frontmatter')
 
       const response = await GET()
       const data = await response.json()
@@ -113,9 +118,9 @@ description: 'Assists with coding'
     })
 
     it('skips files that cannot be read', async () => {
-      mockReaddir.mockResolvedValue(['good.md', 'bad.md'])
-      mockReadFile.mockImplementation(async (filePath: string) => {
-        if (filePath.includes('bad.md')) {
+      vi.mocked(fsPromises.readdir).mockResolvedValue(['good.md', 'bad.md'] as any)
+      vi.mocked(fsPromises.readFile).mockImplementation(async (filePath: any) => {
+        if (String(filePath).includes('bad.md')) {
           throw new Error('Permission denied')
         }
         return `---
@@ -131,8 +136,8 @@ name: Good Agent
     })
 
     it('parses frontmatter with quoted values correctly', async () => {
-      mockReaddir.mockResolvedValue(['agent.md'])
-      mockReadFile.mockResolvedValue(`---
+      vi.mocked(fsPromises.readdir).mockResolvedValue(['agent.md'] as any)
+      vi.mocked(fsPromises.readFile).mockResolvedValue(`---
 name: "Agent with Quotes"
 description: 'Single quoted description'
 model: unquoted-model
@@ -147,14 +152,14 @@ model: unquoted-model
     })
 
     it('skips non-markdown files', async () => {
-      mockReaddir.mockResolvedValue([
+      vi.mocked(fsPromises.readdir).mockResolvedValue([
         'agent.md',
         'config.json',
         'notes.txt',
         'script.js',
-      ])
+      ] as any)
 
-      mockReadFile.mockResolvedValue(`---
+      vi.mocked(fsPromises.readFile).mockResolvedValue(`---
 name: Test Agent
 ---`)
 
@@ -162,12 +167,12 @@ name: Test Agent
       const data = await response.json()
 
       expect(data.agents).toHaveLength(1)
-      expect(mockReadFile).toHaveBeenCalledTimes(1)
+      expect(fsPromises.readFile).toHaveBeenCalledTimes(1)
     })
 
     it('handles empty frontmatter values', async () => {
-      mockReaddir.mockResolvedValue(['agent.md'])
-      mockReadFile.mockResolvedValue(`---
+      vi.mocked(fsPromises.readdir).mockResolvedValue(['agent.md'] as any)
+      vi.mocked(fsPromises.readFile).mockResolvedValue(`---
 name:
 description: Has description
 ---`)
@@ -181,7 +186,7 @@ description: Has description
 
     it('returns agents array on unexpected readdir error', async () => {
       // Mock to throw a different type of error (the route catches this)
-      mockReaddir.mockImplementation(() => {
+      vi.mocked(fsPromises.readdir).mockImplementation(() => {
         throw new Error('Unexpected error')
       })
 

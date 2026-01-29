@@ -106,9 +106,17 @@ describe('useAIChat', () => {
         { backend: 'mock', available: true, error: null },
       ]
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ models: mockModels, backends: mockBackends }),
+      // Reset and set up fresh mock that returns models for ALL calls
+      mockFetch.mockReset()
+      mockFetch.mockImplementation((url: string) => {
+        if (url === '/api/ai/models') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ models: mockModels, backends: mockBackends }),
+          })
+        }
+        // For other calls (like conversation sync), return not ok
+        return Promise.resolve({ ok: false })
       })
 
       const { result } = renderHook(() => useAIChat())
@@ -125,7 +133,15 @@ describe('useAIChat', () => {
     })
 
     it('falls back to mock model on fetch error', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'))
+      // Reset and set up mock that rejects for models endpoint
+      mockFetch.mockReset()
+      mockFetch.mockImplementation((url: string) => {
+        if (url === '/api/ai/models') {
+          return Promise.reject(new Error('Network error'))
+        }
+        // For other calls, return not ok
+        return Promise.resolve({ ok: false })
+      })
 
       const { result } = renderHook(() => useAIChat())
 

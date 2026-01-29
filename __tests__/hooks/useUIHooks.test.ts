@@ -920,17 +920,23 @@ describe('useTerminalExtension', () => {
       expect(result.current.isLoaded).toBe(true)
     })
 
-    // Mock setApiToken validation - need proper mock with json method
+    // Mock setApiToken validation - create proper mock responses
+    const healthResponse = { ok: true }
+    const tokenResponse = {
+      ok: true,
+      json: () => Promise.resolve({ token: 'new-valid-token' }),
+    }
+
     mockFetch
-      .mockResolvedValueOnce({ ok: true }) // health during setApiToken
-      .mockResolvedValueOnce({ // token validation during setApiToken
-        ok: true,
-        json: vi.fn().mockResolvedValue({ token: 'new-valid-token' }),
-      })
+      .mockResolvedValueOnce(healthResponse) // health during setApiToken
+      .mockResolvedValueOnce(tokenResponse) // token validation during setApiToken
 
-    const success = await result.current.setApiToken('new-valid-token')
+    let success: boolean
+    await act(async () => {
+      success = await result.current.setApiToken('new-valid-token')
+    })
 
-    expect(success).toBe(true)
+    expect(success!).toBe(true)
     expect(result.current.authenticated).toBe(true)
     expect(localStorageMock.setItem).toHaveBeenCalledWith('tabz-api-token', 'new-valid-token')
   })
