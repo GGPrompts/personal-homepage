@@ -16,7 +16,7 @@
   },
   "sections": [
     "bookmarks",
-    "search-hub"
+    "search"
   ],
   "enabled": true,
   "mode": "user",
@@ -76,26 +76,26 @@
       "selector": "[data-tabz-action=\"search-bookmarks\"]",
       "description": "Switch to Chrome bookmarks tab",
       "action_type": "navigate",
-      "section": "search-hub"
+      "section": "search"
     },
     {
       "selector": "[data-tabz-input=\"bookmark-search\"]",
       "description": "Chrome bookmark search input",
       "action_type": "input",
-      "section": "search-hub",
+      "section": "search",
       "example": "Search Chrome bookmarks: tabz_fill selector='[data-tabz-input=\"bookmark-search\"]' value='github'"
     },
     {
       "selector": "[data-tabz-list=\"bookmark-results\"]",
       "description": "Chrome bookmark search results container",
       "action_type": "list",
-      "section": "search-hub"
+      "section": "search"
     },
     {
       "selector": "[data-tabz-action=\"open-bookmark\"]",
       "description": "Open a bookmark in new tab",
       "action_type": "click",
-      "section": "search-hub"
+      "section": "search"
     }
   ]
 }
