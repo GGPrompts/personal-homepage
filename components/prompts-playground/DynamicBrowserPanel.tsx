@@ -36,6 +36,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 import { ModelSelector, ModelBadge } from "./ModelSelector"
+import { VotingControls, WinnerBadge, type VoteType } from "./ResponseVoting"
 import type { PanelConfig, AgentConfig } from "@/lib/prompts-playground"
 import { getModelById, MODEL_FAMILY_BG_COLORS } from "@/lib/models-registry"
 
@@ -54,11 +55,15 @@ interface DynamicBrowserPanelProps {
   response?: PanelResponse
   isFullscreen: boolean
   canRemove: boolean
+  vote?: VoteType
+  isWinner?: boolean
   onConfigChange: (updates: Partial<PanelConfig>) => void
   onRefresh: () => void
   onToggleFullscreen: () => void
   onSave: () => void
   onRemove: () => void
+  onVote?: (voteType: VoteType) => void
+  onPickWinner?: () => void
 }
 
 export function DynamicBrowserPanel({
@@ -66,11 +71,15 @@ export function DynamicBrowserPanel({
   response,
   isFullscreen,
   canRemove,
+  vote,
+  isWinner,
   onConfigChange,
   onRefresh,
   onToggleFullscreen,
   onSave,
   onRemove,
+  onVote,
+  onPickWinner,
 }: DynamicBrowserPanelProps) {
   const iframeRef = React.useRef<HTMLIFrameElement>(null)
   const [iframeError, setIframeError] = React.useState(false)
@@ -248,6 +257,19 @@ export function DynamicBrowserPanel({
           </div>
         )}
 
+        {/* Voting controls */}
+        {response?.content && !response.isLoading && onVote && onPickWinner && (
+          <VotingControls
+            panelId={config.id}
+            modelId={config.modelId}
+            vote={vote ?? null}
+            isWinner={isWinner ?? false}
+            onVote={onVote}
+            onPickWinner={onPickWinner}
+            compact
+          />
+        )}
+
         {/* Panel Actions */}
         <div className="flex items-center gap-1">
           {/* Copy response button */}
@@ -406,6 +428,11 @@ export function DynamicBrowserPanel({
 
       {/* Content Area */}
       <div className="flex-1 relative bg-background/30 overflow-hidden">
+        {/* Winner badge overlay */}
+        {isWinner && response?.content && !response.isLoading && (
+          <WinnerBadge />
+        )}
+
         {viewMode === "response" ? (
           <ResponseView
             response={response}

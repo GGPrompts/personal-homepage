@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { DynamicBrowserPanel, type PanelResponse } from "./DynamicBrowserPanel"
 import type { PanelConfig } from "@/lib/prompts-playground"
+import type { VoteType } from "./ResponseVoting"
 
 type ViewMode = "grid" | "horizontal" | "vertical"
 
@@ -20,22 +21,30 @@ interface DynamicPanelViewerProps {
   panels: PanelConfig[]
   responses?: PanelResponses
   viewMode?: ViewMode
+  getVote?: (panelId: string) => VoteType
+  getWinner?: () => string | null
   onPanelChange: (panelId: string, config: Partial<PanelConfig>) => void
   onRefresh: (panelId: string) => void
   onSave: (panelId: string) => void
   onRemove: (panelId: string) => void
   onAdd: () => void
+  onVote?: (panelId: string, modelId: string | undefined, voteType: VoteType) => void
+  onPickWinner?: (panelId: string, modelId: string | undefined) => void
 }
 
 export function DynamicPanelViewer({
   panels,
   responses,
   viewMode = "grid",
+  getVote,
+  getWinner,
   onPanelChange,
   onRefresh,
   onSave,
   onRemove,
   onAdd,
+  onVote,
+  onPickWinner,
 }: DynamicPanelViewerProps) {
   const [fullscreenPanel, setFullscreenPanel] = React.useState<string | null>(
     null
@@ -46,6 +55,16 @@ export function DynamicPanelViewer({
   }
 
   const getResponse = (panelId: string) => responses?.get(panelId)
+
+  const winnerId = getWinner?.()
+
+  // Helper to get common props for a panel
+  const getPanelVotingProps = (panel: PanelConfig) => ({
+    vote: getVote?.(panel.id),
+    isWinner: panel.id === winnerId,
+    onVote: onVote ? (voteType: VoteType) => onVote(panel.id, panel.modelId, voteType) : undefined,
+    onPickWinner: onPickWinner ? () => onPickWinner(panel.id, panel.modelId) : undefined,
+  })
 
   // If a panel is fullscreen, only show that panel
   if (fullscreenPanel !== null) {
@@ -62,6 +81,7 @@ export function DynamicPanelViewer({
           response={getResponse(panel.id)}
           isFullscreen={true}
           canRemove={panels.length > 1}
+          {...getPanelVotingProps(panel)}
           onConfigChange={(updates) => onPanelChange(panel.id, updates)}
           onRefresh={() => onRefresh(panel.id)}
           onToggleFullscreen={() => handleToggleFullscreen(panel.id)}
@@ -82,6 +102,7 @@ export function DynamicPanelViewer({
             response={getResponse(panels[0].id)}
             isFullscreen={false}
             canRemove={false}
+            {...getPanelVotingProps(panels[0])}
             onConfigChange={(updates) => onPanelChange(panels[0].id, updates)}
             onRefresh={() => onRefresh(panels[0].id)}
             onToggleFullscreen={() => handleToggleFullscreen(panels[0].id)}
@@ -115,6 +136,7 @@ export function DynamicPanelViewer({
                       response={getResponse(panel.id)}
                       isFullscreen={false}
                       canRemove={panels.length > 1}
+                      {...getPanelVotingProps(panel)}
                       onConfigChange={(updates) =>
                         onPanelChange(panel.id, updates)
                       }
@@ -155,6 +177,7 @@ export function DynamicPanelViewer({
                       response={getResponse(panel.id)}
                       isFullscreen={false}
                       canRemove={panels.length > 1}
+                      {...getPanelVotingProps(panel)}
                       onConfigChange={(updates) =>
                         onPanelChange(panel.id, updates)
                       }
@@ -181,11 +204,15 @@ export function DynamicPanelViewer({
         <GridLayout
           panels={panels}
           responses={responses}
+          getVote={getVote}
+          winnerId={winnerId}
           onPanelChange={onPanelChange}
           onRefresh={onRefresh}
           onSave={onSave}
           onRemove={onRemove}
           onToggleFullscreen={handleToggleFullscreen}
+          onVote={onVote}
+          onPickWinner={onPickWinner}
         />
       </div>
       <AddPanelButton onClick={onAdd} />
@@ -196,21 +223,29 @@ export function DynamicPanelViewer({
 interface GridLayoutProps {
   panels: PanelConfig[]
   responses?: PanelResponses
+  getVote?: (panelId: string) => VoteType
+  winnerId?: string | null
   onPanelChange: (panelId: string, config: Partial<PanelConfig>) => void
   onRefresh: (panelId: string) => void
   onSave: (panelId: string) => void
   onRemove: (panelId: string) => void
   onToggleFullscreen: (panelId: string) => void
+  onVote?: (panelId: string, modelId: string | undefined, voteType: VoteType) => void
+  onPickWinner?: (panelId: string, modelId: string | undefined) => void
 }
 
 function GridLayout({
   panels,
   responses,
+  getVote,
+  winnerId,
   onPanelChange,
   onRefresh,
   onSave,
   onRemove,
   onToggleFullscreen,
+  onVote,
+  onPickWinner,
 }: GridLayoutProps) {
   // Calculate optimal grid layout
   const count = panels.length
@@ -249,6 +284,8 @@ function GridLayout({
                         response={getResponse(panel.id)}
                         isFullscreen={false}
                         canRemove={panels.length > 1}
+                        vote={getVote?.(panel.id)}
+                        isWinner={panel.id === winnerId}
                         onConfigChange={(updates) =>
                           onPanelChange(panel.id, updates)
                         }
@@ -256,6 +293,8 @@ function GridLayout({
                         onToggleFullscreen={() => onToggleFullscreen(panel.id)}
                         onSave={() => onSave(panel.id)}
                         onRemove={() => onRemove(panel.id)}
+                        onVote={onVote ? (voteType: VoteType) => onVote(panel.id, panel.modelId, voteType) : undefined}
+                        onPickWinner={onPickWinner ? () => onPickWinner(panel.id, panel.modelId) : undefined}
                       />
                     </div>
                   </ResizablePanel>

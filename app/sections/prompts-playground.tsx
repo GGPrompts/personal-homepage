@@ -13,6 +13,10 @@ import { DynamicPanelViewer, type PanelResponses } from "@/components/prompts-pl
 import { type PanelResponse } from "@/components/prompts-playground/DynamicBrowserPanel"
 import { WorkspacePicker, useWorkspace } from "@/components/prompts-playground/WorkspacePicker"
 import { PromptInput } from "@/components/prompts-playground/PromptInput"
+import { MetricsDisplay } from "@/components/prompts-playground/MetricsDisplay"
+import { useVoting, type VoteType } from "@/components/prompts-playground/ResponseVoting"
+import { DiffViewer, DiffTriggerButton } from "@/components/prompts-playground/DiffViewer"
+import { ExportComparison } from "@/components/prompts-playground/ExportComparison"
 import { ComparisonToolbar } from "@/components/prompts/ComparisonToolbar"
 import { SaveComponentDialog } from "@/components/prompts/SaveComponentDialog"
 import { ComponentLibrary } from "@/components/prompts/ComponentLibrary"
@@ -62,9 +66,13 @@ export default function PromptsPlaygroundSection({
   const [savingPanelId, setSavingPanelId] = React.useState<string | null>(null)
   const [viewMode, setViewMode] = React.useState<ViewMode>("grid")
   const [isRunning, setIsRunning] = React.useState(false)
+  const [diffViewerOpen, setDiffViewerOpen] = React.useState(false)
 
   // Workspace hook
   const [workspace] = useWorkspace()
+
+  // Voting hook
+  const { getVote, setVote, pickWinner, getWinner } = useVoting(currentPrompt)
 
   // Handle sub-item navigation
   React.useEffect(() => {
@@ -174,6 +182,21 @@ export default function PromptsPlaygroundSection({
   const handleDeleteComparison = (id: string) => {
     setSavedComparisons((prev) => prev.filter((c) => c.id !== id))
   }
+
+  // Voting handlers
+  const handleVote = (panelId: string, modelId: string | undefined, voteType: VoteType) => {
+    setVote(panelId, modelId, voteType)
+  }
+
+  const handlePickWinner = (panelId: string, modelId: string | undefined) => {
+    pickWinner(panelId, modelId)
+  }
+
+  // Check if we have enough responses for diff viewer
+  const responsesWithContent = Array.from(responses.entries()).filter(
+    ([, r]) => r.content && !r.isLoading
+  )
+  const canShowDiff = responsesWithContent.length >= 2
 
   // Send prompt to all panels with selected models
   const handleSendToAll = async (prompt: string, sysPrompt?: string) => {
@@ -342,26 +365,57 @@ export default function PromptsPlaygroundSection({
             panels={panels}
             responses={responses}
             viewMode={viewMode}
+            getVote={getVote}
+            getWinner={getWinner}
             onPanelChange={handlePanelChange}
             onRefresh={handleRefresh}
             onSave={handleSavePanel}
             onRemove={handleRemovePanel}
             onAdd={handleAddPanel}
+            onVote={handleVote}
+            onPickWinner={handlePickWinner}
+          />
+        </div>
+
+        {/* Metrics Panel (collapsible) */}
+        <div className="flex-shrink-0">
+          <MetricsDisplay
+            panels={panels}
+            responses={responses}
           />
         </div>
 
         {/* Toolbar */}
-        <div className="flex-shrink-0">
-          <ComparisonToolbar
-            panels={panels}
-            savedComparisons={savedComparisons}
-            onRefreshAll={handleRefreshAll}
-            onScreenshotAll={handleScreenshotAll}
-            onOpenLibrary={() => setLibraryOpen(true)}
-            onSaveComparison={handleSaveComparison}
-            onLoadComparison={handleLoadComparison}
-            onDeleteComparison={handleDeleteComparison}
-          />
+        <div className="flex-shrink-0 flex items-center gap-3">
+          <div className="flex-1">
+            <ComparisonToolbar
+              panels={panels}
+              savedComparisons={savedComparisons}
+              onRefreshAll={handleRefreshAll}
+              onScreenshotAll={handleScreenshotAll}
+              onOpenLibrary={() => setLibraryOpen(true)}
+              onSaveComparison={handleSaveComparison}
+              onLoadComparison={handleLoadComparison}
+              onDeleteComparison={handleDeleteComparison}
+            />
+          </div>
+
+          {/* Phase 3: Diff and Export buttons */}
+          <div className="flex items-center gap-2">
+            <DiffTriggerButton
+              onClick={() => setDiffViewerOpen(true)}
+              disabled={!canShowDiff}
+            />
+            <ExportComparison
+              prompt={currentPrompt}
+              systemPrompt={systemPrompt}
+              workspace={workspace || undefined}
+              panels={panels}
+              responses={responses}
+              getVote={getVote}
+              getWinner={getWinner}
+            />
+          </div>
         </div>
 
         {/* Save Component Dialog */}
@@ -380,6 +434,14 @@ export default function PromptsPlaygroundSection({
           components={savedComponents}
           onDelete={handleDeleteComponent}
           onRerunPrompt={handleRerunPrompt}
+        />
+
+        {/* Diff Viewer Dialog */}
+        <DiffViewer
+          open={diffViewerOpen}
+          onOpenChange={setDiffViewerOpen}
+          panels={panels}
+          responses={responses}
         />
       </div>
     </TooltipProvider>

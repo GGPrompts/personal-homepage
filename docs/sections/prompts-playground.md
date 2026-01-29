@@ -14,6 +14,13 @@ A/B testing environment for comparing AI agents and prompts side by side.
 - `components/prompts-playground/DynamicBrowserPanel.tsx` - Individual iframe panel with model selector
 - `components/prompts-playground/ModelSelector.tsx` - Model dropdown with family colors
 - `components/prompts-playground/WorkspacePicker.tsx` - Project folder selector
+- `components/prompts-playground/PromptInput.tsx` - Send to All prompt input
+
+**Arena-style Comparison (Phase 3):**
+- `components/prompts-playground/MetricsDisplay.tsx` - Response time, char/word counts, comparison bars
+- `components/prompts-playground/ResponseVoting.tsx` - Thumbs up/down, pick winner, vote persistence
+- `components/prompts-playground/DiffViewer.tsx` - Side-by-side diff with split/unified modes
+- `components/prompts-playground/ExportComparison.tsx` - Export to Markdown/JSON, copy to clipboard
 
 **Legacy (still used for toolbar/library):**
 - `components/prompts/ComparisonToolbar.tsx` - Actions toolbar
@@ -71,6 +78,20 @@ A/B testing environment for comparing AI agents and prompts side by side.
   - Reference prompt input for saving context
   - Prompts saved with components for reproducibility
 
+- **Arena-style Comparison** (Phase 3):
+  - **Metrics Display**: Collapsible panel showing per-model response time, character count, word count, line count
+  - **Comparison Bars**: Visual bar chart comparing response times across models
+  - **Fastest/Slowest Indicators**: Highlights best and worst performers
+  - **Voting System**: Thumbs up/down per response, stored per session
+  - **Pick Winner**: Quick action to select best response
+  - **Vote Persistence**: Votes saved to localStorage per prompt
+  - **Diff Viewer**: Compare any two responses side-by-side
+  - **Split/Unified Views**: Toggle between diff view modes
+  - **Diff Stats**: Shows additions, deletions, unchanged lines
+  - **Export to Markdown**: Formatted comparison report with metrics
+  - **Export to JSON**: Structured data for further analysis
+  - **Copy to Clipboard**: Quick copy of exports
+
 ## Model Registry
 
 Models are defined in `lib/models-registry.ts`:
@@ -122,6 +143,7 @@ Each model includes:
 | `prompts-playground-components` | Saved components with files/prompts |
 | `prompts-playground-comparisons` | Saved comparison setups |
 | `prompts-playground-workspace` | Selected workspace path |
+| `prompts-playground-votes` | Voting sessions with per-prompt votes |
 
 All state persisted to localStorage.
 
