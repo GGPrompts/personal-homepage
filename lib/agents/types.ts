@@ -24,10 +24,9 @@ export type AgentMode = 'dev' | 'user'
 /**
  * Agent category for gallery organization
  * - 'page-assistant': Section-specific agents for homepage pages
- * - 'development': Development-focused agents
  * - undefined: Categorized by backend (claude, codex, gemini, copilot)
  */
-export type AgentCategory = 'page-assistant' | 'development'
+export type AgentCategory = 'page-assistant'
 
 // ============================================================================
 // Agent Card (Simplified for CLI-only)
@@ -117,7 +116,7 @@ export const AgentModeSchema = z.enum(['dev', 'user'])
 /**
  * Zod schema for AgentCategory
  */
-export const AgentCategorySchema = z.enum(['page-assistant', 'development'])
+export const AgentCategorySchema = z.enum(['page-assistant'])
 
 /**
  * Zod schema for AgentCard

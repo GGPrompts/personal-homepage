@@ -17,7 +17,6 @@ import {
   Gem,
   Plane,
   Layout,
-  Wrench,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
@@ -42,7 +41,7 @@ export interface AgentGalleryProps {
 
 type ViewMode = 'grid' | 'list'
 
-type CategoryKey = 'claude' | 'codex' | 'copilot' | 'gemini' | 'page-assistant' | 'development'
+type CategoryKey = 'claude' | 'codex' | 'copilot' | 'gemini' | 'page-assistant'
 
 interface CategoryConfig {
   label: string
@@ -82,16 +81,10 @@ const CATEGORY_CONFIG: Record<CategoryKey, CategoryConfig> = {
     color: 'text-cyan-400',
     description: 'Homepage section-specific agents',
   },
-  development: {
-    label: 'Development',
-    icon: Wrench,
-    color: 'text-amber-400',
-    description: 'Development-focused agents',
-  },
 }
 
 // Order for displaying categories
-const CATEGORY_ORDER: CategoryKey[] = ['claude', 'codex', 'copilot', 'gemini', 'page-assistant', 'development']
+const CATEGORY_ORDER: CategoryKey[] = ['claude', 'codex', 'copilot', 'gemini', 'page-assistant']
 
 /**
  * Derive category from agent properties
@@ -104,8 +97,8 @@ function deriveCategory(agent: AgentCardType): CategoryKey {
       return backend as CategoryKey
     }
   }
-  // Explicit category takes precedence
-  if (agent.category === 'page-assistant' || agent.category === 'development') {
+  // Explicit page-assistant category takes precedence
+  if (agent.category === 'page-assistant') {
     return agent.category
   }
   // Agents with sections are page assistants
@@ -147,7 +140,6 @@ export function AgentGallery({
       copilot: [],
       gemini: [],
       'page-assistant': [],
-      development: [],
     }
 
     // Filter and group agents
