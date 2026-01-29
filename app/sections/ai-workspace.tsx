@@ -23,7 +23,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { AgentGallery } from "@/components/agents/AgentGallery"
-import { AgentBuilderWizard } from "@/components/agents/AgentBuilderWizard"
+import { AgentBuilderForm } from "@/components/agents/AgentBuilderForm"
 import type { AgentCard, CreateAgentInput } from "@/lib/agents/types"
 import { useSearchParams } from "next/navigation"
 import { useTabzBridge } from "@/hooks/useTabzBridge"
@@ -252,13 +252,11 @@ export default function AIWorkspaceSection({
 
   const handleSelectAgent = (agent: AgentCard) => {
     setSelectedAgent(agent)
-    // Update settings with agent's system prompt and mode
+    // Update settings with agent's mode for context isolation
     setSettings(prev => ({
       ...prev,
-      systemPrompt: agent.system_prompt,
-      temperature: agent.config.temperature,
-      agentMode: agent.mode, // Pass agent mode for context isolation
-      agentDir: agent.workingDir, // Pass agent directory for 'user' mode (hooks disabled)
+      agentMode: agent.mode,
+      agentDir: agent.workingDir ?? undefined,
     }))
     // Also update the active conversation's agentId for persistence
     setConversations(prev => prev.map(conv =>
@@ -271,27 +269,23 @@ export default function AIWorkspaceSection({
 
   // Start a new conversation with a specific agent (from landing page gallery)
   const handleStartChatWithAgent = (agent: AgentCard) => {
-    // Handle vanilla Claude (no agent) specially
-    const isVanilla = agent.id === '__vanilla__'
+    // Handle vanilla agents (no custom configuration) specially
+    const isVanilla = agent.id.startsWith('__vanilla_')
 
     if (isVanilla) {
       setSelectedAgent(null)
       setSettings(prev => ({
         ...prev,
-        systemPrompt: '',
-        temperature: 0.7,
-        agentMode: undefined, // Clear agent mode for vanilla Claude
-        agentDir: undefined, // Clear agent directory for vanilla Claude
+        agentMode: undefined,
+        agentDir: undefined,
       }))
     } else {
       setSelectedAgent(agent)
-      // Update settings with agent's config and mode
+      // Update settings with agent's mode for context isolation
       setSettings(prev => ({
         ...prev,
-        systemPrompt: agent.system_prompt,
-        temperature: agent.config.temperature,
-        agentMode: agent.mode, // Pass agent mode for context isolation
-        agentDir: agent.workingDir, // Pass agent directory for 'user' mode (hooks disabled)
+        agentMode: agent.mode,
+        agentDir: agent.workingDir ?? undefined,
       }))
     }
 
@@ -311,13 +305,6 @@ export default function AIWorkspaceSection({
       model: settings.model,
       projectPath: convWorkingDir,
       agentId: isVanilla ? undefined : agent.id,
-      settings: isVanilla ? {
-        systemPrompt: '',
-        temperature: 0.7,
-      } : {
-        systemPrompt: agent.system_prompt,
-        temperature: agent.config.temperature,
-      },
     }
 
     setConversations(prev => [newConv, ...prev])
@@ -666,8 +653,8 @@ export default function AIWorkspaceSection({
               </DialogContent>
             </Dialog>
 
-            {/* Agent Builder Wizard */}
-            <AgentBuilderWizard
+            {/* Agent Builder Form */}
+            <AgentBuilderForm
               open={showAgentWizard}
               onOpenChange={setShowAgentWizard}
               onAgentCreated={handleAgentCreated}

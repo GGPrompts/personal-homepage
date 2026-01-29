@@ -6,16 +6,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { GlowEffect } from '@/components/ui/glow-effect'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
-import { ImagePlus, RefreshCw, Copy, Play, Loader2 } from 'lucide-react'
+import { Play, Loader2, Bot, Code, Gem, Plane } from 'lucide-react'
 import { toast } from 'sonner'
-import { useAvatarGeneration } from '@/hooks/useAvatarGeneration'
 import { useTabzBridge } from '@/hooks/useTabzBridge'
-import type { AgentCard as AgentCardType, AgentPersonalityTrait } from '@/lib/agents/types'
+import type { AgentCard as AgentCardType } from '@/lib/agents/types'
 
 export interface AgentCardProps {
   /** Agent data to display */
@@ -28,10 +22,6 @@ export interface AgentCardProps {
   className?: string
   /** Display variant: 'card' for grid layout, 'compact' for list layout */
   variant?: 'card' | 'compact'
-  /** Callback when avatar is updated */
-  onAvatarChange?: (agentId: string, newAvatar: string) => void
-  /** Enable avatar editing mode */
-  editable?: boolean
   /** Show spawn button for TabzChrome integration */
   showSpawn?: boolean
   /** Callback when spawn is requested */
@@ -39,24 +29,19 @@ export interface AgentCardProps {
 }
 
 /**
- * Personality trait display configuration
+ * Backend display configuration
  */
-const PERSONALITY_COLORS: Record<AgentPersonalityTrait, string> = {
-  helpful: 'bg-green-500/20 text-green-400 border-green-500/30',
-  concise: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  detailed: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-  technical: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
-  friendly: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-  formal: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
-  creative: 'bg-pink-500/20 text-pink-400 border-pink-500/30',
-  analytical: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
+const BACKEND_CONFIG: Record<string, { icon: React.ElementType; color: string; label: string }> = {
+  claude: { icon: Bot, color: 'text-orange-400 bg-orange-500/15 border-orange-500/30', label: 'Claude' },
+  codex: { icon: Code, color: 'text-green-400 bg-green-500/15 border-green-500/30', label: 'Codex' },
+  gemini: { icon: Gem, color: 'text-blue-400 bg-blue-500/15 border-blue-500/30', label: 'Gemini' },
+  copilot: { icon: Plane, color: 'text-purple-400 bg-purple-500/15 border-purple-500/30', label: 'Copilot' },
 }
 
 /**
  * Check if a string is an emoji (simple heuristic)
  */
 function isEmoji(str: string): boolean {
-  // Check for common emoji patterns
   const emojiRegex = /^[\p{Emoji}\u200d]+$/u
   return emojiRegex.test(str) && str.length <= 8
 }
@@ -65,9 +50,7 @@ function isEmoji(str: string): boolean {
  * Check if a string is a URL
  */
 function isUrl(str: string): boolean {
-  // Check for absolute paths (served by Next.js from public/)
   if (str.startsWith('/')) return true
-  // Check for full URLs
   try {
     new URL(str)
     return true
@@ -89,89 +72,9 @@ function getInitials(name: string): string {
 }
 
 /**
- * AvatarRegeneratePopover - Popover for regenerating agent avatar
- */
-function AvatarRegeneratePopover({
-  agent,
-  onAvatarChange,
-  children,
-}: {
-  agent: AgentCardType
-  onAvatarChange?: (agentId: string, newAvatar: string) => void
-  children: React.ReactNode
-}) {
-  const [isOpen, setIsOpen] = React.useState(false)
-  const { generatePrompt } = useAvatarGeneration()
-  const [prompt, setPrompt] = React.useState<string | null>(null)
-
-  const handleGeneratePrompt = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    const newPrompt = generatePrompt(agent.name, agent.personality, agent.description)
-    setPrompt(newPrompt)
-    setIsOpen(true)
-  }
-
-  const copyPrompt = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (prompt) {
-      navigator.clipboard.writeText(prompt)
-      toast.success('Prompt copied to clipboard')
-    }
-  }
-
-  return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild onClick={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          onClick={handleGeneratePrompt}
-          className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-primary/90 hover:bg-primary flex items-center justify-center shadow-lg transition-all opacity-0 group-hover:opacity-100"
-          title="Generate new avatar"
-        >
-          <RefreshCw className="h-3 w-3 text-primary-foreground" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        className="w-80"
-        onClick={(e) => e.stopPropagation()}
-        align="start"
-      >
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <ImagePlus className="h-4 w-4 text-primary" />
-            <span className="font-medium text-sm">Generate Avatar</span>
-          </div>
-          {prompt && (
-            <>
-              <div className="p-2 rounded bg-muted text-xs leading-relaxed">
-                {prompt}
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={copyPrompt}
-                  className="flex-1 gap-1.5"
-                >
-                  <Copy className="h-3 w-3" />
-                  Copy Prompt
-                </Button>
-              </div>
-              <p className="text-[10px] text-muted-foreground">
-                Ask Claude to generate this avatar with DALL-E, or paste the prompt directly into ChatGPT.
-              </p>
-            </>
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
-  )
-}
-
-/**
  * AgentCard - Visual component for displaying AI agent cards
  *
- * Displays an AI agent's avatar, name, personality traits, and section badges.
+ * Displays an AI agent's avatar, name, backend, and section badges.
  * Supports both grid (card) and list (compact) layouts.
  */
 export function AgentCard({
@@ -180,8 +83,6 @@ export function AgentCard({
   onClick,
   className,
   variant = 'card',
-  onAvatarChange,
-  editable = false,
   showSpawn = false,
   onSpawn,
 }: AgentCardProps) {
@@ -203,10 +104,9 @@ export function AgentCard({
 
   /**
    * Spawn agent terminal via TabzChrome
-   * Builds claude command with --plugin-dir if configured
    */
   const handleSpawn = async (e: React.MouseEvent) => {
-    e.stopPropagation() // Don't trigger card selection
+    e.stopPropagation()
 
     if (!isConnected) {
       toast.error('TabzChrome not connected', {
@@ -218,13 +118,16 @@ export function AgentCard({
     setIsSpawning(true)
 
     try {
-      // Build the claude command with optional --plugin-dir
-      let command = 'claude'
+      // Build command from backend and flags
+      const backend = agent.backend || 'claude'
+      let command = backend
       if (agent.pluginPath) {
         command += ` --plugin-dir "${agent.pluginPath}"`
       }
+      if (agent.flags?.length) {
+        command += ' ' + agent.flags.join(' ')
+      }
 
-      // Spawn via TabzBridge
       spawnTerminal(command, {
         name: `Agent: ${agent.name}`,
       })
@@ -235,7 +138,6 @@ export function AgentCard({
           : 'Default configuration',
       })
 
-      // Call optional callback
       onSpawn?.(agent)
     } catch (error) {
       toast.error('Failed to spawn agent', {
@@ -250,11 +152,8 @@ export function AgentCard({
   const avatarIsEmoji = isEmoji(agent.avatar)
   const avatarIsUrl = isUrl(agent.avatar)
 
-  // Get first personality trait for tagline
-  const primaryTrait = agent.personality[0]
-
   // Check if agent has spawn configuration
-  const hasSpawnConfig = agent.pluginPath || agent.spawnCommand?.length
+  const hasSpawnConfig = agent.pluginPath || (agent.flags?.length ?? 0) > 0
 
   if (variant === 'compact') {
     return (
@@ -278,7 +177,6 @@ export function AgentCard({
         data-tabz-item={`agent-${agent.id}`}
         data-tabz-action="select"
       >
-        {/* Glow effect for selected state */}
         {isSelected && (
           <GlowEffect
             colors={['#22d3ee', '#06b6d4', '#0891b2']}
@@ -290,7 +188,7 @@ export function AgentCard({
         )}
 
         {/* Avatar */}
-        <div className="relative group shrink-0">
+        <div className="relative shrink-0">
           <Avatar className="h-10 w-10">
             {avatarIsUrl && <AvatarImage src={agent.avatar} alt={agent.name} />}
             <AvatarFallback className={cn(
@@ -300,17 +198,22 @@ export function AgentCard({
               {avatarIsEmoji ? agent.avatar : getInitials(agent.name)}
             </AvatarFallback>
           </Avatar>
-          {editable && (
-            <AvatarRegeneratePopover agent={agent} onAvatarChange={onAvatarChange}>
-              <span />
-            </AvatarRegeneratePopover>
-          )}
         </div>
 
-        {/* Name, description and traits */}
+        {/* Name, description */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-medium text-white truncate">{agent.name}</span>
+            {agent.backend && BACKEND_CONFIG[agent.backend] && (() => {
+              const config = BACKEND_CONFIG[agent.backend!]
+              const Icon = config.icon
+              return (
+                <span className={cn('inline-flex items-center gap-1 px-1.5 py-0 rounded text-[9px] border', config.color)}>
+                  <Icon className="h-2.5 w-2.5" />
+                  {config.label}
+                </span>
+              )
+            })()}
             {!agent.enabled && (
               <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                 Disabled
@@ -318,22 +221,6 @@ export function AgentCard({
             )}
           </div>
           <p className="text-xs text-white/60 truncate">{agent.description}</p>
-          {/* Personality traits in compact mode */}
-          {agent.personality.length > 0 && (
-            <div className="flex items-center gap-1 mt-1 flex-wrap">
-              {agent.personality.slice(0, 3).map((trait) => (
-                <span
-                  key={trait}
-                  className={cn(
-                    'text-[9px] px-1.5 py-0 rounded-full border capitalize',
-                    PERSONALITY_COLORS[trait]
-                  )}
-                >
-                  {trait}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Section badges (compact - show count) */}
@@ -390,7 +277,6 @@ export function AgentCard({
       data-tabz-item={`agent-${agent.id}`}
       data-tabz-action="select"
     >
-      {/* Glow effect for selected state */}
       {isSelected && (
         <GlowEffect
           colors={['#22d3ee', '#06b6d4', '#0891b2']}
@@ -403,7 +289,7 @@ export function AgentCard({
 
       {/* Header with avatar and status */}
       <div className="relative flex items-start gap-3 mb-3">
-        <div className="relative group shrink-0">
+        <div className="relative shrink-0">
           <Avatar className="h-12 w-12 ring-2 ring-white/10">
             {avatarIsUrl && <AvatarImage src={agent.avatar} alt={agent.name} />}
             <AvatarFallback className={cn(
@@ -413,24 +299,30 @@ export function AgentCard({
               {avatarIsEmoji ? agent.avatar : getInitials(agent.name)}
             </AvatarFallback>
           </Avatar>
-          {editable && (
-            <AvatarRegeneratePopover agent={agent} onAvatarChange={onAvatarChange}>
-              <span />
-            </AvatarRegeneratePopover>
-          )}
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-semibold text-white truncate">{agent.name}</h3>
+            {agent.backend && BACKEND_CONFIG[agent.backend] && (() => {
+              const config = BACKEND_CONFIG[agent.backend!]
+              const Icon = config.icon
+              return (
+                <span className={cn('inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] border', config.color)}>
+                  <Icon className="h-3 w-3" />
+                  {config.label}
+                </span>
+              )
+            })()}
             {!agent.enabled && (
               <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                 Disabled
               </Badge>
             )}
           </div>
-          {primaryTrait && (
-            <span className="text-xs text-white/60 capitalize">{primaryTrait}</span>
+          {/* Show mode indicator */}
+          {agent.mode && (
+            <span className="text-xs text-white/60 capitalize">{agent.mode} mode</span>
           )}
         </div>
 
@@ -442,28 +334,6 @@ export function AgentCard({
 
       {/* Description */}
       <p className="text-sm text-white/70 line-clamp-2 mb-3">{agent.description}</p>
-
-      {/* Personality traits */}
-      {agent.personality.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {agent.personality.slice(0, 3).map((trait) => (
-            <span
-              key={trait}
-              className={cn(
-                'text-[10px] px-2 py-0.5 rounded-full border capitalize',
-                PERSONALITY_COLORS[trait]
-              )}
-            >
-              {trait}
-            </span>
-          ))}
-          {agent.personality.length > 3 && (
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-white/50">
-              +{agent.personality.length - 3}
-            </span>
-          )}
-        </div>
-      )}
 
       {/* Section badges */}
       {agent.sections && agent.sections.length > 0 && (
@@ -482,34 +352,6 @@ export function AgentCard({
               +{agent.sections.length - 2}
             </Badge>
           )}
-        </div>
-      )}
-
-      {/* MCP tools indicator */}
-      {agent.mcp_tools.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-white/10">
-          <div className="flex items-center gap-1.5 text-[10px] text-white/50">
-            <svg
-              className="h-3 w-3"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-            </svg>
-            <span>{agent.mcp_tools.length} tools available</span>
-          </div>
         </div>
       )}
 
@@ -544,8 +386,8 @@ export function AgentCard({
           {hasSpawnConfig && (
             <p className="text-[10px] text-white/40 mt-1.5 text-center">
               {agent.pluginPath && `Plugin: ${agent.pluginPath.split('/').pop()}`}
-              {agent.pluginPath && agent.spawnCommand?.length && ' • '}
-              {agent.spawnCommand?.length && `${agent.spawnCommand.length} flags`}
+              {agent.pluginPath && (agent.flags?.length ?? 0) > 0 && ' • '}
+              {(agent.flags?.length ?? 0) > 0 && `${agent.flags!.length} flags`}
             </p>
           )}
         </div>

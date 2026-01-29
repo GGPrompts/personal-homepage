@@ -4,7 +4,7 @@ export type { AgentCardProps } from './AgentCard'
 export { AgentGallery } from './AgentGallery'
 export type { AgentGalleryProps } from './AgentGallery'
 
-export { AgentBuilderWizard } from './AgentBuilderWizard'
-export type { AgentBuilderWizardProps } from './AgentBuilderWizard'
+export { AgentBuilderForm } from './AgentBuilderForm'
+export type { AgentBuilderFormProps } from './AgentBuilderForm'
 
 export { FloatingAgentButton } from './FloatingAgentButton'

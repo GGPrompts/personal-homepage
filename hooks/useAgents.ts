@@ -2,7 +2,63 @@
 
 import { useQuery } from "@tanstack/react-query"
 import { useMemo, useCallback } from "react"
-import type { AgentCard } from "@/lib/agents/types"
+import type { AgentCard, AIBackend } from "@/lib/agents/types"
+
+// ============================================================================
+// VANILLA AGENTS
+// ============================================================================
+
+/**
+ * Create a vanilla (no custom config) agent for a CLI backend
+ */
+function createVanillaAgent(backend: AIBackend): AgentCard {
+  const configs: Record<AIBackend, { name: string; avatar: string; description: string }> = {
+    claude: {
+      name: 'Claude',
+      avatar: '🤖',
+      description: 'Anthropic Claude - no custom configuration',
+    },
+    codex: {
+      name: 'Codex',
+      avatar: '💻',
+      description: 'OpenAI Codex - no custom configuration',
+    },
+    copilot: {
+      name: 'Copilot',
+      avatar: '✈️',
+      description: 'GitHub Copilot - no custom configuration',
+    },
+    gemini: {
+      name: 'Gemini',
+      avatar: '💎',
+      description: 'Google Gemini - no custom configuration',
+    },
+  }
+
+  const config = configs[backend]
+  const now = new Date().toISOString()
+
+  return {
+    id: `__vanilla_${backend}__`,
+    name: config.name,
+    description: config.description,
+    avatar: config.avatar,
+    backend,
+    flags: [],
+    sections: [],
+    enabled: true,
+    created_at: now,
+    updated_at: now,
+  }
+}
+
+/** Pre-built vanilla agents for each CLI backend */
+const VANILLA_AGENTS: AgentCard[] = [
+  createVanillaAgent('claude'),
+  createVanillaAgent('codex'),
+  createVanillaAgent('copilot'),
+  createVanillaAgent('gemini'),
+]
 
 // ============================================================================
 // TYPES
@@ -69,15 +125,20 @@ export function useAgents(): UseAgentsReturn {
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   })
 
-  // Get all agents (including disabled)
-  const allAgents = useMemo(() => {
+  // Get all registered agents (including disabled)
+  const registeredAgents = useMemo(() => {
     return agentsData?.agents ?? []
   }, [agentsData?.agents])
 
-  // Get enabled agents only
+  // Combine vanilla agents with registered agents
+  const allAgents = useMemo(() => {
+    return [...VANILLA_AGENTS, ...registeredAgents]
+  }, [registeredAgents])
+
+  // Get enabled agents only (vanilla agents are always enabled)
   const agents = useMemo(() => {
-    return allAgents.filter(a => a.enabled)
-  }, [allAgents])
+    return [...VANILLA_AGENTS, ...registeredAgents.filter(a => a.enabled)]
+  }, [registeredAgents])
 
   // Get agent by ID
   const getById = useCallback(

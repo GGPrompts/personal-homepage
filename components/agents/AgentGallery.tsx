@@ -2,48 +2,124 @@
 
 import * as React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, LayoutGrid, List, Users, Filter, Plus, Pencil, Trash2 } from 'lucide-react'
+import {
+  Search,
+  LayoutGrid,
+  List,
+  Users,
+  Plus,
+  Pencil,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  Bot,
+  Code,
+  Gem,
+  Plane,
+  Layout,
+  Wrench,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { AgentCard } from './AgentCard'
-import type { AgentCard as AgentCardType, CreateAgentInput } from '@/lib/agents/types'
+import type { AgentCard as AgentCardType } from '@/lib/agents/types'
 
 export interface AgentGalleryProps {
-  /** List of agents to display */
   agents: AgentCardType[]
-  /** Currently selected agent ID */
   selectedAgentId?: string | null
-  /** Callback when an agent is selected */
   onSelectAgent: (agent: AgentCardType) => void
-  /** Callback when edit is requested for an agent */
   onEditAgent?: (agent: AgentCardType) => void
-  /** Callback when creating a new agent */
   onNewAgent?: () => void
-  /** Callback when deleting an agent */
   onDeleteAgent?: (agent: AgentCardType) => void
-  /** Optional section filter to show only agents for specific sections */
   sectionFilter?: string | null
-  /** Optional className for custom styling */
   className?: string
-  /** Whether the gallery is loading */
   isLoading?: boolean
-  /** Enable edit mode with edit/delete buttons */
   editable?: boolean
 }
 
 type ViewMode = 'grid' | 'list'
 
+type CategoryKey = 'claude' | 'codex' | 'copilot' | 'gemini' | 'page-assistant' | 'development'
+
+interface CategoryConfig {
+  label: string
+  icon: React.ElementType
+  color: string
+  description: string
+}
+
+const CATEGORY_CONFIG: Record<CategoryKey, CategoryConfig> = {
+  claude: {
+    label: 'Claude',
+    icon: Bot,
+    color: 'text-orange-400',
+    description: 'Anthropic Claude agents',
+  },
+  codex: {
+    label: 'Codex',
+    icon: Code,
+    color: 'text-green-400',
+    description: 'OpenAI Codex agents',
+  },
+  copilot: {
+    label: 'Copilot',
+    icon: Plane,
+    color: 'text-purple-400',
+    description: 'GitHub Copilot agents',
+  },
+  gemini: {
+    label: 'Gemini',
+    icon: Gem,
+    color: 'text-blue-400',
+    description: 'Google Gemini agents',
+  },
+  'page-assistant': {
+    label: 'Page Assistants',
+    icon: Layout,
+    color: 'text-cyan-400',
+    description: 'Homepage section-specific agents',
+  },
+  development: {
+    label: 'Development',
+    icon: Wrench,
+    color: 'text-amber-400',
+    description: 'Development-focused agents',
+  },
+}
+
+// Order for displaying categories
+const CATEGORY_ORDER: CategoryKey[] = ['claude', 'codex', 'copilot', 'gemini', 'page-assistant', 'development']
+
 /**
- * AgentGallery - Grid/list view for browsing and selecting AI agents
- *
- * Features:
- * - Search filtering by name and description
- * - Toggle between grid and list layouts
- * - Section-based filtering
- * - Selection state with visual feedback
+ * Derive category from agent properties
  */
+function deriveCategory(agent: AgentCardType): CategoryKey {
+  // Vanilla agents go to their backend category
+  if (agent.id.startsWith('__vanilla_')) {
+    const backend = agent.id.replace('__vanilla_', '').replace('__', '')
+    if (['claude', 'codex', 'copilot', 'gemini'].includes(backend)) {
+      return backend as CategoryKey
+    }
+  }
+  // Explicit category takes precedence
+  if (agent.category === 'page-assistant' || agent.category === 'development') {
+    return agent.category
+  }
+  // Agents with sections are page assistants
+  if (agent.sections && agent.sections.length > 0) {
+    return 'page-assistant'
+  }
+  // Default to backend category
+  if (agent.backend && ['claude', 'codex', 'copilot', 'gemini'].includes(agent.backend)) {
+    return agent.backend as CategoryKey
+  }
+  // Fallback to claude
+  return 'claude'
+}
+
 export function AgentGallery({
   agents,
   selectedAgentId,
@@ -58,75 +134,68 @@ export function AgentGallery({
 }: AgentGalleryProps) {
   const [searchQuery, setSearchQuery] = React.useState('')
   const [viewMode, setViewMode] = React.useState<ViewMode>('grid')
-  const [activeSection, setActiveSection] = React.useState<string | null>(sectionFilter || null)
+  const [expandedCategories, setExpandedCategories] = React.useState<Set<CategoryKey>>(
+    new Set(['claude', 'page-assistant']) // Default expanded
+  )
 
-  // Get unique sections from all agents
-  const availableSections = React.useMemo(() => {
-    const sections = new Set<string>()
-    agents.forEach((agent) => {
-      agent.sections?.forEach((section) => sections.add(section))
-    })
-    return Array.from(sections).sort()
-  }, [agents])
-
-  // Virtual "vanilla Claude" agent for starting without a custom agent
-  const vanillaClaudeAgent: AgentCardType = React.useMemo(() => ({
-    id: '__vanilla__',
-    name: 'Claude',
-    description: 'Start a conversation with Claude without any custom agent configuration',
-    avatar: '🤖',
-    system_prompt: '',
-    personality: ['helpful'],
-    sections: [],
-    enabled: true,
-    mcp_tools: [],
-    selectors: [],
-    config: {
-      model: 'sonnet',
-      temperature: 0.7,
-      max_tokens: 8192,
-    },
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }), [])
-
-  // Filter agents based on search and section
-  const filteredAgents = React.useMemo(() => {
-    const filtered = agents.filter((agent) => {
-      // Search filter
-      const searchLower = searchQuery.toLowerCase()
-      const matchesSearch =
-        !searchQuery ||
-        agent.name.toLowerCase().includes(searchLower) ||
-        agent.description.toLowerCase().includes(searchLower) ||
-        agent.personality.some((trait) => trait.toLowerCase().includes(searchLower))
-
-      // Section filter
-      const matchesSection =
-        !activeSection ||
-        agent.sections?.includes(activeSection)
-
-      // Only show enabled agents by default
-      return matchesSearch && matchesSection && agent.enabled
-    })
-
-    // Add vanilla Claude at the start if it matches the search
-    const vanillaMatchesSearch = !searchQuery ||
-      'claude'.includes(searchQuery.toLowerCase()) ||
-      'vanilla'.includes(searchQuery.toLowerCase()) ||
-      vanillaClaudeAgent.description.toLowerCase().includes(searchQuery.toLowerCase())
-
-    // Only show vanilla option when no section filter is active
-    if (vanillaMatchesSearch && !activeSection) {
-      return [vanillaClaudeAgent, ...filtered]
+  // Group agents by category
+  // Note: agents prop now includes vanilla agents from useAgents hook
+  const agentsByCategory = React.useMemo(() => {
+    const grouped: Record<CategoryKey, AgentCardType[]> = {
+      claude: [],
+      codex: [],
+      copilot: [],
+      gemini: [],
+      'page-assistant': [],
+      development: [],
     }
 
-    return filtered
-  }, [agents, searchQuery, activeSection, vanillaClaudeAgent])
+    // Filter and group agents
+    const searchLower = searchQuery.toLowerCase()
 
-  // Handle section filter change
-  const handleSectionFilter = (section: string | null) => {
-    setActiveSection(section === activeSection ? null : section)
+    for (const agent of agents) {
+      if (!agent.enabled) continue
+
+      // Apply search filter
+      if (searchQuery) {
+        const matchesSearch =
+          agent.name.toLowerCase().includes(searchLower) ||
+          agent.description.toLowerCase().includes(searchLower) ||
+          agent.backend?.toLowerCase().includes(searchLower) ||
+          ('vanilla'.includes(searchLower) && agent.id.startsWith('__vanilla_'))
+        if (!matchesSearch) continue
+      }
+
+      // Apply section filter - skip vanilla agents when filtering by section
+      const isVanilla = agent.id.startsWith('__vanilla_')
+      if (sectionFilter) {
+        if (isVanilla) continue // Don't show vanilla agents when filtering by section
+        if (!agent.sections?.includes(sectionFilter)) continue
+      }
+
+      const category = deriveCategory(agent)
+      grouped[category].push(agent)
+    }
+
+    return grouped
+  }, [agents, searchQuery, sectionFilter])
+
+  // Count total visible agents
+  const totalAgents = React.useMemo(() => {
+    return Object.values(agentsByCategory).reduce((sum, arr) => sum + arr.length, 0)
+  }, [agentsByCategory])
+
+  // Toggle category expansion
+  const toggleCategory = (category: CategoryKey) => {
+    setExpandedCategories((prev) => {
+      const next = new Set(prev)
+      if (next.has(category)) {
+        next.delete(category)
+      } else {
+        next.add(category)
+      }
+      return next
+    })
   }
 
   if (isLoading) {
@@ -144,15 +213,14 @@ export function AgentGallery({
 
   return (
     <div className={cn('flex flex-col h-full w-full overflow-hidden', className)} data-tabz-region="agent-gallery">
-      {/* Header with search and controls */}
+      {/* Header */}
       <div className="space-y-3 pb-4 border-b border-border/40">
-        {/* Title and view toggle */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
             <h3 className="font-semibold text-lg terminal-glow">AI Agents</h3>
             <Badge variant="secondary" className="text-xs">
-              {filteredAgents.length}
+              {totalAgents}
             </Badge>
           </div>
 
@@ -190,7 +258,7 @@ export function AgentGallery({
           </div>
         </div>
 
-        {/* Search input */}
+        {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -202,127 +270,135 @@ export function AgentGallery({
             data-tabz-input="agent-search"
           />
         </div>
-
-        {/* Section filter chips */}
-        {availableSections.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <Filter className="h-3 w-3 text-muted-foreground shrink-0" />
-            <Button
-              variant={activeSection === null ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-6 text-xs px-2"
-              onClick={() => handleSectionFilter(null)}
-            >
-              All
-            </Button>
-            {availableSections.map((section) => (
-              <Button
-                key={section}
-                variant={activeSection === section ? 'secondary' : 'ghost'}
-                size="sm"
-                className="h-6 text-xs px-2 capitalize"
-                onClick={() => handleSectionFilter(section)}
-              >
-                {section.replace(/-/g, ' ')}
-              </Button>
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* Agents list/grid */}
-      <div className="flex-1 mt-4 min-w-0 overflow-y-auto overflow-x-hidden">
-        {filteredAgents.length === 0 ? (
+      {/* Categories */}
+      <div className="flex-1 mt-4 min-w-0 overflow-y-auto overflow-x-hidden space-y-2">
+        {totalAgents === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <p className="text-muted-foreground">
-              {searchQuery || activeSection
-                ? 'No agents match your filters'
-                : 'No agents available'}
+              {searchQuery ? 'No agents match your search' : 'No agents available'}
             </p>
-            {(searchQuery || activeSection) && (
+            {searchQuery && (
               <Button
                 variant="ghost"
                 size="sm"
                 className="mt-2"
-                onClick={() => {
-                  setSearchQuery('')
-                  setActiveSection(null)
-                }}
+                onClick={() => setSearchQuery('')}
               >
-                Clear filters
+                Clear search
               </Button>
             )}
           </div>
         ) : (
-          <motion.div
-            className={cn(
-              'w-full',
-              viewMode === 'grid'
-                ? 'grid grid-cols-1 sm:grid-cols-2 gap-3'
-                : 'flex flex-col gap-2'
-            )}
-          >
-            <AnimatePresence mode="popLayout">
-              {filteredAgents.map((agent, index) => {
-                const isCustomAgent = agent.id !== '__vanilla__'
+          CATEGORY_ORDER.map((categoryKey) => {
+            const categoryAgents = agentsByCategory[categoryKey]
+            if (categoryAgents.length === 0) return null
 
-                return (
-                  <motion.div
-                    key={agent.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ delay: index * 0.05 }}
-                    className="w-full relative group"
+            const config = CATEGORY_CONFIG[categoryKey]
+            const Icon = config.icon
+            const isExpanded = expandedCategories.has(categoryKey)
+
+            return (
+              <Collapsible
+                key={categoryKey}
+                open={isExpanded}
+                onOpenChange={() => toggleCategory(categoryKey)}
+              >
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between h-10 px-3 hover:bg-muted/50"
                   >
-                    <AgentCard
-                      agent={agent}
-                      isSelected={selectedAgentId === agent.id}
-                      onClick={onSelectAgent}
-                      variant={viewMode === 'grid' ? 'card' : 'compact'}
-                    />
-
-                    {/* Edit/Delete buttons - appear on hover when editable */}
-                    {editable && isCustomAgent && (
-                      <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                        {onEditAgent && (
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-7 w-7 bg-background/80 backdrop-blur-sm hover:bg-background"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onEditAgent(agent)
-                            }}
-                            title="Edit agent"
-                            data-tabz-action="edit-agent"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                        {onDeleteAgent && (
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-7 w-7 bg-background/80 backdrop-blur-sm hover:bg-destructive hover:text-destructive-foreground"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onDeleteAgent(agent)
-                            }}
-                            title="Delete agent"
-                            data-tabz-action="delete-agent"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <Icon className={cn('h-4 w-4', config.color)} />
+                      <span className="font-medium">{config.label}</span>
+                      <Badge variant="outline" className="text-[10px] h-5">
+                        {categoryAgents.length}
+                      </Badge>
+                    </div>
+                    {isExpanded ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     )}
+                  </Button>
+                </CollapsibleTrigger>
+
+                <CollapsibleContent className="pt-2 pb-4">
+                  <motion.div
+                    className={cn(
+                      'w-full',
+                      viewMode === 'grid'
+                        ? 'grid grid-cols-1 sm:grid-cols-2 gap-3'
+                        : 'flex flex-col gap-2'
+                    )}
+                  >
+                    <AnimatePresence mode="popLayout">
+                      {categoryAgents.map((agent, index) => {
+                        const isVanilla = agent.id.startsWith('__vanilla_')
+
+                        return (
+                          <motion.div
+                            key={agent.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            transition={{ delay: index * 0.03 }}
+                            className="w-full relative group"
+                          >
+                            <AgentCard
+                              agent={agent}
+                              isSelected={selectedAgentId === agent.id}
+                              onClick={onSelectAgent}
+                              variant={viewMode === 'grid' ? 'card' : 'compact'}
+                            />
+
+                            {/* Edit/Delete buttons */}
+                            {editable && !isVanilla && (
+                              <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                {onEditAgent && (
+                                  <Button
+                                    variant="secondary"
+                                    size="icon"
+                                    className="h-7 w-7 bg-background/80 backdrop-blur-sm hover:bg-background"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      onEditAgent(agent)
+                                    }}
+                                    title="Edit agent"
+                                    data-tabz-action="edit-agent"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                                {onDeleteAgent && (
+                                  <Button
+                                    variant="secondary"
+                                    size="icon"
+                                    className="h-7 w-7 bg-background/80 backdrop-blur-sm hover:bg-destructive hover:text-destructive-foreground"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      onDeleteAgent(agent)
+                                    }}
+                                    title="Delete agent"
+                                    data-tabz-action="delete-agent"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+                          </motion.div>
+                        )
+                      })}
+                    </AnimatePresence>
                   </motion.div>
-                )
-              })}
-            </AnimatePresence>
-          </motion.div>
+                </CollapsibleContent>
+              </Collapsible>
+            )
+          })
         )}
       </div>
     </div>

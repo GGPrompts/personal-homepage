@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAgentsDirectoryPath, listAgentDirectories, isAgentsDirectoryValid } from '@/lib/agents/loader'
+import { getAgentsDirectoryPath, isAgentsDirectoryValid, loadAgents } from '@/lib/agents/loader'
 
 /**
  * GET /api/ai/agents/directory
@@ -9,13 +9,17 @@ export async function GET() {
   try {
     const directoryPath = getAgentsDirectoryPath()
     const isValid = isAgentsDirectoryValid()
-    const directories = await listAgentDirectories()
+    const agents = await loadAgents()
 
     return NextResponse.json({
       path: directoryPath,
       isValid,
-      agents: directories,
-      total: directories.length,
+      agents: agents.map(a => ({
+        id: a.id,
+        name: a.name,
+        enabled: a.enabled,
+      })),
+      total: agents.length,
     })
   } catch (error) {
     console.error('Failed to get agents directory info:', error)
