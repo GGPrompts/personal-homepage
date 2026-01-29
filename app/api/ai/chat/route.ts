@@ -154,6 +154,16 @@ export async function POST(request: NextRequest) {
   try {
     const body: ChatRequest = await request.json()
 
+    console.log('[AI Chat API] Request body:', JSON.stringify({
+      backend: body.backend,
+      model: body.model,
+      cwd: body.cwd,
+      conversationId: body.conversationId,
+      settingsKeys: body.settings ? Object.keys(body.settings) : [],
+      agentDir: body.settings?.agentDir,
+      agentMode: body.settings?.agentMode,
+    }, null, 2))
+
     const { messages, backend, model, settings: rawSettings, cwd, conversationId, claudeSessionId } = body
 
     // Validate and sanitize settings
