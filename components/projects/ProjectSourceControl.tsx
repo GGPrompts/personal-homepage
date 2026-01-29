@@ -25,6 +25,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Loader2,
+  Sparkles,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -93,6 +94,7 @@ export default function ProjectSourceControl({ project }: ProjectSourceControlPr
   const [unstagedOpen, setUnstagedOpen] = React.useState(true)
   const [untrackedOpen, setUntrackedOpen] = React.useState(true)
   const [actionOutput, setActionOutput] = React.useState<string | null>(null)
+  const [isGenerating, setIsGenerating] = React.useState(false)
 
   const projectPath = project.local?.path
 
@@ -186,6 +188,29 @@ export default function ProjectSourceControl({ project }: ProjectSourceControlPr
     if (files.length === 0) return
     if (!confirm(`Discard changes to ${files.length} file(s)? This cannot be undone.`)) return
     gitAction.mutate({ action: "discard", files })
+  }
+
+  const handleGenerateMessage = async () => {
+    if (!projectPath || stagedFiles.length === 0) return
+    setIsGenerating(true)
+    try {
+      const res = await fetch("/api/git/generate-message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoPath: projectPath }),
+      })
+      const result = await res.json()
+      if (!result.success) {
+        setActionOutput(`Error generating message: ${result.error}`)
+        return
+      }
+      setCommitMessage(result.message)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to generate message"
+      setActionOutput(`Error: ${message}`)
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   if (!projectPath) {
@@ -351,21 +376,44 @@ export default function ProjectSourceControl({ project }: ProjectSourceControlPr
       <Card className="glass">
         <CardContent className="p-4">
           <div className="flex gap-2">
-            <Input
-              placeholder="Commit message"
-              value={commitMessage}
-              onChange={(e) => setCommitMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && canCommit) {
-                  handleCommit()
-                }
-              }}
-              disabled={gitAction.isPending}
-              className="flex-1"
-            />
+            <div className="relative flex-1">
+              <Input
+                placeholder="Commit message"
+                value={commitMessage}
+                onChange={(e) => setCommitMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && canCommit) {
+                    handleCommit()
+                  }
+                }}
+                disabled={gitAction.isPending || isGenerating}
+                className="pr-9"
+              />
+              {stagedFiles.length > 0 && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={handleGenerateMessage}
+                        disabled={isGenerating || gitAction.isPending}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-colors disabled:opacity-50"
+                      >
+                        {isGenerating ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-4 w-4" />
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Generate commit message with AI</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
             <Button
               onClick={handleCommit}
-              disabled={!canCommit || gitAction.isPending}
+              disabled={!canCommit || gitAction.isPending || isGenerating}
             >
               {gitAction.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
