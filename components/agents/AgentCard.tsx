@@ -254,7 +254,7 @@ export function AgentCard({
   const primaryTrait = agent.personality[0]
 
   // Check if agent has spawn configuration
-  const hasSpawnConfig = agent.pluginPath || agent.profileId
+  const hasSpawnConfig = agent.pluginPath || agent.spawnCommand?.length
 
   if (variant === 'compact') {
     return (
@@ -544,8 +544,8 @@ export function AgentCard({
           {hasSpawnConfig && (
             <p className="text-[10px] text-white/40 mt-1.5 text-center">
               {agent.pluginPath && `Plugin: ${agent.pluginPath.split('/').pop()}`}
-              {agent.pluginPath && agent.profileId && ' • '}
-              {agent.profileId && `Profile: ${agent.profileId}`}
+              {agent.pluginPath && agent.spawnCommand?.length && ' • '}
+              {agent.spawnCommand?.length && `${agent.spawnCommand.length} flags`}
             </p>
           )}
         </div>
