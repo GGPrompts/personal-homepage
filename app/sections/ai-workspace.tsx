@@ -130,7 +130,7 @@ export default function AIWorkspaceSection({
   const searchParams = useSearchParams()
 
   // Use shared hooks for agents and projects
-  const { agents: registryAgents, isLoading: agentsLoading, getById: getAgentById } = useAgents()
+  const { agents: registryAgents, isLoading: agentsLoading, getById: getAgentById, refetch: refetchAgents } = useAgents()
   const { projects: availableProjects, isPinned } = useProjects()
 
   // Compute effective working directory with fallback chain:
@@ -390,8 +390,13 @@ export default function AIWorkspaceSection({
         method: 'DELETE',
       })
       if (!res.ok) throw new Error('Failed to delete agent')
-      // Refresh agents list - useAgents hook should handle this
-      window.location.reload() // Simple refresh for now
+      // Refresh agents list via React Query refetch
+      refetchAgents()
+      // Clear selected agent if it was the deleted one
+      if (selectedAgent?.id === agent.id) {
+        setSelectedAgent(null)
+        setSettings(prev => ({ ...prev, systemPrompt: '' }))
+      }
     } catch (error) {
       console.error('Failed to delete agent:', error)
     }
@@ -413,8 +418,24 @@ export default function AIWorkspaceSection({
 
       if (!res.ok) throw new Error('Failed to save agent')
 
-      // Refresh agents list
-      window.location.reload() // Simple refresh for now
+      const savedAgent = await res.json()
+
+      // Refresh agents list via React Query refetch
+      refetchAgents()
+
+      // If we were editing the currently selected agent, update it
+      if (isEditing && selectedAgent?.id === editingAgent!.id && savedAgent.agent) {
+        setSelectedAgent(savedAgent.agent)
+        setSettings(prev => ({
+          ...prev,
+          systemPrompt: savedAgent.agent.system_prompt,
+          temperature: savedAgent.agent.config?.temperature ?? prev.temperature,
+        }))
+      }
+
+      // Close the wizard
+      setShowAgentWizard(false)
+      setEditingAgent(null)
     } catch (error) {
       console.error('Failed to save agent:', error)
     }
