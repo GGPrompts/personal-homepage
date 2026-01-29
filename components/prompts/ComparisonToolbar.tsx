@@ -31,7 +31,7 @@ import type { PanelConfig, SavedComparison } from "@/lib/prompts-playground"
 import { generateId } from "@/lib/prompts-playground"
 
 interface ComparisonToolbarProps {
-  panels: [PanelConfig, PanelConfig, PanelConfig, PanelConfig]
+  panels: PanelConfig[]
   savedComparisons: SavedComparison[]
   onRefreshAll: () => void
   onScreenshotAll: () => void
@@ -165,7 +165,10 @@ export function ComparisonToolbar({
                     >
                       <span className="font-medium">{comparison.name}</span>
                       <span className="text-xs text-muted-foreground ml-2">
-                        {new Date(comparison.createdAt).toLocaleDateString()}
+                        {comparison.panels.length} panels
+                      </span>
+                      <span className="text-xs text-muted-foreground ml-1">
+                        - {new Date(comparison.createdAt).toLocaleDateString()}
                       </span>
                     </button>
                     <Button

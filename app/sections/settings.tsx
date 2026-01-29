@@ -32,6 +32,8 @@ import {
   Video,
   HardDrive,
   Headphones,
+  Mail,
+  Calendar,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -50,6 +52,7 @@ import {
   DEFAULT_VISIBILITY,
 } from "@/hooks/useSectionPreferences"
 import { useMediaDirectories, useDirectoryExists } from "@/hooks/useMediaLibrary"
+import { useGoogleAuth } from "@/hooks/useGoogleAuth"
 
 // ============================================================================
 // TYPES
@@ -215,6 +218,190 @@ function ApiKeyInput({
                 </a>
               )}
             </div>
+          )}
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+// ============================================================================
+// GOOGLE OAUTH CARD COMPONENT
+// ============================================================================
+
+function GoogleOAuthCard() {
+  const {
+    isConnected,
+    isLoading,
+    error,
+    user,
+    connect,
+    disconnect,
+    refreshStatus,
+  } = useGoogleAuth()
+
+  const [disconnecting, setDisconnecting] = React.useState(false)
+
+  const handleDisconnect = async () => {
+    if (!confirm('Disconnect from Google? You will need to re-authorize to use Gmail and Calendar features.')) {
+      return
+    }
+    setDisconnecting(true)
+    try {
+      await disconnect()
+    } finally {
+      setDisconnecting(false)
+    }
+  }
+
+  const statusConfig = isConnected
+    ? {
+        icon: CheckCircle2,
+        color: "text-emerald-500",
+        bg: "bg-emerald-500/10",
+        border: "border-emerald-500/30",
+        label: "Connected",
+      }
+    : {
+        icon: XCircle,
+        color: "text-muted-foreground",
+        bg: "bg-muted/10",
+        border: "border-border",
+        label: "Not Connected",
+      }
+
+  const StatusIcon = statusConfig.icon
+
+  return (
+    <Card className={`glass p-5 ${statusConfig.border} transition-colors`}>
+      <div className="flex items-start gap-4">
+        <div className={`p-3 rounded-lg ${statusConfig.bg} flex-shrink-0`}>
+          <Mail className={`h-6 w-6 ${statusConfig.color}`} />
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="font-semibold">Google (OAuth)</h3>
+            <Badge
+              variant="outline"
+              className={`${statusConfig.color} border-current/30 text-xs py-0`}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  Checking...
+                </>
+              ) : (
+                <>
+                  <StatusIcon className="h-3 w-3 mr-1" />
+                  {statusConfig.label}
+                </>
+              )}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground mb-3">
+            Connect Gmail and Google Calendar for email and scheduling integration
+          </p>
+
+          {/* User info when connected */}
+          {isConnected && user && (
+            <div className="flex items-center gap-2 mb-3 text-sm">
+              {user.picture && (
+                <img
+                  src={user.picture}
+                  alt={user.name}
+                  className="w-6 h-6 rounded-full"
+                />
+              )}
+              <span className="text-emerald-500">{user.email}</span>
+            </div>
+          )}
+
+          {/* Scopes info */}
+          {isConnected && (
+            <div className="flex flex-wrap gap-1 mb-3">
+              <Badge variant="secondary" className="text-xs gap-1">
+                <Mail className="h-3 w-3" />
+                Gmail
+              </Badge>
+              <Badge variant="secondary" className="text-xs gap-1">
+                <Calendar className="h-3 w-3" />
+                Calendar
+              </Badge>
+            </div>
+          )}
+
+          {/* Error message */}
+          {error && (
+            <p className="text-xs text-destructive mb-3">{error}</p>
+          )}
+
+          {/* Actions */}
+          <div className="flex flex-wrap gap-2">
+            {!isConnected ? (
+              <Button
+                size="sm"
+                onClick={connect}
+                disabled={isLoading}
+                className="gap-1"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Mail className="h-4 w-4" />
+                )}
+                Connect Google
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refreshStatus()}
+                  disabled={isLoading}
+                  className="gap-1"
+                >
+                  <RefreshCw className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDisconnect}
+                  disabled={disconnecting}
+                  className="gap-1 text-destructive hover:text-destructive"
+                >
+                  {disconnecting ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <XCircle className="h-3 w-3" />
+                  )}
+                  Disconnect
+                </Button>
+              </>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className="gap-1"
+            >
+              <a
+                href="https://console.cloud.google.com/apis/credentials"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <ExternalLink className="h-3 w-3" />
+                Console
+              </a>
+            </Button>
+          </div>
+
+          {/* Setup hint when not connected */}
+          {!isConnected && (
+            <p className="text-xs text-muted-foreground mt-3">
+              Requires GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env.local
+            </p>
           )}
         </div>
       </div>
@@ -847,6 +1034,8 @@ function IntegrationsTab({ onSwitchTab }: { onSwitchTab: (tab: string) => void }
               onNavigate={onSwitchTab}
             />
           ))}
+          {/* Google OAuth - special interactive card */}
+          <GoogleOAuthCard />
         </div>
       </div>
 

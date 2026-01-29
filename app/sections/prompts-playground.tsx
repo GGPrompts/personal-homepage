@@ -11,7 +11,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { QuadSplitViewer } from "@/components/prompts/QuadSplitViewer"
+import { DynamicPanelViewer } from "@/components/prompts-playground/DynamicPanelViewer"
+import { WorkspacePicker } from "@/components/prompts-playground/WorkspacePicker"
 import { ComparisonToolbar } from "@/components/prompts/ComparisonToolbar"
 import { SaveComponentDialog } from "@/components/prompts/SaveComponentDialog"
 import { ComponentLibrary } from "@/components/prompts/ComponentLibrary"
@@ -22,12 +23,15 @@ import {
   saveSavedComponents,
   loadSavedComparisons,
   saveSavedComparisons,
+  addPanel,
+  removePanel,
+  updatePanel,
   type PanelConfig,
   type SavedComponent,
   type SavedComparison,
 } from "@/lib/prompts-playground"
 
-type ViewMode = "quad" | "horizontal" | "vertical"
+type ViewMode = "grid" | "horizontal" | "vertical"
 
 interface PromptsPlaygroundSectionProps {
   activeSubItem?: string | null
@@ -38,21 +42,21 @@ export default function PromptsPlaygroundSection({
   activeSubItem,
   onSubItemHandled,
 }: PromptsPlaygroundSectionProps) {
-  // Panel configs
-  const [panels, setPanels] = React.useState<
-    [PanelConfig, PanelConfig, PanelConfig, PanelConfig]
-  >(loadPanelConfigs)
+  // Panel configs - now dynamic array
+  const [panels, setPanels] = React.useState<PanelConfig[]>(loadPanelConfigs)
 
   // Saved data
-  const [savedComponents, setSavedComponents] = React.useState<SavedComponent[]>(loadSavedComponents)
-  const [savedComparisons, setSavedComparisons] = React.useState<SavedComparison[]>(loadSavedComparisons)
+  const [savedComponents, setSavedComponents] =
+    React.useState<SavedComponent[]>(loadSavedComponents)
+  const [savedComparisons, setSavedComparisons] =
+    React.useState<SavedComparison[]>(loadSavedComparisons)
 
   // UI state
   const [currentPrompt, setCurrentPrompt] = React.useState("")
   const [libraryOpen, setLibraryOpen] = React.useState(false)
   const [saveDialogOpen, setSaveDialogOpen] = React.useState(false)
-  const [savingPanelIndex, setSavingPanelIndex] = React.useState<number | null>(null)
-  const [viewMode, setViewMode] = React.useState<ViewMode>("quad")
+  const [savingPanelId, setSavingPanelId] = React.useState<string | null>(null)
+  const [viewMode, setViewMode] = React.useState<ViewMode>("grid")
 
   // Handle sub-item navigation
   React.useEffect(() => {
@@ -77,35 +81,34 @@ export default function PromptsPlaygroundSection({
     saveSavedComparisons(savedComparisons)
   }, [savedComparisons])
 
-  // Panel change handler
-  const handlePanelChange = (index: number, config: PanelConfig) => {
-    setPanels((prev) => {
-      const updated = [...prev] as [PanelConfig, PanelConfig, PanelConfig, PanelConfig]
-      updated[index] = config
-      return updated
-    })
+  // Panel change handler - now by ID
+  const handlePanelChange = (panelId: string, updates: Partial<PanelConfig>) => {
+    setPanels((prev) => updatePanel(prev, panelId, updates))
   }
 
-  // Refresh a single panel
-  const handleRefresh = (index: number) => {
-    setPanels((prev) => {
-      const updated = [...prev] as [PanelConfig, PanelConfig, PanelConfig, PanelConfig]
-      updated[index] = { ...updated[index], key: Date.now() }
-      return updated
-    })
+  // Refresh a single panel by ID
+  const handleRefresh = (panelId: string) => {
+    setPanels((prev) =>
+      updatePanel(prev, panelId, { key: Date.now() })
+    )
   }
 
   // Refresh all panels
   const handleRefreshAll = () => {
     setPanels((prev) => {
       const timestamp = Date.now()
-      return prev.map((p, i) => ({ ...p, key: timestamp + i })) as [
-        PanelConfig,
-        PanelConfig,
-        PanelConfig,
-        PanelConfig
-      ]
+      return prev.map((p, i) => ({ ...p, key: timestamp + i }))
     })
+  }
+
+  // Add a new panel
+  const handleAddPanel = () => {
+    setPanels((prev) => addPanel(prev))
+  }
+
+  // Remove a panel by ID
+  const handleRemovePanel = (panelId: string) => {
+    setPanels((prev) => removePanel(prev, panelId))
   }
 
   // Screenshot all panels (placeholder - would need html2canvas or similar)
@@ -116,10 +119,15 @@ export default function PromptsPlaygroundSection({
   }
 
   // Open save dialog for a specific panel
-  const handleSavePanel = (index: number) => {
-    setSavingPanelIndex(index)
+  const handleSavePanel = (panelId: string) => {
+    setSavingPanelId(panelId)
     setSaveDialogOpen(true)
   }
+
+  // Get the panel config for the save dialog
+  const savingPanelConfig = savingPanelId
+    ? panels.find((p) => p.id === savingPanelId) ?? null
+    : null
 
   // Save a component
   const handleSaveComponent = (component: SavedComponent) => {
@@ -168,54 +176,60 @@ export default function PromptsPlaygroundSection({
                 Prompts Playground
               </h1>
               <p className="text-sm text-muted-foreground">
-                Compare 4 agents building the same component side by side
+                Compare AI models side by side ({panels.length} panel
+                {panels.length !== 1 ? "s" : ""})
               </p>
             </div>
           </div>
 
-          {/* View Mode Toggle */}
-          <div className="flex items-center gap-1 glass rounded-lg p-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={viewMode === "quad" ? "secondary" : "ghost"}
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setViewMode("quad")}
-                >
-                  <Grid2X2 className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>2x2 Grid</TooltipContent>
-            </Tooltip>
+          <div className="flex items-center gap-3">
+            {/* Workspace Picker */}
+            <WorkspacePicker />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={viewMode === "horizontal" ? "secondary" : "ghost"}
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setViewMode("horizontal")}
-                >
-                  <Columns className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Horizontal Split</TooltipContent>
-            </Tooltip>
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-1 glass rounded-lg p-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={viewMode === "grid" ? "secondary" : "ghost"}
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setViewMode("grid")}
+                  >
+                    <Grid2X2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Grid Layout</TooltipContent>
+              </Tooltip>
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={viewMode === "vertical" ? "secondary" : "ghost"}
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setViewMode("vertical")}
-                >
-                  <Rows className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Vertical Split</TooltipContent>
-            </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={viewMode === "horizontal" ? "secondary" : "ghost"}
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setViewMode("horizontal")}
+                  >
+                    <Columns className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Horizontal Split</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={viewMode === "vertical" ? "secondary" : "ghost"}
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setViewMode("vertical")}
+                  >
+                    <Rows className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Vertical Split</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
         </div>
 
@@ -235,12 +249,14 @@ export default function PromptsPlaygroundSection({
 
         {/* Main Viewer Area */}
         <div className="flex-1 min-h-0">
-          <QuadSplitViewer
+          <DynamicPanelViewer
             panels={panels}
             viewMode={viewMode}
             onPanelChange={handlePanelChange}
             onRefresh={handleRefresh}
             onSave={handleSavePanel}
+            onRemove={handleRemovePanel}
+            onAdd={handleAddPanel}
           />
         </div>
 
@@ -262,7 +278,7 @@ export default function PromptsPlaygroundSection({
         <SaveComponentDialog
           open={saveDialogOpen}
           onOpenChange={setSaveDialogOpen}
-          panelConfig={savingPanelIndex !== null ? panels[savingPanelIndex] : null}
+          panelConfig={savingPanelConfig}
           currentPrompt={currentPrompt}
           onSave={handleSaveComponent}
         />

@@ -1,10 +1,12 @@
 // Types and localStorage helpers for Prompts Playground
 
 export interface PanelConfig {
+  id: string // Unique identifier for the panel
   url: string
   label: string
   key: number
   prompt?: string
+  modelId?: string // Reference to model in models-registry
   agentConfig?: AgentConfig
 }
 
@@ -21,6 +23,7 @@ export interface SavedComponent {
   name: string
   createdAt: string
   prompt: string
+  modelId?: string
   agentConfig: AgentConfig
   files: ComponentFile[]
   screenshot?: string
@@ -36,7 +39,7 @@ export interface ComponentFile {
 }
 
 export interface PlaygroundState {
-  panels: [PanelConfig, PanelConfig, PanelConfig, PanelConfig]
+  panels: PanelConfig[]
   currentPrompt: string
   savedComponents: SavedComponent[]
 }
@@ -45,8 +48,11 @@ export interface SavedComparison {
   id: string
   name: string
   createdAt: string
-  panels: [PanelConfig, PanelConfig, PanelConfig, PanelConfig]
+  panels: PanelConfig[]
 }
+
+// Legacy type for backward compatibility
+export type FixedPanelArray = [PanelConfig, PanelConfig, PanelConfig, PanelConfig]
 
 const STORAGE_KEYS = {
   panels: "prompts-playground-panels",
@@ -54,36 +60,85 @@ const STORAGE_KEYS = {
   comparisons: "prompts-playground-comparisons",
 }
 
-const DEFAULT_PANELS: [PanelConfig, PanelConfig, PanelConfig, PanelConfig] = [
-  { url: "http://localhost:3001", label: "Agent 1", key: 1 },
-  { url: "http://localhost:3002", label: "Agent 2", key: 2 },
-  { url: "http://localhost:3003", label: "Agent 3", key: 3 },
-  { url: "http://localhost:3004", label: "Agent 4", key: 4 },
+// Create a default panel with a unique ID
+export function createDefaultPanel(index: number): PanelConfig {
+  return {
+    id: generateId(),
+    url: `http://localhost:${3001 + index}`,
+    label: `Agent ${index + 1}`,
+    key: Date.now() + index,
+  }
+}
+
+const DEFAULT_PANELS: PanelConfig[] = [
+  createDefaultPanel(0),
+  createDefaultPanel(1),
+  createDefaultPanel(2),
+  createDefaultPanel(3),
 ]
 
-export function loadPanelConfigs(): [PanelConfig, PanelConfig, PanelConfig, PanelConfig] {
+// Migrate old panel format (without id) to new format
+function migratePanels(panels: unknown[]): PanelConfig[] {
+  return panels.map((panel, index) => {
+    const p = panel as Partial<PanelConfig>
+    return {
+      id: p.id || generateId(),
+      url: p.url || `http://localhost:${3001 + index}`,
+      label: p.label || `Agent ${index + 1}`,
+      key: p.key || Date.now() + index,
+      prompt: p.prompt,
+      modelId: p.modelId,
+      agentConfig: p.agentConfig,
+    }
+  })
+}
+
+export function loadPanelConfigs(): PanelConfig[] {
   if (typeof window === "undefined") {
-    return DEFAULT_PANELS
+    return DEFAULT_PANELS.map((p, i) => createDefaultPanel(i))
   }
 
   try {
     const saved = localStorage.getItem(STORAGE_KEYS.panels)
     if (saved) {
       const parsed = JSON.parse(saved)
-      if (Array.isArray(parsed) && parsed.length === 4) {
-        return parsed as [PanelConfig, PanelConfig, PanelConfig, PanelConfig]
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return migratePanels(parsed)
       }
     }
   } catch {
     // Invalid JSON, use defaults
   }
 
-  return DEFAULT_PANELS
+  return DEFAULT_PANELS.map((p, i) => createDefaultPanel(i))
 }
 
-export function savePanelConfigs(panels: [PanelConfig, PanelConfig, PanelConfig, PanelConfig]): void {
+export function savePanelConfigs(panels: PanelConfig[]): void {
   if (typeof window === "undefined") return
   localStorage.setItem(STORAGE_KEYS.panels, JSON.stringify(panels))
+}
+
+// Add a new panel
+export function addPanel(panels: PanelConfig[]): PanelConfig[] {
+  const newPanel = createDefaultPanel(panels.length)
+  return [...panels, newPanel]
+}
+
+// Remove a panel by ID (minimum 1 panel)
+export function removePanel(panels: PanelConfig[], panelId: string): PanelConfig[] {
+  if (panels.length <= 1) return panels
+  return panels.filter((p) => p.id !== panelId)
+}
+
+// Update a specific panel
+export function updatePanel(
+  panels: PanelConfig[],
+  panelId: string,
+  updates: Partial<PanelConfig>
+): PanelConfig[] {
+  return panels.map((p) =>
+    p.id === panelId ? { ...p, ...updates } : p
+  )
 }
 
 export function loadSavedComponents(): SavedComponent[] {
@@ -116,7 +171,12 @@ export function loadSavedComparisons(): SavedComparison[] {
   try {
     const saved = localStorage.getItem(STORAGE_KEYS.comparisons)
     if (saved) {
-      return JSON.parse(saved)
+      const parsed = JSON.parse(saved)
+      // Migrate old comparisons to new format
+      return parsed.map((comp: SavedComparison) => ({
+        ...comp,
+        panels: migratePanels(comp.panels),
+      }))
     }
   } catch {
     // Invalid JSON
