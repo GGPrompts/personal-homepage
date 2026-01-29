@@ -4,8 +4,48 @@
  */
 
 import { spawn } from 'child_process'
-import type { ChatSettings } from './types'
+import type { ChatSettings, GeminiSettings } from './types'
 import type { ModelContext } from './conversation'
+
+/**
+ * Build CLI args from GeminiSettings
+ * Handles both legacy flat settings and nested gemini settings
+ */
+function buildGeminiArgs(settings?: ChatSettings): string[] {
+  const args: string[] = []
+
+  // Get gemini-specific settings, prefer nested over flat legacy
+  const gemini = settings?.gemini || {}
+
+  // Model (prefer nested, fall back to legacy flat)
+  const model = gemini.model || settings?.geminiModel
+  if (model) {
+    args.push('--model', model)
+  }
+
+  // Temperature
+  if (gemini.temperature !== undefined) {
+    args.push('--temperature', gemini.temperature.toString())
+  }
+
+  // Max output tokens
+  if (gemini.maxOutputTokens !== undefined) {
+    args.push('--max-output-tokens', gemini.maxOutputTokens.toString())
+  }
+
+  // System instruction (use nested gemini.systemInstruction or top-level systemPrompt)
+  const systemInstruction = gemini.systemInstruction || settings?.systemPrompt
+  if (systemInstruction) {
+    args.push('--system-instruction', systemInstruction)
+  }
+
+  // Safety settings / harm block threshold
+  if (gemini.harmBlockThreshold) {
+    args.push('--harm-block-threshold', gemini.harmBlockThreshold)
+  }
+
+  return args
+}
 
 /**
  * Stream chat completions from Gemini CLI
@@ -42,22 +82,15 @@ export async function streamGemini(
   if (settings?.spawnCommand && settings.spawnCommand.length > 0) {
     // Use pre-built spawn command args
     args.push(...settings.spawnCommand)
-  } else {
-    // Build from individual settings (backwards compatibility)
-    args.push('-p', fullPrompt)
-
-    // Add Gemini model if specified
-    if (settings?.geminiModel) {
-      args.push('--model', settings.geminiModel)
-    }
-  }
-
-  // If using spawnCommand, we still need to add the prompt
-  if (settings?.spawnCommand && settings.spawnCommand.length > 0) {
-    // Check if -p is not already in spawnCommand, add prompt
+    // Add prompt if not already in spawnCommand
     if (!settings.spawnCommand.includes('-p')) {
       args.push('-p', fullPrompt)
     }
+  } else {
+    // Build from individual settings using helper
+    args.push(...buildGeminiArgs(settings))
+    // Always add the prompt
+    args.push('-p', fullPrompt)
   }
 
   const gemini = spawn('gemini', args, {

@@ -23,7 +23,70 @@ import {
   createConversation,
   type ModelId
 } from '@/lib/ai/conversation'
-import type { ChatRequest, AIBackend, ChatSettings } from '@/lib/ai/types'
+import type { ChatRequest, AIBackend, ChatSettings, PermissionMode } from '@/lib/ai/types'
+
+/**
+ * Validate ChatSettings before passing to backend
+ * Returns validated settings or throws error for invalid values
+ */
+function validateSettings(settings: ChatSettings | undefined, backend: AIBackend): ChatSettings | undefined {
+  if (!settings) return undefined
+
+  const validated = { ...settings }
+
+  // Validate common settings
+  if (validated.temperature !== undefined) {
+    validated.temperature = Math.max(0, Math.min(2, validated.temperature))
+  }
+  if (validated.maxTokens !== undefined) {
+    validated.maxTokens = Math.max(1, Math.min(128000, validated.maxTokens))
+  }
+
+  // Validate backend-specific settings
+  if (backend === 'claude' && validated.claude) {
+    // Validate permission mode
+    const validModes: PermissionMode[] = ['acceptEdits', 'bypassPermissions', 'default', 'plan']
+    if (validated.claude.permissionMode && !validModes.includes(validated.claude.permissionMode)) {
+      validated.claude.permissionMode = 'default'
+    }
+    // Validate max budget (must be positive)
+    if (validated.claude.maxBudgetUsd !== undefined && validated.claude.maxBudgetUsd < 0) {
+      validated.claude.maxBudgetUsd = undefined
+    }
+  }
+
+  if (backend === 'codex' && validated.codex) {
+    // Validate sandbox mode
+    const validSandbox = ['read-only', 'full', 'off'] as const
+    if (validated.codex.sandbox && !validSandbox.includes(validated.codex.sandbox)) {
+      validated.codex.sandbox = 'read-only'
+    }
+    // Validate approval mode
+    const validApproval = ['always', 'never', 'dangerous'] as const
+    if (validated.codex.approvalMode && !validApproval.includes(validated.codex.approvalMode)) {
+      validated.codex.approvalMode = undefined
+    }
+    // Validate reasoning effort
+    const validEffort = ['low', 'medium', 'high'] as const
+    if (validated.codex.reasoningEffort && !validEffort.includes(validated.codex.reasoningEffort)) {
+      validated.codex.reasoningEffort = 'high'
+    }
+  }
+
+  if (backend === 'gemini' && validated.gemini) {
+    // Validate temperature
+    if (validated.gemini.temperature !== undefined) {
+      validated.gemini.temperature = Math.max(0, Math.min(2, validated.gemini.temperature))
+    }
+    // Validate harm block threshold
+    const validThresholds = ['BLOCK_NONE', 'BLOCK_LOW_AND_ABOVE', 'BLOCK_MEDIUM_AND_ABOVE', 'BLOCK_HIGH_AND_ABOVE'] as const
+    if (validated.gemini.harmBlockThreshold && !validThresholds.includes(validated.gemini.harmBlockThreshold)) {
+      validated.gemini.harmBlockThreshold = undefined
+    }
+  }
+
+  return validated
+}
 
 /**
  * Stream Codex responses using MCP server for persistent sessions
@@ -91,7 +154,10 @@ export async function POST(request: NextRequest) {
   try {
     const body: ChatRequest = await request.json()
 
-    const { messages, backend, model, settings, cwd, conversationId, claudeSessionId } = body
+    const { messages, backend, model, settings: rawSettings, cwd, conversationId, claudeSessionId } = body
+
+    // Validate and sanitize settings
+    const settings = validateSettings(rawSettings, backend)
 
     // Validate we have either messages or a conversationId
     if ((!messages || messages.length === 0) && !conversationId) {

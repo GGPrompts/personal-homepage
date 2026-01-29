@@ -8,6 +8,41 @@ import type { CodexSettings, ChatSettings } from './types'
 import type { ModelContext } from './conversation'
 
 /**
+ * Build CLI args from CodexSettings
+ * Handles both legacy flat settings and nested codex settings
+ */
+function buildCodexArgs(chatSettings?: ChatSettings, codexSettings?: CodexSettings): string[] {
+  const args: string[] = []
+
+  // Get codex-specific settings, prefer explicit codexSettings, then nested, then legacy flat
+  const codex = codexSettings || chatSettings?.codex || {}
+
+  // Model selection (prefer nested, fall back to legacy flat, default to gpt-5)
+  const model = codex.model || chatSettings?.codexModel || 'gpt-5'
+  args.push('-m', model)
+
+  // Reasoning effort (prefer nested, fall back to legacy flat, default to high)
+  const effort = codex.reasoningEffort || chatSettings?.reasoningEffort || 'high'
+  args.push('-c', `model_reasoning_effort="${effort}"`)
+
+  // Sandbox mode (prefer nested, fall back to legacy flat, default to read-only)
+  const sandbox = codex.sandbox || chatSettings?.sandbox || 'read-only'
+  args.push('--sandbox', sandbox)
+
+  // Approval mode
+  if (codex.approvalMode) {
+    args.push('--approval-mode', codex.approvalMode)
+  }
+
+  // Max tokens
+  if (codex.maxTokens !== undefined) {
+    args.push('--max-tokens', codex.maxTokens.toString())
+  }
+
+  return args
+}
+
+/**
  * Stream chat completions from Codex CLI
  * Uses context built by the conversation system for multi-model awareness
  */
@@ -45,18 +80,8 @@ export async function streamCodex(
     // Use pre-built spawn command args
     args.push(...chatSettings.spawnCommand)
   } else {
-    // Build from individual settings (backwards compatibility)
-    // Model selection
-    const model = settings?.model || 'gpt-5'
-    args.push('-m', model)
-
-    // Reasoning effort
-    const effort = settings?.reasoningEffort || 'high'
-    args.push('-c', `model_reasoning_effort="${effort}"`)
-
-    // Sandbox mode
-    const sandbox = settings?.sandbox || 'read-only'
-    args.push('--sandbox', sandbox)
+    // Build from individual settings using helper
+    args.push(...buildCodexArgs(chatSettings, settings))
   }
 
   // Always add the prompt last

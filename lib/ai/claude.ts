@@ -7,7 +7,7 @@ import { spawn, ChildProcess } from 'child_process'
 import { homedir } from 'os'
 import { join } from 'path'
 import { existsSync } from 'fs'
-import type { ChatMessage, ChatSettings } from './types'
+import type { ChatMessage, ChatSettings, ClaudeSettings } from './types'
 
 // Path to the Claude CLI binary - check local install first, fall back to PATH
 const LOCAL_CLAUDE = join(homedir(), '.claude', 'local', 'claude')
@@ -94,6 +94,102 @@ export interface ClaudeStreamResult {
 const HEARTBEAT_INTERVAL = 15000
 
 /**
+ * Build CLI args from ClaudeSettings
+ * Handles both legacy flat settings and nested claude settings
+ */
+function buildClaudeArgs(settings: ChatSettings): string[] {
+  const args: string[] = []
+
+  // Get claude-specific settings, prefer nested over flat legacy
+  const claude = settings.claude || {}
+
+  // System prompt (from top-level or nested)
+  const systemPrompt = claude.systemPrompt || settings.systemPrompt
+  if (systemPrompt) {
+    args.push('--append-system-prompt', systemPrompt)
+  }
+
+  // Model (prefer nested, fall back to legacy flat)
+  const model = claude.model || settings.claudeModel
+  if (model) {
+    args.push('--model', model)
+  }
+
+  // Agent (prefer nested, fall back to legacy flat)
+  const agent = claude.agent || settings.claudeAgent
+  if (agent) {
+    args.push('--agent', agent)
+  }
+
+  // Additional directories (prefer nested, fall back to legacy flat)
+  const additionalDirs = claude.additionalDirs || settings.additionalDirs
+  if (additionalDirs && additionalDirs.length > 0) {
+    args.push('--add-dir', ...additionalDirs)
+  }
+
+  // Allowed tools (prefer nested, fall back to legacy flat)
+  const allowedTools = claude.allowedTools || settings.allowedTools
+  if (allowedTools && allowedTools.length > 0) {
+    args.push('--allowed-tools', ...allowedTools)
+  }
+
+  // Disallowed tools (prefer nested, fall back to legacy flat)
+  const disallowedTools = claude.disallowedTools || settings.disallowedTools
+  if (disallowedTools && disallowedTools.length > 0) {
+    args.push('--disallowed-tools', ...disallowedTools)
+  }
+
+  // Permission mode (prefer nested, fall back to legacy flat)
+  const permissionMode = claude.permissionMode || settings.permissionMode
+  if (permissionMode) {
+    args.push('--permission-mode', permissionMode)
+  }
+
+  // MCP config files
+  if (claude.mcpConfig && claude.mcpConfig.length > 0) {
+    for (const configPath of claude.mcpConfig) {
+      args.push('--mcp-config', configPath)
+    }
+  }
+
+  // Strict MCP config (only use specified MCP servers)
+  if (claude.strictMcpConfig) {
+    args.push('--strict-mcp-config')
+  }
+
+  // Plugin directories
+  if (claude.pluginDirs && claude.pluginDirs.length > 0) {
+    for (const pluginDir of claude.pluginDirs) {
+      args.push('--plugin-dir', pluginDir)
+    }
+  }
+
+  // Max budget in USD
+  if (claude.maxBudgetUsd !== undefined) {
+    args.push('--max-budget-usd', claude.maxBudgetUsd.toString())
+  }
+
+  // Beta feature flags
+  if (claude.betas && claude.betas.length > 0) {
+    for (const beta of claude.betas) {
+      args.push('--beta', beta)
+    }
+  }
+
+  // Verbose mode
+  if (claude.verbose) {
+    args.push('--verbose')
+  }
+
+  // Dangerous: skip permissions (use with caution)
+  if (claude.dangerouslySkipPermissions) {
+    args.push('--dangerously-skip-permissions')
+  }
+
+  return args
+}
+
+/**
  * Stream chat completions from Claude CLI
  * Returns stream and a function to get the captured session_id
  *
@@ -133,40 +229,12 @@ export async function streamClaude(
   if (settings?.spawnCommand && settings.spawnCommand.length > 0) {
     // Use pre-built spawn command args
     args.push(...settings.spawnCommand)
-  } else {
-    // Build from individual settings (backwards compatibility)
-    if (systemPrompt) {
-      args.push('--append-system-prompt', systemPrompt)
-    }
-
-    // Add Claude-specific model
-    if (settings?.claudeModel) {
-      args.push('--model', settings.claudeModel)
-    }
-
-    // Add agent (from ~/.claude/agents/)
-    if (settings?.claudeAgent) {
-      args.push('--agent', settings.claudeAgent)
-    }
-
-    // Add additional directories
-    if (settings?.additionalDirs && settings.additionalDirs.length > 0) {
-      args.push('--add-dir', ...settings.additionalDirs)
-    }
-
-    // Add tool permissions
-    if (settings?.allowedTools && settings.allowedTools.length > 0) {
-      args.push('--allowed-tools', ...settings.allowedTools)
-    }
-
-    if (settings?.disallowedTools && settings.disallowedTools.length > 0) {
-      args.push('--disallowed-tools', ...settings.disallowedTools)
-    }
-
-    // Add permission mode
-    if (settings?.permissionMode) {
-      args.push('--permission-mode', settings.permissionMode)
-    }
+  } else if (settings) {
+    // Build from individual settings using helper
+    args.push(...buildClaudeArgs(settings))
+  } else if (systemPrompt) {
+    // Fallback for minimal settings
+    args.push('--append-system-prompt', systemPrompt)
   }
 
   // Always add the prompt as the last argument
