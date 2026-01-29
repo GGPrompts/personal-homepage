@@ -1374,7 +1374,7 @@ export default function CalendarSection({
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Calendar View */}
         <div className="flex-1">
-          <Card className="glass border-primary/30 p-4 md:p-6">
+          <Card key={`calendar-${view}-${selectedDate.getTime()}`} className="glass border-primary/30 p-4 md:p-6">
             {view === "month" && renderMonthView()}
             {view === "week" && renderWeekView()}
             {view === "day" && renderDayView()}
