@@ -4,6 +4,7 @@
  */
 
 import { spawn, ChildProcess } from 'child_process'
+import { randomUUID } from 'crypto'
 import { homedir } from 'os'
 import { join } from 'path'
 import { existsSync } from 'fs'
@@ -228,13 +229,18 @@ export async function streamClaude(
 
   const args = [
     '--print',
-    '--output-format', 'stream-json',
-    '--verbose'
+    '--output-format', 'stream-json'
   ]
 
-  // Resume existing session if we have a session ID
+  // Session persistence: use --resume for existing sessions, --session-id for new ones
+  // This replaces --verbose which added unnecessary logging overhead
   if (sessionId) {
+    // Resume existing session
     args.push('--resume', sessionId)
+  } else {
+    // Generate a new session ID upfront for persistence without verbose output
+    const newSessionId = randomUUID()
+    args.push('--session-id', newSessionId)
   }
 
   // Check if we have a pre-built spawn command (takes precedence)

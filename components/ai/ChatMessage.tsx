@@ -12,6 +12,7 @@ import {
   CheckCheck, Clock, Wrench, Loader2, ChevronRight,
   Terminal, ExternalLink,
 } from "lucide-react"
+import { toast } from "sonner"
 import {
   type Message,
   type ToolUse,
@@ -516,7 +517,10 @@ export function ChatMessage({
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => onFeedback('up')}
+                        onClick={() => {
+                          onFeedback('up')
+                          toast.success(message.feedback === 'up' ? 'Feedback removed' : 'Feedback recorded')
+                        }}
                         className={`h-7 px-2 ${message.feedback === 'up' ? 'text-green-500' : ''}`}
                       >
                         <ThumbsUp className="h-3 w-3" />
@@ -530,7 +534,10 @@ export function ChatMessage({
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => onFeedback('down')}
+                        onClick={() => {
+                          onFeedback('down')
+                          toast.success(message.feedback === 'down' ? 'Feedback removed' : 'Feedback recorded')
+                        }}
                         className={`h-7 px-2 ${message.feedback === 'down' ? 'text-red-500' : ''}`}
                       >
                         <ThumbsDown className="h-3 w-3" />
