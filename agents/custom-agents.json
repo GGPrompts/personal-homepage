@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "agents": [
+    {
+      "id": "weather-agent",
+      "name": "Weather Agent",
+      "command": "claude",
+      "flags": ["--model", "sonnet"],
+      "workingDir": null,
+      "avatar": "/avatars/weather-agent.png",
+      "description": "Weather information assistant that helps with forecasts, conditions, and weather-related queries",
+      "sections": ["weather"],
+      "settingsDir": "./agents/weather-agent/",
+      "enabled": true,
+      "mode": "user"
+    },
+    {
+      "id": "files-agent",
+      "name": "Files Agent",
+      "command": "claude",
+      "flags": ["--model", "sonnet"],
+      "workingDir": null,
+      "avatar": "/avatars/files-agent.png",
+      "description": "File system navigator that helps browse directories, find files, and manage file operations",
+      "sections": ["files"],
+      "settingsDir": "./agents/files-agent/",
+      "enabled": true,
+      "mode": "user"
+    },
+    {
+      "id": "trading-agent",
+      "name": "Trading Assistant",
+      "command": "claude",
+      "flags": ["--model", "sonnet"],
+      "workingDir": null,
+      "avatar": "/avatars/trading-agent.png",
+      "description": "Stock trading assistant that helps with portfolio management, market analysis, and executing trades",
+      "sections": ["stocks"],
+      "settingsDir": "./agents/trading-agent/",
+      "enabled": true,
+      "mode": "user"
+    },
+    {
+      "id": "music-dj",
+      "name": "Music DJ",
+      "command": "claude",
+      "flags": ["--model", "sonnet"],
+      "workingDir": null,
+      "avatar": "/avatars/music-dj.png",
+      "description": "Music playback assistant that controls the player, manages playlists, and helps discover new tracks",
+      "sections": ["music-player"],
+      "settingsDir": "./agents/music-dj/",
+      "enabled": true,
+      "mode": "user"
+    },
+    {
+      "id": "research-librarian",
+      "name": "Research Librarian",
+      "command": "claude",
+      "flags": ["--model", "sonnet"],
+      "workingDir": null,
+      "avatar": "/avatars/research-librarian.png",
+      "description": "Research assistant that helps find, organize, and manage bookmarks across personal and Chrome collections",
+      "sections": ["bookmarks", "search"],
+      "settingsDir": "./agents/research-librarian/",
+      "enabled": true,
+      "mode": "user"
+    }
+  ]
+}

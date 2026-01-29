@@ -64,9 +64,14 @@ import {
   ToggleableSection,
   DEFAULT_SECTION_ORDER,
   DEFAULT_CATEGORY_ASSIGNMENTS,
+  DEFAULT_SECTION_AGENTS,
   CategoryId,
   CategoryMeta,
 } from "@/hooks/useSectionPreferences"
+import { useAgents } from "@/hooks/useAgents"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { isEmoji, isAvatarUrl } from "@/lib/ai/utils"
+import { Bot } from "lucide-react"
 
 // Section metadata for display
 const sectionMeta: Record<ToggleableSection, { label: string; icon: React.ElementType; description: string }> = {
@@ -96,22 +101,35 @@ const sectionMeta: Record<ToggleableSection, { label: string; icon: React.Elemen
   flowchart: { label: "Flowchart", icon: GitBranch, description: "Workflow designer" },
 }
 
+// Agent card type for display
+interface AgentOption {
+  id: string
+  name: string
+  avatar: string
+}
+
 // Sortable section item component
 function SortableItem({
   sectionId,
   isEnabled,
   categoryId,
+  agentId,
   categories,
+  agents,
   onToggleVisibility,
   onCategoryChange,
+  onAgentChange,
   isOverlay = false,
 }: {
   sectionId: ToggleableSection
   isEnabled: boolean
   categoryId: CategoryId
+  agentId: string | null
   categories: CategoryMeta[]
+  agents: AgentOption[]
   onToggleVisibility: () => void
   onCategoryChange: (categoryId: CategoryId) => void
+  onAgentChange: (agentId: string | null) => void
   isOverlay?: boolean
 }) {
   const {
@@ -128,6 +146,7 @@ function SortableItem({
   if (!meta) return null
   const Icon = meta.icon
   const currentCategory = categories.find(c => c.id === categoryId)
+  const currentAgent = agents.find(a => a.id === agentId)
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -196,6 +215,67 @@ function SortableItem({
         </DropdownMenuContent>
       </DropdownMenu>
 
+      {/* Agent selector */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            className={`flex items-center gap-1 px-2 py-1 text-xs rounded border transition-colors ${
+              currentAgent
+                ? "border-primary/30 bg-primary/5 text-primary hover:bg-primary/10"
+                : "border-border/50 hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {currentAgent ? (
+              <Avatar className="h-4 w-4">
+                {isAvatarUrl(currentAgent.avatar) ? (
+                  <AvatarImage src={currentAgent.avatar} alt={currentAgent.name} />
+                ) : null}
+                <AvatarFallback className="text-[8px] bg-primary/20">
+                  {isEmoji(currentAgent.avatar)
+                    ? currentAgent.avatar
+                    : currentAgent.name.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+            ) : (
+              <Bot className="h-3 w-3" />
+            )}
+            <span className="max-w-[50px] truncate">
+              {currentAgent?.name || "Agent"}
+            </span>
+            <ChevronDown className="h-3 w-3" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem
+            onClick={() => onAgentChange(null)}
+            className={!agentId ? "bg-primary/10" : ""}
+          >
+            <Bot className="h-4 w-4 mr-2 text-muted-foreground" />
+            No default agent
+          </DropdownMenuItem>
+          {agents.map((agent) => (
+            <DropdownMenuItem
+              key={agent.id}
+              onClick={() => onAgentChange(agent.id)}
+              className={agentId === agent.id ? "bg-primary/10" : ""}
+            >
+              <Avatar className="h-4 w-4 mr-2">
+                {isAvatarUrl(agent.avatar) ? (
+                  <AvatarImage src={agent.avatar} alt={agent.name} />
+                ) : null}
+                <AvatarFallback className="text-[8px] bg-primary/20">
+                  {isEmoji(agent.avatar)
+                    ? agent.avatar
+                    : agent.name.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+              {agent.name}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
       {/* Visibility toggle */}
       <div className="flex items-center gap-2">
         {isEnabled ? (
@@ -224,15 +304,26 @@ export function SectionSettings() {
     visibility,
     order,
     categoryAssignments,
+    sectionAgents,
     isLoaded,
     toggleVisibility,
     reorder,
     resetToDefaults,
     setSectionCategory,
+    setSectionAgent,
     getAllCategories,
   } = useSectionPreferences()
 
+  const { agents: registryAgents, isLoading: agentsLoading } = useAgents()
+
   const categories = getAllCategories()
+
+  // Convert registry agents to simple options for dropdown
+  const agentOptions: AgentOption[] = registryAgents.map(a => ({
+    id: a.id,
+    name: a.name,
+    avatar: a.avatar,
+  }))
 
   const [activeId, setActiveId] = useState<ToggleableSection | null>(null)
   const [overId, setOverId] = useState<ToggleableSection | null>(null)
@@ -262,7 +353,8 @@ export function SectionSettings() {
   const hasChanges =
     JSON.stringify(order) !== JSON.stringify(DEFAULT_SECTION_ORDER) ||
     Object.values(visibility).some((v) => !v) ||
-    JSON.stringify(categoryAssignments) !== JSON.stringify(DEFAULT_CATEGORY_ASSIGNMENTS)
+    JSON.stringify(categoryAssignments) !== JSON.stringify(DEFAULT_CATEGORY_ASSIGNMENTS) ||
+    JSON.stringify(sectionAgents) !== JSON.stringify(DEFAULT_SECTION_AGENTS)
 
   function handleDragStart(event: DragStartEvent) {
     setActiveId(event.active.id as ToggleableSection)
@@ -344,9 +436,12 @@ export function SectionSettings() {
                     sectionId={sectionId}
                     isEnabled={isEnabled}
                     categoryId={categoryAssignments[sectionId]}
+                    agentId={sectionAgents[sectionId]}
                     categories={categories}
+                    agents={agentOptions}
                     onToggleVisibility={() => toggleVisibility(sectionId)}
                     onCategoryChange={(categoryId) => setSectionCategory(sectionId, categoryId)}
+                    onAgentChange={(agentId) => setSectionAgent(sectionId, agentId)}
                   />
                   {showIndicatorAfterThis && <DropIndicator />}
                 </div>
@@ -361,9 +456,12 @@ export function SectionSettings() {
               sectionId={activeId}
               isEnabled={visibility[activeId]}
               categoryId={categoryAssignments[activeId]}
+              agentId={sectionAgents[activeId]}
               categories={categories}
+              agents={agentOptions}
               onToggleVisibility={() => {}}
               onCategoryChange={() => {}}
+              onAgentChange={() => {}}
               isOverlay
             />
           ) : null}

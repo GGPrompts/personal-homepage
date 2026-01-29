@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useAuth } from "@/components/AuthProvider"
-import { Slider } from "@/components/ui/slider"
+// Slider removed - settings simplified
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -1141,54 +1141,11 @@ export default function AIWorkspaceSection({
               <Separator />
 
               <p className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
-                Settings apply to <strong>new conversations</strong>. Each conversation keeps its own settings.
+                Agents are configured via files. Use Settings &gt; Sections to assign default agents per section.
               </p>
 
-              {/* Model Selection */}
-              <div className="space-y-3">
-                <Label>Model</Label>
-                {modelsLoading ? (
-                  <div className="glass px-3 py-2 text-sm text-muted-foreground">
-                    Loading models...
-                  </div>
-                ) : (
-                  <Select
-                    value={settings.model}
-                    onValueChange={(value) => setSettings({ ...settings, model: value })}
-                  >
-                    <SelectTrigger className="glass" data-tabz-input="model-selector">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableModels.map(model => (
-                        <SelectItem key={model.id} value={model.id}>
-                          <div className="flex flex-col items-start">
-                            <span className="font-medium">{model.name}</span>
-                            <span className="text-xs text-muted-foreground">{model.description}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-
-                {backends.length > 0 && (
-                  <div className="space-y-2 pt-2">
-                    <p className="text-xs font-medium text-muted-foreground">Backend Status:</p>
-                    {backends.map(backend => (
-                      <div key={backend.backend} className="flex items-center justify-between text-xs">
-                        <span className="capitalize">{backend.backend}</span>
-                        <Badge variant={backend.available ? 'default' : 'secondary'} className="text-xs">
-                          {backend.available ? 'Available' : 'Unavailable'}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
               {/* Agent Configuration */}
-              <Collapsible className="space-y-3">
+              <Collapsible className="space-y-3" defaultOpen={!!selectedAgent}>
                 <CollapsibleTrigger className="flex items-center justify-between w-full">
                   <Label className="flex items-center gap-2">
                     <Bot className="h-3 w-3" />
@@ -1201,6 +1158,25 @@ export default function AIWorkspaceSection({
                     Agents are configured via files in the <code className="bg-muted px-1 rounded">agents/</code> directory.
                     Each agent has a <code className="bg-muted px-1 rounded">CLAUDE.md</code> (system prompt) and <code className="bg-muted px-1 rounded">agent.json</code> (config).
                   </p>
+
+                  {/* Open current agent's settings if one is selected */}
+                  {selectedAgent && selectedAgent.workingDir && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        if (selectedAgent.workingDir && onNavigateToSection) {
+                          onNavigateToSection('files', selectedAgent.workingDir)
+                        }
+                      }}
+                      data-tabz-action="open-agent-settings"
+                    >
+                      <Settings className="h-3 w-3 mr-2" />
+                      Open {selectedAgent.name} Settings
+                    </Button>
+                  )}
+
                   <Button
                     variant="outline"
                     size="sm"
@@ -1225,70 +1201,6 @@ export default function AIWorkspaceSection({
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span>{registryAgents.length} agents loaded</span>
                   </div>
-                </CollapsibleContent>
-              </Collapsible>
-
-              {/* Temperature - Only for Docker models */}
-              {selectedModel?.backend === 'docker' && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label>Temperature</Label>
-                    <span className="text-sm text-muted-foreground">{settings.temperature.toFixed(1)}</span>
-                  </div>
-                  <Slider
-                    value={[settings.temperature]}
-                    onValueChange={([value]) => setSettings({ ...settings, temperature: value })}
-                    min={0}
-                    max={1}
-                    step={0.1}
-                    className="glass"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Higher values make output more random
-                  </p>
-                </div>
-              )}
-
-              {/* Max Tokens - Only for Docker models */}
-              {selectedModel?.backend === 'docker' && (
-                <div className="space-y-3">
-                  <Label>Max Tokens</Label>
-                  <Input
-                    type="number"
-                    value={settings.maxTokens}
-                    onChange={(e) => setSettings({ ...settings, maxTokens: parseInt(e.target.value) || 2048 })}
-                    min={256}
-                    max={8192}
-                    step={256}
-                    className="glass"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Maximum length of the response
-                  </p>
-                </div>
-              )}
-
-              {/* Append System Prompt */}
-              <Collapsible className="space-y-3">
-                <CollapsibleTrigger className="flex items-center justify-between w-full">
-                  <Label>Append System Prompt</Label>
-                  <ChevronDown className="h-4 w-4" />
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <Textarea
-                    value={settings.systemPrompt}
-                    onChange={(e) => setSettings({ ...settings, systemPrompt: e.target.value })}
-                    className="glass min-h-[120px]"
-                    placeholder="Leave empty for vanilla behavior..."
-                    disabled={selectedModel?.backend === 'mock'}
-                  />
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {selectedModel?.backend === 'claude' && 'Appended via --append-system-prompt flag'}
-                    {selectedModel?.backend === 'gemini' && 'Prepended to conversation as system context'}
-                    {selectedModel?.backend === 'codex' && 'Prepended to conversation as system context'}
-                    {selectedModel?.backend === 'docker' && 'Sent as system role message'}
-                    {selectedModel?.backend === 'mock' && 'Not used for mock responses'}
-                  </p>
                 </CollapsibleContent>
               </Collapsible>
 
@@ -1366,234 +1278,6 @@ export default function AIWorkspaceSection({
                   </div>
                 </CollapsibleContent>
               </Collapsible>
-
-              {/* Claude-specific settings */}
-              {selectedModel?.backend === 'claude' && (
-                <>
-                  <Separator />
-
-                  <div className="space-y-3">
-                    <Label>Claude Model</Label>
-                    <Select
-                      value={settings.claudeModel || 'default'}
-                      onValueChange={(value) => setSettings({ ...settings, claudeModel: value === 'default' ? undefined : value })}
-                    >
-                      <SelectTrigger className="glass">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="default">Default (from config)</SelectItem>
-                        <SelectItem value="opus">Opus</SelectItem>
-                        <SelectItem value="sonnet">Sonnet</SelectItem>
-                        <SelectItem value="haiku">Haiku</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      Override the default model for this conversation
-                    </p>
-                  </div>
-
-                  {availableAgents.length > 0 && (
-                    <div className="space-y-3">
-                      <Label>Agent</Label>
-                      <Select
-                        value={settings.claudeAgent || 'none'}
-                        onValueChange={(value) => setSettings({ ...settings, claudeAgent: value === 'none' ? undefined : value })}
-                      >
-                        <SelectTrigger className="glass">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None (default)</SelectItem>
-                          {availableAgents.map(agent => (
-                            <SelectItem key={agent.filename} value={agent.filename}>
-                              <div className="flex flex-col items-start">
-                                <span className="font-medium">{agent.name}</span>
-                                {agent.description && (
-                                  <span className="text-xs text-muted-foreground truncate max-w-[200px]">
-                                    {agent.description}
-                                  </span>
-                                )}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        Use an agent from ~/.claude/agents/
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="space-y-3">
-                    <Label>Permission Mode</Label>
-                    <Select
-                      value={settings.permissionMode || 'default'}
-                      onValueChange={(value) => setSettings({ ...settings, permissionMode: value === 'default' ? undefined : value as any })}
-                    >
-                      <SelectTrigger className="glass">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="default">Default (ask)</SelectItem>
-                        <SelectItem value="acceptEdits">Accept Edits</SelectItem>
-                        <SelectItem value="bypassPermissions">Bypass All</SelectItem>
-                        <SelectItem value="plan">Plan Mode</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      Control how Claude asks for permissions
-                    </p>
-                  </div>
-
-                  <Collapsible className="space-y-3">
-                    <CollapsibleTrigger className="flex items-center justify-between w-full">
-                      <Label>Additional Directories</Label>
-                      <ChevronDown className="h-4 w-4" />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="space-y-2 pt-2">
-                      {settings.additionalDirs?.map((dir, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <Input
-                            value={dir}
-                            onChange={(e) => {
-                              const newDirs = [...(settings.additionalDirs || [])]
-                              newDirs[idx] = e.target.value
-                              setSettings({ ...settings, additionalDirs: newDirs })
-                            }}
-                            className="glass flex-1 text-xs"
-                            placeholder="/path/to/directory"
-                          />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => {
-                              const newDirs = settings.additionalDirs?.filter((_, i) => i !== idx)
-                              setSettings({ ...settings, additionalDirs: newDirs?.length ? newDirs : undefined })
-                            }}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full glass"
-                        onClick={() => {
-                          const newDirs = [...(settings.additionalDirs || []), '']
-                          setSettings({ ...settings, additionalDirs: newDirs })
-                        }}
-                      >
-                        <Plus className="h-3 w-3 mr-2" />
-                        Add Directory
-                      </Button>
-                      <p className="text-xs text-muted-foreground">
-                        Grant Claude access to additional project directories
-                      </p>
-                    </CollapsibleContent>
-                  </Collapsible>
-                </>
-              )}
-
-              {/* Gemini-specific settings */}
-              {selectedModel?.backend === 'gemini' && (
-                <>
-                  <Separator />
-
-                  <div className="space-y-3">
-                    <Label>Gemini Model</Label>
-                    <Select
-                      value={settings.geminiModel || 'default'}
-                      onValueChange={(value) => setSettings({ ...settings, geminiModel: value === 'default' ? undefined : value })}
-                    >
-                      <SelectTrigger className="glass">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="default">Default</SelectItem>
-                        <SelectItem value="gemini-2.5-pro">Gemini 2.5 Pro</SelectItem>
-                        <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash</SelectItem>
-                        <SelectItem value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</SelectItem>
-                        <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      Select the Gemini model variant
-                    </p>
-                  </div>
-                </>
-              )}
-
-              {/* Codex-specific settings */}
-              {selectedModel?.backend === 'codex' && (
-                <>
-                  <Separator />
-
-                  <div className="space-y-3">
-                    <Label>Codex Model</Label>
-                    <Select
-                      value={settings.codexModel || 'default'}
-                      onValueChange={(value) => setSettings({ ...settings, codexModel: value === 'default' ? undefined : value })}
-                    >
-                      <SelectTrigger className="glass">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="default">Default (gpt-5.2-codex)</SelectItem>
-                        <SelectItem value="gpt-5.2-codex">GPT-5.2 Codex (Frontier agentic)</SelectItem>
-                        <SelectItem value="gpt-5.1-codex-max">GPT-5.1 Codex Max (Deep reasoning)</SelectItem>
-                        <SelectItem value="gpt-5.1-codex-mini">GPT-5.1 Codex Mini (Faster)</SelectItem>
-                        <SelectItem value="gpt-5.2">GPT-5.2 (Frontier)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      Select the OpenAI Codex model
-                    </p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <Label>Reasoning Effort</Label>
-                    <Select
-                      value={settings.reasoningEffort || 'high'}
-                      onValueChange={(value) => setSettings({ ...settings, reasoningEffort: value as 'low' | 'medium' | 'high' })}
-                    >
-                      <SelectTrigger className="glass">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      How much reasoning to apply (higher = more thorough)
-                    </p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <Label>Sandbox Mode</Label>
-                    <Select
-                      value={settings.sandbox || 'read-only'}
-                      onValueChange={(value) => setSettings({ ...settings, sandbox: value as 'read-only' | 'full' | 'off' })}
-                    >
-                      <SelectTrigger className="glass">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="read-only">Read Only</SelectItem>
-                        <SelectItem value="full">Full Access</SelectItem>
-                        <SelectItem value="off">Off (No Sandbox)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      Control file system access level
-                    </p>
-                  </div>
-                </>
-              )}
 
               <Separator />
 

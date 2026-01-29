@@ -175,6 +175,48 @@ export interface AgentRegistryData {
 }
 
 // ============================================================================
+// Unified Agent Config (new simplified format)
+// ============================================================================
+
+/**
+ * Unified agent configuration - simpler format stored in custom-agents.json
+ */
+export interface UnifiedAgentConfig {
+  /** Unique identifier for the agent */
+  id: string
+  /** Display name for the agent */
+  name: string
+  /** CLI command to run (e.g., 'claude', 'codex') */
+  command: string
+  /** Additional CLI flags (e.g., ['--model', 'sonnet']) */
+  flags: string[]
+  /** Working directory for the agent (null for default) */
+  workingDir: string | null
+  /** Avatar URL or emoji */
+  avatar: string
+  /** Short description */
+  description: string
+  /** Sections this agent specializes in */
+  sections: string[]
+  /** Path to settings directory for agent configuration */
+  settingsDir: string
+  /** Whether the agent is enabled */
+  enabled: boolean
+  /** Execution mode: 'dev' or 'user' */
+  mode?: AgentMode
+}
+
+/**
+ * Container for unified agent configs
+ */
+export interface UnifiedAgentRegistry {
+  /** Schema version */
+  version: number
+  /** Array of unified agent configs */
+  agents: UnifiedAgentConfig[]
+}
+
+// ============================================================================
 // Zod Schemas for Runtime Validation
 // ============================================================================
 

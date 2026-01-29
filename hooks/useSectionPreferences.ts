@@ -228,6 +228,36 @@ interface SectionPreferences {
   // New: custom categories and category order
   customCategories: CategoryData[]
   categoryOrder: CategoryId[]
+  // New: section-to-agent mappings
+  sectionAgents: Record<ToggleableSection, string | null>
+}
+
+// Default section-to-agent mappings (all null = no default agent)
+export const DEFAULT_SECTION_AGENTS: Record<ToggleableSection, string | null> = {
+  weather: null,
+  feed: null,
+  "market-pulse": null,
+  "api-playground": null,
+  bookmarks: null,
+  search: null,
+  "ai-workspace": null,
+  "prompts-playground": null,
+  stocks: null,
+  crypto: null,
+  spacex: null,
+  "video-player": null,
+  "github-activity": null,
+  disasters: null,
+  tasks: null,
+  projects: null,
+  files: null,
+  jobs: null,
+  analytics: null,
+  profile: null,
+  kanban: null,
+  "photo-gallery": null,
+  "music-player": null,
+  flowchart: null,
 }
 
 function loadPreferences(): SectionPreferences {
@@ -239,6 +269,7 @@ function loadPreferences(): SectionPreferences {
       collapsedCategories: DEFAULT_COLLAPSED_CATEGORIES,
       customCategories: [],
       categoryOrder: DEFAULT_CATEGORY_ORDER,
+      sectionAgents: DEFAULT_SECTION_AGENTS,
     }
   }
 
@@ -294,7 +325,10 @@ function loadPreferences(): SectionPreferences {
         categoryOrder = [...DEFAULT_CATEGORY_ORDER, ...customCategories.map(c => c.id)]
       }
 
-      return { visibility, order, categoryAssignments, collapsedCategories, customCategories, categoryOrder }
+      // Load section-to-agent mappings
+      const sectionAgents = { ...DEFAULT_SECTION_AGENTS, ...parsed.sectionAgents }
+
+      return { visibility, order, categoryAssignments, collapsedCategories, customCategories, categoryOrder, sectionAgents }
     }
   } catch {
     // Invalid JSON, use defaults
@@ -307,6 +341,7 @@ function loadPreferences(): SectionPreferences {
     collapsedCategories: DEFAULT_COLLAPSED_CATEGORIES,
     customCategories: [],
     categoryOrder: DEFAULT_CATEGORY_ORDER,
+    sectionAgents: DEFAULT_SECTION_AGENTS,
   }
 }
 
@@ -387,6 +422,7 @@ export function useSectionPreferences() {
       collapsedCategories: DEFAULT_COLLAPSED_CATEGORIES,
       customCategories: [],
       categoryOrder: DEFAULT_CATEGORY_ORDER,
+      sectionAgents: DEFAULT_SECTION_AGENTS,
     })
   }, [])
 
@@ -465,6 +501,22 @@ export function useSectionPreferences() {
   const getSectionCategory = useCallback((section: ToggleableSection): CategoryId => {
     return preferences.categoryAssignments[section]
   }, [preferences.categoryAssignments])
+
+  // Get a section's assigned agent
+  const getSectionAgent = useCallback((section: ToggleableSection): string | null => {
+    return preferences.sectionAgents[section]
+  }, [preferences.sectionAgents])
+
+  // Set a section's assigned agent
+  const setSectionAgent = useCallback((section: ToggleableSection, agentId: string | null) => {
+    setPreferences((prev) => ({
+      ...prev,
+      sectionAgents: {
+        ...prev.sectionAgents,
+        [section]: agentId,
+      },
+    }))
+  }, [])
 
   // =====================================================
   // CATEGORY MANAGEMENT FUNCTIONS
@@ -630,6 +682,7 @@ export function useSectionPreferences() {
     collapsedCategories: preferences.collapsedCategories,
     customCategories: preferences.customCategories,
     categoryOrder: preferences.categoryOrder,
+    sectionAgents: preferences.sectionAgents,
     isLoaded,
     toggleVisibility,
     setVisibility,
@@ -645,6 +698,9 @@ export function useSectionPreferences() {
     getSectionsByCategory,
     isCategoryCollapsed,
     getSectionCategory,
+    // Agent management
+    getSectionAgent,
+    setSectionAgent,
     // Category management
     getAllCategories,
     getCategory,
