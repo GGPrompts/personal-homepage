@@ -327,18 +327,10 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
     if (!content.trim()) return
 
     const { projectPath, model } = options
-
-    // Generate message ID first for atomic deduplication
-    const messageId = generateId()
+    const trimmedContent = content.trim()
 
     // Atomic check-and-set to prevent race condition with duplicate submissions
-    // If another sendMessage call is in flight, reject this one
-    if (inFlightMessageIdsRef.current.has(messageId)) {
-      console.warn('Duplicate message ID detected, rejecting:', messageId)
-      return
-    }
-
-    // Also check if we're already processing a message for this conversation
+    // Check if we're already processing a message for this conversation
     // This prevents rapid double-clicks or double-submits
     const convInFlightKey = `conv:${activeConvId}`
     if (inFlightMessageIdsRef.current.has(convInFlightKey)) {
@@ -346,9 +338,21 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
       return
     }
 
-    // Mark both the message ID and conversation as in-flight
-    inFlightMessageIdsRef.current.add(messageId)
+    // Also check for duplicate content being submitted rapidly
+    // This catches the case where two identical messages are sent in quick succession
+    const contentKey = `content:${activeConvId}:${trimmedContent.slice(0, 100)}`
+    if (inFlightMessageIdsRef.current.has(contentKey)) {
+      console.warn('Duplicate content already in flight, rejecting')
+      return
+    }
+
+    // Mark conversation and content as in-flight atomically (synchronous operation)
+    // This prevents race conditions where two simultaneous calls both pass the checks above
     inFlightMessageIdsRef.current.add(convInFlightKey)
+    inFlightMessageIdsRef.current.add(contentKey)
+
+    // Generate message ID after acquiring the "lock"
+    const messageId = generateId()
 
     // Add user message
     const userMessage: Message = {
@@ -607,12 +611,12 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
       setGeneratingConvs(loadGeneratingConversations())
       abortControllerRef.current = null
       // Clear in-flight tracking on success
-      inFlightMessageIdsRef.current.delete(messageId)
       inFlightMessageIdsRef.current.delete(convInFlightKey)
+      inFlightMessageIdsRef.current.delete(contentKey)
     } catch (error) {
       // Always clear in-flight tracking on any error
-      inFlightMessageIdsRef.current.delete(messageId)
       inFlightMessageIdsRef.current.delete(convInFlightKey)
+      inFlightMessageIdsRef.current.delete(contentKey)
 
       if (error instanceof Error && error.name === 'AbortError') {
         console.log('Chat request aborted')
