@@ -406,63 +406,54 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                           <ChevronDown className="h-3 w-3 text-muted-foreground" />
                         </motion.button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-64">
-                        {/* No agent / default option */}
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSelectedAgentId(null)
-                            setAgentPickerOpen(false)
-                          }}
-                          className="flex items-center gap-2"
-                        >
-                          <Bot className="h-4 w-4" />
-                          <span className="flex-1">Default Assistant</span>
-                          {!selectedAgentId && <Check className="h-4 w-4 text-primary" />}
-                        </DropdownMenuItem>
-
-                        {availableAgents.length > 0 && <DropdownMenuSeparator />}
-
+                      <DropdownMenuContent align="start" className="w-64 max-h-80 overflow-y-auto">
                         {agentsLoading ? (
                           <DropdownMenuItem disabled>
                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
                             Loading agents...
                           </DropdownMenuItem>
                         ) : (
-                          availableAgents.map(agent => {
+                          availableAgents.map((agent, index) => {
                             const isSelected = selectedAgentId === agent.id
                             const isRecommended = recommendedAgent?.id === agent.id
+                            const isVanilla = agent.id.startsWith('__vanilla_')
+                            // Add separator after vanilla agents
+                            const showSeparator = isVanilla && availableAgents[index + 1] && !availableAgents[index + 1].id.startsWith('__vanilla_')
+
                             return (
-                              <DropdownMenuItem
-                                key={agent.id}
-                                onClick={() => {
-                                  setSelectedAgentId(agent.id)
-                                  setAgentPickerOpen(false)
-                                }}
-                                className="flex items-center gap-2"
-                              >
-                                <Avatar className="h-5 w-5 shrink-0">
-                                  {isAvatarUrl(agent.avatar) && (
-                                    <AvatarImage src={agent.avatar} alt={agent.name} />
-                                  )}
-                                  <AvatarFallback className="text-xs bg-transparent">
-                                    {agent.avatar}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-sm truncate">{agent.name}</span>
-                                    {isRecommended && (
-                                      <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-primary/10 text-primary border-primary/30">
-                                        Recommended
-                                      </Badge>
+                              <React.Fragment key={agent.id}>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setSelectedAgentId(agent.id)
+                                    setAgentPickerOpen(false)
+                                  }}
+                                  className="flex items-center gap-2"
+                                >
+                                  <Avatar className="h-5 w-5 shrink-0">
+                                    {isAvatarUrl(agent.avatar) && (
+                                      <AvatarImage src={agent.avatar} alt={agent.name} />
                                     )}
+                                    <AvatarFallback className="text-xs bg-transparent">
+                                      {agent.avatar}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-sm truncate">{agent.name}</span>
+                                      {isRecommended && (
+                                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-primary/10 text-primary border-primary/30">
+                                          Recommended
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground truncate">
+                                      {agent.description}
+                                    </p>
                                   </div>
-                                  <p className="text-xs text-muted-foreground truncate">
-                                    {agent.description}
-                                  </p>
-                                </div>
-                                {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
-                              </DropdownMenuItem>
+                                  {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
+                                </DropdownMenuItem>
+                                {showSeparator && <DropdownMenuSeparator />}
+                              </React.Fragment>
                             )
                           })
                         )}
@@ -1198,7 +1189,12 @@ export function AIDrawerToggle({ className = "", currentSection }: AIDrawerToggl
   const { toggle, isOpen, hasActiveConversation } = context
 
   // Render avatar or fallback icon
+  // Use default icon until mounted to prevent hydration mismatch
   const renderIcon = () => {
+    if (!mounted) {
+      // Server render: always show generic icon to match initial client render
+      return <MessageSquare className="h-5 w-5" />
+    }
     if (matchingAgent) {
       const avatarIsUrl = isAvatarUrl(matchingAgent.avatar)
       return (
@@ -1237,8 +1233,8 @@ export function AIDrawerToggle({ className = "", currentSection }: AIDrawerToggl
     </Button>
   )
 
-  // Wrap with tooltip if there's a matching agent
-  if (matchingAgent) {
+  // Wrap with tooltip if there's a matching agent (only after mount to prevent hydration mismatch)
+  if (mounted && matchingAgent) {
     return (
       <TooltipProvider>
         <Tooltip>
