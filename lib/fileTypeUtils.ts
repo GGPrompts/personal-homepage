@@ -85,6 +85,14 @@ export const getFileTypeAndLanguage = (filePath: string): FileTypeInfo => {
     return { type: "prompty" }
   }
 
+  // Files in .prompts/ or .claude/commands/ directories are prompty files
+  // These often contain {{placeholders}} for variable substitution
+  if (filePath.includes("/.prompts/") || filePath.includes("/.claude/commands/")) {
+    if (["md", "yaml", "yml", "txt"].includes(ext)) {
+      return { type: "prompty" }
+    }
+  }
+
   // Markdown files
   if (["md", "markdown"].includes(ext)) {
     return { type: "markdown", language: "markdown" }

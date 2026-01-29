@@ -7,17 +7,23 @@ import {
   Github,
   PanelRightClose,
   PanelRightOpen,
+  FileText,
+  Bot,
+  Star,
+  FolderTree,
 } from 'lucide-react'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs' // Tabs still used for local/github toggle
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { FilesProvider, useFilesContext } from '@/app/contexts/FilesContext'
 import { FileTree } from '@/app/components/files/FileTree'
 import { FileViewer } from '@/app/components/files/FileViewer'
 import { PluginList } from '@/app/components/files/PluginList'
+import { FilteredFileList } from '@/app/components/files/FilteredFileList'
 import { GitHubFileTree } from '@/app/components/files/GitHubFileTree'
 import { GitHubFileViewer } from '@/app/components/files/GitHubFileViewer'
 import { useWorkingDirectory } from '@/hooks/useWorkingDirectory'
 import { useAuth } from '@/components/AuthProvider'
 import { cn } from '@/lib/utils'
+import type { FileFilter } from '@/lib/claudeFileTypes'
 
 interface FilesSectionProps {
   activeSubItem?: string | null
@@ -31,7 +37,15 @@ type FileSource = 'local' | 'github'
 function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onInitialPathConsumed }: FilesSectionProps) {
   const { workingDir } = useWorkingDirectory()
   const { user, getGitHubToken } = useAuth()
-  const { navigateTreeTo } = useFilesContext()
+  const {
+    navigateTreeTo,
+    activeFilter,
+    setActiveFilter,
+    filteredFiles,
+    filteredFilesLoading,
+    loadFilteredFiles,
+    openFile,
+  } = useFilesContext()
 
   const [showPlugins, setShowPlugins] = useState<boolean>(true)
   const [fileSource, setFileSource] = useState<FileSource>(() => {
@@ -85,6 +99,41 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
     setSelectedGitHubFile(null)
   }, [])
 
+  // Load filtered files when filter changes
+  useEffect(() => {
+    if (activeFilter !== 'all' && workingDir) {
+      loadFilteredFiles(activeFilter, workingDir)
+    }
+  }, [activeFilter, workingDir, loadFilteredFiles])
+
+  // Handle filter change
+  const handleFilterChange = useCallback((filter: FileFilter) => {
+    setActiveFilter(filter)
+    if (filter !== 'all' && workingDir) {
+      loadFilteredFiles(filter, workingDir)
+    }
+  }, [setActiveFilter, workingDir, loadFilteredFiles])
+
+  // Handle file selection from filtered list
+  const handleFilteredFileSelect = useCallback((path: string) => {
+    openFile(path)
+  }, [openFile])
+
+  // Handle refresh of filtered files
+  const handleRefreshFiltered = useCallback(() => {
+    if (activeFilter !== 'all' && workingDir) {
+      loadFilteredFiles(activeFilter, workingDir)
+    }
+  }, [activeFilter, workingDir, loadFilteredFiles])
+
+  // Filter button configs
+  const filterButtons: { filter: FileFilter; icon: React.ReactNode; label: string; color: string }[] = [
+    { filter: 'all', icon: <FolderTree className="h-3 w-3" />, label: 'All', color: '' },
+    { filter: 'prompts', icon: <FileText className="h-3 w-3" />, label: 'Prompts', color: 'text-pink-400' },
+    { filter: 'claude', icon: <Bot className="h-3 w-3" />, label: 'Claude', color: 'text-orange-400' },
+    { filter: 'favorites', icon: <Star className="h-3 w-3" />, label: 'Favorites', color: 'text-yellow-400' },
+  ]
+
   return (
     <div className="min-h-full lg:h-full flex flex-col lg:flex-row gap-4 p-6" data-tabz-section="files">
       {/* Left sidebar - File Tree with source toggle */}
@@ -118,15 +167,49 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
             </Tabs>
           </div>
 
-          {/* File Tree based on source */}
+          {/* Filter buttons (only for local files) */}
+          {fileSource === 'local' && (
+            <div className="px-3 py-2 border-b border-border/50 flex gap-1 flex-wrap">
+              {filterButtons.map(({ filter, icon, label, color }) => (
+                <button
+                  key={filter}
+                  onClick={() => handleFilterChange(filter)}
+                  className={cn(
+                    'flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors',
+                    activeFilter === filter
+                      ? 'bg-primary/20 text-primary'
+                      : 'hover:bg-muted text-muted-foreground',
+                    activeFilter === filter && color
+                  )}
+                  data-tabz-action={`filter-${filter}`}
+                  title={`Show ${label.toLowerCase()} files`}
+                >
+                  {icon}
+                  <span className="hidden sm:inline">{label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* File Tree based on source and filter */}
           <div className="flex-1 overflow-hidden">
             {fileSource === 'local' ? (
-              <FileTree
-                basePath={workingDir || '~'}
-                maxDepth={5}
-                showHidden={false}
-                className="h-full"
-              />
+              activeFilter === 'all' ? (
+                <FileTree
+                  basePath={workingDir || '~'}
+                  maxDepth={5}
+                  showHidden={false}
+                  className="h-full"
+                />
+              ) : (
+                <FilteredFileList
+                  filter={activeFilter}
+                  filteredFiles={filteredFiles}
+                  loading={filteredFilesLoading}
+                  onFileSelect={handleFilteredFileSelect}
+                  onRefresh={handleRefreshFiltered}
+                />
+              )
             ) : (
               <GitHubFileTree
                 className="h-full"
