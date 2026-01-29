@@ -11,7 +11,7 @@ import type { ModelContext } from './conversation'
  * Build CLI args from CodexSettings
  * Handles both legacy flat settings and nested codex settings
  */
-function buildCodexArgs(chatSettings?: ChatSettings, codexSettings?: CodexSettings): string[] {
+export function buildCodexArgs(chatSettings?: ChatSettings, codexSettings?: CodexSettings): string[] {
   const args: string[] = []
 
   // Get codex-specific settings, prefer explicit codexSettings, then nested, then legacy flat

@@ -129,7 +129,7 @@ export function QuadSplitViewer({
       <ResizablePanelGroup direction="vertical" className="h-full">
         {/* Top Row */}
         <ResizablePanel defaultSize={50} minSize={20}>
-          <ResizablePanelGroup direction="horizontal">
+          <ResizablePanelGroup direction="horizontal" className="h-full">
             <ResizablePanel defaultSize={50} minSize={20}>
               <div className="h-full p-1">
                 <BrowserPanel
@@ -166,7 +166,7 @@ export function QuadSplitViewer({
 
         {/* Bottom Row */}
         <ResizablePanel defaultSize={50} minSize={20}>
-          <ResizablePanelGroup direction="horizontal">
+          <ResizablePanelGroup direction="horizontal" className="h-full">
             <ResizablePanel defaultSize={50} minSize={20}>
               <div className="h-full p-1">
                 <BrowserPanel

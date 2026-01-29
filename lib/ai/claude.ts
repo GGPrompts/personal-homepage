@@ -101,7 +101,7 @@ const HEARTBEAT_INTERVAL = 15000
  * Build CLI args from ClaudeSettings
  * Handles both legacy flat settings and nested claude settings
  */
-function buildClaudeArgs(settings: ChatSettings): string[] {
+export function buildClaudeArgs(settings: ChatSettings): string[] {
   const args: string[] = []
 
   // Get claude-specific settings, prefer nested over flat legacy

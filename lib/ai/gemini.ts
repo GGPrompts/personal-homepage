@@ -11,7 +11,7 @@ import type { ModelContext } from './conversation'
  * Build CLI args from GeminiSettings
  * Handles both legacy flat settings and nested gemini settings
  */
-function buildGeminiArgs(settings?: ChatSettings): string[] {
+export function buildGeminiArgs(settings?: ChatSettings): string[] {
   const args: string[] = []
 
   // Get gemini-specific settings, prefer nested over flat legacy
