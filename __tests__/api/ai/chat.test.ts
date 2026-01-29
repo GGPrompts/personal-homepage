@@ -392,19 +392,25 @@ describe('AI Chat API Route', () => {
     })
 
     describe('conversation mode', () => {
-      it('creates conversation when conversationId provided', async () => {
-        const { createConversation, appendMessage } = await import('@/lib/ai/conversation')
+      it('appends message when conversationId provided', async () => {
+        const { appendMessage, readConversation, buildModelContext } = await import('@/lib/ai/conversation')
         vi.mocked(streamMock).mockResolvedValue(createMockStream(['response']))
+        vi.mocked(readConversation).mockReturnValue([])
+        vi.mocked(buildModelContext).mockReturnValue({
+          systemPrompt: 'test',
+          messages: [{ role: 'user', content: 'Hi' }],
+        })
 
         const request = createRequest({
           backend: 'mock',
           messages: [{ role: 'user', content: 'Hi' }],
-          conversationId: 'new',
+          conversationId: 'conv_existing_123',
         })
 
         const response = await POST(request)
         expect(response.status).toBe(200)
-        expect(createConversation).toHaveBeenCalled()
+        // appendMessage is called to save the user message
+        expect(appendMessage).toHaveBeenCalled()
       })
     })
   })

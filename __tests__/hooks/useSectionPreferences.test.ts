@@ -301,7 +301,9 @@ describe('useSectionPreferences utilities', () => {
 
     it('has icon components instead of iconName', () => {
       for (const cat of CATEGORIES) {
-        expect(typeof cat.icon).toBe('function') // React components are functions
+        // React components can be functions or objects (forwardRef returns an object)
+        expect(['function', 'object']).toContain(typeof cat.icon)
+        expect(cat.icon).toBeDefined()
         expect((cat as any).iconName).toBeUndefined()
       }
     })

@@ -90,7 +90,7 @@ describe('useMediaLibrary', () => {
       })
     })
 
-    it('loads directories from localStorage', () => {
+    it('loads directories from localStorage', async () => {
       localStorageMock.setItem(
         'media-directories',
         JSON.stringify({ photos: '/custom/photos', music: '/custom/music' })
@@ -98,14 +98,22 @@ describe('useMediaLibrary', () => {
 
       const { result } = renderHook(() => useMediaDirectories())
 
-      // After useEffect runs
+      // Wait for useEffect to run
+      await waitFor(() => {
+        expect(result.current.loaded).toBe(true)
+      })
+
       expect(result.current.directories.photos).toBe('/custom/photos')
       expect(result.current.directories.music).toBe('/custom/music')
       expect(result.current.directories.videos).toBe('~/Videos') // default fallback
     })
 
-    it('sets directories and saves to localStorage', () => {
+    it('sets directories and saves to localStorage', async () => {
       const { result } = renderHook(() => useMediaDirectories())
+
+      await waitFor(() => {
+        expect(result.current.loaded).toBe(true)
+      })
 
       act(() => {
         result.current.setDirectories({ photos: '/new/photos' })
@@ -118,8 +126,12 @@ describe('useMediaLibrary', () => {
       )
     })
 
-    it('resets to defaults', () => {
+    it('resets to defaults', async () => {
       const { result } = renderHook(() => useMediaDirectories())
+
+      await waitFor(() => {
+        expect(result.current.loaded).toBe(true)
+      })
 
       act(() => {
         result.current.setDirectories({ photos: '/custom/path' })
@@ -136,10 +148,14 @@ describe('useMediaLibrary', () => {
       })
     })
 
-    it('handles corrupted localStorage data gracefully', () => {
+    it('handles corrupted localStorage data gracefully', async () => {
       localStorageMock.setItem('media-directories', 'invalid-json{')
 
       const { result } = renderHook(() => useMediaDirectories())
+
+      await waitFor(() => {
+        expect(result.current.loaded).toBe(true)
+      })
 
       expect(result.current.directories).toEqual({
         photos: '~/Pictures',
@@ -163,6 +179,11 @@ describe('useMediaLibrary', () => {
     })
 
     it('initializes with provided path', () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ path: '', files: [], total: 0, hasMore: false }),
+      })
+
       const { result } = renderHook(
         () => useMediaBrowser('/home/user/Pictures'),
         { wrapper: createWrapper() }
@@ -237,7 +258,8 @@ describe('useMediaLibrary', () => {
     })
 
     it('handles API errors', async () => {
-      mockFetch.mockResolvedValueOnce({
+      // Mock both initial and retry attempts (retry: 1 in hook config)
+      mockFetch.mockResolvedValue({
         ok: false,
         json: () => Promise.resolve({ error: 'Directory not found' }),
       })
@@ -247,12 +269,18 @@ describe('useMediaLibrary', () => {
         { wrapper: createWrapper() }
       )
 
+      // Wait for the query to fail after retry
       await waitFor(() => {
         expect(result.current.error).toBe('Directory not found')
-      })
+      }, { timeout: 3000 })
     })
 
     it('toggles recursive mode', () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ path: '', files: [], total: 0, hasMore: false }),
+      })
+
       const { result } = renderHook(
         () => useMediaBrowser('/home/user/Pictures'),
         { wrapper: createWrapper() }
@@ -466,18 +494,26 @@ describe('usePageBackground', () => {
       expect(result.current.isLoaded).toBe(true)
     })
 
+    // First set URL and type
     act(() => {
       result.current.setBackgroundUrl('https://example.com/bg.jpg')
       result.current.setBackgroundType('image')
+    })
+
+    // Then trigger error
+    act(() => {
       result.current.handleMediaError()
     })
 
+    // Verify error is set
     expect(result.current.mediaError).toBe(true)
 
+    // Now change URL - this should reset error via useEffect
     act(() => {
       result.current.setBackgroundUrl('https://example.com/new-bg.jpg')
     })
 
+    // Wait for useEffect to run
     await waitFor(() => {
       expect(result.current.mediaError).toBe(false)
     })
@@ -652,24 +688,31 @@ describe('useTheme', () => {
 describe('useTerminalExtension', () => {
   beforeEach(() => {
     localStorageMock.clear()
-    mockFetch.mockClear()
+    mockFetch.mockReset()
     vi.clearAllMocks()
     // Reset to localhost
     mockLocation.hostname = 'localhost'
   })
 
-  it('returns initial state', () => {
-    mockFetch.mockRejectedValue(new Error('Network error'))
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('returns initial state before loading', () => {
+    // Don't resolve fetch so we can check initial state
+    mockFetch.mockImplementation(() => new Promise(() => {}))
 
     const { result } = renderHook(() => useTerminalExtension())
 
     expect(result.current.available).toBe(false)
     expect(result.current.authenticated).toBe(false)
     expect(result.current.hasToken).toBe(false)
+    expect(result.current.isLoaded).toBe(false)
   })
 
-  it('loads default working directory', () => {
+  it('loads default working directory from localStorage', async () => {
     localStorageMock.setItem('global-working-directory', '/home/user/projects')
+    mockFetch.mockRejectedValue(new Error('Network error'))
 
     const { result } = renderHook(() => useTerminalExtension())
 
@@ -677,13 +720,21 @@ describe('useTerminalExtension', () => {
   })
 
   it('returns ~ as default working directory when not set', () => {
+    mockFetch.mockRejectedValue(new Error('Network error'))
+
     const { result } = renderHook(() => useTerminalExtension())
 
     expect(result.current.defaultWorkDir).toBe('~')
   })
 
-  it('updates default working directory', () => {
+  it('updates default working directory', async () => {
+    mockFetch.mockRejectedValue(new Error('Network error'))
+
     const { result } = renderHook(() => useTerminalExtension())
+
+    await waitFor(() => {
+      expect(result.current.isLoaded).toBe(true)
+    })
 
     act(() => {
       result.current.updateDefaultWorkDir('/home/user/new-projects')
@@ -698,8 +749,13 @@ describe('useTerminalExtension', () => {
 
   it('clears API token', async () => {
     localStorageMock.setItem('tabz-api-token', 'test-token')
+    mockFetch.mockRejectedValue(new Error('Network error'))
 
     const { result } = renderHook(() => useTerminalExtension())
+
+    await waitFor(() => {
+      expect(result.current.isLoaded).toBe(true)
+    })
 
     act(() => {
       result.current.clearApiToken()
@@ -724,21 +780,19 @@ describe('useTerminalExtension', () => {
     expect(spawnResult.error).toContain('API token required')
   })
 
-  it('runCommand calls API with token', async () => {
+  it('runCommand calls API with token and succeeds', async () => {
     localStorageMock.setItem('tabz-api-token', 'valid-token')
 
-    // Mock successful health check
+    // Mock init sequence
     mockFetch
-      .mockResolvedValueOnce({ ok: true }) // health check
-      .mockResolvedValueOnce({ // token check
+      .mockResolvedValueOnce({ // token fetch during init
         ok: true,
-        json: () => Promise.resolve({ token: null }),
+        json: () => Promise.resolve({ token: 'valid-token' }),
       })
-      .mockResolvedValueOnce({ ok: true }) // token fetch
-      .mockResolvedValueOnce({ // spawn call
+      .mockResolvedValueOnce({ ok: true }) // health check during init
+      .mockResolvedValueOnce({ // token validation during init
         ok: true,
-        status: 200,
-        json: () => Promise.resolve({ success: true, terminal: { id: '1', name: 'Terminal' } }),
+        json: () => Promise.resolve({ token: 'valid-token' }),
       })
 
     const { result } = renderHook(() => useTerminalExtension())
@@ -747,31 +801,42 @@ describe('useTerminalExtension', () => {
       expect(result.current.isLoaded).toBe(true)
     })
 
+    // Mock spawn call
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ success: true, terminal: { id: '1', name: 'Terminal' } }),
+    })
+
     const spawnResult = await result.current.runCommand('echo hello')
 
     expect(spawnResult.success).toBe(true)
     expect(spawnResult.terminal?.id).toBe('1')
   })
 
-  it('handles authentication failure', async () => {
+  it('handles 401 authentication failure in runCommand', async () => {
     localStorageMock.setItem('tabz-api-token', 'invalid-token')
 
+    // Mock init - fails to get token from backend, uses stored
     mockFetch
-      .mockResolvedValueOnce({ ok: true }) // health
-      .mockResolvedValueOnce({ // token check
+      .mockRejectedValueOnce(new Error('Network error')) // token fetch
+      .mockResolvedValueOnce({ ok: true }) // health check
+      .mockResolvedValueOnce({ // token validation - mismatch
         ok: true,
-        json: () => Promise.resolve({ token: null }),
-      })
-      .mockResolvedValueOnce({ // spawn - auth failure
-        ok: false,
-        status: 401,
-        json: () => Promise.resolve({ error: 'Unauthorized' }),
+        json: () => Promise.resolve({ token: 'different-token' }),
       })
 
     const { result } = renderHook(() => useTerminalExtension())
 
     await waitFor(() => {
       expect(result.current.isLoaded).toBe(true)
+    })
+
+    // Mock spawn - returns 401
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: () => Promise.resolve({ error: 'Unauthorized' }),
     })
 
     const spawnResult = await result.current.runCommand('echo test')
@@ -783,19 +848,23 @@ describe('useTerminalExtension', () => {
   it('handles network errors in runCommand', async () => {
     localStorageMock.setItem('tabz-api-token', 'valid-token')
 
+    // Mock init
     mockFetch
+      .mockRejectedValueOnce(new Error('Network error')) // token fetch
       .mockResolvedValueOnce({ ok: true }) // health
-      .mockResolvedValueOnce({ // token
+      .mockResolvedValueOnce({ // token validation
         ok: true,
-        json: () => Promise.resolve({ token: null }),
+        json: () => Promise.resolve({ token: 'valid-token' }),
       })
-      .mockRejectedValueOnce(new TypeError('Failed to fetch')) // spawn fails
 
     const { result } = renderHook(() => useTerminalExtension())
 
     await waitFor(() => {
       expect(result.current.isLoaded).toBe(true)
     })
+
+    // Mock spawn - network failure
+    mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'))
 
     const spawnResult = await result.current.runCommand('echo test')
 
@@ -806,45 +875,43 @@ describe('useTerminalExtension', () => {
   it('pasteToTerminal sets autoExecute to false', async () => {
     localStorageMock.setItem('tabz-api-token', 'valid-token')
 
+    // Mock init
     mockFetch
+      .mockRejectedValueOnce(new Error('Network error')) // token fetch
       .mockResolvedValueOnce({ ok: true }) // health
-      .mockResolvedValueOnce({ // token
+      .mockResolvedValueOnce({ // token validation
         ok: true,
-        json: () => Promise.resolve({ token: null }),
-      })
-      .mockResolvedValueOnce({ // spawn
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ success: true, terminal: { id: '1', name: 'Terminal' } }),
+        json: () => Promise.resolve({ token: 'valid-token' }),
       })
 
     const { result } = renderHook(() => useTerminalExtension())
 
     await waitFor(() => {
       expect(result.current.isLoaded).toBe(true)
+    })
+
+    // Mock spawn
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ success: true, terminal: { id: '1', name: 'Terminal' } }),
     })
 
     await result.current.pasteToTerminal('echo hello')
 
-    expect(mockFetch).toHaveBeenLastCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        body: expect.stringContaining('"autoExecute":false'),
-      })
-    )
+    // Check the last call had autoExecute: false
+    const lastCall = mockFetch.mock.calls[mockFetch.mock.calls.length - 1]
+    expect(lastCall[1].body).toContain('"autoExecute":false')
   })
 
-  it('setApiToken validates and stores token', async () => {
+  it('setApiToken validates and stores token on success', async () => {
+    // Mock init - no token initially
     mockFetch
-      .mockResolvedValueOnce({ ok: true }) // health during init
-      .mockResolvedValueOnce({ // token during init
+      .mockRejectedValueOnce(new Error('Network error')) // token fetch
+      .mockResolvedValueOnce({ ok: true }) // health check
+      .mockResolvedValueOnce({ // token validation - no token
         ok: true,
         json: () => Promise.resolve({ token: null }),
-      })
-      .mockResolvedValueOnce({ ok: true }) // health during setApiToken
-      .mockResolvedValueOnce({ // token validation during setApiToken
-        ok: true,
-        json: () => Promise.resolve({ token: 'new-valid-token' }),
       })
 
     const { result } = renderHook(() => useTerminalExtension())
@@ -852,6 +919,14 @@ describe('useTerminalExtension', () => {
     await waitFor(() => {
       expect(result.current.isLoaded).toBe(true)
     })
+
+    // Mock setApiToken validation - need proper mock with json method
+    mockFetch
+      .mockResolvedValueOnce({ ok: true }) // health during setApiToken
+      .mockResolvedValueOnce({ // token validation during setApiToken
+        ok: true,
+        json: vi.fn().mockResolvedValue({ token: 'new-valid-token' }),
+      })
 
     const success = await result.current.setApiToken('new-valid-token')
 
@@ -875,16 +950,13 @@ describe('useTerminalExtension', () => {
   })
 
   it('setApiToken sanitizes non-ASCII characters', async () => {
+    // Mock init
     mockFetch
-      .mockResolvedValueOnce({ ok: true }) // health during init
-      .mockResolvedValueOnce({ // token during init
+      .mockRejectedValueOnce(new Error('Network error'))
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({ token: null }),
-      })
-      .mockResolvedValueOnce({ ok: true }) // health during setApiToken
-      .mockResolvedValueOnce({ // token validation
-        ok: true,
-        json: () => Promise.resolve({ token: 'cleantoken' }),
       })
 
     const { result } = renderHook(() => useTerminalExtension())
@@ -892,6 +964,14 @@ describe('useTerminalExtension', () => {
     await waitFor(() => {
       expect(result.current.isLoaded).toBe(true)
     })
+
+    // Mock setApiToken validation
+    mockFetch
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ token: 'cleantoken' }),
+      })
 
     // Token with unicode characters that should be stripped
     await result.current.setApiToken('cleantoken\u2019')
@@ -912,24 +992,22 @@ describe('useTerminalExtension', () => {
       expect(result.current.isLoaded).toBe(true)
     })
 
-    // Should not have made health check from remote site during init
-    expect(mockFetch).not.toHaveBeenCalledWith(
-      expect.stringContaining('/api/health'),
-      expect.anything()
-    )
+    // Should not have made any fetch calls from remote site during init
+    // (isLocalhost returns false, so fetchTokenFromBackend returns null immediately)
+    expect(mockFetch).not.toHaveBeenCalled()
   })
 
-  it('refreshStatus probes backend', async () => {
+  it('refreshStatus probes backend and returns availability', async () => {
     localStorageMock.setItem('tabz-api-token', 'test-token')
 
+    // Mock init
     mockFetch
-      .mockResolvedValueOnce({ ok: true }) // health during init
-      .mockResolvedValueOnce({ // token during init
+      .mockResolvedValueOnce({ // token fetch
         ok: true,
         json: () => Promise.resolve({ token: 'test-token' }),
       })
-      .mockResolvedValueOnce({ ok: true }) // health during refresh
-      .mockResolvedValueOnce({ // token during refresh
+      .mockResolvedValueOnce({ ok: true }) // health
+      .mockResolvedValueOnce({ // token validation
         ok: true,
         json: () => Promise.resolve({ token: 'test-token' }),
       })
@@ -940,8 +1018,58 @@ describe('useTerminalExtension', () => {
       expect(result.current.isLoaded).toBe(true)
     })
 
+    // Mock refresh
+    mockFetch
+      .mockResolvedValueOnce({ // token fetch during refresh
+        ok: true,
+        json: () => Promise.resolve({ token: 'test-token' }),
+      })
+      .mockResolvedValueOnce({ ok: true }) // health during refresh
+      .mockResolvedValueOnce({ // token validation during refresh
+        ok: true,
+        json: () => Promise.resolve({ token: 'test-token' }),
+      })
+
     const available = await result.current.refreshStatus()
 
     expect(available).toBe(true)
+    expect(result.current.authenticated).toBe(true)
+  })
+
+  it('detects when backend is not running', async () => {
+    mockFetch.mockRejectedValue(new Error('Network error'))
+
+    const { result } = renderHook(() => useTerminalExtension())
+
+    await waitFor(() => {
+      expect(result.current.isLoaded).toBe(true)
+    })
+
+    expect(result.current.backendRunning).toBe(false)
+    expect(result.current.available).toBe(false)
+  })
+
+  it('hasToken reflects token presence', async () => {
+    mockFetch.mockRejectedValue(new Error('Network error'))
+
+    const { result: result1 } = renderHook(() => useTerminalExtension())
+
+    await waitFor(() => {
+      expect(result1.current.isLoaded).toBe(true)
+    })
+
+    expect(result1.current.hasToken).toBe(false)
+
+    // Now with token
+    localStorageMock.setItem('tabz-api-token', 'test-token')
+
+    const { result: result2 } = renderHook(() => useTerminalExtension())
+
+    await waitFor(() => {
+      expect(result2.current.isLoaded).toBe(true)
+    })
+
+    // hasToken should be true after init loads the stored token
+    expect(result2.current.hasToken).toBe(true)
   })
 })

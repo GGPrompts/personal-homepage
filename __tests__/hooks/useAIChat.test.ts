@@ -27,25 +27,27 @@ Object.defineProperty(window, 'localStorage', {
 // Mock scrollIntoView
 Element.prototype.scrollIntoView = vi.fn()
 
+// Mock fetch globally
+const mockFetch = vi.fn()
+global.fetch = mockFetch
+
 describe('useAIChat', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorageMock.clear()
-    vi.useFakeTimers()
+    // Default successful fetch mock for models endpoint
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ models: [], backends: [] }),
+    })
   })
 
   afterEach(() => {
-    vi.useRealTimers()
+    vi.resetAllMocks()
   })
 
   describe('initialization', () => {
     it('initializes with default conversation', async () => {
-      // Mock fetch for models endpoint
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ models: [], backends: [] }),
-      })
-
       const { result } = renderHook(() => useAIChat())
 
       expect(result.current.conversations).toHaveLength(1)
@@ -68,11 +70,6 @@ describe('useAIChat', () => {
       ]
       localStorageMock.setItem('ai-workspace-conversations', JSON.stringify(savedConversations))
 
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ models: [], backends: [] }),
-      })
-
       const { result } = renderHook(() => useAIChat())
 
       expect(result.current.conversations).toHaveLength(1)
@@ -88,11 +85,6 @@ describe('useAIChat', () => {
         systemPrompt: 'You are a helpful assistant',
       }
       localStorageMock.setItem('ai-workspace-settings', JSON.stringify(savedSettings))
-
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ models: [], backends: [] }),
-      })
 
       const { result } = renderHook(() => useAIChat())
 
@@ -114,7 +106,7 @@ describe('useAIChat', () => {
         { backend: 'mock', available: true, error: null },
       ]
 
-      global.fetch = vi.fn().mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({ models: mockModels, backends: mockBackends }),
       })
@@ -133,7 +125,7 @@ describe('useAIChat', () => {
     })
 
     it('falls back to mock model on fetch error', async () => {
-      global.fetch = vi.fn().mockRejectedValueOnce(new Error('Network error'))
+      mockFetch.mockRejectedValueOnce(new Error('Network error'))
 
       const { result } = renderHook(() => useAIChat())
 
@@ -148,13 +140,6 @@ describe('useAIChat', () => {
   })
 
   describe('conversation management', () => {
-    beforeEach(() => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ models: [], backends: [] }),
-      })
-    })
-
     it('creates a new conversation', async () => {
       const { result } = renderHook(() => useAIChat())
 
@@ -295,13 +280,6 @@ describe('useAIChat', () => {
   })
 
   describe('settings management', () => {
-    beforeEach(() => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ models: [], backends: [] }),
-      })
-    })
-
     it('updates settings', async () => {
       const { result } = renderHook(() => useAIChat())
 
@@ -335,13 +313,6 @@ describe('useAIChat', () => {
   })
 
   describe('feedback handling', () => {
-    beforeEach(() => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ models: [], backends: [] }),
-      })
-    })
-
     it('adds feedback to a message', async () => {
       const savedConversations = [
         {
@@ -401,11 +372,6 @@ describe('useAIChat', () => {
     it('calls onConversationsChange when conversations change', async () => {
       const onConversationsChange = vi.fn()
 
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ models: [], backends: [] }),
-      })
-
       const { result } = renderHook(() => useAIChat({ onConversationsChange }))
 
       await waitFor(() => {
@@ -420,16 +386,11 @@ describe('useAIChat', () => {
       })
 
       // Called again after creating conversation
-      expect(onConversationsChange).toHaveBeenCalledTimes(expect.any(Number))
+      expect(onConversationsChange.mock.calls.length).toBeGreaterThan(1)
     })
 
     it('calls onSettingsChange when settings change', async () => {
       const onSettingsChange = vi.fn()
-
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ models: [], backends: [] }),
-      })
 
       const { result } = renderHook(() => useAIChat({ onSettingsChange }))
 
@@ -447,11 +408,6 @@ describe('useAIChat', () => {
 
   describe('stopStreaming', () => {
     it('resets streaming state when stopped', async () => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ models: [], backends: [] }),
-      })
-
       const { result } = renderHook(() => useAIChat())
 
       await waitFor(() => {
@@ -469,11 +425,6 @@ describe('useAIChat', () => {
 
   describe('refs', () => {
     it('provides textarea and messagesEnd refs', async () => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ models: [], backends: [] }),
-      })
-
       const { result } = renderHook(() => useAIChat())
 
       expect(result.current.textareaRef).toBeDefined()

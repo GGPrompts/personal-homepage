@@ -235,10 +235,10 @@ describe('AI Agents [id] API Route', () => {
         'New system prompt'
       )
 
-      // Check agent.json was written
+      // Check agent.json was written (JSON is pretty-printed with spaces)
       expect(fs.writeFileSync).toHaveBeenCalledWith(
         expect.stringContaining('agent.json'),
-        expect.stringContaining('"name":"Updated Agent"')
+        expect.stringContaining('"name": "Updated Agent"')
       )
     })
 
