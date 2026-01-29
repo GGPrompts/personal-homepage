@@ -8,6 +8,7 @@ import { useBoardStore } from "../lib/store"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ChatMessage } from "./ChatMessage"
 import { ChatInput } from "./ChatInput"
+import { IssueSummary } from "./IssueSummary"
 import { AgentSelector } from "../shared/AgentSelector"
 import { AgentBadge } from "../shared/AgentBadge"
 import { ContextIndicator } from "../shared/ContextIndicator"
@@ -111,6 +112,9 @@ export function TaskChat({ task }: TaskChatProps) {
 
   return (
     <div className="flex flex-col w-full">
+      {/* Issue Context Summary - collapsible */}
+      <IssueSummary task={task} defaultExpanded={true} />
+
       {/* Agent Header */}
       <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
         <div className="flex items-center gap-3">
