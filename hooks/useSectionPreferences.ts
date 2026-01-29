@@ -26,7 +26,7 @@ import {
 } from "lucide-react"
 
 // Section IDs that can be toggled (excluding home and settings which are always visible)
-export type ToggleableSection = "weather" | "feed" | "api-playground" | "bookmarks" | "search" | "stocks" | "crypto" | "spacex" | "github-activity" | "disasters" | "tasks" | "projects" | "jobs" | "profile" | "ai-workspace" | "market-pulse" | "kanban" | "photo-gallery" | "music-player" | "video-player" | "files" | "analytics" | "prompts-playground" | "flowchart"
+export type ToggleableSection = "weather" | "feed" | "api-playground" | "bookmarks" | "search" | "stocks" | "crypto" | "spacex" | "github-activity" | "disasters" | "tasks" | "projects" | "jobs" | "profile" | "ai-workspace" | "market-pulse" | "kanban" | "photo-gallery" | "music-player" | "video-player" | "files" | "analytics" | "prompts-playground" | "flowchart" | "email" | "calendar"
 
 // All sections including non-toggleable ones
 export type Section = "home" | ToggleableSection | "settings"
@@ -147,6 +147,8 @@ export const DEFAULT_CATEGORY_ASSIGNMENTS: Record<ToggleableSection, CategoryId>
   analytics: "development",
   "prompts-playground": "development",
   flowchart: "development",
+  email: "productivity",
+  calendar: "productivity",
 }
 
 // Default collapsed state (all expanded)
@@ -167,6 +169,7 @@ export const DEFAULT_SECTION_ORDER: ToggleableSection[] = [
   "api-playground",
   "bookmarks",
   "search",
+  "email",
   "ai-workspace",
   "prompts-playground",
   "stocks",
@@ -185,6 +188,7 @@ export const DEFAULT_SECTION_ORDER: ToggleableSection[] = [
   "photo-gallery",
   "music-player",
   "flowchart",
+  "calendar",
 ]
 
 // Default visibility (all visible except media players which are opt-in)
@@ -195,6 +199,7 @@ export const DEFAULT_VISIBILITY: Record<ToggleableSection, boolean> = {
   "api-playground": true,
   bookmarks: true,
   search: true,
+  email: true,
   "ai-workspace": true,
   "prompts-playground": true,
   stocks: true,
@@ -213,6 +218,7 @@ export const DEFAULT_VISIBILITY: Record<ToggleableSection, boolean> = {
   "photo-gallery": false,
   "music-player": false,
   flowchart: true,
+  calendar: true,
 }
 
 const STORAGE_KEY = "section-preferences"
@@ -240,6 +246,7 @@ export const DEFAULT_SECTION_AGENTS: Record<ToggleableSection, string | null> = 
   "api-playground": null,
   bookmarks: null,
   search: null,
+  email: null,
   "ai-workspace": null,
   "prompts-playground": null,
   stocks: null,
@@ -258,6 +265,7 @@ export const DEFAULT_SECTION_AGENTS: Record<ToggleableSection, string | null> = 
   "photo-gallery": null,
   "music-player": null,
   flowchart: null,
+  calendar: null,
 }
 
 function loadPreferences(): SectionPreferences {

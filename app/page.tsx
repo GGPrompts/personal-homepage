@@ -37,6 +37,8 @@ import {
   BarChart3,
   Beaker,
   GitBranch,
+  Mail,
+  Calendar,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -95,6 +97,8 @@ import FilesSection from "./sections/files"
 import AnalyticsSection from "./sections/analytics"
 import PromptsPlaygroundSection from "./sections/prompts-playground"
 import FlowchartSection from "./sections/flowchart"
+import EmailSection from "./sections/email"
+import CalendarSection from "./sections/calendar"
 import SettingsSection from "./sections/settings"
 import { MusicPlayerSection } from "./sections/music-player"
 import dynamic from "next/dynamic"
@@ -134,6 +138,8 @@ const navigationItems: NavigationItem[] = [
   { id: "api-playground", label: "API Playground", icon: Zap, description: "Test & debug APIs" },
   { id: "bookmarks", label: "Bookmarks", icon: Bookmark, description: "Quick links" },
   { id: "search", label: "Search Hub", icon: Search, description: "Search, AI & Image" },
+  { id: "email", label: "Email", icon: Mail, description: "Gmail inbox" },
+  { id: "calendar", label: "Calendar", icon: Calendar, description: "Google Calendar events" },
   { id: "ai-workspace", label: "AI Workspace", icon: MessageSquare, description: "Chat with AI models" },
   { id: "stocks", label: "Paper Trading", icon: TrendingUp, description: "Practice stock trading" },
   { id: "crypto", label: "Crypto", icon: Bitcoin, description: "Live cryptocurrency prices" },
@@ -748,6 +754,8 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
             "api-playground": { icon: Zap, label: "API Playground", description: "Test and debug API requests" },
             bookmarks: { icon: Bookmark, label: "Bookmarks", description: "Organized quick links" },
             search: { icon: Search, label: "Search Hub", description: "Multi-engine web search" },
+            email: { icon: Mail, label: "Email", description: "Gmail inbox & compose" },
+            calendar: { icon: Calendar, label: "Calendar", description: "Google Calendar events" },
             "ai-workspace": { icon: MessageSquare, label: "AI Workspace", description: "Chat with Claude & local models" },
             stocks: { icon: TrendingUp, label: "Paper Trading", description: "Practice stock trading" },
             crypto: { icon: Bitcoin, label: "Crypto", description: "Live cryptocurrency prices" },
@@ -910,6 +918,10 @@ export default function PersonalHomepage() {
         return <BookmarksSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSettings={() => setActiveSection("profile")} />
       case "search":
         return <SearchHubSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "email":
+        return <EmailSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "calendar":
+        return <CalendarSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "ai-workspace":
         if (!isLocal) {
           return <LocalOnlyOverlay sectionName="AI Workspace" description="This feature streams from local AI CLIs (Claude, Gemini, Codex) that require localhost to run." />
