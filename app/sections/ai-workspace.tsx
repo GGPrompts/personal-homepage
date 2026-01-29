@@ -629,9 +629,24 @@ export default function AIWorkspaceSection({
             </Button>
 
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <div className="p-2 rounded-lg bg-primary/10 border border-primary/20 shrink-0 hidden sm:flex">
-                <Bot className="h-5 w-5 text-primary terminal-glow" />
-              </div>
+              {/* Agent/Bot icon - show agent avatar if selected, otherwise Bot icon */}
+              {(() => {
+                const agent = selectedAgent || (activeConv.agentId ? getAgentById(activeConv.agentId) : null)
+                return agent ? (
+                  <Avatar className="h-9 w-9 shrink-0 hidden sm:flex ring-1 ring-primary/20">
+                    {isAvatarUrl(agent.avatar) ? (
+                      <AvatarImage src={agent.avatar} alt={agent.name} />
+                    ) : null}
+                    <AvatarFallback className="text-base bg-primary/10">
+                      {isEmoji(agent.avatar) ? agent.avatar : agent.name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                ) : (
+                  <div className="p-2 rounded-lg bg-primary/10 border border-primary/20 shrink-0 hidden sm:flex">
+                    <Bot className="h-5 w-5 text-primary terminal-glow" />
+                  </div>
+                )
+              })()}
               <div className="min-w-0">
                 <h2 className="font-semibold terminal-glow truncate">{activeConv.title}</h2>
                 <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">

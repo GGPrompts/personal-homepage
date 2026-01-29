@@ -32,7 +32,7 @@ import { ChatMessage, TypingIndicator } from "./ChatMessage"
 import { ChatInput } from "./ChatInput"
 import { useAuth } from "@/components/AuthProvider"
 import { useProjects } from "@/hooks/useProjects"
-import { isAvatarUrl } from "@/lib/ai/utils"
+import { isAvatarUrl, isEmoji } from "@/lib/ai/utils"
 
 // ============================================================================
 // TYPES
@@ -349,6 +349,7 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                   onSelectConversation={setActiveConvId}
                   onNewConversation={createNewConversation}
                   generatingConvs={generatingConvs}
+                  selectedAgent={selectedAgent}
                 />
               )}
 
@@ -872,6 +873,12 @@ function getShortModelName(model?: string): string | null {
   return parts[0] || model
 }
 
+interface SelectedAgent {
+  id: string
+  name: string
+  avatar: string
+}
+
 interface MinimizedDrawerProps {
   hasActiveConversation: boolean
   onExpand: () => void
@@ -882,6 +889,7 @@ interface MinimizedDrawerProps {
   onSelectConversation: (id: string) => void
   onNewConversation: () => void
   generatingConvs: Record<string, { startedAt: number; model: string }>
+  selectedAgent?: SelectedAgent | null
 }
 
 function MinimizedDrawer({
@@ -894,6 +902,7 @@ function MinimizedDrawer({
   onSelectConversation,
   onNewConversation,
   generatingConvs,
+  selectedAgent,
 }: MinimizedDrawerProps) {
   return (
     <motion.div
@@ -907,13 +916,29 @@ function MinimizedDrawer({
       {/* Header */}
       <div className="p-3 border-b border-border/40 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <motion.div
-            className="p-1.5 rounded-lg bg-primary/10 border border-primary/20"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <Bot className="h-4 w-4 text-primary terminal-glow" />
-          </motion.div>
+          {selectedAgent ? (
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Avatar className="h-7 w-7 ring-1 ring-primary/20">
+                {isAvatarUrl(selectedAgent.avatar) && (
+                  <AvatarImage src={selectedAgent.avatar} alt={selectedAgent.name} />
+                )}
+                <AvatarFallback className="text-sm bg-primary/10">
+                  {isEmoji(selectedAgent.avatar) ? selectedAgent.avatar : selectedAgent.name.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+            </motion.div>
+          ) : (
+            <motion.div
+              className="p-1.5 rounded-lg bg-primary/10 border border-primary/20"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Bot className="h-4 w-4 text-primary terminal-glow" />
+            </motion.div>
+          )}
           <div>
             <h3 className="text-sm font-semibold terminal-glow">AI Chat</h3>
             {isGenerating ? (
