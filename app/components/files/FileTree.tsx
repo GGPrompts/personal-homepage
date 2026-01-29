@@ -258,6 +258,53 @@ export function FileTree({
     navigateToPath()
   }, [pendingTreeNavigation, clearPendingNavigation, maxDepth, showHidden, setFileTree, setFileTreePath, fetchGitStatus])
 
+  // Sync tree when basePath (working dir) changes from sidebar
+  // This allows users to navigate by changing the global working directory
+  const prevBasePathRef = useRef(basePath)
+  useEffect(() => {
+    // Skip on initial mount
+    if (prevBasePathRef.current === basePath) return
+    prevBasePathRef.current = basePath
+
+    // Navigate to new basePath
+    setCurrentPath(basePath)
+    hasFetchedRef.current = false
+
+    const syncToBasePath = async () => {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const params = new URLSearchParams({
+          path: basePath,
+          depth: maxDepth.toString(),
+          showHidden: showHidden.toString(),
+        })
+        const response = await fetch(`/api/files/tree?${params}`)
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to load file tree')
+        }
+
+        const data = await response.json()
+        setFileTree(data)
+        setFileTreePath(data.path)
+        setExpandedFolders(new Set([data.path]))
+        hasFetchedRef.current = true
+
+        fetchGitStatus(data.path)
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load files'
+        setError(errorMessage)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    syncToBasePath()
+  }, [basePath, maxDepth, showHidden, setFileTree, setFileTreePath, fetchGitStatus])
+
   // Toggle folder expansion with lazy loading
   const toggleFolder = useCallback((path: string, hasChildren: boolean) => {
     setExpandedFolders(prev => {
