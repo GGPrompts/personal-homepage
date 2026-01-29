@@ -104,6 +104,47 @@ const CHART_COLORS = [
   "hsl(340, 82%, 52%)", // pink
 ]
 
+// Custom tooltip component with proper theme styling
+interface CustomTooltipProps {
+  active?: boolean
+  payload?: Array<{ name: string; value: number; color?: string; dataKey?: string }>
+  label?: string
+  formatter?: (value: number) => string
+  labelFormatter?: (label: string) => string
+}
+
+function CustomChartTooltip({ active, payload, label, formatter, labelFormatter }: CustomTooltipProps) {
+  if (!active || !payload?.length) return null
+
+  return (
+    <div className="glass-dark border border-border/50 rounded-lg p-3 shadow-xl">
+      {label && (
+        <p className="text-foreground font-medium mb-2 border-b border-border/30 pb-2">
+          {labelFormatter ? labelFormatter(label) : label}
+        </p>
+      )}
+      <div className="space-y-1">
+        {payload.map((entry, index) => (
+          <div key={index} className="flex items-center justify-between gap-4 text-sm">
+            <span className="text-secondary/70 flex items-center gap-2">
+              {entry.color && (
+                <span
+                  className="w-2.5 h-2.5 rounded-full"
+                  style={{ backgroundColor: entry.color }}
+                />
+              )}
+              {entry.name}
+            </span>
+            <span className="text-foreground font-medium">
+              {formatter ? formatter(entry.value) : entry.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ============================================================================
 // COMPONENT
 // ============================================================================
@@ -330,15 +371,18 @@ export default function MarketPulseSection({ activeSubItem, onSubItemHandled }: 
                     tick={{ fontSize: 12 }}
                   />
                   <RechartsTooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--popover))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                      padding: "12px",
-                    }}
-                    labelStyle={{ color: "hsl(var(--popover-foreground))" }}
-                    itemStyle={{ color: "hsl(var(--popover-foreground))" }}
-                    formatter={(value: number) => formatFullSalary(value)}
+                    content={({ active, payload, label }) => (
+                      <CustomChartTooltip
+                        active={active}
+                        payload={payload?.map((p) => ({
+                          name: "Annual Salary",
+                          value: p.value as number,
+                          color: p.payload?.fill || CHART_COLORS[0],
+                        }))}
+                        label={payload?.[0]?.payload?.fullName || label}
+                        formatter={formatFullSalary}
+                      />
+                    )}
                   />
                   <Bar dataKey="salary" radius={[0, 4, 4, 0]}>
                     {salaryBarData.map((entry, index) => (
@@ -395,6 +439,68 @@ export default function MarketPulseSection({ activeSubItem, onSubItemHandled }: 
               <div className="h-[400px] flex items-center justify-center">
                 <RefreshCw className="h-8 w-8 animate-spin text-primary" />
               </div>
+            ) : salaryTrendData.length <= 1 ? (
+              /* Show salary comparison chart when insufficient historical data */
+              <div className="space-y-6">
+                <div className="flex items-start gap-3 p-4 rounded-lg bg-secondary/5 border border-border/30">
+                  <AlertCircle className="h-5 w-5 text-amber-400 mt-0.5 shrink-0" />
+                  <div className="text-sm">
+                    <p className="text-foreground font-medium mb-1">Limited Historical Data</p>
+                    <p className="text-secondary/70">
+                      BLS currently only provides {salaryTrendData[0]?.year || "current"} annual wage data for these occupations.
+                      The chart below shows a salary comparison across roles.
+                    </p>
+                  </div>
+                </div>
+                <ResponsiveContainer width="100%" height={350}>
+                  <BarChart
+                    data={data?.occupations.map((o, i) => ({
+                      name: o.name.length > 15 ? o.name.substring(0, 13) + "..." : o.name,
+                      fullName: o.name,
+                      salary: o.currentSalary,
+                      color: CHART_COLORS[i % CHART_COLORS.length],
+                    }))}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis
+                      dataKey="name"
+                      stroke="hsl(var(--muted-foreground))"
+                      tick={{ fontSize: 11 }}
+                      angle={-35}
+                      textAnchor="end"
+                      height={60}
+                    />
+                    <YAxis
+                      stroke="hsl(var(--muted-foreground))"
+                      tickFormatter={(value) => formatSalary(value)}
+                    />
+                    <RechartsTooltip
+                      content={({ active, payload }) => (
+                        <CustomChartTooltip
+                          active={active}
+                          payload={payload?.map((p) => ({
+                            name: "Annual Salary",
+                            value: p.value as number,
+                            color: p.payload?.color,
+                          }))}
+                          label={payload?.[0]?.payload?.fullName}
+                          formatter={formatFullSalary}
+                        />
+                      )}
+                    />
+                    <Bar dataKey="salary" radius={[4, 4, 0, 0]}>
+                      {data?.occupations.map((_, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={CHART_COLORS[index % CHART_COLORS.length]}
+                          fillOpacity={0.8}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             ) : (
               <ResponsiveContainer width="100%" height={400}>
                 <AreaChart data={salaryTrendData}>
@@ -414,15 +520,18 @@ export default function MarketPulseSection({ activeSubItem, onSubItemHandled }: 
                     domain={['auto', 'auto']}
                   />
                   <RechartsTooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--popover))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                      padding: "12px",
-                    }}
-                    labelStyle={{ color: "hsl(var(--popover-foreground))" }}
-                    itemStyle={{ color: "hsl(var(--popover-foreground))" }}
-                    formatter={(value: number) => formatFullSalary(value)}
+                    content={({ active, payload, label }) => (
+                      <CustomChartTooltip
+                        active={active}
+                        payload={payload?.map((p, i) => ({
+                          name: p.name as string,
+                          value: p.value as number,
+                          color: CHART_COLORS[i % CHART_COLORS.length],
+                        }))}
+                        label={label}
+                        formatter={formatFullSalary}
+                      />
+                    )}
                   />
                   <Legend />
                   {data?.occupations.map((o, i) => (
