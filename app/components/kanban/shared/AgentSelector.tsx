@@ -1,7 +1,6 @@
 "use client"
 
-import { Bot, Sparkles } from "lucide-react"
-import type { AgentType } from "./types"
+import { Bot, Loader2 } from "lucide-react"
 import {
   Select,
   SelectContent,
@@ -10,61 +9,74 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { useAgents } from "@/hooks/useAgents"
 
 interface AgentSelectorProps {
-  value?: AgentType
-  onValueChange: (value: AgentType) => void
+  value?: string
+  onValueChange: (value: string) => void
   disabled?: boolean
 }
-
-const AGENTS: { value: AgentType; label: string; icon: typeof Bot; color: string }[] = [
-  { value: "claude-code", label: "Claude Code", icon: Sparkles, color: "text-emerald-400" },
-  { value: "gemini-cli", label: "Gemini CLI", icon: Bot, color: "text-blue-400" },
-  { value: "codex", label: "Codex", icon: Bot, color: "text-purple-400" },
-  { value: "copilot", label: "Copilot", icon: Bot, color: "text-cyan-400" },
-  { value: "amp", label: "Amp", icon: Bot, color: "text-orange-400" },
-  { value: "cursor", label: "Cursor", icon: Bot, color: "text-pink-400" },
-  { value: "custom", label: "Custom", icon: Bot, color: "text-zinc-400" },
-]
 
 export function AgentSelector({
   value,
   onValueChange,
   disabled = false,
 }: AgentSelectorProps) {
-  const selectedAgent = AGENTS.find((a) => a.value === value)
+  const { agents, isLoading } = useAgents()
+
+  // Find the selected agent from the registry
+  const selectedAgent = agents.find((a) => a.id === value)
+
+  // If value is set but not found in registry (legacy value), show fallback
+  const displayValue = selectedAgent?.name || (value ? value : undefined)
 
   return (
-    <Select value={value} onValueChange={onValueChange} disabled={disabled}>
+    <Select value={value} onValueChange={onValueChange} disabled={disabled || isLoading}>
       <SelectTrigger
         className={cn(
           "w-[160px] glass-dark border-white/10",
           "focus:ring-emerald-500/50 focus:border-emerald-500/50",
-          disabled && "opacity-50 cursor-not-allowed"
+          (disabled || isLoading) && "opacity-50 cursor-not-allowed"
         )}
       >
-        <SelectValue placeholder="Select agent">
-          {selectedAgent && (
+        <SelectValue placeholder={isLoading ? "Loading..." : "Select agent"}>
+          {isLoading ? (
             <div className="flex items-center gap-2">
-              <selectedAgent.icon className={cn("h-4 w-4", selectedAgent.color)} />
-              <span>{selectedAgent.label}</span>
+              <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
+              <span className="text-zinc-400">Loading...</span>
             </div>
-          )}
+          ) : selectedAgent ? (
+            <div className="flex items-center gap-2">
+              <span className="text-base">{selectedAgent.avatar}</span>
+              <span>{selectedAgent.name}</span>
+            </div>
+          ) : displayValue ? (
+            <div className="flex items-center gap-2">
+              <Bot className="h-4 w-4 text-zinc-400" />
+              <span>{displayValue}</span>
+            </div>
+          ) : null}
         </SelectValue>
       </SelectTrigger>
       <SelectContent className="glass-dark border-white/10">
-        {AGENTS.map((agent) => (
-          <SelectItem
-            key={agent.value}
-            value={agent.value}
-            className="focus:bg-white/10"
-          >
-            <div className="flex items-center gap-2">
-              <agent.icon className={cn("h-4 w-4", agent.color)} />
-              <span>{agent.label}</span>
-            </div>
-          </SelectItem>
-        ))}
+        {agents.length === 0 && !isLoading ? (
+          <div className="px-2 py-4 text-center text-sm text-zinc-500">
+            No agents configured
+          </div>
+        ) : (
+          agents.map((agent) => (
+            <SelectItem
+              key={agent.id}
+              value={agent.id}
+              className="focus:bg-white/10"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-base">{agent.avatar}</span>
+                <span>{agent.name}</span>
+              </div>
+            </SelectItem>
+          ))
+        )}
       </SelectContent>
     </Select>
   )
