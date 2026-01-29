@@ -374,6 +374,9 @@ export default function AIWorkspaceSection({
   const hasMessageUsage = activeConv.usage && activeConv.usage.totalTokens > 0
   const hasActualUsage = hasCumulativeUsage || hasMessageUsage
 
+  // Detect if we're waiting for first usage data (shows calculating spinner instead of 0%)
+  const isCalculatingUsage = (isTyping || isStreaming) && !hasActualUsage && activeConv.messages.length > 0
+
   let contextTokens: number
   let usageSource: 'cumulative' | 'message' | 'estimated'
 
@@ -622,26 +625,38 @@ export default function AIWorkspaceSection({
                               ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
                               : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                           }`}>
-                            {contextStatus === 'danger' ? (
+                            {isCalculatingUsage ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : contextStatus === 'danger' ? (
                               <AlertTriangle className="h-3 w-3" />
                             ) : (
                               <Gauge className="h-3 w-3" />
                             )}
-                            <span className="text-[10px] font-mono">{contextPercentage}%</span>
+                            <span className="text-[10px] font-mono">
+                              {isCalculatingUsage ? '...' : `${contextPercentage}%`}
+                            </span>
                           </span>
                         </TooltipTrigger>
                         <TooltipContent side="bottom" className="max-w-xs">
                           <p className="font-medium text-xs">
-                            Context: {usageSource === 'estimated' ? '~' : ''}{contextTokens.toLocaleString()} tokens
-                            <span className={`ml-1.5 text-[10px] px-1 py-0.5 rounded ${
-                              usageSource === 'cumulative'
-                                ? 'bg-emerald-500/20 text-emerald-400'
-                                : usageSource === 'message'
-                                ? 'bg-blue-500/20 text-blue-400'
-                                : 'bg-muted text-muted-foreground'
-                            }`}>
-                              {usageSource === 'cumulative' ? 'tracked' : usageSource === 'message' ? 'actual' : 'est'}
-                            </span>
+                            {isCalculatingUsage ? (
+                              <>
+                                <span className="text-muted-foreground">Calculating usage...</span>
+                              </>
+                            ) : (
+                              <>
+                                Context: {usageSource === 'estimated' ? '~' : ''}{contextTokens.toLocaleString()} tokens
+                                <span className={`ml-1.5 text-[10px] px-1 py-0.5 rounded ${
+                                  usageSource === 'cumulative'
+                                    ? 'bg-emerald-500/20 text-emerald-400'
+                                    : usageSource === 'message'
+                                    ? 'bg-blue-500/20 text-blue-400'
+                                    : 'bg-muted text-muted-foreground'
+                                }`}>
+                                  {usageSource === 'cumulative' ? 'tracked' : usageSource === 'message' ? 'actual' : 'est'}
+                                </span>
+                              </>
+                            )}
                           </p>
                           {/* Show cumulative stats when available */}
                           {activeConv.cumulativeUsage && (
