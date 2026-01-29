@@ -131,11 +131,44 @@ Each theme defines its own gradient colors.
 
 ### Animations
 
-Available animation utilities:
+### Gradient Animations
 - `.animate-gradient` - Gradient position shift (3s)
 - `.animate-gradient-fast` - Faster (2s)
 - `.animate-gradient-slow` - Slower (5s)
 - `.animate-gradient-pulse` - With opacity pulse
+
+### UI Animations
+- `.animate-fade-in` - Simple fade in (0.3s)
+- `.animate-fade-in-up` - Fade in with upward motion (0.4s)
+- `.animate-fade-in-scale` - Fade in with scale (0.3s)
+- `.animate-slide-in-left` - Slide in from left (0.3s)
+- `.animate-subtle-pulse` - Subtle opacity pulse (infinite)
+- `.animate-glow-pulse` - Glow shadow pulse (infinite)
+
+### Animation Delays
+For staggered animations: `.animation-delay-75`, `.animation-delay-100`, `.animation-delay-150`, `.animation-delay-200`, `.animation-delay-300`, `.animation-delay-500`
+
+## Interactive States
+
+### Hover Effects
+- `.hover-lift` - Card lift with shadow on hover
+- `.hover-glow` - Glow effect with border highlight
+- `.hover-scale` - Subtle scale increase (1.02x)
+- `.active-press` - Press down effect on click (0.98x)
+- `.nav-item-hover` - Navigation item with gradient overlay
+
+### Focus States
+- `.focus-ring` - Accessible focus ring with offset
+- `.focus-ring-inset` - Inset focus for dark backgrounds
+
+### Interactive Components
+- `.glass-card-interactive` - Glass card with lift and glow on hover
+- `.nav-item` - Sidebar nav item with animated indicator bar
+- `.btn-interactive` - Button with shine effect on hover
+- `.input-enhanced` - Input with enhanced focus glow
+
+### Skeleton Loading
+- `.skeleton-shimmer` - Animated loading skeleton with gradient
 
 ## File Locations
 

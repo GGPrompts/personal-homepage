@@ -279,13 +279,13 @@ function SidebarContent({
         <TooltipTrigger asChild>
           <button
             onClick={handleHomeClick}
-            className={`p-4 border-b border-border/20 transition-all duration-300 w-full text-left hover:bg-primary/5 ${collapsed && !mobile ? 'px-3' : ''}`}
+            className={`p-4 border-b border-border/20 transition-all duration-300 w-full text-left hover:bg-primary/5 group ${collapsed && !mobile ? 'px-3' : ''}`}
             data-tabz-section="home"
             data-tabz-action="navigate"
           >
             <div className={`flex items-center gap-3 transition-all duration-300 ${collapsed && !mobile ? 'justify-center' : ''}`}>
-              <div className="h-10 w-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
-                <Home className="h-5 w-5 text-primary" />
+              <div className="h-10 w-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0 transition-all duration-200 group-hover:bg-primary/30 group-hover:scale-105 group-hover:shadow-lg group-hover:shadow-primary/20">
+                <Home className="h-5 w-5 text-primary transition-transform duration-200 group-hover:scale-110" />
               </div>
               <div className={`flex-1 transition-[max-width,opacity] duration-300 overflow-hidden ${collapsed && !mobile ? 'max-w-0 opacity-0' : 'max-w-[200px] opacity-100'}`}>
                 <div className="flex items-center gap-2">
@@ -345,16 +345,16 @@ function SidebarContent({
                         <PopoverTrigger asChild>
                           <button
                             className={`
-                              w-full flex items-center justify-center p-2.5 rounded-lg transition-colors
+                              w-full flex items-center justify-center p-2.5 rounded-lg transition-all duration-200 ease-out group
                               ${hasActiveSection
                                 ? 'glass text-primary border-glow'
-                                : 'hover:bg-primary/10 text-muted-foreground hover:text-foreground'
+                                : 'hover:bg-primary/10 text-muted-foreground hover:text-foreground hover:scale-105'
                               }
                             `}
                             data-tabz-category={category.id}
                             data-tabz-action="open-category-flyout"
                           >
-                            <CategoryIcon className="h-4 w-4" />
+                            <CategoryIcon className="h-4 w-4 transition-transform duration-200 group-hover:scale-110" />
                           </button>
                         </PopoverTrigger>
                       </TooltipTrigger>
@@ -386,10 +386,10 @@ function SidebarContent({
                                   setOpenCategoryFlyout(null)
                                 }}
                                 className={`
-                                  w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors
+                                  w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 ease-out group
                                   ${isActive
                                     ? 'glass text-primary border-glow'
-                                    : 'hover:bg-primary/10 text-muted-foreground hover:text-foreground'
+                                    : 'hover:bg-primary/10 text-muted-foreground hover:text-foreground hover:translate-x-0.5'
                                   }
                                   ${showNowPlaying ? 'text-[#1DB954]' : ''}
                                 `}
@@ -397,9 +397,9 @@ function SidebarContent({
                                 data-tabz-action="navigate"
                               >
                                 <div className="relative flex-shrink-0">
-                                  <Icon className={`h-4 w-4 ${showNowPlaying && isPlaying ? 'animate-pulse' : ''}`} />
+                                  <Icon className={`h-4 w-4 transition-transform duration-200 group-hover:scale-110 ${showNowPlaying && isPlaying ? 'animate-pulse' : ''}`} />
                                   {item.id === "jobs" && jobsNeedsHumanCount > 0 && (
-                                    <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-amber-500 text-[9px] flex items-center justify-center text-white font-medium">
+                                    <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-amber-500 text-[9px] flex items-center justify-center text-white font-medium animate-pulse">
                                       {jobsNeedsHumanCount > 9 ? '!' : jobsNeedsHumanCount}
                                     </span>
                                   )}
@@ -433,11 +433,11 @@ function SidebarContent({
                   {/* Category Header */}
                   <button
                     onClick={() => onToggleCategoryCollapsed(category.id)}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors group"
+                    className="w-full flex items-center gap-2 px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-all duration-200 group rounded-md hover:bg-primary/5"
                     data-tabz-action="toggle-category"
                   >
                     <ChevronDown
-                      className={`h-3 w-3 transition-transform duration-200 ${isCatCollapsed ? '-rotate-90' : ''}`}
+                      className={`h-3 w-3 transition-transform duration-200 ${isCatCollapsed ? '-rotate-90' : ''} group-hover:text-primary`}
                     />
                     <span className="flex-1 text-left">{category.label}</span>
                     <span className="text-[10px] font-normal opacity-0 group-hover:opacity-60 transition-opacity">
@@ -467,20 +467,22 @@ function SidebarContent({
                           <button
                             onClick={() => handleSectionClick(item.id)}
                             className={`
-                              w-full flex items-center gap-3 px-3 py-2 pl-5 rounded-lg transition-colors
+                              w-full flex items-center gap-3 px-3 py-2 pl-5 rounded-lg transition-all duration-200 ease-out group relative
                               ${isActive
                                 ? 'glass text-primary border-glow'
-                                : 'hover:bg-primary/10 text-muted-foreground hover:text-foreground'
+                                : 'hover:bg-primary/10 text-muted-foreground hover:text-foreground hover:translate-x-0.5'
                               }
                               ${showNowPlaying ? 'text-[#1DB954]' : ''}
                             `}
                             data-tabz-section={item.id}
                             data-tabz-action="navigate"
                           >
+                            {/* Active indicator bar */}
+                            <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full bg-primary transition-all duration-200 ${isActive ? 'h-[60%] opacity-100' : 'h-0 opacity-0 group-hover:h-[30%] group-hover:opacity-50'}`} />
                             <div className="relative flex-shrink-0">
-                              <Icon className={`h-4 w-4 ${showNowPlaying && isPlaying ? 'animate-pulse' : ''}`} />
+                              <Icon className={`h-4 w-4 transition-transform duration-200 group-hover:scale-110 ${showNowPlaying && isPlaying ? 'animate-pulse' : ''}`} />
                               {item.id === "jobs" && jobsNeedsHumanCount > 0 && (
-                                <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-amber-500 text-[9px] flex items-center justify-center text-white font-medium">
+                                <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-amber-500 text-[9px] flex items-center justify-center text-white font-medium animate-pulse">
                                   {jobsNeedsHumanCount > 9 ? '!' : jobsNeedsHumanCount}
                                 </span>
                               )}
@@ -508,17 +510,21 @@ function SidebarContent({
                 <button
                   onClick={() => handleSectionClick("settings")}
                   className={`
-                    w-full flex items-center rounded-lg transition-[background-color,color,padding,gap] duration-200
+                    w-full flex items-center rounded-lg transition-all duration-200 ease-out group relative
                     ${collapsed && !mobile ? 'justify-center p-2.5' : 'gap-3 px-3 py-2'}
                     ${activeSection === "settings"
                       ? 'glass text-primary border-glow'
-                      : 'hover:bg-primary/10 text-muted-foreground hover:text-foreground'
+                      : 'hover:bg-primary/10 text-muted-foreground hover:text-foreground hover:translate-x-0.5'
                     }
                   `}
                   data-tabz-section="settings"
                   data-tabz-action="navigate"
                 >
-                  <Settings className="h-4 w-4 flex-shrink-0" />
+                  {/* Active indicator bar */}
+                  {!(collapsed && !mobile) && (
+                    <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full bg-primary transition-all duration-200 ${activeSection === "settings" ? 'h-[60%] opacity-100' : 'h-0 opacity-0 group-hover:h-[30%] group-hover:opacity-50'}`} />
+                  )}
+                  <Settings className="h-4 w-4 flex-shrink-0 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-45" />
                   <span className={`flex-1 text-left text-sm transition-[max-width,opacity] duration-300 overflow-hidden whitespace-nowrap ${
                     collapsed && !mobile ? 'max-w-0 opacity-0' : 'max-w-[180px] opacity-100'
                   }`}>Settings</span>
@@ -680,12 +686,13 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
               <button
                 key={sectionId}
                 onClick={() => onNavigate("weather")}
-                className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+                className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 ease-out group hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/10 active:scale-[0.99] animate-fade-in-up"
+                style={{ animationDelay: '50ms', animationFillMode: 'backwards' }}
                 data-tabz-section="weather"
                 data-tabz-action="navigate"
               >
                 <div className="flex items-start justify-between mb-4">
-                  <Cloud className="h-8 w-8 text-primary" />
+                  <Cloud className="h-8 w-8 text-primary transition-transform duration-200 group-hover:scale-110" />
                   {weather && (
                     <span className="text-3xl font-bold text-primary">{weather.temp}°</span>
                   )}
@@ -724,12 +731,13 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
               <button
                 key={sectionId}
                 onClick={() => onNavigate("feed")}
-                className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+                className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 ease-out group hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/10 active:scale-[0.99] animate-fade-in-up"
+                style={{ animationDelay: '100ms', animationFillMode: 'backwards' }}
                 data-tabz-section="feed"
                 data-tabz-action="navigate"
               >
                 <div className="flex items-start justify-between mb-4">
-                  <Newspaper className="h-8 w-8 text-primary" />
+                  <Newspaper className="h-8 w-8 text-primary transition-transform duration-200 group-hover:scale-110" />
                   {feedCount !== null && (
                     <span className="text-3xl font-bold text-primary">{feedCount}</span>
                   )}
@@ -780,16 +788,21 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
           if (!config) return null
 
           const Icon = config.icon
+          // Calculate stagger delay based on position (after weather and feed)
+          const tileIndex = effectiveOrder.indexOf(sectionId)
+          const delayMs = 150 + (tileIndex * 50)
+
           return (
             <button
               key={sectionId}
               onClick={() => onNavigate(sectionId)}
-              className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+              className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 ease-out group hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/10 active:scale-[0.99] animate-fade-in-up"
+              style={{ animationDelay: `${delayMs}ms`, animationFillMode: 'backwards' }}
               data-tabz-section={sectionId}
               data-tabz-action="navigate"
             >
               <div className="flex items-start justify-between mb-4">
-                <Icon className="h-8 w-8 text-primary" />
+                <Icon className="h-8 w-8 text-primary transition-transform duration-200 group-hover:scale-110" />
               </div>
               <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">{config.label}</h3>
               <p className="text-sm text-muted-foreground">{config.description}</p>
@@ -800,12 +813,13 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
         {/* Settings Card - always visible at the end */}
         <button
           onClick={() => onNavigate("settings")}
-          className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+          className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 ease-out group hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/10 active:scale-[0.99] animate-fade-in-up"
+          style={{ animationDelay: '800ms', animationFillMode: 'backwards' }}
           data-tabz-section="settings"
           data-tabz-action="navigate"
         >
           <div className="flex items-start justify-between mb-4">
-            <Settings className="h-8 w-8 text-primary" />
+            <Settings className="h-8 w-8 text-primary transition-transform duration-200 group-hover:scale-110 group-hover:rotate-45" />
           </div>
           <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">Settings</h3>
           <p className="text-sm text-muted-foreground">Customize themes and preferences</p>

@@ -5,19 +5,19 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98]",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-md hover:bg-primary/90 border border-primary/50 border-glow",
+          "bg-primary text-primary-foreground shadow-md hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/20 border border-primary/50 border-glow",
         destructive:
-          "bg-destructive text-destructive-foreground shadow-lg hover:bg-destructive/90 border border-destructive/50",
+          "bg-destructive text-destructive-foreground shadow-lg hover:bg-destructive/90 hover:shadow-destructive/30 border border-destructive/50",
         outline:
-          "border-2 border-primary text-primary bg-primary/5 shadow-sm hover:bg-primary/15 hover:border-primary/90 border-glow",
+          "border-2 border-primary text-primary bg-primary/5 shadow-sm hover:bg-primary/15 hover:border-primary/90 hover:shadow-md hover:shadow-primary/10 border-glow",
         secondary:
-          "bg-secondary text-secondary-foreground shadow-lg hover:bg-secondary/90 border border-secondary/30",
-        ghost: "bg-muted/40 text-foreground hover:bg-muted/60 hover:text-foreground shadow-sm border border-transparent",
+          "bg-secondary text-secondary-foreground shadow-lg hover:bg-secondary/90 hover:shadow-secondary/20 border border-secondary/30",
+        ghost: "bg-muted/40 text-foreground hover:bg-muted/60 hover:text-foreground shadow-sm border border-transparent hover:border-border/50",
         link: "text-primary underline-offset-4 hover:underline hover:text-primary/80",
       },
       size: {
