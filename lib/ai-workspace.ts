@@ -147,9 +147,9 @@ export function accumulateUsage(
     outputTokens: prev.outputTokens + messageUsage.outputTokens,
     cacheReadTokens: newCacheRead,
     cacheCreationTokens: newCacheCreation,
-    // Context is the current input context window being used
-    // Only count input_tokens (not cache_read which is reused content, not new context)
-    contextTokens: messageUsage.inputTokens,
+    // Context is the cumulative input tokens across all messages in the conversation
+    // This represents the actual context window being used for accurate percentage calculation
+    contextTokens: newInputTokens,
     messageCount: prev.messageCount + 1,
     lastUpdated: new Date()
   }
