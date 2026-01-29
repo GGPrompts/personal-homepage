@@ -1371,12 +1371,7 @@ export default function CalendarSection({
       </motion.div>
 
       {/* Main Content */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        className="flex flex-col lg:flex-row gap-6"
-      >
+      <div className="flex flex-col lg:flex-row gap-6">
         {/* Calendar View */}
         <div className="flex-1">
           <Card className="glass border-primary/30 p-4 md:p-6">
@@ -1469,7 +1464,7 @@ export default function CalendarSection({
             </motion.div>
           )}
         </AnimatePresence>
-      </motion.div>
+      </div>
 
       {/* Quick Add Popover */}
       <AnimatePresence>
