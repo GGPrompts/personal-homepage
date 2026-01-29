@@ -108,6 +108,8 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
   const messagesEndRef = React.useRef<HTMLDivElement | null>(null)
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null)
   const abortControllerRef = React.useRef<AbortController | null>(null)
+  // Track in-flight message IDs to prevent duplicate submissions (race condition fix)
+  const inFlightMessageIdsRef = React.useRef<Set<string>>(new Set())
 
   // Default conversation for SSR when conversations array is empty
   const defaultConv: Conversation = React.useMemo(() => ({
@@ -326,9 +328,31 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
 
     const { projectPath, model } = options
 
+    // Generate message ID first for atomic deduplication
+    const messageId = generateId()
+
+    // Atomic check-and-set to prevent race condition with duplicate submissions
+    // If another sendMessage call is in flight, reject this one
+    if (inFlightMessageIdsRef.current.has(messageId)) {
+      console.warn('Duplicate message ID detected, rejecting:', messageId)
+      return
+    }
+
+    // Also check if we're already processing a message for this conversation
+    // This prevents rapid double-clicks or double-submits
+    const convInFlightKey = `conv:${activeConvId}`
+    if (inFlightMessageIdsRef.current.has(convInFlightKey)) {
+      console.warn('Message already in flight for conversation, rejecting:', activeConvId)
+      return
+    }
+
+    // Mark both the message ID and conversation as in-flight
+    inFlightMessageIdsRef.current.add(messageId)
+    inFlightMessageIdsRef.current.add(convInFlightKey)
+
     // Add user message
     const userMessage: Message = {
-      id: generateId(),
+      id: messageId,
       role: 'user',
       content: content.trim(),
       timestamp: new Date(),
@@ -582,7 +606,14 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
       clearGenerating(activeConvId)
       setGeneratingConvs(loadGeneratingConversations())
       abortControllerRef.current = null
+      // Clear in-flight tracking on success
+      inFlightMessageIdsRef.current.delete(messageId)
+      inFlightMessageIdsRef.current.delete(convInFlightKey)
     } catch (error) {
+      // Always clear in-flight tracking on any error
+      inFlightMessageIdsRef.current.delete(messageId)
+      inFlightMessageIdsRef.current.delete(convInFlightKey)
+
       if (error instanceof Error && error.name === 'AbortError') {
         console.log('Chat request aborted')
         setIsTyping(false)
