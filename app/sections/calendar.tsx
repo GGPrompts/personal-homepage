@@ -777,15 +777,16 @@ export default function CalendarSection({
       ))}
 
       {/* Date cells */}
-      {getMonthGrid.map((date, idx) => {
+      {getMonthGrid.map((date) => {
         const isCurrentMonth = date.getMonth() === currentDate.getMonth()
         const dayEvents = getEventsForDate(date)
         const isSelected = isSameDay(date, selectedDate)
         const isTodayDate = isToday(date)
+        const dateKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
 
         return (
           <motion.div
-            key={idx}
+            key={dateKey}
             whileHover={{ backgroundColor: "hsl(var(--muted) / 0.5)" }}
             onClick={() => setSelectedDate(date)}
             className={`
@@ -1199,15 +1200,16 @@ export default function CalendarSection({
               {day}
             </div>
           ))}
-          {miniGrid.map((date, idx) => {
+          {miniGrid.map((date) => {
             const isCurrentMonth = date.getMonth() === currentDate.getMonth()
             const isSelected = isSameDay(date, selectedDate)
             const isTodayDate = isToday(date)
             const hasEvents = getEventsForDate(date).length > 0
+            const dateKey = `mini-${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
 
             return (
               <button
-                key={idx}
+                key={dateKey}
                 onClick={() => {
                   setSelectedDate(date)
                   if (view === "day") setCurrentDate(date)

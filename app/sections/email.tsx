@@ -717,13 +717,13 @@ export default function EmailSection({
           {/* Search */}
           <div className="flex-1 max-w-2xl">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+              <Input
                 type="text"
                 placeholder="Search emails..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex h-9 w-full rounded-md border border-border bg-muted/50 px-3 py-1 pl-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="pl-10 pr-10 !bg-muted/50 !text-foreground"
                 data-tabz-input="search"
               />
               <Button

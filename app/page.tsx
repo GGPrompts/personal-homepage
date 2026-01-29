@@ -272,8 +272,21 @@ function SidebarContent({
   // Track which category flyout is open (for collapsed sidebar)
   const [openCategoryFlyout, setOpenCategoryFlyout] = React.useState<CategoryId | null>(null)
 
+  // Suppress transitions on initial load to prevent flashing
+  const [transitionsReady, setTransitionsReady] = React.useState(false)
+  React.useEffect(() => {
+    if (prefsLoaded) {
+      // Wait a tick after prefs load before enabling transitions
+      const timer = setTimeout(() => setTransitionsReady(true), 50)
+      return () => clearTimeout(timer)
+    }
+  }, [prefsLoaded])
+
+  // CSS class to suppress transitions during initial load
+  const noTransitionClass = transitionsReady ? '' : '[&_*]:!transition-none'
+
   return (
-    <div className="flex flex-col h-full">
+    <div className={`flex flex-col h-full ${noTransitionClass}`}>
       {/* Header - clickable to return home */}
       <Tooltip>
         <TooltipTrigger asChild>
