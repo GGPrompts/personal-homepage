@@ -19,6 +19,10 @@ import {
   PanelRightClose,
   PanelRight,
   PanelRightOpen,
+  FileText,
+  Tag,
+  GitBranch,
+  Gem,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -207,6 +211,9 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
     // Width
     drawerWidth,
     cycleDrawerWidth,
+    // Task context
+    taskContext,
+    clearTaskContext,
   } = context
 
   // Get the expanded width from preference
@@ -732,6 +739,69 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                     </motion.div>
                   )}
                 </AnimatePresence>
+
+                {/* Task context banner (when opened from kanban) */}
+                {taskContext && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="border-b border-border/40 bg-primary/5"
+                  >
+                    <div className="p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <FileText className="h-3 w-3" />
+                          <span>Task Context</span>
+                          {taskContext.beadsId && (
+                            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[9px] font-mono px-1 py-0">
+                              <Gem className="h-2 w-2 mr-0.5" />
+                              {taskContext.beadsId}
+                            </Badge>
+                          )}
+                        </div>
+                        <motion.button
+                          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={clearTaskContext}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          <X className="h-3 w-3" />
+                        </motion.button>
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-medium text-foreground truncate">
+                          {taskContext.title}
+                        </h4>
+                        {taskContext.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-2">
+                            {taskContext.description}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                          {taskContext.priority && (
+                            <span className="px-1.5 py-0.5 rounded bg-muted/50 capitalize">
+                              {taskContext.priority}
+                            </span>
+                          )}
+                          {taskContext.gitBranch && (
+                            <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-muted/50 font-mono">
+                              <GitBranch className="h-2.5 w-2.5" />
+                              {taskContext.gitBranch.length > 20 ? taskContext.gitBranch.slice(0, 20) + '...' : taskContext.gitBranch}
+                            </span>
+                          )}
+                          {taskContext.labels && taskContext.labels.length > 0 && (
+                            <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-muted/50">
+                              <Tag className="h-2.5 w-2.5" />
+                              {taskContext.labels.slice(0, 2).join(', ')}
+                              {taskContext.labels.length > 2 && ` +${taskContext.labels.length - 2}`}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
 
                 {/* Chat content area */}
                 <ScrollArea className="flex-1">

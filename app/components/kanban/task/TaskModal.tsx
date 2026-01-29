@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Bot, GitBranch, Trash2, MessageSquare, FileText, Gem, ScrollText, Loader2 } from "lucide-react"
+import { Bot, GitBranch, Trash2, FileText, Gem, ScrollText, Loader2, Sparkles } from "lucide-react"
 import type { Task } from "../types"
 import { useBoardStore } from "../lib/store"
 import { useSyncBeadsTask } from "../hooks/useBeadsIssues"
 import { useTranscript, getStoredWorkspace } from "../hooks/useTranscript"
 import { useWorkingDirectory } from "@/hooks/useWorkingDirectory"
+import { useAIDrawerSafe, type TaskContext } from "@/components/ai/AIDrawerProvider"
 import {
   Dialog,
   DialogContent,
@@ -18,8 +19,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { TaskDetailsForm } from "./TaskDetailsForm"
-import { TaskChat } from "./TaskChat"
 import { isBeadsTask } from "../lib/beads/mappers"
 
 export function TaskModal() {
@@ -30,6 +31,7 @@ export function TaskModal() {
   const deleteTask = useBoardStore((state) => state.deleteTask)
   const { syncTaskDetails } = useSyncBeadsTask()
   const { workingDir: globalWorkingDir } = useWorkingDirectory()
+  const aiDrawer = useAIDrawerSafe()
 
   // Get workspace from localStorage or fall back to global working dir
   const [workspace, setWorkspace] = useState<string | null>(null)
@@ -74,6 +76,24 @@ export function TaskModal() {
       deleteTask(task.id)
       handleClose()
     }
+  }
+
+  // Open AI sidebar with task context
+  const handleOpenAI = () => {
+    if (!task || !aiDrawer) return
+
+    // Build task context for AI drawer
+    const taskContext: TaskContext = {
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      priority: task.priority,
+      labels: task.labels,
+      gitBranch: task.git?.branch,
+      beadsId: isBeadsTask(task) ? task.id : undefined,
+    }
+
+    aiDrawer.openWithTaskContext(taskContext)
   }
 
   if (!task) return null
@@ -124,15 +144,36 @@ export function TaskModal() {
                 )}
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-zinc-500 hover:text-red-400 hover:bg-red-500/10"
-              onClick={handleDelete}
-              data-tabz-action="delete-task"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1">
+              {/* Open AI button */}
+              {aiDrawer && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10"
+                        onClick={handleOpenAI}
+                        data-tabz-action="open-ai-with-task"
+                      >
+                        <Sparkles className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Open AI Workspace with task context</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-zinc-500 hover:text-red-400 hover:bg-red-500/10"
+                onClick={handleDelete}
+                data-tabz-action="delete-task"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </DialogHeader>
 
@@ -142,10 +183,6 @@ export function TaskModal() {
             <TabsTrigger value="details" className="gap-1.5">
               <FileText className="h-4 w-4" />
               Details
-            </TabsTrigger>
-            <TabsTrigger value="chat" className="gap-1.5">
-              <MessageSquare className="h-4 w-4" />
-              Chat
             </TabsTrigger>
             {/* Show Transcript tab for closed beads tasks with transcript */}
             {isClosedBeadsTask && transcript?.exists && (
@@ -168,24 +205,6 @@ export function TaskModal() {
                   transition={{ duration: 0.2 }}
                 >
                   <TaskDetailsForm task={task} onUpdate={handleUpdate} />
-                </motion.div>
-              </AnimatePresence>
-            </TabsContent>
-
-            {/* Chat Tab */}
-            <TabsContent value="chat" className="mt-0 h-full">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key="chat"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                  className="space-y-4"
-                >
-                  <div className="glass-dark rounded-lg">
-                    <TaskChat task={task} />
-                  </div>
                 </motion.div>
               </AnimatePresence>
             </TabsContent>

@@ -22,6 +22,17 @@ export const DRAWER_WIDTH_VALUES: Record<AIDrawerWidth, number> = {
 // Minimized header bar width
 export const MINIMIZED_WIDTH = 320
 
+/** Task context for AI chat (from kanban or other sources) */
+export interface TaskContext {
+  id: string
+  title: string
+  description?: string
+  priority?: string
+  labels?: string[]
+  gitBranch?: string
+  beadsId?: string
+}
+
 export interface AIDrawerContextType extends UseAIChatReturn {
   /** Current drawer state: collapsed (hidden), minimized (header bar), expanded (full chat) */
   state: AIDrawerState
@@ -45,6 +56,12 @@ export interface AIDrawerContextType extends UseAIChatReturn {
   setHasActiveConversation: (value: boolean) => void
   /** Open drawer and send a message */
   openWithMessage: (content: string, options?: { projectPath?: string | null }) => Promise<void>
+  /** Open drawer with task context from kanban or other sources */
+  openWithTaskContext: (task: TaskContext, options?: { autoPrompt?: string }) => void
+  /** Currently active task context (if any) */
+  taskContext: TaskContext | null
+  /** Clear the task context */
+  clearTaskContext: () => void
   /** Input value for the chat */
   inputValue: string
   /** Set input value */
@@ -156,6 +173,9 @@ export function AIDrawerProvider({
 
   // Current section for contextual agent selection
   const [currentSection, setCurrentSection] = useState<string | null>(null)
+
+  // Task context for kanban integration
+  const [taskContext, setTaskContext] = useState<TaskContext | null>(null)
 
   // Selected agent ID (null means use recommended or default)
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(() => {
@@ -361,6 +381,63 @@ export function AIDrawerProvider({
     await sendMessage(content, { projectPath: options?.projectPath ?? selectedProjectPath })
   }, [sendMessage, selectedProjectPath])
 
+  // Build system prompt from task context
+  const buildTaskSystemPrompt = useCallback((task: TaskContext): string => {
+    const parts: string[] = []
+
+    parts.push(`You are helping with a task titled: "${task.title}"`)
+
+    if (task.description) {
+      parts.push(`\nTask description:\n${task.description}`)
+    }
+
+    if (task.gitBranch) {
+      parts.push(`\nGit branch: ${task.gitBranch}`)
+    }
+
+    if (task.beadsId) {
+      parts.push(`\nBeads issue ID: ${task.beadsId}`)
+    }
+
+    if (task.labels && task.labels.length > 0) {
+      parts.push(`\nLabels: ${task.labels.join(', ')}`)
+    }
+
+    if (task.priority) {
+      parts.push(`\nPriority: ${task.priority}`)
+    }
+
+    return parts.join('\n')
+  }, [])
+
+  // Open drawer with task context from kanban
+  const openWithTaskContext = useCallback((
+    task: TaskContext,
+    options?: { autoPrompt?: string }
+  ) => {
+    // Store the task context
+    setTaskContext(task)
+
+    // Create a new conversation for this task
+    createNewConversation()
+
+    // Expand the drawer
+    setState("expanded")
+
+    // Set the input with a suggested prompt if provided
+    if (options?.autoPrompt) {
+      setInputValue(options.autoPrompt)
+    } else {
+      // Default prompt based on task
+      setInputValue(`Help me with this task: "${task.title}"`)
+    }
+  }, [createNewConversation])
+
+  // Clear task context
+  const clearTaskContext = useCallback(() => {
+    setTaskContext(null)
+  }, [])
+
   const value: AIDrawerContextType = {
     // Spread all chat functionality
     ...chat,
@@ -380,6 +457,10 @@ export function AIDrawerProvider({
     hasActiveConversation,
     setHasActiveConversation,
     openWithMessage,
+    // Task context
+    openWithTaskContext,
+    taskContext,
+    clearTaskContext,
     // Input state
     inputValue,
     setInputValue,
