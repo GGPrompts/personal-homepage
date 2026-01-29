@@ -188,8 +188,9 @@ describe('buildCodexArgs', () => {
         codex: { maxTokens: 0 },
       })
       const args = buildCodexArgs(settings)
-      // maxTokens: 0 is falsy, so it won't be added
-      expect(args).not.toContain('--max-tokens')
+      // maxTokens: 0 is still a valid value (!== undefined)
+      expect(args).toContain('--max-tokens')
+      expect(args).toContain('0')
     })
   })
 
