@@ -15,3 +15,32 @@ export {
 } from "./ResponseVoting"
 export { DiffViewer, DiffTriggerButton } from "./DiffViewer"
 export { ExportComparison, CopyResponseButton, type ExportData } from "./ExportComparison"
+
+// Phase 4: UX Polish
+export {
+  useKeyboardShortcuts,
+  ShortcutsHelpDialog,
+  ShortcutBadge,
+  PLAYGROUND_SHORTCUTS,
+  type ShortcutAction,
+} from "./KeyboardShortcuts"
+export {
+  useComparisonHistory,
+  ComparisonHistorySheet,
+  HistoryTriggerButton,
+  type ComparisonHistoryEntry,
+} from "./ComparisonHistory"
+export {
+  useSessionManager,
+  NewSessionButton,
+  SessionStatus,
+  type SessionState,
+} from "./SessionManager"
+export {
+  PanelSkeleton,
+  MetricsSkeleton,
+  PromptInputSkeleton,
+  PlaygroundSkeleton,
+  TransitionWrapper,
+  FadeIn,
+} from "./LoadingSkeleton"

@@ -22,6 +22,12 @@ A/B testing environment for comparing AI agents and prompts side by side.
 - `components/prompts-playground/DiffViewer.tsx` - Side-by-side diff with split/unified modes
 - `components/prompts-playground/ExportComparison.tsx` - Export to Markdown/JSON, copy to clipboard
 
+**UX Polish (Phase 4):**
+- `components/prompts-playground/KeyboardShortcuts.tsx` - Shortcut hook, help dialog, shortcut badges
+- `components/prompts-playground/ComparisonHistory.tsx` - History storage, sheet UI, quick reload
+- `components/prompts-playground/SessionManager.tsx` - Auto-save/restore, new session, status indicator
+- `components/prompts-playground/LoadingSkeleton.tsx` - Loading states, fade transitions
+
 **Legacy (still used for toolbar/library):**
 - `components/prompts/ComparisonToolbar.tsx` - Actions toolbar
 - `components/prompts/ComponentLibrary.tsx` - Saved components browser
@@ -92,6 +98,28 @@ A/B testing environment for comparing AI agents and prompts side by side.
   - **Export to JSON**: Structured data for further analysis
   - **Copy to Clipboard**: Quick copy of exports
 
+- **UX Polish** (Phase 4):
+  - **Keyboard Shortcuts**: Full keyboard navigation with help dialog (press `?`)
+  - **Session Management**: Auto-save prompt/settings, restore on page load
+  - **Comparison History**: Last 20 comparisons stored, quick reload
+  - **New Session**: Clear current work and start fresh
+  - **Toast Notifications**: Feedback for all actions (copied, saved, etc.)
+  - **Loading Skeletons**: Smooth initial load with skeleton placeholders
+  - **Smooth Transitions**: Fade-in animations between states
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl/Cmd + Enter` | Send to all models |
+| `Ctrl/Cmd + N` | Add new panel |
+| `Ctrl/Cmd + E` | Toggle export dialog |
+| `Ctrl/Cmd + M` | Toggle metrics panel |
+| `Ctrl/Cmd + H` | Open comparison history |
+| `Ctrl/Cmd + Shift + N` | Start new session |
+| `Escape` | Close any open dialog |
+| `?` | Show shortcuts help |
+
 ## Model Registry
 
 Models are defined in `lib/models-registry.ts`:
@@ -144,6 +172,8 @@ Each model includes:
 | `prompts-playground-comparisons` | Saved comparison setups |
 | `prompts-playground-workspace` | Selected workspace path |
 | `prompts-playground-votes` | Voting sessions with per-prompt votes |
+| `prompts-playground-history` | Last 20 comparison results (Phase 4) |
+| `prompts-playground-session` | Current session state - prompt, settings (Phase 4) |
 
 All state persisted to localStorage.
 
