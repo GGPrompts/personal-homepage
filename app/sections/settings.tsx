@@ -1349,48 +1349,74 @@ function ImportExportTab() {
   const [importSuccess, setImportSuccess] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
-  const exportConfig = () => {
-    // Get current preferences from localStorage
-    let visibility = DEFAULT_VISIBILITY
-    let order = DEFAULT_SECTION_ORDER
+  const [isExporting, setIsExporting] = React.useState(false)
+
+  const exportConfig = async () => {
+    setIsExporting(true)
     try {
-      const saved = localStorage.getItem("section-preferences")
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        visibility = parsed.visibility || DEFAULT_VISIBILITY
-        order = parsed.order || DEFAULT_SECTION_ORDER
+      // Get current preferences from localStorage
+      let visibility = DEFAULT_VISIBILITY
+      let order = DEFAULT_SECTION_ORDER
+      try {
+        const saved = localStorage.getItem("section-preferences")
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          visibility = parsed.visibility || DEFAULT_VISIBILITY
+          order = parsed.order || DEFAULT_SECTION_ORDER
+        }
+      } catch {
+        // Use defaults
       }
-    } catch {
-      // Use defaults
-    }
 
-    const config = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      apiKeys: {
-        finnhub: getStoredApiKey("finnhub-api-key") ? "***configured***" : null,
-        alphaVantage: getStoredApiKey("alpha-vantage-api-key") ? "***configured***" : null,
-      },
-      sections: {
-        visibility,
-        order,
-      },
-      tabzChrome: {
-        token: getStoredApiKey("tabz-api-token") ? "***configured***" : null,
-        defaultWorkDir,
-      },
-    }
+      // Fetch agents from registry
+      let agents: unknown[] = []
+      try {
+        const response = await fetch('/api/ai/agents/registry')
+        if (response.ok) {
+          const data = await response.json()
+          // Strip id, created_at, updated_at from agents since they'll be regenerated on import
+          agents = (data.agents || []).map((agent: Record<string, unknown>) => {
+            const { id, created_at, updated_at, ...rest } = agent
+            return rest
+          })
+        }
+      } catch {
+        // Continue without agents
+      }
 
-    const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `personal-homepage-config-${new Date().toISOString().split("T")[0]}.json`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+      const config = {
+        version: 2,
+        exportedAt: new Date().toISOString(),
+        apiKeys: {
+          finnhub: getStoredApiKey("finnhub-api-key") ? "***configured***" : null,
+          alphaVantage: getStoredApiKey("alpha-vantage-api-key") ? "***configured***" : null,
+        },
+        sections: {
+          visibility,
+          order,
+        },
+        tabzChrome: {
+          token: getStoredApiKey("tabz-api-token") ? "***configured***" : null,
+          defaultWorkDir,
+        },
+        agents,
+      }
+
+      const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `personal-homepage-config-${new Date().toISOString().split("T")[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } finally {
+      setIsExporting(false)
+    }
   }
+
+  const [isImporting, setIsImporting] = React.useState(false)
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -1398,9 +1424,10 @@ function ImportExportTab() {
 
     setImportError(null)
     setImportSuccess(false)
+    setIsImporting(true)
 
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const config = JSON.parse(e.target?.result as string)
 
@@ -1423,11 +1450,38 @@ function ImportExportTab() {
           updateDefaultWorkDir(config.tabzChrome.defaultWorkDir)
         }
 
+        // Import agents (version 2+)
+        if (config.agents?.length) {
+          for (const agent of config.agents) {
+            // Try to create the agent first
+            const createResponse = await fetch('/api/ai/agents/registry', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(agent),
+            })
+
+            // If agent exists (409 conflict), update it instead
+            if (createResponse.status === 409) {
+              const slug = agent.name
+                .toLowerCase()
+                .replace(/\s+/g, '-')
+                .replace(/[^a-z0-9-]/g, '')
+              await fetch(`/api/ai/agents/${slug}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(agent),
+              })
+            }
+          }
+        }
+
         setImportSuccess(true)
         // Reload to apply changes
         setTimeout(() => window.location.reload(), 1500)
       } catch (err) {
         setImportError(err instanceof Error ? err.message : "Failed to parse config file")
+      } finally {
+        setIsImporting(false)
       }
     }
     reader.readAsText(file)
@@ -1469,9 +1523,9 @@ function ImportExportTab() {
             <p className="text-sm text-muted-foreground mb-4">
               Download your current settings as a JSON file. API keys are not exported for security.
             </p>
-            <Button onClick={exportConfig} data-tabz-button="export-config">
+            <Button onClick={exportConfig} disabled={isExporting} data-tabz-button="export-config">
               <Download className="h-4 w-4 mr-2" />
-              Export Config
+              {isExporting ? "Exporting..." : "Export Config"}
             </Button>
           </div>
         </div>
@@ -1498,10 +1552,11 @@ function ImportExportTab() {
             <Button
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
+              disabled={isImporting}
               data-tabz-button="import-config"
             >
               <Upload className="h-4 w-4 mr-2" />
-              Import Config
+              {isImporting ? "Importing..." : "Import Config"}
             </Button>
             {importError && (
               <p className="text-sm text-destructive mt-2">{importError}</p>
