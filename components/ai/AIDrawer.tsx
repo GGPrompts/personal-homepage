@@ -218,6 +218,13 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
     return availableAgents.find(a => a.id === selectedAgentId) ?? null
   }, [selectedAgentId, availableAgents])
 
+  // Determine which agent to display on the floating button
+  // For AI Workspace, show selected agent (if any) instead of section-recommended agent
+  const isAIWorkspace = context.currentSection === 'ai-workspace'
+  const displayAgent = isAIWorkspace
+    ? selectedAgent  // May be null - will show generic icon
+    : (recommendedAgent ?? selectedAgent)
+
   // Use shared hook for projects
   const { projects: availableProjects, isPinned } = useProjects()
 
@@ -264,18 +271,20 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                     className="h-14 w-14 rounded-full glass border-glow shadow-lg relative transition-shadow hover:shadow-xl hover:shadow-primary/20"
                     data-tabz-action="toggle-ai-drawer"
                     data-tabz-region="ai-drawer-toggle"
-                    data-tabz-agent={recommendedAgent?.id}
+                    data-tabz-agent={displayAgent?.id}
                   >
-                    {/* Show recommended agent avatar or fallback to generic icon */}
-                    {recommendedAgent ? (
+                    {/* Show selected/recommended agent avatar or fallback to generic icon */}
+                    {displayAgent ? (
                       <Avatar className="h-8 w-8">
-                        {isAvatarUrl(recommendedAgent.avatar) && (
-                          <AvatarImage src={recommendedAgent.avatar} alt={recommendedAgent.name} />
+                        {isAvatarUrl(displayAgent.avatar) && (
+                          <AvatarImage src={displayAgent.avatar} alt={displayAgent.name} />
                         )}
                         <AvatarFallback className="text-sm bg-transparent">
-                          {recommendedAgent.avatar}
+                          {displayAgent.avatar}
                         </AvatarFallback>
                       </Avatar>
+                    ) : isAIWorkspace ? (
+                      <Sparkles className="h-6 w-6" />
                     ) : (
                       <MessageSquare className="h-6 w-6" />
                     )}
@@ -291,7 +300,7 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="left">
-                  <p>{recommendedAgent?.name || 'AI Assistant'}</p>
+                  <p>{displayAgent?.name || 'AI Assistant'}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -1100,8 +1109,18 @@ export function AIDrawerToggle({ className = "", currentSection }: AIDrawerToggl
     }
   }, [context, currentSection])
 
-  // Use recommended agent from context (or fall back to local lookup)
-  const matchingAgent = context?.recommendedAgent ?? null
+  // Get selected agent from context
+  const selectedAgent = React.useMemo(() => {
+    if (!context?.selectedAgentId) return null
+    return context.availableAgents.find(a => a.id === context.selectedAgentId) ?? null
+  }, [context?.selectedAgentId, context?.availableAgents])
+
+  // For AI Workspace, show selected agent (if any) instead of section-recommended agent
+  // This allows the AI Workspace to show any agent, not just the code agent
+  const isAIWorkspace = currentSection === 'ai-workspace'
+  const matchingAgent = isAIWorkspace
+    ? selectedAgent  // May be null - will show generic icon
+    : (context?.recommendedAgent ?? selectedAgent)
 
   // Don't render if context is not available
   if (!context) return null
@@ -1120,6 +1139,10 @@ export function AIDrawerToggle({ className = "", currentSection }: AIDrawerToggl
           </AvatarFallback>
         </Avatar>
       )
+    }
+    // For AI Workspace with no agent, show sparkles icon
+    if (isAIWorkspace) {
+      return <Sparkles className="h-5 w-5" />
     }
     // Fallback to generic icon
     return <MessageSquare className="h-5 w-5" />
