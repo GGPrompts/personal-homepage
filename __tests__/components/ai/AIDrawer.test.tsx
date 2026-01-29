@@ -174,10 +174,9 @@ describe('AIDrawer', () => {
       renderWithProviders('collapsed')
 
       // The FAB should be visible - find by data-tabz attribute
-      const toggleButton = screen.getByTestId('ai-drawer-fab')
-        || screen.getAllByRole('button').find(
-          btn => btn.getAttribute('data-tabz-action') === 'toggle-ai-drawer'
-        )
+      const toggleButton = screen.getAllByRole('button').find(
+        btn => btn.getAttribute('data-tabz-action') === 'toggle-ai-drawer'
+      )
       expect(toggleButton).toBeTruthy()
     })
 
