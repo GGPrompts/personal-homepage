@@ -156,16 +156,11 @@ const formatDate = (date: Date) => {
 }
 
 const isSameDay = (d1: Date, d2: Date) => {
-  const result = (
+  return (
     d1.getFullYear() === d2.getFullYear() &&
     d1.getMonth() === d2.getMonth() &&
     d1.getDate() === d2.getDate()
   )
-  // Debug: log when comparison is true
-  if (result) {
-    console.log('isSameDay TRUE:', d1.toLocaleDateString(), d2.toLocaleDateString())
-  }
-  return result
 }
 
 const isToday = (date: Date) => {
@@ -324,10 +319,6 @@ export default function CalendarSection({
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState(new Date())
 
-  // Debug: log when selectedDate changes
-  React.useEffect(() => {
-    console.log('selectedDate state updated to:', selectedDate.toISOString())
-  }, [selectedDate])
   const [view, setView] = useState<ViewType>("month")
   const [showEventModal, setShowEventModal] = useState(false)
   const [showEventDetail, setShowEventDetail] = useState(false)
@@ -770,9 +761,7 @@ export default function CalendarSection({
   }
 
   // Render month view
-  const renderMonthView = () => {
-    console.log('renderMonthView called, selectedDate:', selectedDate.toLocaleDateString())
-    return (
+  const renderMonthView = () => (
     <div
       className="grid grid-cols-7 gap-px bg-border/30 rounded-lg overflow-hidden"
       data-tabz-region="month-view"
@@ -800,10 +789,12 @@ export default function CalendarSection({
           <div
             key={dateKey}
             onClick={() => {
-              console.log('Date clicked:', date.toISOString(), 'isSelected before:', isSelected)
               const newDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-              console.log('Setting selectedDate to:', newDate.toISOString())
               setSelectedDate(newDate)
+              // Also update currentDate if clicking a date in a different month
+              if (date.getMonth() !== currentDate.getMonth() || date.getFullYear() !== currentDate.getFullYear()) {
+                setCurrentDate(newDate)
+              }
             }}
             className={`
               min-h-[80px] md:min-h-[100px] p-1 md:p-2 cursor-pointer transition-all hover:bg-muted/50 hover:scale-[1.01] active:scale-[0.99]
@@ -852,7 +843,7 @@ export default function CalendarSection({
         )
       })}
     </div>
-  )}
+  )
 
   // Render week view
   const renderWeekView = () => (
@@ -1227,9 +1218,12 @@ export default function CalendarSection({
                 key={dateKey}
                 type="button"
                 onClick={() => {
-                  console.log('Mini calendar clicked:', date.toISOString())
-                  setSelectedDate(new Date(date))
-                  if (view === "day") setCurrentDate(new Date(date))
+                  const newDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+                  setSelectedDate(newDate)
+                  // Update currentDate for day view or if clicking a different month
+                  if (view === "day" || date.getMonth() !== currentDate.getMonth() || date.getFullYear() !== currentDate.getFullYear()) {
+                    setCurrentDate(newDate)
+                  }
                 }}
                 className={`
                   text-xs p-1 rounded-full relative transition-colors
@@ -1374,7 +1368,7 @@ export default function CalendarSection({
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Calendar View */}
         <div className="flex-1">
-          <Card key={`calendar-${view}-${selectedDate.getTime()}`} className="glass border-primary/30 p-4 md:p-6">
+          <Card className="glass border-primary/30 p-4 md:p-6">
             {view === "month" && renderMonthView()}
             {view === "week" && renderWeekView()}
             {view === "day" && renderDayView()}
