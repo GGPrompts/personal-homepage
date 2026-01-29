@@ -255,24 +255,46 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
             whileTap={shouldReduceMotion ? undefined : "tap"}
             className="fixed bottom-24 right-4 z-40"
           >
-            <Button
-              size="icon"
-              onClick={toggle}
-              className="h-14 w-14 rounded-full glass border-glow shadow-lg relative transition-shadow hover:shadow-xl hover:shadow-primary/20"
-              data-tabz-action="toggle-ai-drawer"
-              data-tabz-region="ai-drawer-toggle"
-            >
-              <MessageSquare className="h-6 w-6" />
-              {hasActiveConversation && (
-                <motion.span
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-primary"
-                >
-                  <span className="absolute inset-0 rounded-full bg-primary animate-ping opacity-75" />
-                </motion.span>
-              )}
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    onClick={toggle}
+                    className="h-14 w-14 rounded-full glass border-glow shadow-lg relative transition-shadow hover:shadow-xl hover:shadow-primary/20"
+                    data-tabz-action="toggle-ai-drawer"
+                    data-tabz-region="ai-drawer-toggle"
+                    data-tabz-agent={recommendedAgent?.id}
+                  >
+                    {/* Show recommended agent avatar or fallback to generic icon */}
+                    {recommendedAgent ? (
+                      <Avatar className="h-8 w-8">
+                        {isAvatarUrl(recommendedAgent.avatar) && (
+                          <AvatarImage src={recommendedAgent.avatar} alt={recommendedAgent.name} />
+                        )}
+                        <AvatarFallback className="text-sm bg-transparent">
+                          {recommendedAgent.avatar}
+                        </AvatarFallback>
+                      </Avatar>
+                    ) : (
+                      <MessageSquare className="h-6 w-6" />
+                    )}
+                    {hasActiveConversation && (
+                      <motion.span
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-primary"
+                      >
+                        <span className="absolute inset-0 rounded-full bg-primary animate-ping opacity-75" />
+                      </motion.span>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="left">
+                  <p>{recommendedAgent?.name || 'AI Assistant'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </motion.div>
         )}
       </AnimatePresence>

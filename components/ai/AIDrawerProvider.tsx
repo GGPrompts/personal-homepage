@@ -195,6 +195,24 @@ export function AIDrawerProvider({
     }
   }, [recommendedAgent, userHasSelectedAgent])
 
+  // When agent changes, find and switch to most recent conversation with that agent
+  useEffect(() => {
+    if (!selectedAgentId) return
+
+    // Find conversations with this agent, sorted by updatedAt (most recent first)
+    const agentConversations = chat.conversations
+      .filter(c => c.agentId === selectedAgentId)
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+
+    if (agentConversations.length > 0) {
+      // Switch to the most recent conversation with this agent
+      const mostRecent = agentConversations[0]
+      if (mostRecent.id !== chat.activeConvId) {
+        chat.setActiveConvId(mostRecent.id)
+      }
+    }
+  }, [selectedAgentId, chat.conversations, chat.activeConvId, chat.setActiveConvId])
+
   // Determine if current selection is auto-selected
   const isAgentAutoSelected = useMemo(() => {
     return !userHasSelectedAgent && selectedAgentId === recommendedAgent?.id
@@ -300,6 +318,37 @@ export function AIDrawerProvider({
     })
   }, [])
 
+  // Create new conversation with current agent
+  const createNewConversation = useCallback(() => {
+    chat.createNewConversation()
+    // Tag the new conversation with the current agent
+    if (selectedAgentId) {
+      // Small delay to ensure the conversation is created first
+      setTimeout(() => {
+        chat.setConversations(prev => {
+          if (prev.length === 0) return prev
+          const newest = prev[0] // New conversations are prepended
+          if (newest.agentId) return prev // Already tagged
+          return [{ ...newest, agentId: selectedAgentId }, ...prev.slice(1)]
+        })
+      }, 0)
+    }
+  }, [chat, selectedAgentId])
+
+  // Wrapper for sendMessage that tags conversation with agent on first message
+  const sendMessage = useCallback(async (
+    content: string,
+    options?: { projectPath?: string | null }
+  ) => {
+    // Tag conversation with agent if it's the first message and no agentId set
+    if (selectedAgentId && chat.activeConv.messages.length === 0 && !chat.activeConv.agentId) {
+      chat.setConversations(prev => prev.map(conv =>
+        conv.id === chat.activeConvId ? { ...conv, agentId: selectedAgentId } : conv
+      ))
+    }
+    return chat.sendMessage(content, options)
+  }, [chat, selectedAgentId])
+
   // Open drawer with a message
   // TODO: [code-review] sendMessage promise not caught - verify error handling in chat.sendMessage
   const openWithMessage = useCallback(async (
@@ -309,12 +358,16 @@ export function AIDrawerProvider({
     setState("expanded")
     // Small delay to let drawer animation start
     await new Promise(resolve => setTimeout(resolve, 50))
-    await chat.sendMessage(content, { projectPath: options?.projectPath ?? selectedProjectPath })
-  }, [chat, selectedProjectPath])
+    await sendMessage(content, { projectPath: options?.projectPath ?? selectedProjectPath })
+  }, [sendMessage, selectedProjectPath])
 
   const value: AIDrawerContextType = {
     // Spread all chat functionality
     ...chat,
+    // Override createNewConversation to tag with agent
+    createNewConversation,
+    // Override sendMessage to tag with agent on first message
+    sendMessage,
     // Drawer state
     state,
     open,
