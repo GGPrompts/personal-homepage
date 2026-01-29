@@ -1380,20 +1380,10 @@ export default function CalendarSection({
         {/* Calendar View */}
         <div className="flex-1">
           <Card className="glass border-primary/30 p-4 md:p-6">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={view}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3 }}
-              >
-                {view === "month" && renderMonthView()}
-                {view === "week" && renderWeekView()}
-                {view === "day" && renderDayView()}
-                {view === "agenda" && renderAgendaView()}
-              </motion.div>
-            </AnimatePresence>
+            {view === "month" && renderMonthView()}
+            {view === "week" && renderWeekView()}
+            {view === "day" && renderDayView()}
+            {view === "agenda" && renderAgendaView()}
           </Card>
         </div>
 
