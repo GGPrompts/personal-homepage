@@ -115,7 +115,10 @@ export default function AIWorkspaceSection({
   const [showAgentGallery, setShowAgentGallery] = React.useState(false)
   const [selectedAgent, setSelectedAgent] = React.useState<AgentCard | null>(null)
   const [availableAgents, setAvailableAgents] = React.useState<{ name: string; description: string; model?: string; filename: string }[]>([])
-  const [selectedProjectPath, setSelectedProjectPath] = React.useState<string | null>(null)
+  // Initialize from persisted settings (globalProjectPath)
+  const [selectedProjectPath, setSelectedProjectPath] = React.useState<string | null>(() => {
+    return settings.globalProjectPath ?? null
+  })
   // Agent editor wizard state
   const [showAgentWizard, setShowAgentWizard] = React.useState(false)
   const [editingAgent, setEditingAgent] = React.useState<AgentCard | null>(null)
@@ -179,6 +182,14 @@ export default function AIWorkspaceSection({
       }
     }
   }, [defaultWorkingDir, availableProjects, selectedProjectPath, initialProjectPath])
+
+  // Persist selectedProjectPath to settings (localStorage) when it changes
+  React.useEffect(() => {
+    // Only update if the value actually differs from persisted settings
+    if (settings.globalProjectPath !== selectedProjectPath) {
+      setSettings(prev => ({ ...prev, globalProjectPath: selectedProjectPath }))
+    }
+  }, [selectedProjectPath])
 
 
   // Restore model and project context when switching conversations

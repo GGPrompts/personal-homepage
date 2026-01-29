@@ -223,6 +223,9 @@ export interface ChatSettings {
   maxTokens: number
   systemPrompt: string
 
+  // Global project path (persisted across sessions)
+  globalProjectPath?: string | null
+
   // Quick prompts
   suggestedPrompts?: SuggestedPrompt[]
 
