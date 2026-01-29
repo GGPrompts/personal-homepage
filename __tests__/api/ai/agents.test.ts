@@ -9,6 +9,7 @@ vi.mock('fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs/promises')>()
   return {
     ...actual,
+    default: actual,
     readdir: vi.fn(),
     readFile: vi.fn(),
   }
@@ -18,6 +19,7 @@ vi.mock('os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('os')>()
   return {
     ...actual,
+    default: actual,
     homedir: vi.fn(() => '/home/testuser'),
   }
 })

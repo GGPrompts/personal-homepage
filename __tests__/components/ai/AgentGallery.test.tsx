@@ -111,8 +111,12 @@ describe('AgentGallery', () => {
       renderGallery()
 
       expect(screen.getByText('All')).toBeInTheDocument()
-      expect(screen.getByText('development')).toBeInTheDocument()
-      expect(screen.getByText('analytics')).toBeInTheDocument()
+      // Section names appear both in filter chips and agent cards
+      // Check for filter button with "development" text
+      const devButtons = screen.getAllByRole('button', { name: /development/i })
+      expect(devButtons.length).toBeGreaterThanOrEqual(1)
+      const analyticsButtons = screen.getAllByRole('button', { name: /analytics/i })
+      expect(analyticsButtons.length).toBeGreaterThanOrEqual(1)
     })
   })
 
