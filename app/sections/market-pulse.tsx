@@ -371,6 +371,7 @@ export default function MarketPulseSection({ activeSubItem, onSubItemHandled }: 
                     tick={{ fontSize: 12 }}
                   />
                   <RechartsTooltip
+                    cursor={{ fill: 'hsl(var(--primary) / 0.1)' }}
                     content={({ active, payload, label }) => (
                       <CustomChartTooltip
                         active={active}
@@ -476,6 +477,7 @@ export default function MarketPulseSection({ activeSubItem, onSubItemHandled }: 
                       tickFormatter={(value) => formatSalary(value)}
                     />
                     <RechartsTooltip
+                      cursor={{ fill: 'hsl(var(--primary) / 0.1)' }}
                       content={({ active, payload }) => (
                         <CustomChartTooltip
                           active={active}
@@ -520,6 +522,7 @@ export default function MarketPulseSection({ activeSubItem, onSubItemHandled }: 
                     domain={['auto', 'auto']}
                   />
                   <RechartsTooltip
+                    cursor={{ stroke: 'hsl(var(--primary) / 0.3)', strokeWidth: 1 }}
                     content={({ active, payload, label }) => (
                       <CustomChartTooltip
                         active={active}
