@@ -15,7 +15,15 @@ const CLAUDE_PATHS = [
   join(homedir(), '.claude', 'local', 'claude'),   // claude local install
   '/usr/local/bin/claude',                          // system install
 ]
-const CLAUDE_BIN = CLAUDE_PATHS.find(p => existsSync(p)) || 'claude'
+
+// Debug: log what we find
+const foundPath = CLAUDE_PATHS.find(p => {
+  const exists = existsSync(p)
+  console.log(`[Claude CLI] Checking ${p}: ${exists ? 'EXISTS' : 'NOT FOUND'}`)
+  return exists
+})
+const CLAUDE_BIN = foundPath || 'claude'
+console.log(`[Claude CLI] Using binary: ${CLAUDE_BIN}`)
 
 // Content block types from Claude CLI stream-json
 interface TextBlock {
@@ -244,22 +252,50 @@ export async function streamClaude(
   // Always add the prompt as the last argument
   args.push(lastUserMessage.content)
 
+  // Expand ~ to home directory (Node.js spawn doesn't do this automatically)
+  const expandTilde = (path: string): string => {
+    if (path.startsWith('~/')) {
+      return join(homedir(), path.slice(2))
+    }
+    if (path === '~') {
+      return homedir()
+    }
+    return path
+  }
+
   // Determine working directory based on agent mode
   // - 'user' mode: Use agent's directory (no beads hooks, gets agent's CLAUDE.md)
   // - 'dev' mode (default): Use provided cwd or process.cwd() for full dev context
-  let effectiveCwd = cwd || process.cwd()
+  let effectiveCwd = cwd ? expandTilde(cwd) : process.cwd()
   if (settings?.agentMode === 'user') {
     if (settings?.agentDir) {
       // Use agent's directory - has .claude/settings.json that disables hooks
       // and includes the agent's CLAUDE.md for personality
-      effectiveCwd = settings.agentDir.startsWith('/')
-        ? settings.agentDir
-        : join(process.cwd(), settings.agentDir)
+      // Path resolution:
+      // - Absolute paths (/path/to/agent): use as-is
+      // - Tilde paths (~/path): expand to home directory
+      // - Relative paths with ./ prefix: relative to Next.js project (process.cwd())
+      // - Plain relative paths: relative to home directory (user context)
+      if (settings.agentDir.startsWith('/')) {
+        effectiveCwd = settings.agentDir
+      } else if (settings.agentDir.startsWith('~/')) {
+        effectiveCwd = join(homedir(), settings.agentDir.slice(2))
+      } else if (settings.agentDir.startsWith('./')) {
+        effectiveCwd = join(process.cwd(), settings.agentDir.slice(2))
+      } else {
+        // Plain relative paths resolve from home directory for 'user' mode
+        effectiveCwd = join(homedir(), settings.agentDir)
+      }
     } else {
       // Fallback to home directory if no agentDir specified
       effectiveCwd = homedir()
     }
   }
+
+  console.log(`[Claude CLI] Spawning: ${CLAUDE_BIN}`)
+  console.log(`[Claude CLI] Args: ${args.slice(0, 5).join(' ')}...`)
+  console.log(`[Claude CLI] CWD: ${effectiveCwd}`)
+  console.log(`[Claude CLI] Binary exists at spawn time: ${existsSync(CLAUDE_BIN)}`)
 
   const claude = spawn(CLAUDE_BIN, args, {
     env: {
