@@ -236,6 +236,7 @@ function useCalendars(accessToken: string | null) {
     },
     enabled: !!accessToken,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -295,6 +296,7 @@ function useCalendarEvents(
     },
     enabled: !!accessToken && visibleCalendarIds.length > 0,
     staleTime: 1 * 60 * 1000, // 1 minute
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -318,7 +320,6 @@ export default function CalendarSection({
   // UI State
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState(new Date())
-
   const [view, setView] = useState<ViewType>("month")
   const [showEventModal, setShowEventModal] = useState(false)
   const [showEventDetail, setShowEventDetail] = useState(false)
@@ -778,28 +779,21 @@ export default function CalendarSection({
       ))}
 
       {/* Date cells */}
-      {getMonthGrid.map((date) => {
+      {getMonthGrid.map((date, idx) => {
         const isCurrentMonth = date.getMonth() === currentDate.getMonth()
         const dayEvents = getEventsForDate(date)
         const isSelected = isSameDay(date, selectedDate)
         const isTodayDate = isToday(date)
-        const dateKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
 
         return (
           <div
-            key={dateKey}
-            onClick={() => {
-              const newDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-              setSelectedDate(newDate)
-              // Also update currentDate if clicking a date in a different month
-              if (date.getMonth() !== currentDate.getMonth() || date.getFullYear() !== currentDate.getFullYear()) {
-                setCurrentDate(newDate)
-              }
-            }}
+            key={idx}
+            onClick={() => setSelectedDate(date)}
             className={`
-              min-h-[80px] md:min-h-[100px] p-1 md:p-2 cursor-pointer transition-all hover:bg-muted/50 hover:scale-[1.01] active:scale-[0.99]
+              min-h-[80px] md:min-h-[100px] p-1 md:p-2 cursor-pointer transition-all
               ${isCurrentMonth ? "glass" : "glass-dark opacity-50"}
-              ${isSelected ? "ring-2 ring-primary ring-inset" : ""}
+              ${isSelected ? "!border-2 !border-primary border-glow" : ""}
+              hover:bg-muted/30
             `}
             data-tabz-item={date.toISOString()}
           >
@@ -814,13 +808,14 @@ export default function CalendarSection({
             </div>
             <div className="space-y-0.5">
               {dayEvents.slice(0, 3).map((event) => (
-                <div
+                <motion.div
                   key={event.id}
+                  whileHover={{ scale: 1.02 }}
                   onClick={(e) => {
                     e.stopPropagation()
                     handleEventClick(event)
                   }}
-                  className="text-xs truncate px-1 py-0.5 rounded cursor-pointer hover:scale-[1.02] transition-transform"
+                  className="text-xs truncate px-1 py-0.5 rounded cursor-pointer"
                   style={{
                     backgroundColor: `${event.color}20`,
                     borderLeft: `2px solid ${event.color}`,
@@ -831,7 +826,7 @@ export default function CalendarSection({
                     className="md:hidden w-full h-1 block rounded"
                     style={{ backgroundColor: event.color }}
                   />
-                </div>
+                </motion.div>
               ))}
               {dayEvents.length > 3 && (
                 <div className="text-xs text-muted-foreground px-1">
@@ -1206,24 +1201,18 @@ export default function CalendarSection({
               {day}
             </div>
           ))}
-          {miniGrid.map((date) => {
+          {miniGrid.map((date, idx) => {
             const isCurrentMonth = date.getMonth() === currentDate.getMonth()
             const isSelected = isSameDay(date, selectedDate)
             const isTodayDate = isToday(date)
             const hasEvents = getEventsForDate(date).length > 0
-            const dateKey = `mini-${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
 
             return (
               <button
-                key={dateKey}
-                type="button"
+                key={idx}
                 onClick={() => {
-                  const newDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-                  setSelectedDate(newDate)
-                  // Update currentDate for day view or if clicking a different month
-                  if (view === "day" || date.getMonth() !== currentDate.getMonth() || date.getFullYear() !== currentDate.getFullYear()) {
-                    setCurrentDate(newDate)
-                  }
+                  setSelectedDate(date)
+                  if (view === "day") setCurrentDate(date)
                 }}
                 className={`
                   text-xs p-1 rounded-full relative transition-colors
@@ -1365,14 +1354,29 @@ export default function CalendarSection({
       </motion.div>
 
       {/* Main Content */}
-      <div className="flex flex-col lg:flex-row gap-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+        className="flex flex-col lg:flex-row gap-6"
+      >
         {/* Calendar View */}
         <div className="flex-1">
           <Card className="glass border-primary/30 p-4 md:p-6">
-            {view === "month" && renderMonthView()}
-            {view === "week" && renderWeekView()}
-            {view === "day" && renderDayView()}
-            {view === "agenda" && renderAgendaView()}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={view}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                {view === "month" && renderMonthView()}
+                {view === "week" && renderWeekView()}
+                {view === "day" && renderDayView()}
+                {view === "agenda" && renderAgendaView()}
+              </motion.div>
+            </AnimatePresence>
           </Card>
         </div>
 
@@ -1458,7 +1462,7 @@ export default function CalendarSection({
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </motion.div>
 
       {/* Quick Add Popover */}
       <AnimatePresence>
@@ -1511,7 +1515,7 @@ export default function CalendarSection({
 
       {/* Event Creation Modal */}
       <Dialog open={showEventModal} onOpenChange={setShowEventModal}>
-        <DialogContent className="glass border-primary/30 max-w-lg" aria-describedby={undefined}>
+        <DialogContent className="glass border-primary/30 max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-foreground">Create Event</DialogTitle>
           </DialogHeader>
@@ -1638,7 +1642,7 @@ export default function CalendarSection({
 
       {/* Event Detail Modal */}
       <Dialog open={showEventDetail} onOpenChange={setShowEventDetail}>
-        <DialogContent className="glass border-primary/30 max-w-lg" aria-describedby={undefined}>
+        <DialogContent className="glass border-primary/30 max-w-lg">
           {selectedEvent && (
             <>
               <DialogHeader>
