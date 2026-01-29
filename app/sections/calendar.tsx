@@ -787,10 +787,11 @@ export default function CalendarSection({
         return (
           <motion.div
             key={dateKey}
-            whileHover={{ backgroundColor: "hsl(var(--muted) / 0.5)" }}
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
             onClick={() => setSelectedDate(date)}
             className={`
-              min-h-[80px] md:min-h-[100px] p-1 md:p-2 cursor-pointer transition-colors
+              min-h-[80px] md:min-h-[100px] p-1 md:p-2 cursor-pointer transition-colors hover:bg-muted/50
               ${isCurrentMonth ? "glass" : "glass-dark opacity-50"}
               ${isSelected ? "ring-2 ring-primary ring-inset" : ""}
             `}
@@ -1515,7 +1516,7 @@ export default function CalendarSection({
 
       {/* Event Creation Modal */}
       <Dialog open={showEventModal} onOpenChange={setShowEventModal}>
-        <DialogContent className="glass border-primary/30 max-w-lg">
+        <DialogContent className="glass border-primary/30 max-w-lg" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="text-foreground">Create Event</DialogTitle>
           </DialogHeader>
@@ -1642,7 +1643,7 @@ export default function CalendarSection({
 
       {/* Event Detail Modal */}
       <Dialog open={showEventDetail} onOpenChange={setShowEventDetail}>
-        <DialogContent className="glass border-primary/30 max-w-lg">
+        <DialogContent className="glass border-primary/30 max-w-lg" aria-describedby={undefined}>
           {selectedEvent && (
             <>
               <DialogHeader>
