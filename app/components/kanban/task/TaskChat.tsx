@@ -110,7 +110,7 @@ export function TaskChat({ task }: TaskChatProps) {
   }
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col w-full">
       {/* Agent Header */}
       <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
         <div className="flex items-center gap-3">
