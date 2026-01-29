@@ -8,13 +8,17 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
 import { Button } from "@/components/ui/button"
-import { DynamicBrowserPanel } from "./DynamicBrowserPanel"
+import { DynamicBrowserPanel, type PanelResponse } from "./DynamicBrowserPanel"
 import type { PanelConfig } from "@/lib/prompts-playground"
 
 type ViewMode = "grid" | "horizontal" | "vertical"
 
+// Map of panel ID to response state
+export type PanelResponses = Map<string, PanelResponse>
+
 interface DynamicPanelViewerProps {
   panels: PanelConfig[]
+  responses?: PanelResponses
   viewMode?: ViewMode
   onPanelChange: (panelId: string, config: Partial<PanelConfig>) => void
   onRefresh: (panelId: string) => void
@@ -25,6 +29,7 @@ interface DynamicPanelViewerProps {
 
 export function DynamicPanelViewer({
   panels,
+  responses,
   viewMode = "grid",
   onPanelChange,
   onRefresh,
@@ -40,6 +45,8 @@ export function DynamicPanelViewer({
     setFullscreenPanel(fullscreenPanel === panelId ? null : panelId)
   }
 
+  const getResponse = (panelId: string) => responses?.get(panelId)
+
   // If a panel is fullscreen, only show that panel
   if (fullscreenPanel !== null) {
     const panel = panels.find((p) => p.id === fullscreenPanel)
@@ -52,6 +59,7 @@ export function DynamicPanelViewer({
       <div className="h-full" data-tabz-region="panel-viewer">
         <DynamicBrowserPanel
           config={panel}
+          response={getResponse(panel.id)}
           isFullscreen={true}
           canRemove={panels.length > 1}
           onConfigChange={(updates) => onPanelChange(panel.id, updates)}
@@ -71,6 +79,7 @@ export function DynamicPanelViewer({
         <div className="flex-1">
           <DynamicBrowserPanel
             config={panels[0]}
+            response={getResponse(panels[0].id)}
             isFullscreen={false}
             canRemove={false}
             onConfigChange={(updates) => onPanelChange(panels[0].id, updates)}
@@ -103,6 +112,7 @@ export function DynamicPanelViewer({
                   <div className="h-full p-1">
                     <DynamicBrowserPanel
                       config={panel}
+                      response={getResponse(panel.id)}
                       isFullscreen={false}
                       canRemove={panels.length > 1}
                       onConfigChange={(updates) =>
@@ -142,6 +152,7 @@ export function DynamicPanelViewer({
                   <div className="h-full p-1">
                     <DynamicBrowserPanel
                       config={panel}
+                      response={getResponse(panel.id)}
                       isFullscreen={false}
                       canRemove={panels.length > 1}
                       onConfigChange={(updates) =>
@@ -169,6 +180,7 @@ export function DynamicPanelViewer({
       <div className="flex-1">
         <GridLayout
           panels={panels}
+          responses={responses}
           onPanelChange={onPanelChange}
           onRefresh={onRefresh}
           onSave={onSave}
@@ -183,6 +195,7 @@ export function DynamicPanelViewer({
 
 interface GridLayoutProps {
   panels: PanelConfig[]
+  responses?: PanelResponses
   onPanelChange: (panelId: string, config: Partial<PanelConfig>) => void
   onRefresh: (panelId: string) => void
   onSave: (panelId: string) => void
@@ -192,6 +205,7 @@ interface GridLayoutProps {
 
 function GridLayout({
   panels,
+  responses,
   onPanelChange,
   onRefresh,
   onSave,
@@ -208,6 +222,8 @@ function GridLayout({
   for (let i = 0; i < rows; i++) {
     panelRows.push(panels.slice(i * cols, (i + 1) * cols))
   }
+
+  const getResponse = (panelId: string) => responses?.get(panelId)
 
   return (
     <ResizablePanelGroup direction="vertical" className="h-full">
@@ -230,6 +246,7 @@ function GridLayout({
                     <div className="h-full p-1">
                       <DynamicBrowserPanel
                         config={panel}
+                        response={getResponse(panel.id)}
                         isFullscreen={false}
                         canRemove={panels.length > 1}
                         onConfigChange={(updates) =>

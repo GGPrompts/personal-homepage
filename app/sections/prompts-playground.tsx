@@ -3,16 +3,16 @@
 import * as React from "react"
 import { Beaker, Grid2X2, Columns, Rows } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { DynamicPanelViewer } from "@/components/prompts-playground/DynamicPanelViewer"
-import { WorkspacePicker } from "@/components/prompts-playground/WorkspacePicker"
+import { DynamicPanelViewer, type PanelResponses } from "@/components/prompts-playground/DynamicPanelViewer"
+import { type PanelResponse } from "@/components/prompts-playground/DynamicBrowserPanel"
+import { WorkspacePicker, useWorkspace } from "@/components/prompts-playground/WorkspacePicker"
+import { PromptInput } from "@/components/prompts-playground/PromptInput"
 import { ComparisonToolbar } from "@/components/prompts/ComparisonToolbar"
 import { SaveComponentDialog } from "@/components/prompts/SaveComponentDialog"
 import { ComponentLibrary } from "@/components/prompts/ComponentLibrary"
@@ -45,6 +45,9 @@ export default function PromptsPlaygroundSection({
   // Panel configs - now dynamic array
   const [panels, setPanels] = React.useState<PanelConfig[]>(loadPanelConfigs)
 
+  // Panel responses - map of panelId -> response state
+  const [responses, setResponses] = React.useState<PanelResponses>(new Map())
+
   // Saved data
   const [savedComponents, setSavedComponents] =
     React.useState<SavedComponent[]>(loadSavedComponents)
@@ -53,10 +56,15 @@ export default function PromptsPlaygroundSection({
 
   // UI state
   const [currentPrompt, setCurrentPrompt] = React.useState("")
+  const [systemPrompt, setSystemPrompt] = React.useState("")
   const [libraryOpen, setLibraryOpen] = React.useState(false)
   const [saveDialogOpen, setSaveDialogOpen] = React.useState(false)
   const [savingPanelId, setSavingPanelId] = React.useState<string | null>(null)
   const [viewMode, setViewMode] = React.useState<ViewMode>("grid")
+  const [isRunning, setIsRunning] = React.useState(false)
+
+  // Workspace hook
+  const [workspace] = useWorkspace()
 
   // Handle sub-item navigation
   React.useEffect(() => {
@@ -109,6 +117,12 @@ export default function PromptsPlaygroundSection({
   // Remove a panel by ID
   const handleRemovePanel = (panelId: string) => {
     setPanels((prev) => removePanel(prev, panelId))
+    // Also remove any response for this panel
+    setResponses((prev) => {
+      const next = new Map(prev)
+      next.delete(panelId)
+      return next
+    })
   }
 
   // Screenshot all panels (placeholder - would need html2canvas or similar)
@@ -160,6 +174,81 @@ export default function PromptsPlaygroundSection({
   const handleDeleteComparison = (id: string) => {
     setSavedComparisons((prev) => prev.filter((c) => c.id !== id))
   }
+
+  // Send prompt to all panels with selected models
+  const handleSendToAll = async (prompt: string, sysPrompt?: string) => {
+    // Get panels with models selected
+    const panelsWithModels = panels.filter((p) => p.modelId)
+
+    if (panelsWithModels.length === 0) {
+      console.warn("No panels have models selected")
+      return
+    }
+
+    setIsRunning(true)
+
+    // Initialize all responses as loading
+    setResponses((prev) => {
+      const next = new Map(prev)
+      for (const panel of panelsWithModels) {
+        next.set(panel.id, {
+          content: "",
+          isLoading: true,
+        })
+      }
+      return next
+    })
+
+    // Invoke all models in parallel
+    const invocations = panelsWithModels.map(async (panel) => {
+      try {
+        const response = await fetch("/api/prompts-playground/invoke", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            modelId: panel.modelId,
+            prompt,
+            systemPrompt: sysPrompt || panel.agentConfig?.systemPrompt,
+            workspace: workspace || undefined,
+          }),
+        })
+
+        const result = await response.json()
+
+        // Update this panel's response
+        setResponses((prev) => {
+          const next = new Map(prev)
+          next.set(panel.id, {
+            content: result.response || "",
+            timing: result.timing,
+            error: result.error,
+            isLoading: false,
+          })
+          return next
+        })
+      } catch (error) {
+        // Update with error
+        setResponses((prev) => {
+          const next = new Map(prev)
+          next.set(panel.id, {
+            content: "",
+            error: error instanceof Error ? error.message : "Unknown error",
+            isLoading: false,
+          })
+          return next
+        })
+      }
+    })
+
+    await Promise.allSettled(invocations)
+    setIsRunning(false)
+  }
+
+  // Count loading/total for progress indicator
+  const loadingCount = Array.from(responses.values()).filter(
+    (r) => r.isLoading
+  ).length
+  const totalWithModels = panels.filter((p) => p.modelId).length
 
   return (
     <TooltipProvider>
@@ -234,16 +323,16 @@ export default function PromptsPlaygroundSection({
         </div>
 
         {/* Prompt Input */}
-        <div className="flex-shrink-0 space-y-2">
-          <Label className="text-xs text-muted-foreground">
-            Current Prompt (for reference when saving)
-          </Label>
-          <Textarea
+        <div className="flex-shrink-0">
+          <PromptInput
             value={currentPrompt}
-            onChange={(e) => setCurrentPrompt(e.target.value)}
-            placeholder="Enter the prompt you're testing across all agents..."
-            className="h-20 font-mono text-sm resize-none"
-            data-tabz-input="current-prompt"
+            onChange={setCurrentPrompt}
+            onSendToAll={handleSendToAll}
+            isLoading={isRunning}
+            loadingCount={loadingCount}
+            totalCount={totalWithModels}
+            systemPrompt={systemPrompt}
+            onSystemPromptChange={setSystemPrompt}
           />
         </div>
 
@@ -251,6 +340,7 @@ export default function PromptsPlaygroundSection({
         <div className="flex-1 min-h-0">
           <DynamicPanelViewer
             panels={panels}
+            responses={responses}
             viewMode={viewMode}
             onPanelChange={handlePanelChange}
             onRefresh={handleRefresh}

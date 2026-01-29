@@ -1,4 +1,5 @@
 export { ModelSelector, ModelBadge } from "./ModelSelector"
 export { WorkspacePicker, useWorkspace } from "./WorkspacePicker"
-export { DynamicPanelViewer } from "./DynamicPanelViewer"
-export { DynamicBrowserPanel } from "./DynamicBrowserPanel"
+export { DynamicPanelViewer, type PanelResponses } from "./DynamicPanelViewer"
+export { DynamicBrowserPanel, type PanelResponse } from "./DynamicBrowserPanel"
+export { PromptInput } from "./PromptInput"
