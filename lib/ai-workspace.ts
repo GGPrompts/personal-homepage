@@ -134,10 +134,10 @@ export function accumulateUsage(
     lastUpdated: new Date()
   }
 
-  // For context tracking, input_tokens represents current context size
-  // cacheReadTokens are tokens read from cache (efficient reuse)
+  // For context tracking, input_tokens represents actual new context being consumed
+  // cacheReadTokens are tokens read from cache (reused from previous prompts, not new context)
   // cacheCreationTokens are tokens being cached for future use
-  // The effective context size is approximately input_tokens + cacheReadTokens
+  // Only input_tokens + output_tokens count toward actual context window usage
   const newInputTokens = prev.inputTokens + messageUsage.inputTokens
   const newCacheRead = prev.cacheReadTokens + (messageUsage.cacheReadTokens || 0)
   const newCacheCreation = prev.cacheCreationTokens + (messageUsage.cacheCreationTokens || 0)
@@ -148,8 +148,8 @@ export function accumulateUsage(
     cacheReadTokens: newCacheRead,
     cacheCreationTokens: newCacheCreation,
     // Context is the current input context window being used
-    // Latest input_tokens reflects current context size (not cumulative)
-    contextTokens: messageUsage.inputTokens + (messageUsage.cacheReadTokens || 0),
+    // Only count input_tokens (not cache_read which is reused content, not new context)
+    contextTokens: messageUsage.inputTokens,
     messageCount: prev.messageCount + 1,
     lastUpdated: new Date()
   }
