@@ -785,13 +785,14 @@ export default function CalendarSection({
         const dateKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
 
         return (
-          <motion.div
+          <div
             key={dateKey}
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            onClick={() => setSelectedDate(date)}
+            onClick={() => {
+              console.log('Date clicked:', date.toISOString())
+              setSelectedDate(new Date(date))
+            }}
             className={`
-              min-h-[80px] md:min-h-[100px] p-1 md:p-2 cursor-pointer transition-colors hover:bg-muted/50
+              min-h-[80px] md:min-h-[100px] p-1 md:p-2 cursor-pointer transition-all hover:bg-muted/50 hover:scale-[1.01] active:scale-[0.99]
               ${isCurrentMonth ? "glass" : "glass-dark opacity-50"}
               ${isSelected ? "ring-2 ring-primary ring-inset" : ""}
             `}
@@ -808,14 +809,13 @@ export default function CalendarSection({
             </div>
             <div className="space-y-0.5">
               {dayEvents.slice(0, 3).map((event) => (
-                <motion.div
+                <div
                   key={event.id}
-                  whileHover={{ scale: 1.02 }}
                   onClick={(e) => {
                     e.stopPropagation()
                     handleEventClick(event)
                   }}
-                  className="text-xs truncate px-1 py-0.5 rounded cursor-pointer"
+                  className="text-xs truncate px-1 py-0.5 rounded cursor-pointer hover:scale-[1.02] transition-transform"
                   style={{
                     backgroundColor: `${event.color}20`,
                     borderLeft: `2px solid ${event.color}`,
@@ -826,7 +826,7 @@ export default function CalendarSection({
                     className="md:hidden w-full h-1 block rounded"
                     style={{ backgroundColor: event.color }}
                   />
-                </motion.div>
+                </div>
               ))}
               {dayEvents.length > 3 && (
                 <div className="text-xs text-muted-foreground px-1">
@@ -834,7 +834,7 @@ export default function CalendarSection({
                 </div>
               )}
             </div>
-          </motion.div>
+          </div>
         )
       })}
     </div>
@@ -1211,9 +1211,11 @@ export default function CalendarSection({
             return (
               <button
                 key={dateKey}
+                type="button"
                 onClick={() => {
-                  setSelectedDate(date)
-                  if (view === "day") setCurrentDate(date)
+                  console.log('Mini calendar clicked:', date.toISOString())
+                  setSelectedDate(new Date(date))
+                  if (view === "day") setCurrentDate(new Date(date))
                 }}
                 className={`
                   text-xs p-1 rounded-full relative transition-colors
