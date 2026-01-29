@@ -143,6 +143,10 @@ export default function EmailSection({
   const [showSidebar, setShowSidebar] = useState(true)
   const [showFilters, setShowFilters] = useState(false)
   const [filterLabel, setFilterLabel] = useState<string | null>(null)
+  // Pagination state
+  const [allEmails, setAllEmails] = useState<Email[]>([])
+  const [nextPageToken, setNextPageToken] = useState<string | null>(null)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [composeData, setComposeData] = useState({
     to: "",
     cc: "",
@@ -269,7 +273,7 @@ export default function EmailSection({
       if (!token) throw new Error("Not authenticated")
 
       const params = new URLSearchParams({
-        maxResults: "30",
+        maxResults: "50",
         labelIds: selectedFolder,
       })
 
@@ -288,20 +292,56 @@ export default function EmailSection({
       }
 
       const data = await response.json()
-      // Parse dates
-      return {
-        ...data,
-        messages: (data.messages || []).map((m: any) => ({
-          ...m,
-          date: new Date(m.date),
-        })),
-      }
+      // Parse dates and store for pagination
+      const messages = (data.messages || []).map((m: any) => ({
+        ...m,
+        date: new Date(m.date),
+      }))
+      setAllEmails(messages)
+      setNextPageToken(data.nextPageToken || null)
+      return { ...data, messages }
     },
     enabled: isConnected,
     staleTime: 1 * 60 * 1000,
   })
 
-  const emails: Email[] = emailsData?.messages || []
+  // Load more emails (pagination)
+  const loadMoreEmails = async () => {
+    if (!nextPageToken || isLoadingMore) return
+    setIsLoadingMore(true)
+    try {
+      const token = await getAccessToken()
+      if (!token) return
+
+      const params = new URLSearchParams({
+        maxResults: "50",
+        labelIds: selectedFolder,
+        pageToken: nextPageToken,
+      })
+
+      if (searchQuery) {
+        params.set("q", searchQuery)
+      }
+
+      const response = await fetch(`/api/gmail/messages?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const newMessages = (data.messages || []).map((m: any) => ({
+          ...m,
+          date: new Date(m.date),
+        }))
+        setAllEmails(prev => [...prev, ...newMessages])
+        setNextPageToken(data.nextPageToken || null)
+      }
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }
+
+  const emails: Email[] = allEmails.length > 0 ? allEmails : (emailsData?.messages || [])
 
   // Filter emails by label
   const filteredEmails = useMemo(() => {
@@ -951,6 +991,7 @@ export default function EmailSection({
                 ))}
               </div>
             ) : (
+              <>
               <AnimatePresence mode="popLayout">
                 {filteredEmails.length === 0 ? (
                   <motion.div
@@ -1054,6 +1095,27 @@ export default function EmailSection({
                   ))
                 )}
               </AnimatePresence>
+              {/* Load More Button */}
+              {nextPageToken && (
+                <div className="p-4 flex justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={loadMoreEmails}
+                    disabled={isLoadingMore}
+                    className="w-full max-w-xs"
+                  >
+                    {isLoadingMore ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Loading more...
+                      </>
+                    ) : (
+                      <>Load More Emails</>
+                    )}
+                  </Button>
+                </div>
+              )}
+              </>
             )}
           </ScrollArea>
         </div>
