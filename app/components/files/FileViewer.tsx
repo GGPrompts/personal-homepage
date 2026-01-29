@@ -100,27 +100,34 @@ interface CodeViewerProps {
   content: string
   language?: string
   lineCount?: number
+  fontSize?: number
+  fontFamily?: string
 }
 
-function CodeViewer({ content, language = 'text', lineCount }: CodeViewerProps) {
+function CodeViewer({ content, language = 'text', lineCount, fontSize = 16, fontFamily = 'JetBrains Mono' }: CodeViewerProps) {
+  // Build font-family CSS value
+  const fontFamilyValue = fontFamily === 'monospace'
+    ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
+    : `"${fontFamily}", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace`
+
   // Custom style to match glass-dark aesthetic
-  const customStyle = {
+  const customStyle = useMemo(() => ({
     ...oneDark,
     'pre[class*="language-"]': {
       ...oneDark['pre[class*="language-"]'],
       background: 'transparent',
       margin: 0,
       padding: '1rem',
-      fontSize: '13px',
+      fontSize: `${fontSize}px`,
       lineHeight: '1.5',
     },
     'code[class*="language-"]': {
       ...oneDark['code[class*="language-"]'],
       background: 'transparent',
-      fontSize: '13px',
-      fontFamily: 'var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+      fontSize: `${fontSize}px`,
+      fontFamily: fontFamilyValue,
     },
-  }
+  }), [fontSize, fontFamilyValue])
 
   return (
     <div className="relative h-full" data-tabz-region="code-viewer">
@@ -146,6 +153,7 @@ function CodeViewer({ content, language = 'text', lineCount }: CodeViewerProps) 
             color: 'hsl(var(--muted-foreground))',
             opacity: 0.5,
             userSelect: 'none',
+            fontSize: `${fontSize}px`,
           }}
           wrapLines
           customStyle={{
@@ -538,9 +546,11 @@ function TTSControls({ content, className }: TTSControlsProps) {
 
 interface FileContentProps {
   file: OpenFile
+  fontSize?: number
+  fontFamily?: string
 }
 
-function FileContent({ file }: FileContentProps) {
+function FileContent({ file, fontSize, fontFamily }: FileContentProps) {
   if (file.loading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -639,7 +649,7 @@ function FileContent({ file }: FileContentProps) {
         gql: 'graphql',
       }
       const language = languageMap[ext] || 'text'
-      return <CodeViewer content={file.content} language={language} lineCount={file.lineCount} />
+      return <CodeViewer content={file.content} language={language} lineCount={file.lineCount} fontSize={fontSize} fontFamily={fontFamily} />
   }
 }
 
@@ -648,7 +658,7 @@ function FileContent({ file }: FileContentProps) {
 // ============================================================================
 
 export function FileViewer() {
-  const { openFiles, activeFileId, setActiveFileId, closeFile, pinFile } = useFilesContext()
+  const { openFiles, activeFileId, setActiveFileId, closeFile, pinFile, viewerSettings } = useFilesContext()
 
   const activeFile = useMemo(() => {
     return openFiles.find(f => f.id === activeFileId)
@@ -705,7 +715,7 @@ export function FileViewer() {
       {/* File Content Area */}
       <div className="flex-1 overflow-hidden bg-background/50">
         {activeFile ? (
-          <FileContent file={activeFile} />
+          <FileContent file={activeFile} fontSize={viewerSettings.fontSize} fontFamily={viewerSettings.fontFamily} />
         ) : (
           <div className="h-full flex items-center justify-center text-muted-foreground">
             <span className="text-sm">No file selected</span>

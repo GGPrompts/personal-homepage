@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react'
 import { getFileTypeAndLanguage, FileType } from '@/lib/fileTypeUtils'
 import { FileFilter } from '@/lib/claudeFileTypes'
+import { useFileViewerSettings, type FileViewerSettings } from '@/hooks/useFileViewerSettings'
 
 // Types
 interface FileNode {
@@ -154,11 +155,20 @@ interface FilesContextType {
   openFile: (path: string, pin?: boolean) => Promise<void>
   closeFile: (id: string) => void
   pinFile: (id: string) => void
+
+  // File viewer settings
+  viewerSettings: FileViewerSettings
+  setFontSize: (fontSize: number) => void
+  setFontFamily: (fontFamily: string) => void
+  setMaxDepth: (maxDepth: number) => void
 }
 
 const FilesContext = createContext<FilesContextType | null>(null)
 
 export function FilesProvider({ children }: { children: ReactNode }) {
+  // File viewer settings
+  const { settings: viewerSettings, setFontSize, setFontFamily, setMaxDepth } = useFileViewerSettings()
+
   // File tree cache - persist path to localStorage for reload persistence
   const [fileTree, setFileTree] = useState<FileNode | null>(null)
   const [fileTreePath, setFileTreePathState] = useState<string | null>(() => {
@@ -680,6 +690,10 @@ export function FilesProvider({ children }: { children: ReactNode }) {
       openFile,
       closeFile,
       pinFile,
+      viewerSettings,
+      setFontSize,
+      setFontFamily,
+      setMaxDepth,
     }}>
       {children}
     </FilesContext.Provider>

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import {
   Plug,
   HardDrive,
@@ -11,6 +11,7 @@ import {
   Bot,
   Star,
   FolderTree,
+  Settings as SettingsIcon,
 } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { FilesProvider, useFilesContext } from '@/app/contexts/FilesContext'
@@ -45,7 +46,24 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
     filteredFilesLoading,
     loadFilteredFiles,
     openFile,
+    viewerSettings,
+    setFontSize,
+    setFontFamily,
+    setMaxDepth,
   } = useFilesContext()
+  const [showSettingsDropdown, setShowSettingsDropdown] = useState(false)
+  const settingsRef = useRef<HTMLDivElement>(null)
+
+  // Close settings dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+        setShowSettingsDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const [showPlugins, setShowPlugins] = useState<boolean>(true)
   const [fileSource, setFileSource] = useState<FileSource>(() => {
@@ -197,7 +215,7 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
               activeFilter === 'all' ? (
                 <FileTree
                   basePath={workingDir || '~'}
-                  maxDepth={5}
+                  maxDepth={viewerSettings.maxDepth}
                   showHidden={false}
                   className="h-full"
                 />
@@ -223,31 +241,106 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
       {/* Main content area - File viewer */}
       <div className="flex-1 flex flex-col min-w-0">
         <div className="glass-dark rounded-lg border border-border h-full flex flex-col overflow-hidden">
-          {/* Header with plugins toggle */}
+          {/* Header with settings and plugins toggle */}
           <div className="px-4 py-2 border-b border-border/50 bg-background/30 flex-shrink-0 flex items-center justify-between">
             <span className="text-sm font-medium text-muted-foreground">
               {fileSource === 'local' ? 'File Viewer' : 'GitHub Viewer'}
             </span>
-            {fileSource === 'local' && (
-              <button
-                onClick={() => setShowPlugins(!showPlugins)}
-                className={cn(
-                  'flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors',
-                  showPlugins
-                    ? 'bg-primary/20 text-primary'
-                    : 'hover:bg-white/10 text-muted-foreground'
-                )}
-                data-tabz-action="toggle-plugins"
-                title={showPlugins ? 'Hide plugins panel' : 'Show plugins panel'}
-              >
-                {showPlugins ? (
-                  <PanelRightClose className="h-3.5 w-3.5" />
-                ) : (
-                  <PanelRightOpen className="h-3.5 w-3.5" />
-                )}
-                <Plug className="h-3.5 w-3.5" />
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {/* Settings Dropdown */}
+              {fileSource === 'local' && (
+                <div className="relative" ref={settingsRef}>
+                  <button
+                    onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-background border border-border hover:border-primary/50 transition-colors text-sm"
+                    title="Font settings"
+                    data-tabz-action="toggle-settings"
+                  >
+                    <SettingsIcon size={16} />
+                    <span className="text-muted-foreground">{viewerSettings.fontSize}px</span>
+                  </button>
+
+                  {showSettingsDropdown && (
+                    <div className="absolute top-full right-0 mt-1 w-64 bg-card border border-border rounded-lg shadow-xl z-50 p-4 space-y-4">
+                      {/* Font Size */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-sm font-medium">Font Size</label>
+                          <span className="text-sm text-muted-foreground">{viewerSettings.fontSize}px</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="12"
+                          max="24"
+                          step="1"
+                          value={viewerSettings.fontSize}
+                          onChange={(e) => setFontSize(parseInt(e.target.value))}
+                          className="w-full accent-primary"
+                        />
+                      </div>
+
+                      {/* Font Family */}
+                      <div>
+                        <label className="text-sm font-medium block mb-2">Font</label>
+                        <select
+                          value={viewerSettings.fontFamily}
+                          onChange={(e) => setFontFamily(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-background border border-border rounded-lg text-sm"
+                          style={{ fontFamily: viewerSettings.fontFamily }}
+                        >
+                          <option value="JetBrains Mono">JetBrains Mono</option>
+                          <option value="Fira Code">Fira Code</option>
+                          <option value="Cascadia Code">Cascadia Code</option>
+                          <option value="monospace">System Monospace</option>
+                        </select>
+                      </div>
+
+                      {/* File Tree Depth */}
+                      <div className="pt-3 border-t border-border">
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-sm font-medium">Tree Depth</label>
+                          <span className="text-sm text-muted-foreground">{viewerSettings.maxDepth} levels</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="1"
+                          max="10"
+                          step="1"
+                          value={viewerSettings.maxDepth}
+                          onChange={(e) => setMaxDepth(parseInt(e.target.value))}
+                          className="w-full accent-primary"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Lower values load faster
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Plugins toggle */}
+              {fileSource === 'local' && (
+                <button
+                  onClick={() => setShowPlugins(!showPlugins)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors',
+                    showPlugins
+                      ? 'bg-primary/20 text-primary'
+                      : 'hover:bg-white/10 text-muted-foreground'
+                  )}
+                  data-tabz-action="toggle-plugins"
+                  title={showPlugins ? 'Hide plugins panel' : 'Show plugins panel'}
+                >
+                  {showPlugins ? (
+                    <PanelRightClose className="h-3.5 w-3.5" />
+                  ) : (
+                    <PanelRightOpen className="h-3.5 w-3.5" />
+                  )}
+                  <Plug className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* File content */}
