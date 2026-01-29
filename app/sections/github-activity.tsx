@@ -61,6 +61,8 @@ interface GitHubEvent {
     action?: string
     ref?: string
     ref_type?: string
+    before?: string
+    head?: string
     commits?: Array<{
       sha: string
       message: string
@@ -326,6 +328,49 @@ function getEventIcon(eventType: string): React.ReactNode {
       return <BookOpen className="h-4 w-4 text-pink-500" />
     default:
       return <Activity className="h-4 w-4 text-muted-foreground" />
+  }
+}
+
+function getEventUrl(event: GitHubEvent): string | null {
+  const { type, payload, repo } = event
+
+  switch (type) {
+    case "PushEvent":
+      // For single commit, link directly to that commit
+      if (payload.commits?.length === 1) {
+        return `https://github.com/${repo.name}/commit/${payload.commits[0].sha}`
+      }
+      // For multiple commits, link to compare view
+      if (payload.before && payload.head) {
+        return `https://github.com/${repo.name}/compare/${payload.before.slice(0, 7)}...${payload.head.slice(0, 7)}`
+      }
+      return null
+    case "PullRequestEvent":
+    case "PullRequestReviewEvent":
+    case "PullRequestReviewCommentEvent":
+      return payload.pull_request?.html_url || null
+    case "IssuesEvent":
+      return payload.issue?.html_url || null
+    case "IssueCommentEvent":
+      return payload.comment?.html_url || payload.issue?.html_url || null
+    case "CommitCommentEvent":
+      return payload.comment?.html_url || null
+    case "ForkEvent":
+      return payload.forkee?.html_url || null
+    case "ReleaseEvent":
+      return payload.release?.html_url || null
+    case "WatchEvent":
+      return `https://github.com/${repo.name}`
+    case "CreateEvent":
+      if (payload.ref_type === "branch" && payload.ref) {
+        return `https://github.com/${repo.name}/tree/${payload.ref}`
+      }
+      if (payload.ref_type === "tag" && payload.ref) {
+        return `https://github.com/${repo.name}/releases/tag/${payload.ref}`
+      }
+      return `https://github.com/${repo.name}`
+    default:
+      return null
   }
 }
 
@@ -902,7 +947,22 @@ export default function GitHubActivity({ activeSubItem, onSubItemHandled }: GitH
                         <div className="flex items-start gap-3">
                           <div className="mt-0.5">{getEventIcon(event.type)}</div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm text-foreground">{getEventDescription(event)}</p>
+                            {(() => {
+                              const eventUrl = getEventUrl(event)
+                              const description = getEventDescription(event)
+                              return eventUrl ? (
+                                <a
+                                  href={eventUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-foreground hover:text-primary transition-colors"
+                                >
+                                  {description}
+                                </a>
+                              ) : (
+                                <p className="text-sm text-foreground">{description}</p>
+                              )
+                            })()}
                             {event.payload.commits && event.payload.commits.length > 0 && (
                               <div className="mt-2 space-y-1">
                                 {event.payload.commits.slice(0, 3).map((commit) => (
