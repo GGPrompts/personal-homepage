@@ -2,30 +2,25 @@
 
 import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, Clock, ChevronDown, FileText } from 'lucide-react'
+import { CheckCircle2, ChevronDown, FileText } from 'lucide-react'
 import { Task } from '../types'
 import { useBoardStore } from '../lib/store'
 
 /**
- * Format duration between two dates in a human-readable format
+ * Format relative time since a date (e.g., "just now", "5m ago", "2h ago")
  */
-function formatDuration(start: Date, end: Date): string {
-  const ms = end.getTime() - start.getTime()
-  if (ms < 0) return ''
+function formatTimeAgo(date: Date): string {
+  const ms = Date.now() - date.getTime()
+  if (ms < 0) return 'just now'
 
   const minutes = Math.floor(ms / (1000 * 60))
   const hours = Math.floor(ms / (1000 * 60 * 60))
   const days = Math.floor(ms / (1000 * 60 * 60 * 24))
 
-  if (days > 0) {
-    const remainingHours = hours % 24
-    return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`
-  }
-  if (hours > 0) {
-    const remainingMins = minutes % 60
-    return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`
-  }
-  return `${minutes}m`
+  if (minutes < 1) return 'just now'
+  if (days > 0) return `${days}d ago`
+  if (hours > 0) return `${hours}h ago`
+  return `${minutes}m ago`
 }
 
 type DateGroup = 'today' | 'thisWeek' | 'older'
@@ -174,7 +169,7 @@ interface DoneListRowProps {
 
 function DoneListRow({ task, hasTranscript, onClick }: DoneListRowProps) {
   const closedAt = task.beadsMetadata?.closedAt ?? task.updatedAt
-  const duration = closedAt && task.createdAt ? formatDuration(task.createdAt, closedAt) : null
+  const timeAgo = closedAt ? formatTimeAgo(closedAt) : null
 
   return (
     <button
@@ -198,12 +193,9 @@ function DoneListRow({ task, hasTranscript, onClick }: DoneListRowProps) {
         />
       )}
 
-      {/* Duration badge */}
-      {duration && (
-        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-500/15 border border-blue-500/30 shrink-0">
-          <Clock className="h-2.5 w-2.5 text-blue-400" />
-          <span className="text-[10px] font-medium text-blue-400 mono">{duration}</span>
-        </div>
+      {/* Time since closed */}
+      {timeAgo && (
+        <span className="text-[10px] text-zinc-500 mono shrink-0">{timeAgo}</span>
       )}
     </button>
   )

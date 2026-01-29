@@ -76,25 +76,20 @@ const GATE_CONFIG: Record<string, { icon: React.ComponentType<{ className?: stri
 }
 
 /**
- * Format duration between two dates in a human-readable format
+ * Format relative time since a date (e.g., "just now", "5m ago", "2h ago")
  */
-function formatDuration(start: Date, end: Date): string {
-  const ms = end.getTime() - start.getTime()
-  if (ms < 0) return ''
+function formatTimeAgo(date: Date): string {
+  const ms = Date.now() - date.getTime()
+  if (ms < 0) return 'just now'
 
   const minutes = Math.floor(ms / (1000 * 60))
   const hours = Math.floor(ms / (1000 * 60 * 60))
   const days = Math.floor(ms / (1000 * 60 * 60 * 24))
 
-  if (days > 0) {
-    const remainingHours = hours % 24
-    return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`
-  }
-  if (hours > 0) {
-    const remainingMins = minutes % 60
-    return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`
-  }
-  return `${minutes}m`
+  if (minutes < 1) return 'just now'
+  if (days > 0) return `${days}d ago`
+  if (hours > 0) return `${hours}h ago`
+  return `${minutes}m ago`
 }
 
 interface KanbanCardProps {
@@ -178,7 +173,7 @@ export function KanbanCard({
   // Done column metadata
   const closeReason = task.beadsMetadata?.closeReason
   const closedAt = task.beadsMetadata?.closedAt ?? task.updatedAt
-  const duration = closedAt && task.createdAt ? formatDuration(task.createdAt, closedAt) : null
+  const timeAgo = closedAt ? formatTimeAgo(closedAt) : null
 
   // Gate labels - filter labels starting with "gate:" and map to config
   const gateLabels = (task.labels ?? [])
@@ -333,11 +328,8 @@ export function KanbanCard({
               <CheckCircle2 className="h-3 w-3 text-green-400" />
               <span className="text-[10px] font-medium text-green-400 mono">Completed</span>
             </div>
-            {duration && (
-              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-500/15 border border-blue-500/30">
-                <Clock className="h-3 w-3 text-blue-400" />
-                <span className="text-[10px] font-medium text-blue-400 mono">{duration}</span>
-              </div>
+            {timeAgo && (
+              <span className="text-[10px] text-zinc-500 mono">{timeAgo}</span>
             )}
             {hasTranscript && (
               <div
