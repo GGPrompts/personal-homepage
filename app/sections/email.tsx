@@ -686,7 +686,7 @@ export default function EmailSection({
 
   return (
     <div
-      className="flex flex-col h-[calc(100vh-4rem)]"
+      className="flex flex-col h-full min-h-0"
       data-tabz-section="email"
     >
       {/* Header */}
