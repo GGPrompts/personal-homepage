@@ -156,11 +156,16 @@ const formatDate = (date: Date) => {
 }
 
 const isSameDay = (d1: Date, d2: Date) => {
-  return (
+  const result = (
     d1.getFullYear() === d2.getFullYear() &&
     d1.getMonth() === d2.getMonth() &&
     d1.getDate() === d2.getDate()
   )
+  // Debug: log when comparison is true
+  if (result) {
+    console.log('isSameDay TRUE:', d1.toLocaleDateString(), d2.toLocaleDateString())
+  }
+  return result
 }
 
 const isToday = (date: Date) => {
@@ -765,7 +770,9 @@ export default function CalendarSection({
   }
 
   // Render month view
-  const renderMonthView = () => (
+  const renderMonthView = () => {
+    console.log('renderMonthView called, selectedDate:', selectedDate.toLocaleDateString())
+    return (
     <div
       className="grid grid-cols-7 gap-px bg-border/30 rounded-lg overflow-hidden"
       data-tabz-region="month-view"
@@ -845,7 +852,7 @@ export default function CalendarSection({
         )
       })}
     </div>
-  )
+  )}
 
   // Render week view
   const renderWeekView = () => (
