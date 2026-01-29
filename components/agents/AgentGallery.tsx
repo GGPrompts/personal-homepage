@@ -2,13 +2,13 @@
 
 import * as React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, LayoutGrid, List, Users, Filter } from 'lucide-react'
+import { Search, LayoutGrid, List, Users, Filter, Plus, Pencil, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { AgentCard } from './AgentCard'
-import type { AgentCard as AgentCardType } from '@/lib/agents/types'
+import type { AgentCard as AgentCardType, CreateAgentInput } from '@/lib/agents/types'
 
 export interface AgentGalleryProps {
   /** List of agents to display */
@@ -17,12 +17,20 @@ export interface AgentGalleryProps {
   selectedAgentId?: string | null
   /** Callback when an agent is selected */
   onSelectAgent: (agent: AgentCardType) => void
+  /** Callback when edit is requested for an agent */
+  onEditAgent?: (agent: AgentCardType) => void
+  /** Callback when creating a new agent */
+  onNewAgent?: () => void
+  /** Callback when deleting an agent */
+  onDeleteAgent?: (agent: AgentCardType) => void
   /** Optional section filter to show only agents for specific sections */
   sectionFilter?: string | null
   /** Optional className for custom styling */
   className?: string
   /** Whether the gallery is loading */
   isLoading?: boolean
+  /** Enable edit mode with edit/delete buttons */
+  editable?: boolean
 }
 
 type ViewMode = 'grid' | 'list'
@@ -40,9 +48,13 @@ export function AgentGallery({
   agents,
   selectedAgentId,
   onSelectAgent,
+  onEditAgent,
+  onNewAgent,
+  onDeleteAgent,
   sectionFilter,
   className,
   isLoading = false,
+  editable = false,
 }: AgentGalleryProps) {
   const [searchQuery, setSearchQuery] = React.useState('')
   const [viewMode, setViewMode] = React.useState<ViewMode>('grid')
@@ -145,6 +157,18 @@ export function AgentGallery({
           </div>
 
           <div className="flex items-center gap-1">
+            {editable && onNewAgent && (
+              <Button
+                variant="default"
+                size="sm"
+                className="h-8 gap-1.5"
+                onClick={onNewAgent}
+                data-tabz-action="new-agent"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">New Agent</span>
+              </Button>
+            )}
             <Button
               variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
               size="icon"
@@ -240,23 +264,63 @@ export function AgentGallery({
             )}
           >
             <AnimatePresence mode="popLayout">
-              {filteredAgents.map((agent, index) => (
-                <motion.div
-                  key={agent.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="w-full"
-                >
-                  <AgentCard
-                    agent={agent}
-                    isSelected={selectedAgentId === agent.id}
-                    onClick={onSelectAgent}
-                    variant={viewMode === 'grid' ? 'card' : 'compact'}
-                  />
-                </motion.div>
-              ))}
+              {filteredAgents.map((agent, index) => {
+                const isCustomAgent = agent.id !== '__vanilla__'
+
+                return (
+                  <motion.div
+                    key={agent.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="w-full relative group"
+                  >
+                    <AgentCard
+                      agent={agent}
+                      isSelected={selectedAgentId === agent.id}
+                      onClick={onSelectAgent}
+                      variant={viewMode === 'grid' ? 'card' : 'compact'}
+                    />
+
+                    {/* Edit/Delete buttons - appear on hover when editable */}
+                    {editable && isCustomAgent && (
+                      <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                        {onEditAgent && (
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-7 w-7 bg-background/80 backdrop-blur-sm hover:bg-background"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onEditAgent(agent)
+                            }}
+                            title="Edit agent"
+                            data-tabz-action="edit-agent"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {onDeleteAgent && (
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-7 w-7 bg-background/80 backdrop-blur-sm hover:bg-destructive hover:text-destructive-foreground"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onDeleteAgent(agent)
+                            }}
+                            title="Delete agent"
+                            data-tabz-action="delete-agent"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </motion.div>
+                )
+              })}
             </AnimatePresence>
           </motion.div>
         )}

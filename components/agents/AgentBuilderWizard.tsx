@@ -18,6 +18,10 @@ import {
   Plug,
   FolderOpen,
   Terminal,
+  ChevronDown,
+  ChevronUp,
+  Play,
+  BookOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -35,6 +39,18 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useAvatarGeneration } from '@/hooks/useAvatarGeneration'
 import { toast } from 'sonner'
 import type {
@@ -43,6 +59,13 @@ import type {
   MCPTool,
   AgentConfig,
 } from '@/lib/agents/types'
+import {
+  type AIBackend,
+  getFlagsByCategory,
+  CATEGORY_LABELS,
+  getExecutableName,
+  type CLIFlag,
+} from '@/lib/ai/cli-flags'
 import { AgentCard } from './AgentCard'
 
 // ============================================================================
@@ -93,10 +116,10 @@ const WIZARD_STEPS: WizardStep[] = [
     icon: Settings,
   },
   {
-    id: 'plugins',
-    title: 'Plugins',
-    description: 'Isolated spawning',
-    icon: Plug,
+    id: 'spawn',
+    title: 'Spawn',
+    description: 'CLI command',
+    icon: Terminal,
   },
   {
     id: 'prompts',
@@ -599,32 +622,184 @@ function ToolsStep({ selectedTools, setSelectedTools }: ToolsStepProps) {
   )
 }
 
-interface PluginsStepProps {
+interface SpawnStepProps {
+  backend: AIBackend
+  setBackend: (backend: AIBackend) => void
+  workingDir: string
+  setWorkingDir: (dir: string) => void
   pluginPath: string
   setPluginPath: (path: string) => void
   profileId: string
   setProfileId: (id: string) => void
+  spawnCommand: string[]
+  setSpawnCommand: (cmd: string[]) => void
 }
 
-function PluginsStep({
+/**
+ * CLI Flag Reference Panel - Collapsible panel showing available flags for the selected backend
+ */
+function CLIFlagReference({ backend }: { backend: AIBackend }) {
+  const [isOpen, setIsOpen] = React.useState(false)
+  const flagsByCategory = React.useMemo(() => getFlagsByCategory(backend), [backend])
+
+  const copyFlag = (flag: CLIFlag) => {
+    const text = flag.example || `--${flag.name}`
+    navigator.clipboard.writeText(text)
+    toast.success(`Copied: ${text}`)
+  }
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <CollapsibleTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-between text-muted-foreground hover:text-foreground"
+        >
+          <span className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4" />
+            CLI Flag Reference
+          </span>
+          {isOpen ? (
+            <ChevronUp className="h-4 w-4" />
+          ) : (
+            <ChevronDown className="h-4 w-4" />
+          )}
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pt-2">
+        <ScrollArea className="h-[200px] rounded-lg border border-border/50 bg-muted/30 p-3">
+          <div className="space-y-4">
+            {Object.entries(flagsByCategory).map(([category, flags]) => (
+              <div key={category}>
+                <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  {CATEGORY_LABELS[category] || category}
+                </h5>
+                <div className="space-y-1.5">
+                  {flags.map((flag) => (
+                    <div
+                      key={flag.name}
+                      className="group flex items-start gap-2 p-1.5 rounded hover:bg-muted/50 cursor-pointer transition-colors"
+                      onClick={() => copyFlag(flag)}
+                      title="Click to copy"
+                    >
+                      <code className="text-xs font-mono text-primary shrink-0">
+                        --{flag.name}
+                        {flag.alias && <span className="text-muted-foreground"> (-{flag.alias})</span>}
+                      </code>
+                      <span className="text-[10px] text-muted-foreground flex-1">
+                        {flag.description}
+                      </span>
+                      {flag.type === 'enum' && flag.values && (
+                        <Badge variant="outline" className="text-[9px] shrink-0">
+                          {flag.values.slice(0, 3).join(' | ')}
+                          {flag.values.length > 3 && '...'}
+                        </Badge>
+                      )}
+                      <Copy className="h-3 w-3 opacity-0 group-hover:opacity-50 shrink-0" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+        <p className="text-[10px] text-muted-foreground mt-2 text-center">
+          Click any flag to copy it. These are {getExecutableName(backend)} print-mode flags.
+        </p>
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
+function SpawnStep({
+  backend,
+  setBackend,
+  workingDir,
+  setWorkingDir,
   pluginPath,
   setPluginPath,
   profileId,
   setProfileId,
-}: PluginsStepProps) {
+  spawnCommand,
+  setSpawnCommand,
+}: SpawnStepProps) {
+  const [rawCommand, setRawCommand] = React.useState(spawnCommand.join(' '))
+  const [useRawMode, setUseRawMode] = React.useState(spawnCommand.length > 0)
+
+  // Sync raw command with spawnCommand array
+  const handleRawCommandChange = (value: string) => {
+    setRawCommand(value)
+    // Parse into array, respecting quoted strings
+    const args: string[] = []
+    const regex = /(?:[^\s"']+|"[^"]*"|'[^']*')+/g
+    let match
+    while ((match = regex.exec(value)) !== null) {
+      // Remove surrounding quotes
+      let arg = match[0]
+      if ((arg.startsWith('"') && arg.endsWith('"')) || (arg.startsWith("'") && arg.endsWith("'"))) {
+        arg = arg.slice(1, -1)
+      }
+      args.push(arg)
+    }
+    setSpawnCommand(args)
+  }
+
+  // Build command preview from individual fields
+  const buildCommandPreview = () => {
+    const parts = [getExecutableName(backend)]
+    if (pluginPath) parts.push(`--plugin-dir "${pluginPath}"`)
+    return parts.join(' ')
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      {/* Backend Selection */}
+      <div className="space-y-2">
+        <Label className="flex items-center gap-2">
+          <Terminal className="h-4 w-4" />
+          Backend
+        </Label>
+        <Select value={backend} onValueChange={(v) => setBackend(v as AIBackend)}>
+          <SelectTrigger className="glass">
+            <SelectValue placeholder="Select backend" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="claude">Claude Code</SelectItem>
+            <SelectItem value="codex">Codex</SelectItem>
+            <SelectItem value="gemini">Gemini CLI</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-[10px] text-muted-foreground">
+          CLI tool used when spawning this agent
+        </p>
+      </div>
+
+      {/* Working Directory */}
+      <div className="space-y-2">
+        <Label htmlFor="working-dir" className="flex items-center gap-2">
+          <FolderOpen className="h-4 w-4" />
+          Working Directory
+        </Label>
+        <Input
+          id="working-dir"
+          value={workingDir}
+          onChange={(e) => setWorkingDir(e.target.value)}
+          placeholder="e.g., ~/projects/my-app (inherits from global if empty)"
+          className="glass font-mono text-sm"
+          data-tabz-input="working-dir"
+        />
+        <p className="text-[10px] text-muted-foreground">
+          Override the working directory for this agent. Leave empty to use global settings.
+        </p>
+      </div>
+
       {/* Plugin Path */}
       <div className="space-y-2">
         <Label htmlFor="plugin-path" className="flex items-center gap-2">
-          <FolderOpen className="h-4 w-4" />
+          <Plug className="h-4 w-4" />
           Plugin Directory
         </Label>
-        <p className="text-xs text-muted-foreground">
-          Path to a Claude Code plugin directory. When spawning this agent, Claude Code
-          will load plugins from this directory using the <code className="px-1 py-0.5 rounded bg-muted">--plugin-dir</code> flag,
-          providing isolated section-specific skills.
-        </p>
         <Input
           id="plugin-path"
           value={pluginPath}
@@ -633,47 +808,65 @@ function PluginsStep({
           className="glass font-mono text-sm"
           data-tabz-input="plugin-path"
         />
-        <p className="text-[10px] text-muted-foreground">
-          Leave empty to spawn without custom plugins
-        </p>
       </div>
 
       {/* TabzChrome Profile */}
       <div className="space-y-2">
-        <Label htmlFor="profile-id" className="flex items-center gap-2">
-          <Terminal className="h-4 w-4" />
-          TabzChrome Profile
-        </Label>
-        <p className="text-xs text-muted-foreground">
-          Select a pre-configured TabzChrome profile for terminal spawning. Profiles can
-          include window position, shell settings, and environment configuration.
-        </p>
+        <Label htmlFor="profile-id">TabzChrome Profile</Label>
         <Input
           id="profile-id"
           value={profileId}
           onChange={(e) => setProfileId(e.target.value)}
-          placeholder="e.g., agent-default, weather-dev"
+          placeholder="e.g., agent-default"
           className="glass text-sm"
           data-tabz-input="profile-id"
         />
-        <p className="text-[10px] text-muted-foreground">
-          Leave empty to use the default terminal profile
-        </p>
       </div>
 
-      {/* Info box */}
-      <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 space-y-2">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <Plug className="h-4 w-4 text-primary" />
-          <span>Plugin Isolation Benefits</span>
+      {/* Spawn Command Editor */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="flex items-center gap-2">
+            <Play className="h-4 w-4" />
+            Spawn Command
+          </Label>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-muted-foreground">Raw mode</span>
+            <Switch
+              checked={useRawMode}
+              onCheckedChange={setUseRawMode}
+              className="scale-75"
+            />
+          </div>
         </div>
-        <ul className="text-xs text-muted-foreground space-y-1 ml-6 list-disc">
-          <li>Each agent runs in isolated context with custom plugins</li>
-          <li>Section-specific skills without bloating main session</li>
-          <li>Pre-configured profiles for consistent terminal spawning</li>
-          <li>One-click spawn via TabzChrome integration</li>
-        </ul>
+
+        {useRawMode ? (
+          <>
+            <Textarea
+              value={rawCommand}
+              onChange={(e) => handleRawCommandChange(e.target.value)}
+              placeholder={`${getExecutableName(backend)} --model sonnet --permission-mode acceptEdits`}
+              className="glass font-mono text-sm min-h-[80px]"
+              data-tabz-input="spawn-command"
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Enter the full spawn command. This overrides individual field settings.
+            </p>
+          </>
+        ) : (
+          <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
+            <code className="text-xs font-mono text-muted-foreground">
+              {buildCommandPreview() || `${getExecutableName(backend)}`}
+            </code>
+            <p className="text-[10px] text-muted-foreground mt-2">
+              Command is built from fields above. Enable raw mode to customize.
+            </p>
+          </div>
+        )}
       </div>
+
+      {/* CLI Flag Reference */}
+      <CLIFlagReference backend={backend} />
     </div>
   )
 }
@@ -870,6 +1063,10 @@ export function AgentBuilderWizard({
   const [enabled, setEnabled] = React.useState(initialData?.enabled ?? true)
   const [pluginPath, setPluginPath] = React.useState(initialData?.pluginPath || '')
   const [profileId, setProfileId] = React.useState(initialData?.profileId || '')
+  // Spawn command state
+  const [backend, setBackend] = React.useState<AIBackend>('claude')
+  const [workingDir, setWorkingDir] = React.useState(initialData?.workingDir || '')
+  const [spawnCommand, setSpawnCommand] = React.useState<string[]>(initialData?.spawnCommand || [])
 
   // Reset form when dialog closes
   React.useEffect(() => {
@@ -886,6 +1083,9 @@ export function AgentBuilderWizard({
       setEnabled(initialData?.enabled ?? true)
       setPluginPath(initialData?.pluginPath || '')
       setProfileId(initialData?.profileId || '')
+      setBackend('claude')
+      setWorkingDir(initialData?.workingDir || '')
+      setSpawnCommand(initialData?.spawnCommand || [])
     }
   }, [open, initialData])
 
@@ -903,6 +1103,8 @@ export function AgentBuilderWizard({
     enabled,
     pluginPath: pluginPath || undefined,
     profileId: profileId || undefined,
+    workingDir: workingDir || undefined,
+    spawnCommand: spawnCommand.length > 0 ? spawnCommand : undefined,
   }
 
   // Validation
@@ -1050,11 +1252,17 @@ export function AgentBuilderWizard({
                 />
               )}
               {currentStep === 3 && (
-                <PluginsStep
+                <SpawnStep
+                  backend={backend}
+                  setBackend={setBackend}
+                  workingDir={workingDir}
+                  setWorkingDir={setWorkingDir}
                   pluginPath={pluginPath}
                   setPluginPath={setPluginPath}
                   profileId={profileId}
                   setProfileId={setProfileId}
+                  spawnCommand={spawnCommand}
+                  setSpawnCommand={setSpawnCommand}
                 />
               )}
               {currentStep === 4 && (

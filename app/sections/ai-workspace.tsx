@@ -29,7 +29,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { AgentGallery } from "@/components/agents/AgentGallery"
-import type { AgentCard } from "@/lib/agents/types"
+import { AgentBuilderWizard } from "@/components/agents/AgentBuilderWizard"
+import type { AgentCard, CreateAgentInput } from "@/lib/agents/types"
 import { useSearchParams } from "next/navigation"
 import { useTabzBridge } from "@/hooks/useTabzBridge"
 import { TabzConnectionStatus } from "@/components/TabzConnectionStatus"
@@ -115,6 +116,9 @@ export default function AIWorkspaceSection({
   const [selectedAgent, setSelectedAgent] = React.useState<AgentCard | null>(null)
   const [availableAgents, setAvailableAgents] = React.useState<{ name: string; description: string; model?: string; filename: string }[]>([])
   const [selectedProjectPath, setSelectedProjectPath] = React.useState<string | null>(null)
+  // Agent editor wizard state
+  const [showAgentWizard, setShowAgentWizard] = React.useState(false)
+  const [editingAgent, setEditingAgent] = React.useState<AgentCard | null>(null)
 
   // Track if user has dismissed the context warning for this conversation
   const [contextWarningDismissed, setContextWarningDismissed] = React.useState<Set<string>>(new Set())
@@ -354,6 +358,55 @@ export default function AIWorkspaceSection({
 
   const dismissContextWarning = () => {
     setContextWarningDismissed(prev => new Set(prev).add(activeConvId))
+  }
+
+  // Agent wizard handlers
+  const handleNewAgent = () => {
+    setEditingAgent(null)
+    setShowAgentWizard(true)
+  }
+
+  const handleEditAgent = (agent: AgentCard) => {
+    setEditingAgent(agent)
+    setShowAgentWizard(true)
+  }
+
+  const handleDeleteAgent = async (agent: AgentCard) => {
+    if (!confirm(`Are you sure you want to delete "${agent.name}"?`)) return
+
+    try {
+      const res = await fetch(`/api/ai/agents/${encodeURIComponent(agent.id)}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) throw new Error('Failed to delete agent')
+      // Refresh agents list - useAgents hook should handle this
+      window.location.reload() // Simple refresh for now
+    } catch (error) {
+      console.error('Failed to delete agent:', error)
+    }
+  }
+
+  const handleAgentCreated = async (agentInput: CreateAgentInput) => {
+    try {
+      const isEditing = !!editingAgent
+      const url = isEditing
+        ? `/api/ai/agents/${encodeURIComponent(editingAgent!.id)}`
+        : '/api/ai/agents/registry'
+      const method = isEditing ? 'PUT' : 'POST'
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(agentInput),
+      })
+
+      if (!res.ok) throw new Error('Failed to save agent')
+
+      // Refresh agents list
+      window.location.reload() // Simple refresh for now
+    } catch (error) {
+      console.error('Failed to save agent:', error)
+    }
   }
 
   // Determine if a conversation is persistent (JSONL saved)
@@ -807,7 +860,11 @@ export default function AIWorkspaceSection({
                     agents={registryAgents}
                     selectedAgentId={selectedAgent?.id}
                     onSelectAgent={handleSelectAgent}
+                    onEditAgent={handleEditAgent}
+                    onNewAgent={handleNewAgent}
+                    onDeleteAgent={handleDeleteAgent}
                     isLoading={agentsLoading}
+                    editable={true}
                   />
                 </div>
                 {selectedAgent && (
@@ -824,6 +881,14 @@ export default function AIWorkspaceSection({
                 )}
               </DialogContent>
             </Dialog>
+
+            {/* Agent Builder Wizard */}
+            <AgentBuilderWizard
+              open={showAgentWizard}
+              onOpenChange={setShowAgentWizard}
+              onAgentCreated={handleAgentCreated}
+              initialData={editingAgent || undefined}
+            />
 
             <TooltipProvider>
               <Tooltip>
