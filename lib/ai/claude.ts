@@ -627,9 +627,9 @@ export async function streamClaude(
   // We need to escape each arg individually for the shell
   const escapedArgs = args.map(arg => shellEscape(arg)).join(' ')
 
-  // Build command that pipes through tee to capture output
+  // Build command - tmux-manager wraps with `script` for output capture
   // Note: We unset ANTHROPIC_API_KEY to force subscription auth
-  const command = `ANTHROPIC_API_KEY= ${CLAUDE_BIN} ${escapedArgs} 2>&1 | tee ${shellEscape(outputPath)}`
+  const command = `ANTHROPIC_API_KEY= ${CLAUDE_BIN} ${escapedArgs} 2>&1`
 
   console.log(`[Claude CLI] Command: ${command.slice(0, 100)}...`)
 

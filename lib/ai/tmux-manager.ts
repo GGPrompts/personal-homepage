@@ -12,7 +12,7 @@
 
 import { exec } from 'child_process'
 import { promisify } from 'util'
-import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync, chmodSync } from 'fs'
 
 const execAsync = promisify(exec)
 
@@ -105,18 +105,22 @@ export async function spawnInWindow(
   await ensureSession()
   ensureOutputDir()
 
-  // Escape double quotes in command for shell
-  const escapedCommand = command.replace(/"/g, '\\"')
-
-  // Create new window with the command
-  // Use script command for unbuffered output capture (works better than tee for this)
-  // The -q flag quiets script's own messages, -f flushes after each write
   const outputPath = getOutputPath(windowName)
-  const fullCommand = `script -q -f "${outputPath}" -c "${escapedCommand}"`
+
+  // Write command to a temp script file to avoid shell escaping issues
+  // This is more reliable than trying to escape nested quotes
+  const scriptPath = `${OUTPUT_DIR}/${windowName}.sh`
+  const scriptContent = `#!/bin/bash
+cd ${JSON.stringify(cwd)}
+${command} > ${JSON.stringify(outputPath)} 2>&1
+`
+
+  writeFileSync(scriptPath, scriptContent)
+  chmodSync(scriptPath, '755')
 
   try {
     await execAsync(
-      `tmux new-window -t ${SESSION_NAME} -n '${windowName}' -c '${cwd}' '${fullCommand}'`
+      `tmux new-window -t ${SESSION_NAME} -n '${windowName}' '${scriptPath}'`
     )
   } catch (error) {
     const err = error as Error & { stderr?: string }
