@@ -342,7 +342,9 @@ export async function POST(request: NextRequest) {
 
             // Capture usage from done events
             for (const event of events) {
+              console.log('[Chat API] Parsed event:', event.type, event.usage ? 'has usage' : 'no usage')
               if (event.type === 'done' && event.usage) {
+                console.log('[Chat API] Captured usage:', event.usage)
                 capturedUsage = event.usage
               }
             }

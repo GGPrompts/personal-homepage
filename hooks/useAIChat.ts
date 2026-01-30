@@ -697,6 +697,7 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
             }
 
             if (chunk.done) {
+              console.log('[useAIChat] Received done chunk:', { hasUsage: !!chunk.usage, usage: chunk.usage })
               setConversations(prev => prev.map(conv => {
                 if (conv.id !== activeConvId) return conv
 
@@ -704,6 +705,7 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
                 const newCumulativeUsage = chunk.usage
                   ? accumulateUsage(conv.cumulativeUsage ?? null, chunk.usage as TokenUsage)
                   : conv.cumulativeUsage
+                console.log('[useAIChat] Updated cumulative usage:', newCumulativeUsage)
 
                 return {
                   ...conv,

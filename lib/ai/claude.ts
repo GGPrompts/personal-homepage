@@ -424,6 +424,7 @@ function createTailStream(
               break
 
             case 'result':
+              console.log('[Claude CLI] Received result event, usage:', event.usage ? 'present' : 'missing')
               if (event.session_id) {
                 onSessionId(event.session_id)
               }
@@ -435,6 +436,7 @@ function createTailStream(
                     event.usage.output_tokens +
                     (event.usage.cache_read_input_tokens || 0) +
                     (event.usage.cache_creation_input_tokens || 0)
+                  console.log('[Claude CLI] Enqueueing done event with usage:', { inputTokens: event.usage.input_tokens, totalTokens })
                   enqueueChunk({
                     type: 'done',
                     sessionId: undefined,  // Will be set by caller
