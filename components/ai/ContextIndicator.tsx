@@ -11,9 +11,33 @@ import type { Conversation } from "@/lib/ai-workspace"
 // CONSTANTS
 // ============================================================================
 
-const CONTEXT_LIMIT = 200000
+// Context limits vary by plan:
+// - Standard: 200K
+// - Pro/Team: 200K
+// - Enterprise: 500K
+// - Beta (1M header): 1M
+// We detect the effective limit based on actual usage - if usage exceeds 200K,
+// the user must have access to extended context
+const CONTEXT_LIMIT_STANDARD = 200000
+const CONTEXT_LIMIT_EXTENDED = 500000
+const CONTEXT_LIMIT_MAX = 1000000
+
 const WARNING_THRESHOLD = 0.7
 const DANGER_THRESHOLD = 0.9
+
+/**
+ * Detect the effective context limit based on actual usage
+ * If we see usage > 200K, user has extended context access
+ */
+function detectContextLimit(contextTokens: number): number {
+  if (contextTokens > CONTEXT_LIMIT_EXTENDED) {
+    return CONTEXT_LIMIT_MAX
+  }
+  if (contextTokens > CONTEXT_LIMIT_STANDARD) {
+    return CONTEXT_LIMIT_EXTENDED
+  }
+  return CONTEXT_LIMIT_STANDARD
+}
 
 // ============================================================================
 // TYPES
@@ -24,6 +48,7 @@ export type UsageSource = 'cumulative' | 'message' | 'estimated'
 
 export interface ContextUsageData {
   contextTokens: number
+  contextLimit: number
   contextUsage: number
   contextPercentage: number
   contextStatus: ContextStatus
@@ -100,7 +125,8 @@ export function calculateContextUsage(
     usageSource = 'estimated'
   }
 
-  const contextUsage = contextTokens / CONTEXT_LIMIT
+  const effectiveLimit = detectContextLimit(contextTokens)
+  const contextUsage = contextTokens / effectiveLimit
   const contextPercentage = Math.min(Math.round(contextUsage * 100), 100)
   const contextStatus: ContextStatus = contextUsage >= DANGER_THRESHOLD ? 'danger'
     : contextUsage >= WARNING_THRESHOLD ? 'warning'
@@ -108,6 +134,7 @@ export function calculateContextUsage(
 
   return {
     contextTokens,
+    contextLimit: effectiveLimit,
     contextUsage,
     contextPercentage,
     contextStatus,
@@ -130,6 +157,7 @@ export function ContextIndicator({
 }: ContextIndicatorProps) {
   const {
     contextTokens,
+    contextLimit,
     contextPercentage,
     contextStatus,
     usageSource,
@@ -171,7 +199,7 @@ export function ContextIndicator({
               </>
             ) : (
               <>
-                Context: {usageSource === 'estimated' ? '~' : ''}{contextTokens.toLocaleString()} tokens
+                Context: {usageSource === 'estimated' ? '~' : ''}{contextTokens.toLocaleString()} / {(contextLimit / 1000).toFixed(0)}K
                 <span className={`ml-1.5 text-[10px] px-1 py-0.5 rounded ${
                   usageSource === 'cumulative'
                     ? 'bg-emerald-500/20 text-emerald-400'

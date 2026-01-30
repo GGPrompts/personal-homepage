@@ -74,6 +74,7 @@ interface ClaudeStreamEvent {
   session_id?: string
   message?: {
     content: ContentBlock[]
+    usage?: ClaudeUsage
   }
   index?: number
   content_block?: ContentBlock
@@ -284,6 +285,9 @@ function createTailStream(
   // Track current tool use for streaming input
   const activeTools = new Map<number, { id: string; name: string; input: string }>()
 
+  // Track latest usage from assistant messages (--print mode doesn't emit 'result' events)
+  let latestUsage: ClaudeUsage | null = null
+
   return new ReadableStream<string>({
     async start(controller) {
       // Helper to safely close the stream
@@ -298,6 +302,33 @@ function createTailStream(
         if (pollTimeout) {
           clearTimeout(pollTimeout)
           pollTimeout = null
+        }
+
+        // Emit usage data collected from assistant messages before closing
+        if (latestUsage) {
+          const totalTokens = latestUsage.input_tokens +
+            latestUsage.output_tokens +
+            (latestUsage.cache_read_input_tokens || 0) +
+            (latestUsage.cache_creation_input_tokens || 0)
+          console.log('[Claude CLI] Emitting usage from assistant messages:', {
+            inputTokens: latestUsage.input_tokens,
+            cacheReadTokens: latestUsage.cache_read_input_tokens,
+            totalTokens
+          })
+          try {
+            controller.enqueue(`\n__CLAUDE_EVENT__${JSON.stringify({
+              type: 'done',
+              usage: {
+                inputTokens: latestUsage.input_tokens,
+                outputTokens: latestUsage.output_tokens,
+                cacheReadTokens: latestUsage.cache_read_input_tokens,
+                cacheCreationTokens: latestUsage.cache_creation_input_tokens,
+                totalTokens
+              }
+            })}__END_EVENT__\n`)
+          } catch {
+            // Stream already closed
+          }
         }
 
         try {
@@ -374,6 +405,17 @@ function createTailStream(
                   }
                 }
               }
+              // Capture usage from assistant messages (--print mode doesn't emit 'result' events)
+              // We track the latest usage since each assistant message includes current context window
+              if (event.message?.usage) {
+                const usage = event.message.usage as ClaudeUsage
+                latestUsage = {
+                  input_tokens: usage.input_tokens,
+                  output_tokens: usage.output_tokens,
+                  cache_read_input_tokens: usage.cache_read_input_tokens,
+                  cache_creation_input_tokens: usage.cache_creation_input_tokens,
+                }
+              }
               break
 
             case 'content_block_start':
@@ -437,6 +479,8 @@ function createTailStream(
                     (event.usage.cache_read_input_tokens || 0) +
                     (event.usage.cache_creation_input_tokens || 0)
                   console.log('[Claude CLI] Enqueueing done event with usage:', { inputTokens: event.usage.input_tokens, totalTokens })
+                  // Clear latestUsage since we're emitting from result event
+                  latestUsage = null
                   enqueueChunk({
                     type: 'done',
                     sessionId: undefined,  // Will be set by caller
