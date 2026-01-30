@@ -168,6 +168,10 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
   // Don't render if context is not available (outside provider)
   if (!context) return null
 
+  // Hide drawer when on AI Workspace (workspace manages its own chat UI)
+  const isOnWorkspace = context.currentSection === 'ai-workspace'
+  if (isOnWorkspace) return null
+
   const {
     state,
     close,
@@ -1194,6 +1198,9 @@ export function AIDrawerToggle({ className = "", currentSection }: AIDrawerToggl
 
   // Don't render if context is not available
   if (!context) return null
+
+  // Hide toggle when on AI Workspace
+  if (mounted && context.currentSection === 'ai-workspace') return null
 
   const { toggle, isOpen, hasActiveConversation } = context
 

@@ -41,7 +41,7 @@ import {
   generateCompactPrompt,
   generateId,
 } from "@/lib/ai-workspace"
-import { useAIChat } from "@/hooks/useAIChat"
+import { useAIDrawer } from "@/components/ai/AIDrawerProvider"
 import { ChatMessage, TypingIndicator } from "@/components/ai/ChatMessage"
 import { ChatInput } from "@/components/ai/ChatInput"
 import { ConversationSidebar } from "@/components/ai/ConversationSidebar"
@@ -80,7 +80,8 @@ export default function AIWorkspaceSection({
     spawnTerminal: tabzSpawnTerminal,
   } = useTabzBridge()
 
-  // Use the extracted chat hook
+  // Use shared drawer context for chat functionality (single source of truth)
+  const drawer = useAIDrawer()
   const {
     conversations,
     activeConvId,
@@ -104,7 +105,16 @@ export default function AIWorkspaceSection({
     stopStreaming,
     textareaRef,
     messagesEndRef,
-  } = useAIChat()
+    // Drawer-specific for section tracking
+    setCurrentSection,
+    setSelectedAgentId: setDrawerAgentId,
+  } = drawer
+
+  // Track that we're on the AI Workspace section
+  React.useEffect(() => {
+    setCurrentSection('ai-workspace')
+    return () => setCurrentSection(null)
+  }, [setCurrentSection])
 
   // Local state for UI
   const [inputValue, setInputValue] = React.useState('')
@@ -253,6 +263,8 @@ export default function AIWorkspaceSection({
 
   const handleSelectAgent = (agent: AgentCard) => {
     setSelectedAgent(agent)
+    // Sync with drawer context so state is shared
+    setDrawerAgentId(agent.id)
     // Update settings with agent's mode for context isolation
     setSettings(prev => ({
       ...prev,
@@ -275,6 +287,7 @@ export default function AIWorkspaceSection({
 
     if (isVanilla) {
       setSelectedAgent(null)
+      setDrawerAgentId(null)  // Sync with drawer
       setSettings(prev => ({
         ...prev,
         agentMode: undefined,
@@ -282,6 +295,7 @@ export default function AIWorkspaceSection({
       }))
     } else {
       setSelectedAgent(agent)
+      setDrawerAgentId(agent.id)  // Sync with drawer
       // Update settings with agent's mode for context isolation
       setSettings(prev => ({
         ...prev,
@@ -314,6 +328,7 @@ export default function AIWorkspaceSection({
 
   const handleClearAgent = () => {
     setSelectedAgent(null)
+    setDrawerAgentId(null)  // Sync with drawer
     setSettings(prev => ({
       ...prev,
       systemPrompt: '',
