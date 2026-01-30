@@ -21,6 +21,7 @@ import {
   accumulateUsage,
   GENERATING_STORAGE_KEY,
 } from "@/lib/ai-workspace"
+import { useModels } from "./useModels"
 
 // ============================================================================
 // TYPES
@@ -100,10 +101,15 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
   const [settings, setSettings] = React.useState<ChatSettings>(loadSettings)
   const [isTyping, setIsTyping] = React.useState(false)
   const [isStreaming, setIsStreaming] = React.useState(false)
-  const [availableModels, setAvailableModels] = React.useState<ModelInfo[]>([])
-  const [backends, setBackends] = React.useState<BackendStatus[]>([])
-  const [modelsLoading, setModelsLoading] = React.useState(true)
   const [generatingConvs, setGeneratingConvs] = React.useState<GeneratingConversations>(() => loadGeneratingConversations())
+
+  // Use shared models hook (cached at app level via React Query)
+  const {
+    models: availableModels,
+    backends,
+    isLoading: modelsLoading,
+    defaultModel,
+  } = useModels()
 
   const messagesEndRef = React.useRef<HTMLDivElement | null>(null)
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null)
@@ -267,40 +273,16 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
     }
   }, [activeConvId])
 
-  // Fetch available models on mount
+  // Set default model when models are loaded and current setting doesn't exist
   React.useEffect(() => {
-    async function fetchModels() {
-      try {
-        const response = await fetch('/api/ai/models')
-        const data = await response.json()
-
-        if (data.models) {
-          setAvailableModels(data.models)
-
-          const defaultModel = data.models.find((m: ModelInfo) => m.backend !== 'mock') || data.models[0]
-          if (defaultModel && !data.models.find((m: ModelInfo) => m.id === settings.model)) {
-            setSettings(prev => ({ ...prev, model: defaultModel.id }))
-          }
-        }
-
-        if (data.backends) {
-          setBackends(data.backends)
-        }
-      } catch (error) {
-        console.error('Failed to fetch models:', error)
-        setAvailableModels([{
-          id: 'mock',
-          name: 'Mock AI (Demo)',
-          backend: 'mock',
-          description: 'Simulated responses'
-        }])
-      } finally {
-        setModelsLoading(false)
+    if (!modelsLoading && defaultModel) {
+      // Only update if current model doesn't exist in available models
+      const currentModelExists = availableModels.some(m => m.id === settings.model)
+      if (!currentModelExists) {
+        setSettings(prev => ({ ...prev, model: defaultModel.id }))
       }
     }
-
-    fetchModels()
-  }, [])
+  }, [modelsLoading, defaultModel, availableModels, settings.model])
 
   // Save conversations to localStorage
   React.useEffect(() => {
