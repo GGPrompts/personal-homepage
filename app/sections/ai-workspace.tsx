@@ -31,6 +31,7 @@ import { TabzConnectionStatus } from "@/components/TabzConnectionStatus"
 import { useAgents } from "@/hooks/useAgents"
 import { useProjects } from "@/hooks/useProjects"
 import { isEmoji, isAvatarUrl } from "@/lib/ai/utils"
+import { BackendIcon } from "@/lib/ai/backend-icons"
 import {
   type Conversation,
   DEFAULT_SUGGESTED_PROMPTS,
@@ -479,7 +480,9 @@ export default function AIWorkspaceSection({
                       <AvatarImage src={agent.avatar} alt={agent.name} />
                     ) : null}
                     <AvatarFallback className="text-base bg-primary/10">
-                      {isEmoji(agent.avatar) ? agent.avatar : <Bot className="h-5 w-5 text-primary" />}
+                      {isEmoji(agent.avatar)
+                        ? agent.avatar
+                        : <BackendIcon agent={agent} className="h-5 w-5" />}
                     </AvatarFallback>
                   </Avatar>
                 ) : (
@@ -729,7 +732,9 @@ export default function AIWorkspaceSection({
                                 <AvatarImage src={agent.avatar} alt={agent.name} />
                               ) : null}
                               <AvatarFallback className="text-2xl bg-primary/20">
-                                {isEmoji(agent.avatar) ? agent.avatar : <Bot className="h-8 w-8 text-primary" />}
+                                {isEmoji(agent.avatar)
+                                  ? agent.avatar
+                                  : <BackendIcon agent={agent} className="h-8 w-8" />}
                               </AvatarFallback>
                             </Avatar>
                             <div>

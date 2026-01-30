@@ -37,6 +37,7 @@ import { ChatInput } from "./ChatInput"
 import { useAuth } from "@/components/AuthProvider"
 import { useProjects } from "@/hooks/useProjects"
 import { isAvatarUrl, isEmoji } from "@/lib/ai/utils"
+import { BackendIcon, getAgentBackendConfig } from "@/lib/ai/backend-icons"
 
 // ============================================================================
 // TYPES
@@ -280,14 +281,16 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                     data-tabz-region="ai-drawer-toggle"
                     data-tabz-agent={displayAgent?.id}
                   >
-                    {/* Show selected/recommended agent avatar or fallback to generic icon */}
+                    {/* Show selected/recommended agent avatar or fallback to backend icon */}
                     {displayAgent ? (
                       <Avatar className="h-8 w-8">
                         {isAvatarUrl(displayAgent.avatar) && (
                           <AvatarImage src={displayAgent.avatar} alt={displayAgent.name} />
                         )}
                         <AvatarFallback className="text-sm bg-transparent">
-                          {displayAgent.avatar}
+                          {isEmoji(displayAgent.avatar)
+                            ? displayAgent.avatar
+                            : <BackendIcon agent={displayAgent} className="h-5 w-5" />}
                         </AvatarFallback>
                       </Avatar>
                     ) : isAIWorkspace ? (
@@ -397,7 +400,9 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                                 <AvatarImage src={selectedAgent.avatar} alt={selectedAgent.name} />
                               )}
                               <AvatarFallback className="text-xs bg-transparent">
-                                {selectedAgent.avatar}
+                                {isEmoji(selectedAgent.avatar)
+                                  ? selectedAgent.avatar
+                                  : <BackendIcon agent={selectedAgent} className="h-4 w-4" />}
                               </AvatarFallback>
                             </Avatar>
                           ) : (
@@ -434,7 +439,9 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                                       <AvatarImage src={agent.avatar} alt={agent.name} />
                                     )}
                                     <AvatarFallback className="text-xs bg-transparent">
-                                      {agent.avatar}
+                                      {isEmoji(agent.avatar)
+                                        ? agent.avatar
+                                        : <BackendIcon agent={agent} className="h-3.5 w-3.5" />}
                                     </AvatarFallback>
                                   </Avatar>
                                   <div className="flex-1 min-w-0">
@@ -996,7 +1003,9 @@ function MinimizedDrawer({
                   <AvatarImage src={selectedAgent.avatar} alt={selectedAgent.name} />
                 )}
                 <AvatarFallback className="text-sm bg-primary/10">
-                  {isEmoji(selectedAgent.avatar) ? selectedAgent.avatar : <Bot className="h-4 w-4 text-primary" />}
+                  {isEmoji(selectedAgent.avatar)
+                    ? selectedAgent.avatar
+                    : <BackendIcon agent={selectedAgent} className="h-4 w-4" />}
                 </AvatarFallback>
               </Avatar>
             </motion.div>
@@ -1201,7 +1210,9 @@ export function AIDrawerToggle({ className = "", currentSection }: AIDrawerToggl
         <Avatar className="h-5 w-5">
           {avatarIsUrl && <AvatarImage src={matchingAgent.avatar} alt={matchingAgent.name} />}
           <AvatarFallback className="text-xs bg-transparent">
-            {matchingAgent.avatar}
+            {isEmoji(matchingAgent.avatar)
+              ? matchingAgent.avatar
+              : <BackendIcon agent={matchingAgent} className="h-4 w-4" />}
           </AvatarFallback>
         </Avatar>
       )
