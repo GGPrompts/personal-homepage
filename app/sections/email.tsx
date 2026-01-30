@@ -898,8 +898,8 @@ export default function EmailSection({
           )}
         </AnimatePresence>
 
-        {/* Overlay for mobile */}
-        {showSidebar && (
+        {/* Overlay for mobile - hide when email is selected since preview takes full screen */}
+        {showSidebar && !selectedEmail && (
           <div
             className="fixed inset-0 bg-background/80 backdrop-blur-sm z-10 md:hidden"
             onClick={() => setShowSidebar(false)}
@@ -1011,7 +1011,10 @@ export default function EmailSection({
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, x: -20 }}
                       transition={{ delay: idx * 0.02 }}
-                      onClick={() => setSelectedEmail(email)}
+                      onClick={() => {
+                        setSelectedEmail(email)
+                        if (window.innerWidth < 768) setShowSidebar(false)
+                      }}
                       className={`flex items-start gap-3 px-4 py-3 border-b border-border cursor-pointer transition-colors ${
                         selectedEmail?.id === email.id
                           ? "bg-primary/10"
