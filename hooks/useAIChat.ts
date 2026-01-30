@@ -302,6 +302,199 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
   }, [activeConv.messages, isTyping])
 
   // ============================================================================
+  // TMUX PROCESS RECOVERY
+  // ============================================================================
+
+  /**
+   * Parse raw Claude output to extract the assistant's response content.
+   * Handles both stream-json format and plain text output.
+   */
+  const parseClaudeOutput = React.useCallback((output: string): string | null => {
+    // Try to extract content from stream-json events
+    let fullContent = ''
+
+    // Look for assistant messages in stream-json format
+    const lines = output.split('\n')
+    for (const line of lines) {
+      if (!line.trim()) continue
+
+      try {
+        const event = JSON.parse(line)
+
+        // Handle different event types from Claude CLI stream-json
+        if (event.type === 'assistant' && event.message?.content) {
+          for (const block of event.message.content) {
+            if (block.type === 'text' && block.text) {
+              fullContent += block.text
+            }
+          }
+        } else if (event.type === 'content_block_delta' && event.delta?.text) {
+          fullContent += event.delta.text
+        }
+      } catch {
+        // Not JSON, could be plain text output - skip
+      }
+    }
+
+    // If we got content from JSON parsing, use it
+    if (fullContent.trim()) {
+      // Parse out any CLAUDE_EVENT markers
+      const { text } = parseClaudeEvents(fullContent)
+      return text.trim() || null
+    }
+
+    // Fallback: look for content between markers in raw output
+    const contentMatch = output.match(/"text":\s*"([^"]+)"/g)
+    if (contentMatch) {
+      const texts = contentMatch.map(m => {
+        const match = m.match(/"text":\s*"([^"]+)"/)
+        return match ? match[1] : ''
+      })
+      const combined = texts.join('')
+      if (combined.trim()) {
+        // Unescape JSON strings
+        try {
+          const unescaped = JSON.parse(`"${combined}"`)
+          return unescaped
+        } catch {
+          return combined
+        }
+      }
+    }
+
+    return null
+  }, [])
+
+  /**
+   * Recover output from a finished tmux process.
+   * Fetches captured output and adds it as a recovered message.
+   */
+  const recoverOutput = React.useCallback(async (conversationId: string) => {
+    try {
+      const res = await fetch(`/api/ai/process/output?conversationId=${conversationId}`)
+      const data = await res.json()
+
+      if (data.success && data.output) {
+        const content = parseClaudeOutput(data.output)
+
+        if (content) {
+          const recoveredMessage: Message = {
+            id: generateId(),
+            role: 'assistant',
+            content,
+            timestamp: new Date(),
+            recovered: true,
+          }
+
+          setConversations(prev => prev.map(conv => {
+            if (conv.id !== conversationId) return conv
+
+            // Check if we already have this content to prevent duplicates
+            const hasMatchingContent = conv.messages.some(m =>
+              m.role === 'assistant' &&
+              m.content === content
+            )
+            if (hasMatchingContent) {
+              console.debug('Skipping recovery - matching content already exists')
+              return conv
+            }
+
+            return {
+              ...conv,
+              messages: [...conv.messages, recoveredMessage],
+              updatedAt: new Date(),
+            }
+          }))
+
+          console.log('Successfully recovered output from tmux process')
+        }
+      }
+    } catch (err) {
+      console.error('Failed to recover output:', err)
+    } finally {
+      clearGenerating(conversationId)
+      setGeneratingConvs(loadGeneratingConversations())
+    }
+  }, [parseClaudeOutput])
+
+  /**
+   * Check for running tmux process on mount and handle reconnection/recovery.
+   */
+  React.useEffect(() => {
+    let mounted = true
+
+    const checkForRunningProcess = async () => {
+      if (!activeConvId) return
+
+      try {
+        const res = await fetch(`/api/ai/process?conversationId=${activeConvId}`)
+        const data = await res.json()
+
+        if (!mounted) return
+
+        if (data.hasProcess && data.running) {
+          // Process still running - show reconnecting state
+          console.log('Detected running tmux process, showing streaming state')
+          setIsStreaming(true)
+          setIsTyping(true)
+          setGenerating(activeConvId, 'claude')
+          setGeneratingConvs(loadGeneratingConversations())
+
+          // Poll for completion
+          const pollForCompletion = async () => {
+            let attempts = 0
+            const maxAttempts = 300 // 5 minutes max (1s intervals)
+
+            while (mounted && attempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, 1000))
+              attempts++
+
+              try {
+                const checkRes = await fetch(`/api/ai/process?conversationId=${activeConvId}`)
+                const checkData = await checkRes.json()
+
+                if (!checkData.running) {
+                  // Process finished - recover output
+                  if (mounted) {
+                    setIsStreaming(false)
+                    setIsTyping(false)
+                    await recoverOutput(activeConvId)
+                  }
+                  break
+                }
+              } catch {
+                // Network error during poll, continue trying
+              }
+            }
+
+            if (attempts >= maxAttempts && mounted) {
+              console.log('Process polling timed out')
+              setIsStreaming(false)
+              setIsTyping(false)
+              clearGenerating(activeConvId)
+              setGeneratingConvs(loadGeneratingConversations())
+            }
+          }
+
+          pollForCompletion()
+        } else if (data.hasProcess && !data.running) {
+          // Process finished while we were away - recover output
+          console.log('Detected finished tmux process, recovering output')
+          await recoverOutput(activeConvId)
+        }
+      } catch (err) {
+        console.error('Failed to check process status:', err)
+      }
+    }
+
+    checkForRunningProcess()
+
+    return () => {
+      mounted = false
+    }
+  }, [activeConvId, recoverOutput])
+
+  // ============================================================================
   // ACTIONS
   // ============================================================================
 
@@ -727,14 +920,30 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
     }))
   }, [activeConvId])
 
-  const stopStreaming = React.useCallback(() => {
+  const stopStreaming = React.useCallback(async () => {
+    // Abort the fetch (immediate UI feedback)
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
       abortControllerRef.current = null
     }
+
+    // Kill the actual tmux process
+    if (activeConvId) {
+      try {
+        await fetch(`/api/ai/process?conversationId=${activeConvId}`, {
+          method: 'DELETE'
+        })
+        console.log('Killed tmux process for conversation:', activeConvId)
+      } catch (err) {
+        console.error('Failed to kill process:', err)
+      }
+    }
+
     setIsStreaming(false)
     setIsTyping(false)
-  }, [])
+    clearGenerating(activeConvId)
+    setGeneratingConvs(loadGeneratingConversations())
+  }, [activeConvId])
 
   // ============================================================================
   // RETURN

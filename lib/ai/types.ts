@@ -43,6 +43,8 @@ export interface Message {
   isStreaming?: boolean
   model?: AIBackend
   toolUses?: ToolUse[]
+  /** Flag indicating message was recovered from tmux output after disconnect */
+  recovered?: boolean
 }
 
 // ============================================================================

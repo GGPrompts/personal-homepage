@@ -10,7 +10,7 @@ import { Collapsible, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
   Bot, User, Copy, RotateCw, ThumbsUp, ThumbsDown,
   CheckCheck, Clock, Wrench, Loader2, ChevronRight,
-  Terminal, ExternalLink,
+  Terminal, ExternalLink, RefreshCw,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -459,6 +459,15 @@ export function ChatMessage({
           <div className="flex items-center gap-2 mt-2 text-xs opacity-60" suppressHydrationWarning>
             <Clock className="h-3 w-3" />
             <span suppressHydrationWarning>{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            {!isUser && message.recovered && (
+              <>
+                <span className="opacity-50">&middot;</span>
+                <span className="inline-flex items-center gap-1 text-amber-500/80">
+                  <RefreshCw className="h-3 w-3" />
+                  <span className="text-[10px]">recovered</span>
+                </span>
+              </>
+            )}
             {!isUser && modelColors && modelName && (
               <>
                 <span className="opacity-50">&middot;</span>
