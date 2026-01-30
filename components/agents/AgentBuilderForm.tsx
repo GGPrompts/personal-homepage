@@ -491,13 +491,12 @@ export function AgentBuilderForm({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">Auto-detect</SelectItem>
+                  <SelectItem value="auto">Auto-detect (by backend)</SelectItem>
                   <SelectItem value="page-assistant">Page Assistant</SelectItem>
-                  <SelectItem value="development">Development</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-[10px] text-muted-foreground">
-                Leave as auto to categorize by sections or backend. Set explicitly to override.
+                Auto-detect groups by backend (Claude, Codex, etc). Use Page Assistant for section-specific agents.
               </p>
             </div>
 
