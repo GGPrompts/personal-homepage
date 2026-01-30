@@ -134,22 +134,26 @@ export function accumulateUsage(
     lastUpdated: new Date()
   }
 
-  // For context tracking, input_tokens represents actual new context being consumed
-  // cacheReadTokens are tokens read from cache (reused from previous prompts, not new context)
-  // cacheCreationTokens are tokens being cached for future use
-  // Only input_tokens + output_tokens count toward actual context window usage
+  // For context tracking, we need to account for ALL tokens that represent the context window:
+  // - inputTokens: new tokens sent in this request (not cached)
+  // - cacheReadTokens: tokens read from cache (the bulk of context when caching is active)
+  // The context window size = inputTokens + cacheReadTokens for the CURRENT request
+  // (not cumulative, as each request's context is its own window)
   const newInputTokens = prev.inputTokens + messageUsage.inputTokens
   const newCacheRead = prev.cacheReadTokens + (messageUsage.cacheReadTokens || 0)
   const newCacheCreation = prev.cacheCreationTokens + (messageUsage.cacheCreationTokens || 0)
+
+  // Current request's context window = input + cache read (this is what we're using right now)
+  const currentContextWindow = messageUsage.inputTokens + (messageUsage.cacheReadTokens || 0)
 
   return {
     inputTokens: newInputTokens,
     outputTokens: prev.outputTokens + messageUsage.outputTokens,
     cacheReadTokens: newCacheRead,
     cacheCreationTokens: newCacheCreation,
-    // Context is the cumulative input tokens across all messages in the conversation
-    // This represents the actual context window being used for accurate percentage calculation
-    contextTokens: newInputTokens,
+    // Context should reflect the CURRENT context window size, not cumulative
+    // Each API call's context = inputTokens + cacheReadTokens for that call
+    contextTokens: currentContextWindow,
     messageCount: prev.messageCount + 1,
     lastUpdated: new Date()
   }

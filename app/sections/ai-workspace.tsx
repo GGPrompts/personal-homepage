@@ -262,21 +262,8 @@ export default function AIWorkspaceSection({
   }
 
   const handleSelectAgent = (agent: AgentCard) => {
-    setSelectedAgent(agent)
-    // Sync with drawer context so state is shared
-    setDrawerAgentId(agent.id)
-    // Update settings with agent's mode for context isolation
-    setSettings(prev => ({
-      ...prev,
-      agentMode: agent.mode,
-      agentDir: agent.workingDir ?? undefined,
-    }))
-    // Also update the active conversation's agentId for persistence
-    setConversations(prev => prev.map(conv =>
-      conv.id === activeConvId
-        ? { ...conv, agentId: agent.id, updatedAt: new Date() }
-        : conv
-    ))
+    // Selecting an agent from the gallery should start a new conversation with that agent
+    handleStartChatWithAgent(agent)
     setShowAgentGallery(false)
   }
 

@@ -509,6 +509,24 @@ function createTailStream(
           // Check if process still running
           const status = await getWindowStatus(conversationId)
           if (!status.running) {
+            // Process exited - do one final read to catch any buffered data
+            // that was written after our last read but before the process exited
+            try {
+              const finalContent = await fs.readFile(filePath, 'utf-8')
+              if (finalContent.length > position) {
+                const finalNewContent = finalContent.slice(position)
+                buffer += finalNewContent
+                const finalLines = buffer.split('\n')
+                buffer = finalLines.pop() || ''
+                for (const line of finalLines) {
+                  processLine(line)
+                  if (isClosed) return
+                }
+              }
+            } catch {
+              // File read failed, proceed with what we have
+            }
+
             // Process any remaining buffer content
             if (buffer.trim()) {
               processLine(buffer)
