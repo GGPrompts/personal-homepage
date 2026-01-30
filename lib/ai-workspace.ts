@@ -134,26 +134,24 @@ export function accumulateUsage(
     lastUpdated: new Date()
   }
 
-  // For context tracking, we need to account for ALL tokens that represent the context window:
-  // - inputTokens: new tokens sent in this request (not cached)
-  // - cacheReadTokens: tokens read from cache (the bulk of context when caching is active)
-  // The context window size = inputTokens + cacheReadTokens for the CURRENT request
-  // (not cumulative, as each request's context is its own window)
+  // Accumulate token counts across all messages (for display purposes)
   const newInputTokens = prev.inputTokens + messageUsage.inputTokens
+  const newOutputTokens = prev.outputTokens + messageUsage.outputTokens
   const newCacheRead = prev.cacheReadTokens + (messageUsage.cacheReadTokens || 0)
   const newCacheCreation = prev.cacheCreationTokens + (messageUsage.cacheCreationTokens || 0)
 
-  // Current request's context window = input + cache read (this is what we're using right now)
-  const currentContextWindow = messageUsage.inputTokens + (messageUsage.cacheReadTokens || 0)
+  // For context window tracking, use the CURRENT turn's context size
+  // Context = input_tokens + cache_read_tokens (the tokens actually in context for this request)
+  // This should reflect actual context window usage (~40-50% typically with Claude Code)
+  const contextTokens = messageUsage.inputTokens + (messageUsage.cacheReadTokens || 0)
 
   return {
     inputTokens: newInputTokens,
-    outputTokens: prev.outputTokens + messageUsage.outputTokens,
+    outputTokens: newOutputTokens,
     cacheReadTokens: newCacheRead,
     cacheCreationTokens: newCacheCreation,
-    // Context should reflect the CURRENT context window size, not cumulative
-    // Each API call's context = inputTokens + cacheReadTokens for that call
-    contextTokens: currentContextWindow,
+    // Context window = input + cache_read for current turn
+    contextTokens,
     messageCount: prev.messageCount + 1,
     lastUpdated: new Date()
   }

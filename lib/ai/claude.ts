@@ -473,26 +473,38 @@ function createTailStream(
               if (event.is_error) {
                 safeError(new Error(event.result || 'Claude CLI error'))
               } else {
-                if (event.usage) {
-                  const totalTokens = event.usage.input_tokens +
-                    event.usage.output_tokens +
-                    (event.usage.cache_read_input_tokens || 0) +
-                    (event.usage.cache_creation_input_tokens || 0)
-                  console.log('[Claude CLI] Enqueueing done event with usage:', { inputTokens: event.usage.input_tokens, totalTokens })
-                  // Clear latestUsage since we're emitting from result event
-                  latestUsage = null
+                // Use latestUsage (from last assistant event) for per-turn context tracking
+                // event.usage is CUMULATIVE across all turns, which gives inflated numbers
+                const usageSource = latestUsage || (event.usage ? {
+                  input_tokens: event.usage.input_tokens,
+                  output_tokens: event.usage.output_tokens,
+                  cache_read_input_tokens: event.usage.cache_read_input_tokens,
+                  cache_creation_input_tokens: event.usage.cache_creation_input_tokens,
+                } : null)
+
+                if (usageSource) {
+                  const totalTokens = usageSource.input_tokens +
+                    usageSource.output_tokens +
+                    (usageSource.cache_read_input_tokens || 0) +
+                    (usageSource.cache_creation_input_tokens || 0)
+                  console.log('[Claude CLI] Enqueueing done event with usage:', {
+                    inputTokens: usageSource.input_tokens,
+                    cacheRead: usageSource.cache_read_input_tokens,
+                    source: latestUsage ? 'assistant' : 'result'
+                  })
                   enqueueChunk({
                     type: 'done',
                     sessionId: undefined,  // Will be set by caller
                     usage: {
-                      inputTokens: event.usage.input_tokens,
-                      outputTokens: event.usage.output_tokens,
-                      cacheReadTokens: event.usage.cache_read_input_tokens,
-                      cacheCreationTokens: event.usage.cache_creation_input_tokens,
+                      inputTokens: usageSource.input_tokens,
+                      outputTokens: usageSource.output_tokens,
+                      cacheReadTokens: usageSource.cache_read_input_tokens,
+                      cacheCreationTokens: usageSource.cache_creation_input_tokens,
                       totalTokens
                     }
                   })
                 }
+                latestUsage = null
                 safeClose()
               }
               break
