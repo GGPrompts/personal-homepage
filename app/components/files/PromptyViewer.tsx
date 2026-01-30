@@ -35,7 +35,7 @@ function ContentWithFields({
   const lines = content.split('\n')
 
   return (
-    <div className="font-mono text-sm leading-relaxed">
+    <div className="font-mono leading-relaxed">
       {lines.map((line, lineIdx) => (
         <div key={lineIdx} className="min-h-[1.5em]">
           <LineWithFields
@@ -234,9 +234,10 @@ function TerminalDropdown({ processedContent, terminals, onFetchTerminals }: Ter
 interface PromptyViewerProps {
   content: string
   fileName?: string
+  fontSize?: number
 }
 
-export function PromptyViewer({ content, fileName }: PromptyViewerProps) {
+export function PromptyViewer({ content, fileName, fontSize = 14 }: PromptyViewerProps) {
   const [copied, setCopied] = useState(false)
   const [variableValues, setVariableValues] = useState<Record<string, string>>({})
   const [activeFieldIndex, setActiveFieldIndex] = useState<number | null>(null)
@@ -451,7 +452,7 @@ export function PromptyViewer({ content, fileName }: PromptyViewerProps) {
 
       {/* Prompt Content with Editable Fields */}
       <ScrollArea className="flex-1">
-        <div className="p-4">
+        <div className="p-4" style={{ fontSize: `${fontSize}px` }}>
           <ContentWithFields
             content={parsed.content}
             variableValues={variableValues}

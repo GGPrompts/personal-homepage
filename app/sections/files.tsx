@@ -261,7 +261,7 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
                   </button>
 
                   {showSettingsDropdown && (
-                    <div className="absolute top-full right-0 mt-1 w-64 bg-card border border-border rounded-lg shadow-xl z-50 p-4 space-y-4">
+                    <div className="absolute top-full right-0 mt-1 w-64 bg-popover/95 backdrop-blur-sm border border-border rounded-lg shadow-xl z-50 p-4 space-y-4">
                       {/* Font Size */}
                       <div>
                         <div className="flex items-center justify-between mb-2">

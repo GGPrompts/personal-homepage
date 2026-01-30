@@ -229,16 +229,17 @@ export async function streamClaude(
 
   const args = [
     '--print',
-    '--output-format', 'stream-json'
+    '--output-format', 'stream-json',
+    '--verbose'  // Required when using --output-format=stream-json with --print
   ]
 
   // Session persistence: use --resume for existing sessions, --session-id for new ones
-  // This replaces --verbose which added unnecessary logging overhead
+  // --session-id lets us know the session ID upfront for multi-turn persistence
   if (sessionId) {
     // Resume existing session
     args.push('--resume', sessionId)
   } else {
-    // Generate a new session ID upfront for persistence without verbose output
+    // Generate a new session ID upfront for persistence
     const newSessionId = randomUUID()
     args.push('--session-id', newSessionId)
   }

@@ -313,38 +313,39 @@ function VideoViewer({ dataUri, fileName }: VideoViewerProps) {
 
 interface MarkdownViewerProps {
   content: string
+  fontSize?: number
 }
 
-function MarkdownViewer({ content }: MarkdownViewerProps) {
-  // Simple markdown rendering with basic styling
-  // For more complex markdown, consider using react-markdown
+function MarkdownViewer({ content, fontSize = 16 }: MarkdownViewerProps) {
+  // Simple markdown rendering with improved styling
   const renderMarkdown = useMemo(() => {
-    // Basic markdown transformations
+    // Basic markdown transformations with better dark theme colors
     let html = content
-      // Headers
-      .replace(/^### (.*$)/gm, '<h3 class="text-lg font-semibold mt-4 mb-2 text-foreground">$1</h3>')
-      .replace(/^## (.*$)/gm, '<h2 class="text-xl font-semibold mt-6 mb-3 text-foreground">$1</h2>')
-      .replace(/^# (.*$)/gm, '<h1 class="text-2xl font-bold mt-8 mb-4 text-foreground">$1</h1>')
+      // Headers - cyan accent for visibility
+      .replace(/^### (.*$)/gm, '<h3 class="text-lg font-semibold mt-6 mb-3 text-cyan-400">$1</h3>')
+      .replace(/^## (.*$)/gm, '<h2 class="text-xl font-semibold mt-8 mb-4 text-cyan-300 border-b border-border/50 pb-2">$1</h2>')
+      .replace(/^# (.*$)/gm, '<h1 class="text-2xl font-bold mt-8 mb-4 text-cyan-200 border-b border-border pb-2">$1</h1>')
       // Bold and italic
-      .replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>')
-      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold">$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
-      // Code blocks
-      .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre class="bg-muted p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm"><code>$2</code></pre>')
-      // Inline code
-      .replace(/`([^`]+)`/g, '<code class="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">$1</code>')
-      // Links
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-cyan-500 hover:underline" target="_blank" rel="noopener noreferrer">$1</a>')
-      // Lists
-      .replace(/^- (.*$)/gm, '<li class="ml-4">$1</li>')
-      .replace(/^(\d+)\. (.*$)/gm, '<li class="ml-4">$2</li>')
-      // Blockquotes
-      .replace(/^> (.*$)/gm, '<blockquote class="border-l-4 border-cyan-500 pl-4 my-4 text-muted-foreground italic">$1</blockquote>')
+      .replace(/\*\*\*(.*?)\*\*\*/g, '<strong class="text-foreground"><em>$1</em></strong>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-foreground">$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em class="italic text-foreground/90">$1</em>')
+      // Code blocks - better contrast
+      .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre class="bg-zinc-900/80 border border-border/50 p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm text-emerald-400"><code>$2</code></pre>')
+      // Inline code - cyan tint
+      .replace(/`([^`]+)`/g, '<code class="bg-zinc-800 text-pink-400 px-1.5 py-0.5 rounded text-sm font-mono">$1</code>')
+      // Links - bright cyan
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-cyan-400 hover:text-cyan-300 hover:underline" target="_blank" rel="noopener noreferrer">$1</a>')
+      // Unordered lists
+      .replace(/^- (.*$)/gm, '<li class="ml-6 text-foreground/90 list-disc">$1</li>')
+      // Ordered lists
+      .replace(/^(\d+)\. (.*$)/gm, '<li class="ml-6 text-foreground/90 list-decimal">$2</li>')
+      // Blockquotes - styled nicely
+      .replace(/^> (.*$)/gm, '<blockquote class="border-l-4 border-cyan-500/50 bg-cyan-500/5 pl-4 pr-4 py-2 my-4 text-foreground/80 italic rounded-r">$1</blockquote>')
       // Horizontal rules
-      .replace(/^---$/gm, '<hr class="my-6 border-border" />')
+      .replace(/^---$/gm, '<hr class="my-8 border-border/50" />')
       // Paragraphs (wrap remaining text)
       .replace(/^(?!<[hpuolba]|<\/|<li|<hr|<pre|<block)(.*$)/gm, (match, p1) => {
-        return p1.trim() ? `<p class="my-2 text-foreground/90">${p1}</p>` : ''
+        return p1.trim() ? `<p class="my-3 text-foreground/85 leading-relaxed">${p1}</p>` : ''
       })
 
     return html
@@ -357,7 +358,8 @@ function MarkdownViewer({ content }: MarkdownViewerProps) {
       </div>
       <ScrollArea className="h-full">
         <div
-          className="prose prose-invert max-w-none p-6"
+          className="max-w-none p-6"
+          style={{ fontSize: `${fontSize}px`, lineHeight: '1.7' }}
           dangerouslySetInnerHTML={{ __html: renderMarkdown }}
         />
       </ScrollArea>
@@ -371,9 +373,11 @@ function MarkdownViewer({ content }: MarkdownViewerProps) {
 
 interface JsonViewerProps {
   content: string
+  fontSize?: number
+  fontFamily?: string
 }
 
-function JsonViewer({ content }: JsonViewerProps) {
+function JsonViewer({ content, fontSize, fontFamily }: JsonViewerProps) {
   const formattedJson = useMemo(() => {
     try {
       const parsed = JSON.parse(content)
@@ -383,7 +387,7 @@ function JsonViewer({ content }: JsonViewerProps) {
     }
   }, [content])
 
-  return <CodeViewer content={formattedJson} language="json" />
+  return <CodeViewer content={formattedJson} language="json" fontSize={fontSize} fontFamily={fontFamily} />
 }
 
 // ============================================================================
@@ -392,9 +396,10 @@ function JsonViewer({ content }: JsonViewerProps) {
 
 interface CsvViewerProps {
   content: string
+  fontSize?: number
 }
 
-function CsvViewer({ content }: CsvViewerProps) {
+function CsvViewer({ content, fontSize = 14 }: CsvViewerProps) {
   const { headers, rows } = useMemo(() => {
     const lines = content.trim().split('\n')
     if (lines.length === 0) return { headers: [], rows: [] }
@@ -415,13 +420,13 @@ function CsvViewer({ content }: CsvViewerProps) {
       </div>
       <ScrollArea className="h-full">
         <div className="p-4">
-          <table className="w-full border-collapse text-sm">
+          <table className="w-full border-collapse" style={{ fontSize: `${fontSize}px` }}>
             <thead>
               <tr>
                 {headers.map((header, i) => (
                   <th
                     key={i}
-                    className="border border-border bg-muted/50 px-3 py-2 text-left font-semibold text-foreground"
+                    className="border border-border bg-cyan-500/10 px-3 py-2 text-left font-semibold text-cyan-400"
                   >
                     {header}
                   </th>
@@ -432,7 +437,7 @@ function CsvViewer({ content }: CsvViewerProps) {
               {rows.map((row, i) => (
                 <tr key={i} className="hover:bg-muted/30">
                   {row.map((cell, j) => (
-                    <td key={j} className="border border-border px-3 py-2 text-muted-foreground">
+                    <td key={j} className="border border-border/50 px-3 py-2 text-foreground/80">
                       {cell}
                     </td>
                   ))}
@@ -594,13 +599,13 @@ function FileContent({ file, fontSize, fontFamily }: FileContentProps) {
 
   switch (file.fileType) {
     case 'prompty':
-      return <PromptyViewer content={file.content} fileName={file.name} />
+      return <PromptyViewer content={file.content} fileName={file.name} fontSize={fontSize} />
     case 'markdown':
-      return <MarkdownViewer content={file.content} />
+      return <MarkdownViewer content={file.content} fontSize={fontSize} />
     case 'json':
-      return <JsonViewer content={file.content} />
+      return <JsonViewer content={file.content} fontSize={fontSize} fontFamily={fontFamily} />
     case 'csv':
-      return <CsvViewer content={file.content} />
+      return <CsvViewer content={file.content} fontSize={fontSize} />
     case 'code':
     case 'text':
     default:

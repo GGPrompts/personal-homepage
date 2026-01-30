@@ -139,6 +139,20 @@ The Scratchpad section (`app/sections/tasks.tsx`) has two tabs:
 - **Tasks**: Simple todos stored in localStorage
 - **Notes**: Quick notes stored at `~/.config/homepage/quicknotes.json` via `/api/quicknotes`
 
+## AI Workspace Architecture
+
+The AI Workspace uses Claude CLI (`--print` mode) for chat. Key files:
+- `lib/ai/claude.ts` - Spawns Claude CLI with streaming
+- `app/api/ai/chat/route.ts` - Chat API endpoint
+- `hooks/useAIChat.ts` - Client-side chat hook
+
+**Session persistence**: Claude CLI stores sessions at `~/.claude/projects/{path}/{session-id}.jsonl`. We generate session IDs upfront with `--session-id` for multi-turn conversations.
+
+**Archived: Multi-model conversations** (`lib/ai/_archived/conversation-multimodel.ts`)
+Built but archived due to context overhead. The system supported switching between Claude/Gemini/Codex mid-conversation with identity-aware prompts ("You are Claude, messages marked [Gemini] are from another AI"). This added ~200 tokens per message even for single-model use. See `personal-homepage-qhif` for revival plan.
+
+**Known limitation**: If page disconnects while Claude is running, the process continues in background but UI can't reconnect. See `personal-homepage-qhif` for process tracking/recovery plan based on vibe-kanban architecture.
+
 ## Quick Reference
 
 - **Auth hook**: `useAuth()` from `components/AuthProvider.tsx`
