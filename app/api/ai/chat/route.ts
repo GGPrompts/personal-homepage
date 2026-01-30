@@ -215,8 +215,8 @@ export async function POST(request: NextRequest) {
         // Get stream from appropriate backend with model-aware context
         if (backend === 'claude') {
           // Claude uses its own conversation format for now
-          // Pass session ID for multi-turn context
-          const result = await streamClaude(messages, settings, cwd, claudeSessionId)
+          // Pass session ID and conversationId for tmux-based streaming
+          const result = await streamClaude(messages, settings, cwd, claudeSessionId, convId)
           stream = result.stream
           getSessionId = result.getSessionId
         } else if (backend === 'gemini') {
@@ -242,7 +242,9 @@ export async function POST(request: NextRequest) {
       } else {
         // Legacy mode - no JSONL, just pass messages directly
         if (backend === 'claude') {
-          const result = await streamClaude(messages, settings, cwd, claudeSessionId)
+          // Generate a conversation ID for tmux-based streaming
+          const legacyConvId = `legacy_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+          const result = await streamClaude(messages, settings, cwd, claudeSessionId, legacyConvId)
           stream = result.stream
           getSessionId = result.getSessionId
         } else if (backend === 'gemini') {

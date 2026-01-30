@@ -1,14 +1,27 @@
 /**
  * Claude CLI Integration
  * Uses the @anthropic-ai/claude-code CLI with Max subscription
+ *
+ * Spawns Claude in tmux windows for:
+ * - Process persistence across page navigations
+ * - Output recovery after disconnection
+ * - Clean process termination
  */
 
-import { spawn, ChildProcess } from 'child_process'
+import { spawn } from 'child_process'
 import { randomUUID } from 'crypto'
 import { homedir } from 'os'
 import { join } from 'path'
-import { existsSync } from 'fs'
+import { existsSync, promises as fs } from 'fs'
 import type { ChatMessage, ChatSettings, ClaudeSettings } from './types'
+import {
+  ensureSession,
+  ensureOutputDir,
+  spawnInWindow,
+  getOutputPath,
+  getWindowStatus,
+  killWindow
+} from './tmux-manager'
 
 // Path to the Claude CLI binary - check common install locations, fall back to PATH
 const CLAUDE_PATHS = [
@@ -202,9 +215,343 @@ export function buildClaudeArgs(settings: ChatSettings): string[] {
   return args
 }
 
+// Expand ~ to home directory (Node.js spawn doesn't do this automatically)
+function expandTilde(path: string): string {
+  if (path.startsWith('~/')) {
+    return join(homedir(), path.slice(2))
+  }
+  if (path === '~') {
+    return homedir()
+  }
+  return path
+}
+
 /**
- * Stream chat completions from Claude CLI
- * Returns stream and a function to get the captured session_id
+ * Determine effective working directory based on settings
+ */
+function resolveWorkingDirectory(cwd: string | undefined, settings: ChatSettings | undefined): string {
+  let effectiveCwd = cwd ? expandTilde(cwd) : process.cwd()
+
+  // 'user' mode: Use agent's directory (no beads hooks, gets agent's CLAUDE.md)
+  // 'dev' mode (default): Use provided cwd or process.cwd() for full dev context
+  if (settings?.agentMode === 'user') {
+    if (settings?.agentDir) {
+      // Path resolution:
+      // - Absolute paths (/path/to/agent): use as-is
+      // - Tilde paths (~/path): expand to home directory
+      // - Relative paths with ./ prefix: relative to Next.js project (process.cwd())
+      // - Plain relative paths: relative to home directory (user context)
+      if (settings.agentDir.startsWith('/')) {
+        effectiveCwd = settings.agentDir
+      } else if (settings.agentDir.startsWith('~/')) {
+        effectiveCwd = join(homedir(), settings.agentDir.slice(2))
+      } else if (settings.agentDir.startsWith('./')) {
+        effectiveCwd = join(process.cwd(), settings.agentDir.slice(2))
+      } else {
+        effectiveCwd = join(homedir(), settings.agentDir)
+      }
+    } else {
+      effectiveCwd = homedir()
+    }
+  }
+
+  return effectiveCwd
+}
+
+/**
+ * Escape a string for use in shell command
+ */
+function shellEscape(str: string): string {
+  // Use single quotes and escape any single quotes within
+  return "'" + str.replace(/'/g, "'\\''") + "'"
+}
+
+/**
+ * Create a stream that tails the output file and parses Claude events
+ */
+function createTailStream(
+  filePath: string,
+  conversationId: string,
+  onSessionId: (sessionId: string) => void
+): ReadableStream<string> {
+  let position = 0
+  let buffer = ''
+  let isClosed = false
+  let heartbeatInterval: NodeJS.Timeout | null = null
+  let pollTimeout: NodeJS.Timeout | null = null
+  let lastActivity = Date.now()
+
+  // Track current tool use for streaming input
+  const activeTools = new Map<number, { id: string; name: string; input: string }>()
+
+  return new ReadableStream<string>({
+    async start(controller) {
+      // Helper to safely close the stream
+      const safeClose = () => {
+        if (isClosed) return
+        isClosed = true
+
+        if (heartbeatInterval) {
+          clearInterval(heartbeatInterval)
+          heartbeatInterval = null
+        }
+        if (pollTimeout) {
+          clearTimeout(pollTimeout)
+          pollTimeout = null
+        }
+
+        try {
+          controller.close()
+        } catch {
+          // Already closed
+        }
+      }
+
+      // Helper to safely error the stream
+      const safeError = (error: Error) => {
+        if (isClosed) return
+        isClosed = true
+
+        if (heartbeatInterval) {
+          clearInterval(heartbeatInterval)
+          heartbeatInterval = null
+        }
+        if (pollTimeout) {
+          clearTimeout(pollTimeout)
+          pollTimeout = null
+        }
+
+        try {
+          controller.error(error)
+        } catch {
+          // Already closed/errored
+        }
+      }
+
+      // Helper to enqueue chunks with proper formatting
+      const enqueueChunk = (chunk: StreamChunk) => {
+        if (isClosed) return
+        lastActivity = Date.now()
+
+        if (chunk.type === 'text' && chunk.content) {
+          controller.enqueue(chunk.content)
+        } else {
+          controller.enqueue(`\n__CLAUDE_EVENT__${JSON.stringify(chunk)}__END_EVENT__\n`)
+        }
+      }
+
+      // Process a complete JSON line from Claude's stream-json output
+      const processLine = (line: string) => {
+        if (!line.trim()) return
+
+        try {
+          const event: ClaudeStreamEvent = JSON.parse(line)
+
+          // Capture session_id from init event
+          if (event.type === 'system' && event.subtype === 'init' && event.session_id) {
+            onSessionId(event.session_id)
+          }
+
+          switch (event.type) {
+            case 'assistant':
+              if (event.message?.content) {
+                for (const block of event.message.content) {
+                  if (block.type === 'text' && block.text) {
+                    enqueueChunk({ type: 'text', content: block.text })
+                  } else if (block.type === 'tool_use') {
+                    enqueueChunk({
+                      type: 'tool_start',
+                      tool: {
+                        id: block.id,
+                        name: block.name,
+                        input: JSON.stringify(block.input, null, 2)
+                      }
+                    })
+                    enqueueChunk({
+                      type: 'tool_end',
+                      tool: { id: block.id, name: block.name }
+                    })
+                  }
+                }
+              }
+              break
+
+            case 'content_block_start':
+              if (event.content_block?.type === 'tool_use' && event.index !== undefined) {
+                const tool = event.content_block as ToolUseBlock
+                activeTools.set(event.index, { id: tool.id, name: tool.name, input: '' })
+                enqueueChunk({
+                  type: 'tool_start',
+                  tool: { id: tool.id, name: tool.name }
+                })
+              }
+              break
+
+            case 'content_block_delta':
+              if (event.delta?.type === 'text_delta' && event.delta.text) {
+                enqueueChunk({ type: 'text', content: event.delta.text })
+              } else if (event.delta?.type === 'input_json_delta' && event.delta.partial_json && event.index !== undefined) {
+                const activeTool = activeTools.get(event.index)
+                if (activeTool) {
+                  activeTool.input += event.delta.partial_json
+                  enqueueChunk({
+                    type: 'tool_input',
+                    tool: {
+                      id: activeTool.id,
+                      name: activeTool.name,
+                      input: event.delta.partial_json
+                    }
+                  })
+                }
+              }
+              break
+
+            case 'content_block_stop':
+              if (event.index !== undefined) {
+                const activeTool = activeTools.get(event.index)
+                if (activeTool) {
+                  enqueueChunk({
+                    type: 'tool_end',
+                    tool: {
+                      id: activeTool.id,
+                      name: activeTool.name,
+                      input: activeTool.input
+                    }
+                  })
+                  activeTools.delete(event.index)
+                }
+              }
+              break
+
+            case 'result':
+              if (event.session_id) {
+                onSessionId(event.session_id)
+              }
+              if (event.is_error) {
+                safeError(new Error(event.result || 'Claude CLI error'))
+              } else {
+                if (event.usage) {
+                  const totalTokens = event.usage.input_tokens +
+                    event.usage.output_tokens +
+                    (event.usage.cache_read_input_tokens || 0) +
+                    (event.usage.cache_creation_input_tokens || 0)
+                  enqueueChunk({
+                    type: 'done',
+                    sessionId: undefined,  // Will be set by caller
+                    usage: {
+                      inputTokens: event.usage.input_tokens,
+                      outputTokens: event.usage.output_tokens,
+                      cacheReadTokens: event.usage.cache_read_input_tokens,
+                      cacheCreationTokens: event.usage.cache_creation_input_tokens,
+                      totalTokens
+                    }
+                  })
+                }
+                safeClose()
+              }
+              break
+
+            case 'message_stop':
+              safeClose()
+              break
+
+            case 'error':
+              safeError(new Error(event.error?.message || 'Claude CLI error'))
+              break
+          }
+        } catch (error) {
+          console.error('[Claude CLI] Failed to parse stream-json:', line, error)
+        }
+      }
+
+      // Start heartbeat to keep connection alive
+      heartbeatInterval = setInterval(() => {
+        if (isClosed) return
+        const timeSinceActivity = Date.now() - lastActivity
+        if (timeSinceActivity >= HEARTBEAT_INTERVAL) {
+          enqueueChunk({ type: 'heartbeat' })
+        }
+      }, HEARTBEAT_INTERVAL)
+
+      // Poll the output file for new content
+      const checkFile = async () => {
+        if (isClosed) return
+
+        try {
+          // Read file content
+          let content: string
+          try {
+            content = await fs.readFile(filePath, 'utf-8')
+          } catch (err) {
+            // File might not exist yet, keep polling
+            pollTimeout = setTimeout(checkFile, 50)
+            return
+          }
+
+          // Process any new content
+          if (content.length > position) {
+            const newContent = content.slice(position)
+            position = content.length
+
+            // Add to buffer and process complete lines
+            buffer += newContent
+            const lines = buffer.split('\n')
+            buffer = lines.pop() || ''
+
+            for (const line of lines) {
+              processLine(line)
+              if (isClosed) return
+            }
+          }
+
+          // Check if process still running
+          const status = await getWindowStatus(conversationId)
+          if (!status.running) {
+            // Process any remaining buffer content
+            if (buffer.trim()) {
+              processLine(buffer)
+            }
+            safeClose()
+            return
+          }
+
+          // Schedule next poll
+          pollTimeout = setTimeout(checkFile, 50)
+        } catch (err) {
+          console.error('[Claude CLI] Tail stream error:', err)
+          safeError(err instanceof Error ? err : new Error(String(err)))
+        }
+      }
+
+      // Start polling
+      checkFile()
+    },
+
+    async cancel() {
+      isClosed = true
+
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval)
+        heartbeatInterval = null
+      }
+      if (pollTimeout) {
+        clearTimeout(pollTimeout)
+        pollTimeout = null
+      }
+
+      // Kill the tmux window
+      await killWindow(conversationId)
+    }
+  })
+}
+
+/**
+ * Stream chat completions from Claude CLI (spawned in tmux)
+ *
+ * Spawns Claude in a tmux window with output captured via tee for:
+ * - Process persistence across page navigations
+ * - Output recovery after disconnection
+ * - Clean process termination
  *
  * Features:
  * - Heartbeat to keep connection alive during long operations
@@ -216,8 +563,13 @@ export async function streamClaude(
   messages: ChatMessage[],
   settings?: ChatSettings,
   cwd?: string,
-  sessionId?: string
+  sessionId?: string,
+  conversationId?: string
 ): Promise<ClaudeStreamResult> {
+  if (!conversationId) {
+    throw new Error('conversationId is required for tmux-based streaming')
+  }
+
   // Build the conversation context
   const systemPrompt = settings?.systemPrompt || ''
 
@@ -234,353 +586,65 @@ export async function streamClaude(
   ]
 
   // Session persistence: use --resume for existing sessions, --session-id for new ones
-  // --session-id lets us know the session ID upfront for multi-turn persistence
   if (sessionId) {
-    // Resume existing session
     args.push('--resume', sessionId)
   } else {
-    // Generate a new session ID upfront for persistence
     const newSessionId = randomUUID()
     args.push('--session-id', newSessionId)
   }
 
   // Check if we have a pre-built spawn command (takes precedence)
   if (settings?.spawnCommand && settings.spawnCommand.length > 0) {
-    // Use pre-built spawn command args
     args.push(...settings.spawnCommand)
   } else if (settings) {
-    // Build from individual settings using helper
     args.push(...buildClaudeArgs(settings))
   } else if (systemPrompt) {
-    // Fallback for minimal settings
     args.push('--append-system-prompt', systemPrompt)
   }
 
   // Always add the prompt as the last argument
   args.push(lastUserMessage.content)
 
-  // Expand ~ to home directory (Node.js spawn doesn't do this automatically)
-  const expandTilde = (path: string): string => {
-    if (path.startsWith('~/')) {
-      return join(homedir(), path.slice(2))
-    }
-    if (path === '~') {
-      return homedir()
-    }
-    return path
-  }
+  // Resolve working directory
+  const effectiveCwd = resolveWorkingDirectory(cwd, settings)
 
-  // Determine working directory based on agent mode
-  // - 'user' mode: Use agent's directory (no beads hooks, gets agent's CLAUDE.md)
-  // - 'dev' mode (default): Use provided cwd or process.cwd() for full dev context
-  let effectiveCwd = cwd ? expandTilde(cwd) : process.cwd()
-  if (settings?.agentMode === 'user') {
-    if (settings?.agentDir) {
-      // Use agent's directory - has .claude/settings.json that disables hooks
-      // and includes the agent's CLAUDE.md for personality
-      // Path resolution:
-      // - Absolute paths (/path/to/agent): use as-is
-      // - Tilde paths (~/path): expand to home directory
-      // - Relative paths with ./ prefix: relative to Next.js project (process.cwd())
-      // - Plain relative paths: relative to home directory (user context)
-      if (settings.agentDir.startsWith('/')) {
-        effectiveCwd = settings.agentDir
-      } else if (settings.agentDir.startsWith('~/')) {
-        effectiveCwd = join(homedir(), settings.agentDir.slice(2))
-      } else if (settings.agentDir.startsWith('./')) {
-        effectiveCwd = join(process.cwd(), settings.agentDir.slice(2))
-      } else {
-        // Plain relative paths resolve from home directory for 'user' mode
-        effectiveCwd = join(homedir(), settings.agentDir)
-      }
-    } else {
-      // Fallback to home directory if no agentDir specified
-      effectiveCwd = homedir()
-    }
-  }
-
-  console.log(`[Claude CLI] Spawning: ${CLAUDE_BIN}`)
+  console.log(`[Claude CLI] Spawning in tmux: ${CLAUDE_BIN}`)
   console.log(`[Claude CLI] Args: ${args.slice(0, 5).join(' ')}...`)
   console.log(`[Claude CLI] CWD: ${effectiveCwd}`)
-  console.log(`[Claude CLI] Binary exists at spawn time: ${existsSync(CLAUDE_BIN)}`)
+  console.log(`[Claude CLI] Conversation ID: ${conversationId}`)
 
-  const claude = spawn(CLAUDE_BIN, args, {
-    env: {
-      ...process.env,
-      // Remove ANTHROPIC_API_KEY to force subscription auth
-      ANTHROPIC_API_KEY: undefined
-    },
-    cwd: effectiveCwd,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    detached: false
-  })
+  // Ensure tmux session exists
+  await ensureSession()
+
+  // Prepare output file
+  const outputPath = getOutputPath(conversationId)
+  ensureOutputDir()
+
+  // Truncate output file if exists
+  await fs.writeFile(outputPath, '')
+
+  // Build command with proper escaping
+  // We need to escape each arg individually for the shell
+  const escapedArgs = args.map(arg => shellEscape(arg)).join(' ')
+
+  // Build command that pipes through tee to capture output
+  // Note: We unset ANTHROPIC_API_KEY to force subscription auth
+  const command = `ANTHROPIC_API_KEY= ${CLAUDE_BIN} ${escapedArgs} 2>&1 | tee ${shellEscape(outputPath)}`
+
+  console.log(`[Claude CLI] Command: ${command.slice(0, 100)}...`)
+
+  // Spawn in tmux window
+  await spawnInWindow(conversationId, command, effectiveCwd)
 
   // Capture session_id from stream events
   let capturedSessionId: string | null = null
 
-  // Track stream state to prevent double operations
-  let isClosed = false
-  let heartbeatInterval: NodeJS.Timeout | null = null
-  let lastActivity = Date.now()
-
-  // Track current tool use for streaming input
-  const activeTools = new Map<number, { id: string; name: string; input: string }>()
-
-  // Helper to safely close the stream
-  const safeClose = (controller: ReadableStreamDefaultController<string>) => {
-    if (isClosed) return
-    isClosed = true
-
-    // Clear heartbeat
-    if (heartbeatInterval) {
-      clearInterval(heartbeatInterval)
-      heartbeatInterval = null
-    }
-
-    // Kill process if still running
-    if (!claude.killed) {
-      claude.kill()
-    }
-
-    try {
-      controller.close()
-    } catch {
-      // Already closed
-    }
-  }
-
-  // Helper to safely error the stream
-  const safeError = (controller: ReadableStreamDefaultController<string>, error: Error) => {
-    if (isClosed) return
-    isClosed = true
-
-    if (heartbeatInterval) {
-      clearInterval(heartbeatInterval)
-      heartbeatInterval = null
-    }
-
-    if (!claude.killed) {
-      claude.kill()
-    }
-
-    try {
-      controller.error(error)
-    } catch {
-      // Already closed/errored
-    }
-  }
-
-  // Helper to enqueue with JSON encoding for structured data
-  const enqueueChunk = (controller: ReadableStreamDefaultController<string>, chunk: StreamChunk) => {
-    if (isClosed) return
-    lastActivity = Date.now()
-
-    // For text content, just send the raw text for backwards compatibility
-    if (chunk.type === 'text' && chunk.content) {
-      controller.enqueue(chunk.content)
-    } else {
-      // For structured events (tool use, heartbeat), send as JSON with marker
-      controller.enqueue(`\n__CLAUDE_EVENT__${JSON.stringify(chunk)}__END_EVENT__\n`)
-    }
-  }
-
-  const stream = new ReadableStream<string>({
-    start(controller) {
-      let buffer = ''
-
-      // Start heartbeat to keep connection alive
-      heartbeatInterval = setInterval(() => {
-        if (isClosed) return
-
-        const timeSinceActivity = Date.now() - lastActivity
-        if (timeSinceActivity >= HEARTBEAT_INTERVAL) {
-          enqueueChunk(controller, { type: 'heartbeat' })
-        }
-      }, HEARTBEAT_INTERVAL)
-
-      // Process stream-json format from Claude CLI
-      claude.stdout.on('data', (chunk: Buffer) => {
-        if (isClosed) return
-
-        buffer += chunk.toString()
-        lastActivity = Date.now()
-
-        // Process complete JSON lines
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-
-        for (const line of lines) {
-          if (!line.trim()) continue
-
-          try {
-            const event: ClaudeStreamEvent = JSON.parse(line)
-
-            // Capture session_id from init event
-            if (event.type === 'system' && event.subtype === 'init' && event.session_id) {
-              capturedSessionId = event.session_id
-            }
-
-            // Handle different event types
-            switch (event.type) {
-              case 'assistant':
-                // Full assistant message with content blocks
-                if (event.message?.content) {
-                  for (const block of event.message.content) {
-                    if (block.type === 'text' && block.text) {
-                      enqueueChunk(controller, { type: 'text', content: block.text })
-                    } else if (block.type === 'tool_use') {
-                      // Tool use in assistant message
-                      enqueueChunk(controller, {
-                        type: 'tool_start',
-                        tool: {
-                          id: block.id,
-                          name: block.name,
-                          input: JSON.stringify(block.input, null, 2)
-                        }
-                      })
-                      enqueueChunk(controller, {
-                        type: 'tool_end',
-                        tool: { id: block.id, name: block.name }
-                      })
-                    }
-                  }
-                }
-                break
-
-              case 'content_block_start':
-                // Start of a content block (text or tool_use)
-                if (event.content_block?.type === 'tool_use' && event.index !== undefined) {
-                  const tool = event.content_block as ToolUseBlock
-                  activeTools.set(event.index, { id: tool.id, name: tool.name, input: '' })
-                  enqueueChunk(controller, {
-                    type: 'tool_start',
-                    tool: { id: tool.id, name: tool.name }
-                  })
-                }
-                break
-
-              case 'content_block_delta':
-                if (event.delta?.type === 'text_delta' && event.delta.text) {
-                  // Text streaming
-                  enqueueChunk(controller, { type: 'text', content: event.delta.text })
-                } else if (event.delta?.type === 'input_json_delta' && event.delta.partial_json && event.index !== undefined) {
-                  // Tool input streaming
-                  const activeTool = activeTools.get(event.index)
-                  if (activeTool) {
-                    activeTool.input += event.delta.partial_json
-                    enqueueChunk(controller, {
-                      type: 'tool_input',
-                      tool: {
-                        id: activeTool.id,
-                        name: activeTool.name,
-                        input: event.delta.partial_json
-                      }
-                    })
-                  }
-                }
-                break
-
-              case 'content_block_stop':
-                // End of a content block
-                if (event.index !== undefined) {
-                  const activeTool = activeTools.get(event.index)
-                  if (activeTool) {
-                    enqueueChunk(controller, {
-                      type: 'tool_end',
-                      tool: {
-                        id: activeTool.id,
-                        name: activeTool.name,
-                        input: activeTool.input
-                      }
-                    })
-                    activeTools.delete(event.index)
-                  }
-                }
-                break
-
-              case 'result':
-                // Capture session_id from result event
-                if (event.session_id) {
-                  capturedSessionId = event.session_id
-                }
-                // End of stream
-                if (event.is_error) {
-                  safeError(controller, new Error(event.result || 'Claude CLI error'))
-                } else {
-                  // Send done event with usage data if available
-                  if (event.usage) {
-                    const totalTokens = event.usage.input_tokens +
-                      event.usage.output_tokens +
-                      (event.usage.cache_read_input_tokens || 0) +
-                      (event.usage.cache_creation_input_tokens || 0)
-                    enqueueChunk(controller, {
-                      type: 'done',
-                      sessionId: capturedSessionId || undefined,
-                      usage: {
-                        inputTokens: event.usage.input_tokens,
-                        outputTokens: event.usage.output_tokens,
-                        cacheReadTokens: event.usage.cache_read_input_tokens,
-                        cacheCreationTokens: event.usage.cache_creation_input_tokens,
-                        totalTokens
-                      }
-                    })
-                  }
-                  safeClose(controller)
-                }
-                break
-
-              case 'message_stop':
-                safeClose(controller)
-                break
-
-              case 'error':
-                safeError(controller, new Error(event.error?.message || 'Claude CLI error'))
-                break
-            }
-          } catch (error) {
-            console.error('Failed to parse Claude stream-json:', line, error)
-          }
-        }
-      })
-
-      claude.stderr.on('data', (chunk: Buffer) => {
-        const stderr = chunk.toString()
-        console.error('Claude CLI stderr:', stderr)
-
-        // Check for fatal errors in stderr
-        if (stderr.includes('Error:') || stderr.includes('FATAL')) {
-          safeError(controller, new Error(`Claude CLI: ${stderr.trim()}`))
-        }
-      })
-
-      claude.on('close', (code) => {
-        if (isClosed) return
-
-        if (code !== 0 && code !== null) {
-          safeError(controller, new Error(`Claude CLI exited with code ${code}`))
-        } else {
-          safeClose(controller)
-        }
-      })
-
-      claude.on('error', (error) => {
-        safeError(controller, error)
-      })
-    },
-
-    cancel() {
-      isClosed = true
-
-      if (heartbeatInterval) {
-        clearInterval(heartbeatInterval)
-        heartbeatInterval = null
-      }
-
-      if (!claude.killed) {
-        claude.kill()
-      }
-    }
-  })
+  // Create stream that tails the output file
+  const stream = createTailStream(
+    outputPath,
+    conversationId,
+    (sid) => { capturedSessionId = sid }
+  )
 
   return {
     stream,
