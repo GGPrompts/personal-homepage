@@ -168,10 +168,6 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
   // Don't render if context is not available (outside provider)
   if (!context) return null
 
-  // Hide drawer when on AI Workspace (workspace manages its own chat UI)
-  const isOnWorkspace = context.currentSection === 'ai-workspace'
-  if (isOnWorkspace) return null
-
   const {
     state,
     close,
@@ -232,8 +228,7 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
 
   // Determine which agent to display on the floating button
   // For AI Workspace, show selected agent (if any) instead of section-recommended agent
-  const isAIWorkspace = context.currentSection === 'ai-workspace'
-  const displayAgent = isAIWorkspace
+  const displayAgent = (context.currentSection === 'ai-workspace')
     ? selectedAgent  // May be null - will show generic icon
     : (recommendedAgent ?? selectedAgent)
 
@@ -259,6 +254,10 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
 
   // Don't render until mounted to prevent hydration mismatch with localStorage state
   if (!mounted) return null
+
+  // Hide drawer when on AI Workspace (workspace manages its own chat UI)
+  const isOnWorkspace = context.currentSection === 'ai-workspace'
+  if (isOnWorkspace) return null
 
   return (
     <>
@@ -297,8 +296,6 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                             : <BackendIcon agent={displayAgent} className="h-5 w-5" />}
                         </AvatarFallback>
                       </Avatar>
-                    ) : isAIWorkspace ? (
-                      <Sparkles className="h-6 w-6" />
                     ) : (
                       <MessageSquare className="h-6 w-6" />
                     )}
