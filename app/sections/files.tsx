@@ -65,7 +65,7 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const [showPlugins, setShowPlugins] = useState<boolean>(true)
+  const [showPlugins, setShowPlugins] = useState<boolean>(false)
   const [fileSource, setFileSource] = useState<FileSource>(() => {
     // Check if coming from Projects page with GitHub context
     if (typeof window !== 'undefined') {
