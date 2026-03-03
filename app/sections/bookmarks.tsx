@@ -1285,19 +1285,19 @@ export default function BookmarksSection({
               </div>
             ))}
             {visibleBookmarks.map((bookmark) => (
+              <ContextMenu key={bookmark.id}>
+                <ContextMenuTrigger asChild>
               <div
-                key={bookmark.id}
                 className="flex items-center gap-3 p-2 rounded-lg hover:bg-primary/10 transition-colors group"
               >
                 {bookmark.type === "terminal" ? (
                   <button
-                    data-terminal-command={bookmark.command}
                     data-tabz-action={bookmark.sendToChat ? "send-chat" : bookmark.autoExecute === false ? "paste-terminal" : "spawn-terminal"}
                     data-tabz-command={bookmark.command}
                     data-tabz-project={bookmark.workingDir}
                     data-tabz-profile={bookmark.profile}
                     data-tabz-item={`bookmark-${bookmark.id}`}
-                    className="flex items-center gap-3 min-w-0 text-left"
+                    className="flex items-center gap-3 flex-1 min-w-0 overflow-hidden text-left"
                     onClick={(e) => {
                       e.stopPropagation()
                       if (bookmark.sendToChat) {
@@ -1322,7 +1322,7 @@ export default function BookmarksSection({
                         <Terminal className="h-5 w-5 text-emerald-400" />
                       )}
                     </div>
-                    <div className="min-w-0 w-48 lg:w-64 flex-shrink-0">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="font-medium truncate">{bookmark.name}</p>
                         {bookmark.profile && (
@@ -1333,9 +1333,6 @@ export default function BookmarksSection({
                       </div>
                       <p className="text-xs text-muted-foreground truncate font-mono">{bookmark.command || <span className="italic">no command</span>}</p>
                     </div>
-                    <p className="text-xs text-muted-foreground hidden lg:block w-32 lg:w-48 truncate font-mono flex-shrink-0">
-                      {bookmark.workingDir || <span className="italic">{defaultWorkDir}</span>}
-                    </p>
                     {bookmark.sendToChat ? (
                       <MessageSquare className="h-4 w-4 text-emerald-400 flex-shrink-0" />
                     ) : bookmark.autoExecute === false ? (
@@ -1349,7 +1346,7 @@ export default function BookmarksSection({
                     href={bookmark.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 min-w-0"
+                    className="flex items-center gap-3 flex-1 min-w-0 overflow-hidden"
                   >
                     <div className="h-8 w-8 flex items-center justify-center flex-shrink-0 rounded-md bg-white/15">
                       {bookmark.icon ? (
@@ -1358,7 +1355,7 @@ export default function BookmarksSection({
                         <FaviconWithFallback url={bookmark.url} className="h-5 w-5" />
                       )}
                     </div>
-                    <div className="min-w-0 w-48 lg:w-64 flex-shrink-0">
+                    <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{bookmark.name}</p>
                       <p className="text-xs text-muted-foreground truncate">{getDomain(bookmark.url)}</p>
                     </div>
@@ -1483,6 +1480,91 @@ export default function BookmarksSection({
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
+                </ContextMenuTrigger>
+                <ContextMenuContent className="w-56 bg-popover/95 backdrop-blur-sm">
+                  {bookmark.type === "terminal" ? (
+                    <>
+                      {bookmark.command && (
+                        <>
+                          <ContextMenuItem
+                            onClick={() => handleLaunchTerminal(bookmark.command!, { workingDir: bookmark.workingDir, name: bookmark.name })}
+                            disabled={!terminalAvailable}
+                          >
+                            <Play className="h-4 w-4 mr-2" />
+                            Run in Terminal
+                          </ContextMenuItem>
+                          <ContextMenuItem
+                            onClick={async () => {
+                              const result = await pasteToTerminal(bookmark.command!, {
+                                workingDir: bookmark.workingDir,
+                                name: bookmark.name,
+                                profile: bookmark.profile,
+                                color: bookmark.color,
+                              })
+                              if (result.success) {
+                                toast.success(`Command pasted to terminal`)
+                              } else {
+                                toast.error(result.error || "Failed to paste to terminal")
+                              }
+                            }}
+                            disabled={!terminalAvailable}
+                          >
+                            <ClipboardPaste className="h-4 w-4 mr-2" />
+                            Paste to Terminal
+                          </ContextMenuItem>
+                          <ContextMenuItem
+                            onClick={() => {
+                              sendToChat(bookmark.command!)
+                              toast.success("Sent to TabzChrome chat")
+                            }}
+                            disabled={!terminalAvailable}
+                          >
+                            <MessageSquare className="h-4 w-4 mr-2" />
+                            Send to Chat
+                          </ContextMenuItem>
+                          <ContextMenuSeparator />
+                          <ContextMenuItem
+                            onClick={() => navigator.clipboard.writeText(bookmark.command!)}
+                          >
+                            <Copy className="h-4 w-4 mr-2" />
+                            Copy Command
+                          </ContextMenuItem>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {bookmark.url && (
+                        <>
+                          <ContextMenuItem onClick={() => window.open(bookmark.url, '_blank', 'noopener,noreferrer')}>
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            Open in New Tab
+                          </ContextMenuItem>
+                          <ContextMenuSeparator />
+                          <ContextMenuItem
+                            onClick={() => navigator.clipboard.writeText(bookmark.url)}
+                          >
+                            <Copy className="h-4 w-4 mr-2" />
+                            Copy Link
+                          </ContextMenuItem>
+                        </>
+                      )}
+                    </>
+                  )}
+                  <ContextMenuSeparator />
+                  <ContextMenuItem onClick={() => openEditBookmark(bookmark)}>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    className="text-destructive"
+                    onClick={() => setDeleteConfirm({ item: bookmark, type: "bookmark" })}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             ))}
           </div>
         )}

@@ -272,11 +272,13 @@ export function FlowEditor({ tabzConnected, tabzQueue, tabzSpawn }: FlowEditorPr
 
   // Get nodes with visibility based on depth level
   // visibleNodeIds: set of node IDs that should be visible (computed from depth groups)
+  // depthLevel: the current depth level (1-indexed) for note visibility comparison
   const getNodesWithVisibility = useCallback((
     visibleNodeIds: Set<string>,
     steps: Step[] = currentSteps,
     notesList: Note[] = currentNotes,
-    editNodeId: string | null = null
+    editNodeId: string | null = null,
+    depthLevel?: number
   ) => {
     const stepNodes = steps.map((step) =>
       createNode(
@@ -289,12 +291,11 @@ export function FlowEditor({ tabzConnected, tabzQueue, tabzSpawn }: FlowEditorPr
         clearEditingNode
       )
     );
-    // Notes visibility: show if any of the visible nodes is at or after the note's appearsWithStep
-    // For depth-based, we need to check if the depth level >= the note's appearsWithStep
+    // Notes visibility: show when depth level >= the note's appearsWithStep
+    // Use explicit depthLevel when provided, fall back to visibleDepth state
+    const effectiveDepth = depthLevel ?? visibleDepth;
     const noteNodes = notesList.map(note => {
-      // Note appears when we've shown enough depth levels
-      // appearsWithStep was 1-indexed count, so we compare with depthLevel
-      const noteVisible = visibleNodeIds.size > 0 && note.appearsWithStep <= visibleNodeIds.size;
+      const noteVisible = effectiveDepth > 0 && note.appearsWithStep <= effectiveDepth;
       return createNoteNode(
         note,
         noteVisible,
@@ -303,7 +304,7 @@ export function FlowEditor({ tabzConnected, tabzQueue, tabzSpawn }: FlowEditorPr
       );
     });
     return [...stepNodes, ...noteNodes];
-  }, [currentSteps, currentNotes, handleNodeDataChange, handleNodeContextMenu, clearEditingNode, handleNoteContentChange]);
+  }, [currentSteps, currentNotes, visibleDepth, handleNodeDataChange, handleNodeContextMenu, clearEditingNode, handleNoteContentChange]);
 
   // Legacy getNodes for compatibility - converts count to visible node IDs using depth groups
   const getNodes = useCallback((depthLevel: number, steps: Step[] = currentSteps, notesList: Note[] = currentNotes, editNodeId: string | null = null) => {
@@ -311,7 +312,7 @@ export function FlowEditor({ tabzConnected, tabzQueue, tabzSpawn }: FlowEditorPr
     const groups = computeDepthGroups(steps, currentEdges);
     const visibleIds = getVisibleNodeIds(groups, depthLevel);
     const visibleSet = new Set(visibleIds);
-    return getNodesWithVisibility(visibleSet, steps, notesList, editNodeId);
+    return getNodesWithVisibility(visibleSet, steps, notesList, editNodeId, depthLevel);
   }, [currentSteps, currentEdges, getNodesWithVisibility]);
 
   // Create initial edges without callbacks (callbacks added via useEffect)
@@ -1167,7 +1168,7 @@ export function FlowEditor({ tabzConnected, tabzQueue, tabzSpawn }: FlowEditorPr
       const visibleIds = getVisibleNodeIds(depthGroups, newDepth);
       const visibleSet = new Set(visibleIds);
 
-      setNodes(getNodesWithVisibility(visibleSet));
+      setNodes(getNodesWithVisibility(visibleSet, undefined, undefined, null, newDepth));
       setEdges(
         currentEdges.map((conn) =>
           createEdge(conn, getEdgeVisibilityByNodeIds(conn, visibleSet), handleEdgeLabelChange, handleFlipEdgeDirection, handleEdgeContextMenu)
@@ -1178,23 +1179,25 @@ export function FlowEditor({ tabzConnected, tabzQueue, tabzSpawn }: FlowEditorPr
       const newlyVisibleIds = getNodesAtDepth(depthGroups, newDepth);
       if (newlyVisibleIds.length > 0) {
         // Use setTimeout to let nodes render before fitting view
+        const currentZoom = getZoom();
         setTimeout(() => {
           if (newlyVisibleIds.length === 1) {
-            // Single node: center on it
+            // Single node: center on it, preserve current zoom
             const node = getNode(newlyVisibleIds[0]);
             if (node) {
               setCenter(
                 node.position.x + (node.measured?.width || 150) / 2,
                 node.position.y + (node.measured?.height || 50) / 2,
-                { duration: 300, zoom: getZoom() }
+                { duration: 300, zoom: currentZoom }
               );
             }
           } else {
-            // Multiple nodes: fit all of them in view
+            // Multiple nodes: fit them in view but don't zoom in past current level
             fitView({
               nodes: newlyVisibleIds.map(id => ({ id })),
               duration: 300,
               padding: 0.2,
+              maxZoom: currentZoom,
             });
           }
         }, 50);
@@ -1210,7 +1213,7 @@ export function FlowEditor({ tabzConnected, tabzQueue, tabzSpawn }: FlowEditorPr
       const visibleIds = getVisibleNodeIds(depthGroups, newDepth);
       const visibleSet = new Set(visibleIds);
 
-      setNodes(getNodesWithVisibility(visibleSet));
+      setNodes(getNodesWithVisibility(visibleSet, undefined, undefined, null, newDepth));
       setEdges(
         currentEdges.map((conn) =>
           createEdge(conn, getEdgeVisibilityByNodeIds(conn, visibleSet), handleEdgeLabelChange, handleFlipEdgeDirection, handleEdgeContextMenu)
@@ -1220,6 +1223,7 @@ export function FlowEditor({ tabzConnected, tabzQueue, tabzSpawn }: FlowEditorPr
       // Focus on the nodes at the current depth level
       const currentLevelIds = getNodesAtDepth(depthGroups, newDepth);
       if (currentLevelIds.length > 0) {
+        const currentZoom = getZoom();
         setTimeout(() => {
           if (currentLevelIds.length === 1) {
             const node = getNode(currentLevelIds[0]);
@@ -1227,7 +1231,7 @@ export function FlowEditor({ tabzConnected, tabzQueue, tabzSpawn }: FlowEditorPr
               setCenter(
                 node.position.x + (node.measured?.width || 150) / 2,
                 node.position.y + (node.measured?.height || 50) / 2,
-                { duration: 300, zoom: getZoom() }
+                { duration: 300, zoom: currentZoom }
               );
             }
           } else {
@@ -1235,6 +1239,7 @@ export function FlowEditor({ tabzConnected, tabzQueue, tabzSpawn }: FlowEditorPr
               nodes: currentLevelIds.map(id => ({ id })),
               duration: 300,
               padding: 0.2,
+              maxZoom: currentZoom,
             });
           }
         }, 50);
@@ -1247,7 +1252,7 @@ export function FlowEditor({ tabzConnected, tabzQueue, tabzSpawn }: FlowEditorPr
     setVisibleDepth(1);
     const visibleIds = getVisibleNodeIds(depthGroups, 1);
     const visibleSet = new Set(visibleIds);
-    setNodes(getNodesWithVisibility(visibleSet));
+    setNodes(getNodesWithVisibility(visibleSet, undefined, undefined, null, 1));
     setEdges(
       currentEdges.map((conn) =>
         createEdge(conn, getEdgeVisibilityByNodeIds(conn, visibleSet), handleEdgeLabelChange, handleFlipEdgeDirection, handleEdgeContextMenu)
@@ -1257,6 +1262,7 @@ export function FlowEditor({ tabzConnected, tabzQueue, tabzSpawn }: FlowEditorPr
     // Center on the first depth level nodes
     const firstLevelIds = getNodesAtDepth(depthGroups, 1);
     if (firstLevelIds.length > 0) {
+      const currentZoom = getZoom();
       setTimeout(() => {
         if (firstLevelIds.length === 1) {
           const node = getNode(firstLevelIds[0]);
@@ -1264,7 +1270,7 @@ export function FlowEditor({ tabzConnected, tabzQueue, tabzSpawn }: FlowEditorPr
             setCenter(
               node.position.x + (node.measured?.width || 150) / 2,
               node.position.y + (node.measured?.height || 50) / 2,
-              { duration: 300, zoom: getZoom() }
+              { duration: 300, zoom: currentZoom }
             );
           }
         } else {
@@ -1272,6 +1278,7 @@ export function FlowEditor({ tabzConnected, tabzQueue, tabzSpawn }: FlowEditorPr
             nodes: firstLevelIds.map(id => ({ id })),
             duration: 300,
             padding: 0.2,
+            maxZoom: currentZoom,
           });
         }
       }, 50);
@@ -1304,7 +1311,7 @@ export function FlowEditor({ tabzConnected, tabzQueue, tabzSpawn }: FlowEditorPr
     setVisibleDepth(totalDepth);
     const visibleIds = getVisibleNodeIds(depthGroups, totalDepth);
     const visibleSet = new Set(visibleIds);
-    setNodes(getNodesWithVisibility(visibleSet));
+    setNodes(getNodesWithVisibility(visibleSet, undefined, undefined, null, totalDepth));
     setEdges(
       currentEdges.map((conn) =>
         createEdge(conn, getEdgeVisibilityByNodeIds(conn, visibleSet), handleEdgeLabelChange, handleFlipEdgeDirection, handleEdgeContextMenu)

@@ -35,51 +35,41 @@ export function computeDepthGroups(
     }
   });
 
-  // Find entry nodes: nodes with no incoming edges
-  // Prefer human-entry type nodes, then fall back to any node with no incoming edges
-  const humanEntryNodes: string[] = [];
-  const otherEntryNodes: string[] = [];
+  // Find all entry nodes: nodes with no incoming edges
+  // These are starting points of the workflow (there may be parallel branches)
+  const entryNodes: string[] = [];
 
   steps.forEach(step => {
-    const hasNoIncoming = (incomingCount.get(step.id) || 0) === 0;
-    if (hasNoIncoming) {
-      if (step.nodeType === 'human-entry') {
-        humanEntryNodes.push(step.id);
-      } else {
-        otherEntryNodes.push(step.id);
-      }
+    if ((incomingCount.get(step.id) || 0) === 0) {
+      entryNodes.push(step.id);
     }
   });
 
-  // Pick the PRIMARY entry node (prefer human-entry, use first one found)
-  // Only traverse from this single entry to avoid mixing disconnected subgraphs
-  let primaryEntry: string | null = null;
-  if (humanEntryNodes.length > 0) {
-    primaryEntry = humanEntryNodes[0];
-  } else if (otherEntryNodes.length > 0) {
-    primaryEntry = otherEntryNodes[0];
-  } else if (steps.length > 0) {
-    primaryEntry = steps[0].id;
+  // Fall back to first step if no entry nodes found (cycle)
+  if (entryNodes.length === 0 && steps.length > 0) {
+    entryNodes.push(steps[0].id);
   }
 
-  if (!primaryEntry) {
+  if (entryNodes.length === 0) {
     return [];
   }
 
-  // BFS to compute depth for each node, starting ONLY from primary entry
-  // This ensures we only include nodes in the main workflow, not disconnected subgraphs
+  // BFS from ALL entry nodes to compute depth
+  // Parallel branches (e.g., "APIs" and "Swarms" both feeding into a merge point)
+  // start at the same depth and converge naturally
   const depth = new Map<string, number>();
   const visited = new Set<string>();
   const queue: { id: string; level: number }[] = [];
 
-  queue.push({ id: primaryEntry, level: 0 });
-  visited.add(primaryEntry);
-  depth.set(primaryEntry, 0);
+  for (const entryId of entryNodes) {
+    queue.push({ id: entryId, level: 0 });
+    visited.add(entryId);
+    depth.set(entryId, 0);
+  }
 
   while (queue.length > 0) {
     const { id, level } = queue.shift()!;
 
-    // Get neighbors (nodes this one points to)
     const neighbors = adjacencyList.get(id) || [];
 
     neighbors.forEach(neighborId => {
@@ -91,9 +81,6 @@ export function computeDepthGroups(
       }
     });
   }
-
-  // Only include nodes reachable from primary entry (ignore disconnected subgraphs)
-  // Disconnected nodes are NOT added to depth groups - they stay visible but don't participate in stepping
 
   // Group only REACHABLE nodes by depth
   const depthGroupsMap = new Map<number, string[]>();

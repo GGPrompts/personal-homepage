@@ -94,16 +94,25 @@ export function WorkingDirSelector({
     return (
       <div className="px-3 py-2 border-b border-border/20 flex justify-center">
         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 text-muted-foreground hover:text-foreground"
-              data-tabz-action="open-working-dir"
-            >
-              <FolderOpen className="h-4 w-4" />
-            </Button>
-          </PopoverTrigger>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                  data-tabz-action="open-working-dir"
+                >
+                  <FolderOpen className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+            </TooltipTrigger>
+            {!popoverOpen && (
+              <TooltipContent side="right" className="font-mono text-xs">
+                {workingDir === "~" ? "Working Dir: ~ (Home)" : workingDir}
+              </TooltipContent>
+            )}
+          </Tooltip>
           <PopoverContent side="right" align="start" className="w-72 p-3" sideOffset={8}>
             <div className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Working Directory
