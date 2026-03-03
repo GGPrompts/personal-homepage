@@ -285,7 +285,7 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
                         <select
                           value={viewerSettings.fontFamily}
                           onChange={(e) => setFontFamily(e.target.value)}
-                          className="w-full px-3 py-1.5 bg-background border border-border rounded-lg text-sm"
+                          className="w-full px-3 py-1.5 bg-background text-foreground border border-border rounded-lg text-sm [&>option]:bg-background [&>option]:text-foreground"
                           style={{ fontFamily: viewerSettings.fontFamily }}
                         >
                           <option value="JetBrains Mono">JetBrains Mono</option>
