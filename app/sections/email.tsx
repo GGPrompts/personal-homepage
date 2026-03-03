@@ -821,9 +821,9 @@ export default function EmailSection({
                 </Button>
               </div>
 
-              <ScrollArea className="flex-1 px-2">
+              <div className="flex-1 overflow-y-auto pb-2">
                 {/* Folders */}
-                <div className="space-y-1">
+                <div className="space-y-1 px-2">
                   {folders.map((folder) => {
                     const Icon = folder.icon
                     const isActive = selectedFolder === folder.labelId
@@ -837,18 +837,18 @@ export default function EmailSection({
                         }}
                         className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
                           isActive
-                            ? "bg-primary/10 text-primary"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                            ? "bg-primary/15 text-primary font-medium border border-primary/30"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent"
                         }`}
                         data-tabz-action="select-folder"
                         data-tabz-folder={folder.labelId}
                       >
-                        <div className="flex items-center gap-3">
-                          <Icon className="h-4 w-4" />
-                          <span className="text-sm">{folder.name}</span>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Icon className="h-4 w-4 flex-shrink-0" />
+                          <span className="text-sm truncate">{folder.name}</span>
                         </div>
                         {folder.unreadCount > 0 && (
-                          <Badge variant="secondary" className="text-xs px-2 py-0">
+                          <Badge variant="secondary" className="text-xs px-2 py-0 flex-shrink-0 min-w-[1.5rem] text-center">
                             {folder.unreadCount}
                           </Badge>
                         )}
@@ -859,15 +859,15 @@ export default function EmailSection({
 
                 {userLabels.length > 0 && (
                   <>
-                    <Separator className="my-4" />
+                    <Separator className="my-4 mx-2" />
 
                     {/* User Labels */}
-                    <div className="mb-2 px-3">
+                    <div className="mb-2 px-5">
                       <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Labels
                       </span>
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-1 px-2">
                       {userLabels.map((label) => (
                         <button
                           key={label.id}
@@ -893,7 +893,7 @@ export default function EmailSection({
                     </div>
                   </>
                 )}
-              </ScrollArea>
+              </div>
             </motion.aside>
           )}
         </AnimatePresence>
