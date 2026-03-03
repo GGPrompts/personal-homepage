@@ -290,7 +290,7 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                         {isAvatarUrl(displayAgent.avatar) && (
                           <AvatarImage src={displayAgent.avatar} alt={displayAgent.name} />
                         )}
-                        <AvatarFallback className="text-sm bg-transparent">
+                        <AvatarFallback delayMs={0} className="text-sm bg-transparent">
                           {isEmoji(displayAgent.avatar)
                             ? displayAgent.avatar
                             : <BackendIcon agent={displayAgent} className="h-5 w-5" />}
@@ -1213,7 +1213,7 @@ export function AIDrawerToggle({ className = "", currentSection }: AIDrawerToggl
       return (
         <Avatar className="h-5 w-5">
           {avatarIsUrl && <AvatarImage src={matchingAgent.avatar} alt={matchingAgent.name} />}
-          <AvatarFallback className="text-xs bg-transparent">
+          <AvatarFallback delayMs={0} className="text-xs bg-transparent">
             {isEmoji(matchingAgent.avatar)
               ? matchingAgent.avatar
               : <BackendIcon agent={matchingAgent} className="h-4 w-4" />}
