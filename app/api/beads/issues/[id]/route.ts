@@ -1,114 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { execFileSync } from "child_process"
-import { existsSync } from "fs"
-import path from "path"
+import { getIssue, updateIssue, closeIssue } from "@/lib/beads-db"
 
 export const dynamic = "force-dynamic"
-
-/**
- * Validate and resolve workspace path
- */
-function validateWorkspace(workspace: string | null): string | undefined {
-  if (!workspace) return undefined
-
-  const resolved = workspace.startsWith("~")
-    ? path.join(process.env.HOME || "/home", workspace.slice(1))
-    : workspace
-
-  const absolute = path.resolve(resolved)
-
-  if (!existsSync(absolute)) {
-    throw new Error(`Workspace path does not exist: ${workspace}`)
-  }
-
-  const beadsDir = path.join(absolute, ".beads")
-  if (!existsSync(beadsDir)) {
-    throw new Error(`No .beads directory found in: ${workspace}`)
-  }
-
-  return absolute
-}
-
-/**
- * Raw issue from bd show --json
- */
-interface RawBeadsIssue {
-  id: string
-  title: string
-  description?: string
-  notes?: string
-  status: string
-  priority: number
-  issue_type?: string
-  labels?: string[]
-  assignee?: string
-  estimate?: number
-  branch?: string
-  pr?: number
-  external_ref?: string
-  created_at?: string
-  updated_at?: string
-  closed_at?: string
-  close_reason?: string
-  dependencies?: Array<{
-    id: string
-    title: string
-    status: string
-    dependency_type: string
-  }>
-  dependents?: Array<{
-    id: string
-    title: string
-    status: string
-    dependency_type: string
-  }>
-}
-
-/**
- * Transform raw CLI output to API format
- */
-function transformIssue(raw: RawBeadsIssue) {
-  const blockedBy: string[] = []
-  const blocks: string[] = []
-
-  if (raw.dependencies) {
-    for (const dep of raw.dependencies) {
-      if (dep.dependency_type === "blocks" && dep.status !== "closed") {
-        blockedBy.push(dep.id)
-      }
-    }
-  }
-
-  if (raw.dependents) {
-    for (const dep of raw.dependents) {
-      if (dep.dependency_type === "blocks") {
-        blocks.push(dep.id)
-      }
-    }
-  }
-
-  return {
-    id: raw.id,
-    title: raw.title,
-    description: raw.description,
-    notes: raw.notes,
-    status: raw.status,
-    priority: raw.priority,
-    type: raw.issue_type,
-    labels: raw.labels ?? [],
-    assignee: raw.assignee,
-    estimate: raw.estimate ? `${raw.estimate}m` : undefined,
-    branch: raw.branch,
-    pr: raw.pr,
-    externalRef: raw.external_ref,
-    blockedBy: blockedBy.length > 0 ? blockedBy : undefined,
-    blocks: blocks.length > 0 ? blocks : undefined,
-    createdAt: raw.created_at,
-    updatedAt: raw.updated_at,
-    closedAt: raw.closed_at,
-    closeReason: raw.close_reason,
-  }
-}
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -116,54 +9,30 @@ interface RouteContext {
 
 /**
  * GET /api/beads/issues/[id]
- * Get detailed info for a single issue
- *
- * Query params:
- *   - workspace: Project path containing .beads directory
+ * Get detailed info for a single issue via direct Postgres query.
  */
 export async function GET(
   request: NextRequest,
   context: RouteContext
 ) {
   const { id } = await context.params
-  const workspace = request.nextUrl.searchParams.get("workspace")
 
   try {
-    const cwd = validateWorkspace(workspace)
+    const issue = await getIssue(id)
 
-    // Use execFileSync with argument array to prevent command injection
-    const output = execFileSync("bd", ["show", id, "--json"], {
-      encoding: "utf-8",
-      timeout: 10000,
-      cwd,
-    })
-
-    // bd show returns an array with one item
-    const rawIssues: RawBeadsIssue[] = JSON.parse(output)
-    if (!rawIssues || rawIssues.length === 0) {
+    if (!issue) {
       return NextResponse.json(
         { error: "Issue not found" },
         { status: 404 }
       )
     }
-
-    const issue = transformIssue(rawIssues[0])
 
     return NextResponse.json({ issue })
   } catch (error) {
     console.error(`Failed to get beads issue ${id}:`, error)
 
-    const message = error instanceof Error ? error.message : "Failed to get issue"
-
-    if (message.includes("not found") || message.includes("no such issue")) {
-      return NextResponse.json(
-        { error: "Issue not found" },
-        { status: 404 }
-      )
-    }
-
     return NextResponse.json(
-      { error: message },
+      { error: error instanceof Error ? error.message : "Failed to get issue" },
       { status: 500 }
     )
   }
@@ -171,10 +40,9 @@ export async function GET(
 
 /**
  * PATCH /api/beads/issues/[id]
- * Update an existing issue
+ * Update an existing issue via direct Postgres query.
  *
  * Body fields (all optional):
- *   - workspace: Project path containing .beads directory
  *   - status: New status (open, in_progress, closed, blocked)
  *   - priority: Priority level (1-4)
  *   - title: New title
@@ -192,57 +60,25 @@ export async function PATCH(
 
   try {
     const body = await request.json()
-    const { workspace, status, priority, title, description, notes, labels, assignee, estimate } = body
+    const { status, priority, title, description, notes, labels, assignee, estimate } = body
 
-    const cwd = validateWorkspace(workspace)
-
-    // Build bd update command using execFileSync for security
-    const args = ["update", id]
-
-    if (status !== undefined) {
-      args.push("-s", status)
-    }
-    if (priority !== undefined) {
-      args.push("-p", String(priority))
-    }
-    if (title !== undefined) {
-      args.push("--title", title)
-    }
-    if (description !== undefined) {
-      args.push("-d", description)
-    }
-    if (assignee !== undefined) {
-      args.push("-a", assignee || "")
-    }
-    if (estimate !== undefined) {
-      args.push("-e", String(estimate))
-    }
-    if (labels !== undefined) {
-      // Replace all labels
-      args.push("--set-labels", labels.join(",") || "")
-    }
-    if (notes !== undefined) {
-      args.push("--notes", notes)
-    }
-
-    // Add --json for structured output
-    args.push("--json")
-
-    execFileSync("bd", args, {
-      encoding: "utf-8",
-      timeout: 10000,
-      cwd,
+    const issue = await updateIssue(id, {
+      status,
+      priority: priority !== undefined ? Number(priority) : undefined,
+      title,
+      description,
+      notes,
+      labels,
+      assignee,
+      estimate: estimate !== undefined ? Number(estimate) : undefined,
     })
 
-    // Fetch the updated issue
-    const showOutput = execFileSync("bd", ["show", id, "--json"], {
-      encoding: "utf-8",
-      timeout: 10000,
-      cwd,
-    })
-
-    const rawIssues: RawBeadsIssue[] = JSON.parse(showOutput)
-    const issue = transformIssue(rawIssues[0])
+    if (!issue) {
+      return NextResponse.json(
+        { error: "Issue not found" },
+        { status: 404 }
+      )
+    }
 
     return NextResponse.json({ issue })
   } catch (error) {
@@ -256,27 +92,23 @@ export async function PATCH(
 
 /**
  * DELETE /api/beads/issues/[id]
- * Close an issue (beads doesn't support hard delete)
- *
- * Query params:
- *   - workspace: Project path containing .beads directory
+ * Close an issue (beads does not support hard delete).
  */
 export async function DELETE(
   request: NextRequest,
   context: RouteContext
 ) {
   const { id } = await context.params
-  const workspace = request.nextUrl.searchParams.get("workspace")
 
   try {
-    const cwd = validateWorkspace(workspace)
+    const closed = await closeIssue(id)
 
-    // Use execFileSync with argument array to prevent command injection
-    execFileSync("bd", ["close", id, "--json"], {
-      encoding: "utf-8",
-      timeout: 10000,
-      cwd,
-    })
+    if (!closed) {
+      return NextResponse.json(
+        { error: "Issue not found" },
+        { status: 404 }
+      )
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

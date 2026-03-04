@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { execFileSync } from "child_process"
-import { existsSync } from "fs"
-import path from "path"
+import { getIssue, type BeadsApiIssue } from "@/lib/beads-db"
 
 export const dynamic = "force-dynamic"
 
@@ -19,64 +17,14 @@ The prompt should:
 Focus on being actionable and specific, not generic.`
 
 /**
- * Validate and resolve workspace path
- */
-function validateWorkspace(workspace: string | null): string | undefined {
-  if (!workspace) return undefined
-
-  const resolved = workspace.startsWith("~")
-    ? path.join(process.env.HOME || "/home", workspace.slice(1))
-    : workspace
-
-  const absolute = path.resolve(resolved)
-
-  if (!existsSync(absolute)) {
-    throw new Error(`Workspace path does not exist: ${workspace}`)
-  }
-
-  const beadsDir = path.join(absolute, ".beads")
-  if (!existsSync(beadsDir)) {
-    throw new Error(`No .beads directory found in: ${workspace}`)
-  }
-
-  return absolute
-}
-
-/**
- * Raw issue from bd show --json
- */
-interface RawBeadsIssue {
-  id: string
-  title: string
-  description?: string
-  notes?: string
-  status: string
-  priority: number
-  issue_type?: string
-  labels?: string[]
-  dependencies?: Array<{
-    id: string
-    title: string
-    status: string
-    dependency_type: string
-  }>
-  dependents?: Array<{
-    id: string
-    title: string
-    status: string
-    dependency_type: string
-  }>
-}
-
-/**
  * Build prompt context from issue details
  */
-function buildIssueContext(issue: RawBeadsIssue): string {
+function buildIssueContext(issue: BeadsApiIssue): string {
   const lines: string[] = []
 
   lines.push(`Issue: ${issue.title}`)
-  if (issue.issue_type) {
-    lines.push(`Type: ${issue.issue_type}`)
+  if (issue.type) {
+    lines.push(`Type: ${issue.type}`)
   }
   lines.push(`Status: ${issue.status}`)
   lines.push(`Priority: ${issue.priority}`)
@@ -89,30 +37,20 @@ function buildIssueContext(issue: RawBeadsIssue): string {
   lines.push(issue.description || "(No description provided)")
 
   // Add blocking dependencies
-  if (issue.dependencies && issue.dependencies.length > 0) {
-    const blockers = issue.dependencies.filter(
-      (d) => d.dependency_type === "blocks"
-    )
-    if (blockers.length > 0) {
-      lines.push("")
-      lines.push("Blocked By:")
-      for (const dep of blockers) {
-        lines.push(`- ${dep.id}: ${dep.title} (${dep.status})`)
-      }
+  if (issue.blockedBy && issue.blockedBy.length > 0) {
+    lines.push("")
+    lines.push("Blocked By:")
+    for (const depId of issue.blockedBy) {
+      lines.push(`- ${depId}`)
     }
   }
 
   // Add dependents (what this blocks)
-  if (issue.dependents && issue.dependents.length > 0) {
-    const blocking = issue.dependents.filter(
-      (d) => d.dependency_type === "blocks"
-    )
-    if (blocking.length > 0) {
-      lines.push("")
-      lines.push("Blocks:")
-      for (const dep of blocking) {
-        lines.push(`- ${dep.id}: ${dep.title}`)
-      }
+  if (issue.blocks && issue.blocks.length > 0) {
+    lines.push("")
+    lines.push("Blocks:")
+    for (const depId of issue.blocks) {
+      lines.push(`- ${depId}`)
     }
   }
 
@@ -169,9 +107,6 @@ interface RouteContext {
  * POST /api/beads/issues/[id]/generate-prompt
  * Generate a worker prompt from issue details using AI
  *
- * Body:
- *   - workspace: Project path containing .beads directory
- *
  * Response:
  *   - prompt: Generated worker prompt text
  */
@@ -179,45 +114,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
   const { id } = await context.params
 
   try {
-    const body = await request.json().catch(() => ({}))
-    const { workspace } = body
+    // Fetch issue details via direct DB query
+    const issue = await getIssue(id)
 
-    let cwd: string | undefined
-    try {
-      cwd = validateWorkspace(workspace)
-    } catch (error) {
-      return NextResponse.json(
-        { error: error instanceof Error ? error.message : "Invalid workspace" },
-        { status: 400 }
-      )
-    }
-
-    // Fetch issue details using bd show
-    let rawIssues: RawBeadsIssue[]
-    try {
-      const output = execFileSync("bd", ["show", id, "--json"], {
-        encoding: "utf-8",
-        timeout: 10000,
-        cwd,
-      })
-      rawIssues = JSON.parse(output)
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to fetch issue"
-      if (message.includes("not found") || message.includes("no such issue")) {
-        return NextResponse.json({ error: "Issue not found" }, { status: 404 })
-      }
-      return NextResponse.json(
-        { error: `Failed to fetch issue: ${message}` },
-        { status: 500 }
-      )
-    }
-
-    if (!rawIssues || rawIssues.length === 0) {
+    if (!issue) {
       return NextResponse.json({ error: "Issue not found" }, { status: 404 })
     }
-
-    const issue = rawIssues[0]
 
     // Build context from issue
     const issueContext = buildIssueContext(issue)
@@ -240,7 +142,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
         settings: {
           systemPrompt: GENERATION_SYSTEM_PROMPT,
         },
-        cwd,
       }),
     })
 
