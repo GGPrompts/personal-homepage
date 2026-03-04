@@ -84,32 +84,32 @@ See [docs/tabz-integration.md](docs/tabz-integration.md) for adding connectors a
 
 ## Issue Tracking (Beads)
 
-This project uses `bd` (beads) for issue tracking. Always use `--json` flag.
+This project uses `ggbd` (beads) for issue tracking. Always use `--json` flag.
 
 ### Worker Workflow
 
-1. **Find work**: `bd ready --json`
-2. **Claim it**: `bd update ID --status in_progress --json`
+1. **Find work**: `ggbd ready --json`
+2. **Claim it**: `ggbd update ID --status in_progress --json`
 3. **Discover new work?** Create linked issue:
    ```bash
-   bd create "Found issue" --deps discovered-from:PARENT-ID --json
+   ggbd create "Found issue" --deps discovered-from:PARENT-ID --json
    ```
 4. **Add progress notes** (for context recovery):
    ```bash
-   bd update ID --notes "Implemented X, still need Y"
+   ggbd update ID --notes "Implemented X, still need Y"
    ```
-5. **Complete**: `bd close ID --reason "Done: summary" --json`
-6. **Sync**: `bd sync` (commits and pushes)
+5. **Complete**: `ggbd close ID --reason "Done: summary" --json`
+6. **Sync**: Supabase auto-syncs (no manual sync needed)
 
 ### Essential Commands
 
 ```bash
-bd ready --json              # Unblocked issues
-bd show ID --json            # Details with notes
-bd update ID --status in_progress --json  # Claim
-bd update ID --notes "Progress notes"     # Context
-bd close ID --reason "Done: what was done" --json
-bd create "Title" --deps discovered-from:PARENT --json  # Link discovered work
+ggbd ready --json              # Unblocked issues
+ggbd show ID --json            # Details with notes
+ggbd update ID --status in_progress --json  # Claim
+ggbd update ID --notes "Progress notes"     # Context
+ggbd close ID --reason "Done: what was done" --json
+ggbd create "Title" --deps discovered-from:PARENT --json  # Link discovered work
 ```
 
 ### Session Close Protocol
@@ -117,8 +117,8 @@ bd create "Title" --deps discovered-from:PARENT --json  # Link discovered work
 **CRITICAL**: Session is NOT complete until `git push` succeeds.
 
 ```bash
-bd close ID --reason "Done: summary" --json  # Close finished work
-bd sync                      # Export/commit/push beads
+ggbd close ID --reason "Done: summary" --json  # Close finished work
+# Supabase auto-syncs (no manual sync needed)
 git push                     # MUST succeed before ending
 ```
 
