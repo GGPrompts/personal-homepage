@@ -1,7 +1,23 @@
 import { NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/govhound/supabase";
 
+function checkSupabaseConfig() {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return NextResponse.json(
+      {
+        error: "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your .env.local file.",
+        error_code: "MISSING_SUPABASE_KEY",
+      },
+      { status: 503 }
+    );
+  }
+  return null;
+}
+
 export async function GET() {
+  const configError = checkSupabaseConfig();
+  if (configError) return configError;
+
   try {
     const supabase = getServiceClient();
 
@@ -53,6 +69,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const configError = checkSupabaseConfig();
+  if (configError) return configError;
+
   try {
     const body = await request.json();
     const supabase = getServiceClient();
@@ -96,6 +115,9 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const configError = checkSupabaseConfig();
+  if (configError) return configError;
+
   try {
     const body = await request.json();
     const supabase = getServiceClient();
@@ -139,6 +161,9 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const configError = checkSupabaseConfig();
+  if (configError) return configError;
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");

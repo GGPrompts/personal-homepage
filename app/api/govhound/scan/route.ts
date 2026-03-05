@@ -5,6 +5,29 @@ import { runProfileScan } from "@/lib/govhound/profile-scanner";
 import type { ScanParams } from "@/lib/govhound/types";
 
 export async function POST(request: Request) {
+  // Check for required configuration before doing anything
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your .env.local file.",
+        error_code: "MISSING_SUPABASE_KEY",
+      },
+      { status: 503 }
+    );
+  }
+
+  if (!process.env.SAM_GOV_API_KEY) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "SAM.gov API key is not configured. Get a free API key at https://api.sam.gov and set SAM_GOV_API_KEY in your .env.local file.",
+        error_code: "MISSING_SAM_API_KEY",
+      },
+      { status: 503 }
+    );
+  }
+
   try {
     const body = await request.json();
 

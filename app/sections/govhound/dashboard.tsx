@@ -9,6 +9,9 @@ import {
   Gavel,
   Search,
   ArrowRight,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +20,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScoreBadge } from "@/components/govhound/score-badge";
 import { EmptyState } from "@/components/govhound/empty-state";
 import type { DashboardStats, OpportunityWithAnalysis } from "@/lib/govhound/types";
+
+interface ConfigStatus {
+  sam_gov_api_key: boolean;
+  supabase_url: boolean;
+  supabase_service_role_key: boolean;
+  all_configured: boolean;
+}
 
 interface TabProps {
   onSelectOpportunity?: (id: string) => void;
@@ -63,6 +73,21 @@ function StatsCard({
   );
 }
 
+function ConfigKeyBadge({ label, configured }: { label: string; configured: boolean }) {
+  return (
+    <div className="flex items-center gap-1.5 text-sm">
+      {configured ? (
+        <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+      ) : (
+        <XCircle className="h-3.5 w-3.5 text-destructive" />
+      )}
+      <span className={configured ? "text-muted-foreground" : "text-foreground"}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
 export function DashboardTab({ onSelectOpportunity, onNavigateTab }: TabProps) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [opportunities, setOpportunities] = useState<
@@ -70,10 +95,24 @@ export function DashboardTab({ onSelectOpportunity, onNavigateTab }: TabProps) {
   >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [configStatus, setConfigStatus] = useState<ConfigStatus | null>(null);
 
   useEffect(() => {
     async function fetchData() {
       try {
+        // Fetch config status first
+        const configRes = await fetch("/api/govhound/config");
+        if (configRes.ok) {
+          const config = await configRes.json();
+          setConfigStatus(config);
+
+          // Skip data fetches if Supabase isn't configured
+          if (!config.supabase_service_role_key || !config.supabase_url) {
+            setLoading(false);
+            return;
+          }
+        }
+
         const [statsRes, oppsRes] = await Promise.all([
           fetch("/api/govhound/stats"),
           fetch("/api/govhound/opportunities?limit=10&sort=posted_date&order=desc"),
@@ -116,6 +155,39 @@ export function DashboardTab({ onSelectOpportunity, onNavigateTab }: TabProps) {
           New Scan
         </Button>
       </div>
+
+      {/* Config Status */}
+      {configStatus && !configStatus.all_configured && (
+        <Card className="border-yellow-500/50">
+          <CardContent className="pt-6 pb-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-yellow-500 shrink-0 mt-0.5" />
+              <div className="space-y-2 flex-1">
+                <p className="text-sm font-medium text-foreground">
+                  Setup incomplete -- some features are unavailable
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <ConfigKeyBadge
+                    label="SAM.gov API Key"
+                    configured={configStatus.sam_gov_api_key}
+                  />
+                  <ConfigKeyBadge
+                    label="Supabase URL"
+                    configured={configStatus.supabase_url}
+                  />
+                  <ConfigKeyBadge
+                    label="Supabase Service Key"
+                    configured={configStatus.supabase_service_role_key}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground/70">
+                  Add missing keys to your <code className="rounded bg-muted px-1 py-0.5 font-mono">.env.local</code> file and restart the dev server.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {error && (
         <Card className="border-destructive/50">

@@ -2,6 +2,16 @@ import { NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/govhound/supabase";
 
 export async function GET() {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return NextResponse.json(
+      {
+        error: "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your .env.local file.",
+        error_code: "MISSING_SUPABASE_KEY",
+      },
+      { status: 503 }
+    );
+  }
+
   try {
     const supabase = getServiceClient();
 

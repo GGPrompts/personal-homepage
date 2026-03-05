@@ -17,6 +17,8 @@ import {
   Clock,
   Bell,
   Download,
+  AlertTriangle,
+  Key,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -96,6 +98,7 @@ export function ScannerTab({ onSelectOpportunity, onNavigateTab }: TabProps) {
   const [scanning, setScanning] = useState(false);
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -192,6 +195,7 @@ export function ScannerTab({ onSelectOpportunity, onNavigateTab }: TabProps) {
   async function handleScan() {
     setScanning(true);
     setError(null);
+    setErrorCode(null);
     try {
       const body: Record<string, unknown> = {};
       if (keywords) body.keywords = keywords;
@@ -214,6 +218,9 @@ export function ScannerTab({ onSelectOpportunity, onNavigateTab }: TabProps) {
 
       if (!res.ok) {
         const data = await res.json();
+        if (data.error_code) {
+          setErrorCode(data.error_code);
+        }
         throw new Error(data.error || "Scan failed");
       }
 
@@ -736,13 +743,66 @@ export function ScannerTab({ onSelectOpportunity, onNavigateTab }: TabProps) {
         </CardContent>
       </Card>
 
-      {error && (
+      {error && (errorCode === "MISSING_SAM_API_KEY" || errorCode === "MISSING_SUPABASE_KEY") ? (
+        <Card className="border-yellow-500/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base text-foreground flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              Configuration Required
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              GovHound needs a few environment variables to connect to external services. Add these to your{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">.env.local</code> file:
+            </p>
+            <div className="space-y-3">
+              {errorCode === "MISSING_SAM_API_KEY" && (
+                <div className="rounded-lg border border-border bg-card p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Key className="h-4 w-4 text-yellow-500" />
+                    <span className="font-medium text-sm text-foreground">SAM_GOV_API_KEY</span>
+                    <Badge variant="outline" className="text-xs border-destructive/50 text-destructive">Missing</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground/70 mb-2">
+                    Required to search federal contract opportunities on SAM.gov.
+                  </p>
+                  <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>Go to <a href="https://api.sam.gov" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">api.sam.gov</a> and create a free account</li>
+                    <li>Request a public API key (instant approval)</li>
+                    <li>Add <code className="rounded bg-muted px-1 py-0.5 font-mono">SAM_GOV_API_KEY=your_key_here</code> to <code className="rounded bg-muted px-1 py-0.5 font-mono">.env.local</code></li>
+                    <li>Restart the dev server</li>
+                  </ol>
+                </div>
+              )}
+              {errorCode === "MISSING_SUPABASE_KEY" && (
+                <div className="rounded-lg border border-border bg-card p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Key className="h-4 w-4 text-yellow-500" />
+                    <span className="font-medium text-sm text-foreground">SUPABASE_SERVICE_ROLE_KEY</span>
+                    <Badge variant="outline" className="text-xs border-destructive/50 text-destructive">Missing</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground/70 mb-2">
+                    Required for server-side database access (storing and querying contracts).
+                  </p>
+                  <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>Open your Supabase project dashboard</li>
+                    <li>Go to Settings &gt; API &gt; Service Role Key</li>
+                    <li>Add <code className="rounded bg-muted px-1 py-0.5 font-mono">SUPABASE_SERVICE_ROLE_KEY=your_key_here</code> to <code className="rounded bg-muted px-1 py-0.5 font-mono">.env.local</code></li>
+                    <li>Restart the dev server</li>
+                  </ol>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      ) : error ? (
         <Card className="border-destructive/50">
           <CardContent className="pt-6">
             <p className="text-destructive text-sm">{error}</p>
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
       {/* Bulk Operations Toolbar */}
       <BulkOperationsToolbar
