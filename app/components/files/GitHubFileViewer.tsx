@@ -339,7 +339,7 @@ export function GitHubFileViewer({
       .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
       .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre class="bg-muted p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm"><code>$2</code></pre>')
       .replace(/`([^`]+)`/g, '<code class="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">$1</code>')
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-cyan-500 hover:underline" target="_blank" rel="noopener noreferrer">$1</a>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-cyan-500 hover:underline cursor-pointer" data-md-link>$1</a>')
       .replace(/^- (.*$)/gm, '<li class="ml-4">$1</li>')
       .replace(/^> (.*$)/gm, '<blockquote class="border-l-4 border-cyan-500 pl-4 my-4 text-muted-foreground italic">$1</blockquote>')
       .replace(/^---$/gm, '<hr class="my-6 border-border" />')
@@ -552,6 +552,22 @@ export function GitHubFileViewer({
                 <div
                   className="prose prose-invert max-w-none p-6"
                   dangerouslySetInnerHTML={{ __html: renderMarkdown }}
+                  onClick={(e) => {
+                    const target = e.target as HTMLElement
+                    const anchor = target.closest('a')
+                    if (!anchor) return
+                    const href = anchor.getAttribute('href')
+                    if (!href) return
+                    e.preventDefault()
+                    if (href.startsWith('#')) {
+                      // Anchor links — scroll within preview
+                      return
+                    }
+                    if (href.startsWith('http://') || href.startsWith('https://')) {
+                      window.open(href, '_blank', 'noopener,noreferrer')
+                    }
+                    // Relative links in GitHub files — not actionable, ignore silently
+                  }}
                 />
               </ScrollArea>
             ) : (

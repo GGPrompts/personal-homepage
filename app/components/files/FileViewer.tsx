@@ -314,17 +314,34 @@ function VideoViewer({ dataUri, fileName }: VideoViewerProps) {
 interface MarkdownViewerProps {
   content: string
   fontSize?: number
+  filePath?: string
 }
 
-function MarkdownViewer({ content, fontSize = 16 }: MarkdownViewerProps) {
+function MarkdownViewer({ content, fontSize = 16, filePath }: MarkdownViewerProps) {
+  const { openFile } = useFilesContext()
+  const contentRef = React.useRef<HTMLDivElement>(null)
+
+  // Generate a slug from heading text (for anchor link targets)
+  const slugify = (text: string) =>
+    text.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim()
+
   // Simple markdown rendering with improved styling
   const renderMarkdown = useMemo(() => {
     // Basic markdown transformations with better dark theme colors
     let html = content
-      // Headers - cyan accent for visibility
-      .replace(/^### (.*$)/gm, '<h3 class="text-lg font-semibold mt-6 mb-3 text-cyan-400">$1</h3>')
-      .replace(/^## (.*$)/gm, '<h2 class="text-xl font-semibold mt-8 mb-4 text-cyan-300 border-b border-border/50 pb-2">$1</h2>')
-      .replace(/^# (.*$)/gm, '<h1 class="text-2xl font-bold mt-8 mb-4 text-cyan-200 border-b border-border pb-2">$1</h1>')
+      // Headers - cyan accent for visibility, with id for anchor links
+      .replace(/^### (.*$)/gm, (_match, p1) => {
+        const id = slugify(p1)
+        return `<h3 id="${id}" class="text-lg font-semibold mt-6 mb-3 text-cyan-400">${p1}</h3>`
+      })
+      .replace(/^## (.*$)/gm, (_match, p1) => {
+        const id = slugify(p1)
+        return `<h2 id="${id}" class="text-xl font-semibold mt-8 mb-4 text-cyan-300 border-b border-border/50 pb-2">${p1}</h2>`
+      })
+      .replace(/^# (.*$)/gm, (_match, p1) => {
+        const id = slugify(p1)
+        return `<h1 id="${id}" class="text-2xl font-bold mt-8 mb-4 text-cyan-200 border-b border-border pb-2">${p1}</h1>`
+      })
       // Bold and italic
       .replace(/\*\*\*(.*?)\*\*\*/g, '<strong class="text-foreground"><em>$1</em></strong>')
       .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-foreground">$1</strong>')
@@ -333,8 +350,8 @@ function MarkdownViewer({ content, fontSize = 16 }: MarkdownViewerProps) {
       .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre class="bg-zinc-900/80 border border-border/50 p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm text-emerald-400"><code>$2</code></pre>')
       // Inline code - cyan tint
       .replace(/`([^`]+)`/g, '<code class="bg-zinc-800 text-pink-400 px-1.5 py-0.5 rounded text-sm font-mono">$1</code>')
-      // Links - bright cyan
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-cyan-400 hover:text-cyan-300 hover:underline" target="_blank" rel="noopener noreferrer">$1</a>')
+      // Links - bright cyan (no target="_blank" — handled by click handler)
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-cyan-400 hover:text-cyan-300 hover:underline cursor-pointer">$1</a>')
       // Unordered lists
       .replace(/^- (.*$)/gm, '<li class="ml-6 text-foreground/90 list-disc">$1</li>')
       // Ordered lists
@@ -351,6 +368,49 @@ function MarkdownViewer({ content, fontSize = 16 }: MarkdownViewerProps) {
     return html
   }, [content])
 
+  // Intercept link clicks to handle relative links and anchors
+  const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement
+    const anchor = target.closest('a')
+    if (!anchor) return
+
+    const href = anchor.getAttribute('href')
+    if (!href) return
+
+    e.preventDefault()
+
+    // Anchor/jump links — scroll to heading within the viewer
+    if (href.startsWith('#')) {
+      const targetId = href.slice(1)
+      const el = contentRef.current?.querySelector(`#${CSS.escape(targetId)}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+      return
+    }
+
+    // External URLs — open in new tab
+    if (href.startsWith('http://') || href.startsWith('https://')) {
+      window.open(href, '_blank', 'noopener,noreferrer')
+      return
+    }
+
+    // Relative file links — resolve against current file's directory and open in viewer
+    if (filePath) {
+      const parentDir = filePath.split('/').slice(0, -1).join('/')
+      // Resolve the relative path
+      const parts = (parentDir ? parentDir + '/' + href : href).split('/')
+      const resolved: string[] = []
+      for (const part of parts) {
+        if (part === '.' || part === '') continue
+        if (part === '..') { resolved.pop(); continue }
+        resolved.push(part)
+      }
+      const resolvedPath = '/' + resolved.join('/')
+      openFile(resolvedPath, false)
+    }
+  }, [filePath, openFile])
+
   return (
     <div className="relative h-full" data-tabz-region="markdown-viewer">
       <div className="absolute top-2 right-2 z-10">
@@ -358,9 +418,11 @@ function MarkdownViewer({ content, fontSize = 16 }: MarkdownViewerProps) {
       </div>
       <ScrollArea className="h-full">
         <div
+          ref={contentRef}
           className="max-w-none p-6"
           style={{ fontSize: `${fontSize}px`, lineHeight: '1.7' }}
           dangerouslySetInnerHTML={{ __html: renderMarkdown }}
+          onClick={handleClick}
         />
       </ScrollArea>
     </div>
@@ -601,7 +663,7 @@ function FileContent({ file, fontSize, fontFamily }: FileContentProps) {
     case 'prompty':
       return <PromptyViewer content={file.content} fileName={file.name} fontSize={fontSize} />
     case 'markdown':
-      return <MarkdownViewer content={file.content} fontSize={fontSize} />
+      return <MarkdownViewer content={file.content} fontSize={fontSize} filePath={file.path} />
     case 'json':
       return <JsonViewer content={file.content} fontSize={fontSize} fontFamily={fontFamily} />
     case 'csv':
