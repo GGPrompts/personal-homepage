@@ -301,7 +301,7 @@ export async function syncOpportunities(
       offset += limit;
 
       // Stop if we've fetched all or hit a reasonable limit
-      if (offset >= result.total || offset >= 200) {
+      if (offset >= result.total || offset >= 1000) {
         hasMore = false;
       }
 
