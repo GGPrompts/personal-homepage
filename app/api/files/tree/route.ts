@@ -349,6 +349,15 @@ export async function GET(request: NextRequest) {
     const cacheKey = getCacheKey(resolvedPath, depth, showHidden)
     const cached = treeCache.get(cacheKey)
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      if (includeGitStatus) {
+        let gitStatusResult: GitStatusResult = { isGitRepo: false, files: {} }
+        try {
+          gitStatusResult = await getGitStatus(resolvedPath)
+        } catch (err) {
+          console.debug("[tree] Git status fetch failed:", err)
+        }
+        return NextResponse.json({ tree: cached.data, gitStatus: gitStatusResult })
+      }
       return NextResponse.json(cached.data)
     }
 
