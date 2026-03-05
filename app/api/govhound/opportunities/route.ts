@@ -27,6 +27,9 @@ export async function GET(request: NextRequest) {
     const setAside = searchParams.get("set_aside") || "";
     const analyzed = searchParams.get("analyzed") || "";
     const minFeasibility = searchParams.get("min_feasibility") || "";
+    const deadlineFrom = searchParams.get("deadline_from") || "";
+    const deadlineTo = searchParams.get("deadline_to") || "";
+    const setAsideMulti = searchParams.get("set_aside_types") || ""; // comma-separated
 
     let query = supabase
       .from("opportunities")
@@ -62,6 +65,22 @@ export async function GET(request: NextRequest) {
 
     if (setAside) {
       query = query.eq("set_aside_type", setAside);
+    }
+
+    // Multi-select set-aside types (comma-separated)
+    if (setAsideMulti) {
+      const types = setAsideMulti.split(",").map((t) => t.trim()).filter(Boolean);
+      if (types.length > 0) {
+        query = query.in("set_aside_type", types);
+      }
+    }
+
+    // Deadline range filtering
+    if (deadlineFrom) {
+      query = query.gte("response_deadline", deadlineFrom);
+    }
+    if (deadlineTo) {
+      query = query.lte("response_deadline", deadlineTo);
     }
 
     if (analyzed === "true") {

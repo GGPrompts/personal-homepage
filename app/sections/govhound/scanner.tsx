@@ -19,6 +19,7 @@ import {
   Download,
   AlertTriangle,
   Key,
+  Database,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,6 +58,7 @@ import { EmptyState } from "@/components/govhound/empty-state";
 import { BulkOperationsToolbar } from "@/components/govhound/bulk-operations-toolbar";
 import { ComparisonView } from "@/components/govhound/comparison-view";
 import type { OpportunityWithAnalysis, SearchProfileWithStats } from "@/lib/govhound/types";
+import { DbExplorer } from "./db-explorer";
 
 interface TabProps {
   onSelectOpportunity?: (id: string) => void;
@@ -81,7 +83,10 @@ const NAICS_OPTIONS = [
   { value: "511210", label: "511210 - Software Publishers" },
 ];
 
+type ScannerView = "scanner" | "explorer";
+
 export function ScannerTab({ onSelectOpportunity, onNavigateTab }: TabProps) {
+  const [activeView, setActiveView] = useState<ScannerView>("scanner");
   const [keywords, setKeywords] = useState("");
   const [naicsCode, setNaicsCode] = useState("");
   const [setAside, setSetAside] = useState("");
@@ -429,9 +434,41 @@ export function ScannerTab({ onSelectOpportunity, onNavigateTab }: TabProps) {
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">Contract Scanner</h1>
         <p className="text-muted-foreground">
-          Search SAM.gov for federal IT contract opportunities.
+          Search SAM.gov for federal IT contract opportunities, or explore your local database.
         </p>
       </div>
+
+      {/* Sub-tab toggle: Scanner vs DB Explorer */}
+      <div className="flex gap-1 rounded-lg border border-border bg-card p-1 w-fit">
+        <button
+          onClick={() => setActiveView("scanner")}
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            activeView === "scanner"
+              ? "bg-primary text-white shadow-sm"
+              : "text-muted-foreground hover:text-foreground hover:bg-accent"
+          }`}
+        >
+          <Search className="inline-block mr-1.5 h-3.5 w-3.5" />
+          SAM.gov Scanner
+        </button>
+        <button
+          onClick={() => setActiveView("explorer")}
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            activeView === "explorer"
+              ? "bg-primary text-white shadow-sm"
+              : "text-muted-foreground hover:text-foreground hover:bg-accent"
+          }`}
+        >
+          <Database className="inline-block mr-1.5 h-3.5 w-3.5" />
+          Database Explorer
+        </button>
+      </div>
+
+      {/* Database Explorer View */}
+      {activeView === "explorer" ? (
+        <DbExplorer onSelectOpportunity={onSelectOpportunity} />
+      ) : (
+      <>
 
       {/* Search Profiles */}
       <Card className="border-border">
@@ -1085,6 +1122,8 @@ export function ScannerTab({ onSelectOpportunity, onNavigateTab }: TabProps) {
           )}
         </CardContent>
       </Card>
+      </>
+      )}
     </div>
   );
 }
