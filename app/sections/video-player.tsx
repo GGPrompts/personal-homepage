@@ -23,17 +23,12 @@ import {
   ChevronUp,
   Clock,
   Eye,
-  CheckCircle2,
   Bell,
   ListVideo,
-  Repeat,
-  Shuffle,
   PictureInPicture2,
   MonitorPlay,
   X,
-  Heart,
   Reply,
-  Flag,
   ExternalLink,
   Copy,
   Twitter,
@@ -62,11 +57,9 @@ import {
 } from "@/components/ui/popover"
 import {
   Collapsible,
-  CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { Textarea } from "@/components/ui/textarea"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { LocalMediaBrowser } from "@/components/LocalMediaBrowser"
 import { getMediaUrl, type MediaFile } from "@/hooks/useMediaLibrary"
 import { getRandomVideos, type SeedVideo } from "@/lib/video-seeds"
@@ -81,264 +74,13 @@ import {
   extractPlaylistId,
   type SearchFilters,
   type CommentData,
-  type ChannelData,
 } from "@/hooks/useYouTube"
 import { Search, Filter, ListPlus, Loader2 as LoaderIcon, Download } from "lucide-react"
 import { VideoDownloadModal, DownloadProgressIndicator } from "@/components/VideoDownloadModal"
 import { useVideoDownload, type DownloadOptions } from "@/hooks/useVideoDownload"
 
-// TypeScript Interfaces
-interface Channel {
-  id: string
-  name: string
-  avatar: string
-  subscribers: number
-  isVerified: boolean
-  isSubscribed: boolean
-}
-
-interface Chapter {
-  title: string
-  startTime: number
-  thumbnail?: string
-}
-
-interface Caption {
-  language: string
-  label: string
-}
-
-interface Quality {
-  resolution: string
-  label: string
-  bitrate: string
-}
-
-interface Video {
-  id: string
-  title: string
-  description: string
-  thumbnail: string
-  duration: number
-  views: number
-  likes: number
-  dislikes: number
-  uploadDate: string
-  channel: Channel
-  quality: Quality[]
-  captions: Caption[]
-  chapters: Chapter[]
-}
-
-interface Comment {
-  id: string
-  author: { name: string; avatar: string }
-  content: string
-  likes: number
-  date: string
-  isLiked: boolean
-  replies: Comment[]
-}
-
-interface PlaylistItem {
-  id: string
-  title: string
-  thumbnail: string
-  duration: number
-  channel: string
-  views: number
-  isPlaying: boolean
-}
-
-// Mock Data
-const currentVideo: Video = {
-  id: "v-001",
-  title: "Building a Modern Web Application with Next.js 15 and React Server Components",
-  description: `In this comprehensive tutorial, we'll dive deep into building a production-ready web application using Next.js 15's latest features including React Server Components, the App Router, and streaming.
-
-🔗 Links:
-- GitHub Repository: https://github.com/example/nextjs-tutorial
-- Documentation: https://nextjs.org/docs
-- Discord Community: https://discord.gg/nextjs
-
-📑 Chapters:
-0:00 - Introduction
-2:45 - Project Setup
-8:30 - App Router Deep Dive
-15:20 - Server Components
-24:00 - Data Fetching Patterns
-35:15 - Authentication
-48:30 - Deployment
-
-#nextjs #react #webdev #programming #tutorial`,
-  thumbnail: "/api/placeholder/1280/720",
-  duration: 3247,
-  views: 284532,
-  likes: 12847,
-  dislikes: 234,
-  uploadDate: "2024-01-15",
-  channel: {
-    id: "ch-001",
-    name: "CodeCraft Academy",
-    avatar: "/api/placeholder/48/48",
-    subscribers: 892000,
-    isVerified: true,
-    isSubscribed: false,
-  },
-  quality: [
-    { resolution: "2160p", label: "4K", bitrate: "45 Mbps" },
-    { resolution: "1440p", label: "2K", bitrate: "16 Mbps" },
-    { resolution: "1080p", label: "Full HD", bitrate: "8 Mbps" },
-    { resolution: "720p", label: "HD", bitrate: "5 Mbps" },
-    { resolution: "480p", label: "SD", bitrate: "2.5 Mbps" },
-    { resolution: "360p", label: "Low", bitrate: "1 Mbps" },
-  ],
-  captions: [
-    { language: "en", label: "English" },
-    { language: "es", label: "Spanish" },
-    { language: "fr", label: "French" },
-    { language: "de", label: "German" },
-  ],
-  chapters: [
-    { title: "Introduction", startTime: 0 },
-    { title: "Project Setup", startTime: 165 },
-    { title: "App Router Deep Dive", startTime: 510 },
-    { title: "Server Components", startTime: 920 },
-    { title: "Data Fetching Patterns", startTime: 1440 },
-    { title: "Authentication", startTime: 2115 },
-    { title: "Deployment", startTime: 2910 },
-  ],
-}
-
-const comments: Comment[] = [
-  {
-    id: "c-001",
-    author: { name: "DevMaster_Pro", avatar: "/api/placeholder/40/40" },
-    content: "This is exactly what I needed! The explanation of Server Components finally clicked. Been struggling with this for weeks.",
-    likes: 342,
-    date: "2 days ago",
-    isLiked: false,
-    replies: [
-      {
-        id: "c-001-r1",
-        author: { name: "CodeCraft Academy", avatar: "/api/placeholder/40/40" },
-        content: "So glad it helped! Server Components can be tricky at first but once you get it, everything makes sense.",
-        likes: 89,
-        date: "2 days ago",
-        isLiked: false,
-        replies: [],
-      },
-      {
-        id: "c-001-r2",
-        author: { name: "ReactFan2024", avatar: "/api/placeholder/40/40" },
-        content: "Same here! The mental model shift takes time but it's worth it.",
-        likes: 23,
-        date: "1 day ago",
-        isLiked: false,
-        replies: [],
-      },
-    ],
-  },
-  {
-    id: "c-002",
-    author: { name: "Sarah_Codes", avatar: "/api/placeholder/40/40" },
-    content: "Great tutorial! Would love to see a follow-up on database integration with Prisma or Drizzle.",
-    likes: 156,
-    date: "1 day ago",
-    isLiked: true,
-    replies: [],
-  },
-  {
-    id: "c-003",
-    author: { name: "TechExplorer", avatar: "/api/placeholder/40/40" },
-    content: "The production deployment section at 48:30 is gold. Saved me hours of debugging Vercel issues.",
-    likes: 98,
-    date: "23 hours ago",
-    isLiked: false,
-    replies: [],
-  },
-  {
-    id: "c-004",
-    author: { name: "NewbieDev", avatar: "/api/placeholder/40/40" },
-    content: "Question: At 15:20, why did you choose to use a Server Component there instead of a Client Component?",
-    likes: 45,
-    date: "18 hours ago",
-    isLiked: false,
-    replies: [
-      {
-        id: "c-004-r1",
-        author: { name: "CodeCraft Academy", avatar: "/api/placeholder/40/40" },
-        content: "Great question! Server Components are the default and better for SEO + initial load. We only use Client Components when we need interactivity.",
-        likes: 67,
-        date: "15 hours ago",
-        isLiked: false,
-        replies: [],
-      },
-    ],
-  },
-]
-
-// Convert seed videos to playlist items for recommendations
-const seedToPlaylistItem = (video: SeedVideo): PlaylistItem => ({
-  id: video.youtubeId,
-  title: video.title,
-  thumbnail: `https://i.ytimg.com/vi/${video.youtubeId}/mqdefault.jpg`,
-  duration: video.durationSeconds,
-  channel: video.channel,
-  views: video.views,
-  isPlaying: false,
-})
-
 // Get real video recommendations from seed data
-const recommendations: PlaylistItem[] = getRandomVideos(8).map(seedToPlaylistItem)
-
-const playlist: PlaylistItem[] = [
-  {
-    id: "p-001",
-    title: "Next.js 15 Complete Course - Part 1",
-    thumbnail: "/api/placeholder/120/68",
-    duration: 2847,
-    channel: "CodeCraft Academy",
-    views: 345000,
-    isPlaying: false,
-  },
-  {
-    id: "p-002",
-    title: "Next.js 15 Complete Course - Part 2",
-    thumbnail: "/api/placeholder/120/68",
-    duration: 3247,
-    channel: "CodeCraft Academy",
-    views: 284000,
-    isPlaying: true,
-  },
-  {
-    id: "p-003",
-    title: "Next.js 15 Complete Course - Part 3",
-    thumbnail: "/api/placeholder/120/68",
-    duration: 2956,
-    channel: "CodeCraft Academy",
-    views: 198000,
-    isPlaying: false,
-  },
-  {
-    id: "p-004",
-    title: "Next.js 15 Complete Course - Part 4",
-    thumbnail: "/api/placeholder/120/68",
-    duration: 3412,
-    channel: "CodeCraft Academy",
-    views: 156000,
-    isPlaying: false,
-  },
-  {
-    id: "p-005",
-    title: "Next.js 15 Complete Course - Part 5",
-    thumbnail: "/api/placeholder/120/68",
-    duration: 2789,
-    channel: "CodeCraft Academy",
-    views: 134000,
-    isPlaying: false,
-  },
-]
+const recommendations: SeedVideo[] = getRandomVideos(8)
 
 // Video Source Types
 type VideoSourceType = 'none' | 'url' | 'file' | 'youtube'
@@ -393,16 +135,6 @@ const formatViews = (views: number): string => {
   return views.toString()
 }
 
-const formatSubscribers = (subs: number): string => {
-  if (subs >= 1000000) {
-    return `${(subs / 1000000).toFixed(2)}M`
-  }
-  if (subs >= 1000) {
-    return `${(subs / 1000).toFixed(0)}K`
-  }
-  return subs.toString()
-}
-
 export default function VideoPlayerSection({
   activeSubItem,
   onSubItemHandled,
@@ -413,7 +145,7 @@ export default function VideoPlayerSection({
   // Player State
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
-  const [duration, setDuration] = useState(currentVideo.duration)
+  const [duration, setDuration] = useState(0)
   const [volume, setVolume] = useState(80)
   const [isMuted, setIsMuted] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -436,19 +168,15 @@ export default function VideoPlayerSection({
   const [isLoading, setIsLoading] = useState(false)
 
   // UI State
-  const [isSubscribed, setIsSubscribed] = useState(currentVideo.channel.isSubscribed)
+  const [isSubscribed, setIsSubscribed] = useState(false)
   const [isLiked, setIsLiked] = useState(false)
   const [isDisliked, setIsDisliked] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
-  const [likes, setLikes] = useState(currentVideo.likes)
+  const [likes, setLikes] = useState(0)
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
   const [showPlaylist, setShowPlaylist] = useState(true)
-  const [commentText, setCommentText] = useState("")
   const [commentSort, setCommentSort] = useState<"top" | "newest">("top")
   const [showShareModal, setShowShareModal] = useState(false)
-  const [autoplay, setAutoplay] = useState(true)
-  const [loopPlaylist, setLoopPlaylist] = useState(false)
-  const [shufflePlaylist, setShufflePlaylist] = useState(false)
   const [viewMode, setViewMode] = useState<"player" | "browse" | "search" | "playlist">("player")
   const [localVideoUrl, setLocalVideoUrl] = useState<string | null>(null)
   const [localVideoName, setLocalVideoName] = useState<string | null>(null)
@@ -531,16 +259,6 @@ export default function VideoPlayerSection({
   const videoRef = useRef<HTMLVideoElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Get current chapter
-  const getCurrentChapter = useCallback(() => {
-    for (let i = currentVideo.chapters.length - 1; i >= 0; i--) {
-      if (currentTime >= currentVideo.chapters[i].startTime) {
-        return currentVideo.chapters[i]
-      }
-    }
-    return currentVideo.chapters[0]
-  }, [currentTime])
-
   // Video event handlers
   const handleLoadStart = useCallback(() => {
     setIsLoading(true)
@@ -568,10 +286,7 @@ export default function VideoPlayerSection({
 
   const handleEnded = useCallback(() => {
     setIsPlaying(false)
-    if (autoplay && playlist.length > 0) {
-      // Auto-play next video logic would go here
-    }
-  }, [autoplay])
+  }, [])
 
   const handleError = useCallback((e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
     const video = e.currentTarget
@@ -1570,22 +1285,6 @@ export default function VideoPlayerSection({
                 </div>
               )}
 
-              {/* Chapter Marker - only show when video is loaded and chapters exist */}
-              <AnimatePresence>
-                {showControls && videoSource.type !== 'none' && videoSource.type !== 'youtube' && duration > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="absolute top-4 left-4 glass rounded-lg px-3 py-1.5"
-                  >
-                    <p className="text-foreground text-sm font-medium">
-                      {getCurrentChapter()?.title || 'Playing'}
-                    </p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
               {/* Center Play Button - only show when video is loaded */}
               <AnimatePresence>
                 {!isPlaying && showControls && videoSource.type !== 'none' && videoSource.type !== 'youtube' && !isLoading && !videoError && (
@@ -1615,14 +1314,6 @@ export default function VideoPlayerSection({
                     {/* Progress Bar */}
                     <div className="mb-4 group">
                       <div className="relative h-1 group-hover:h-1.5 transition-all bg-muted-foreground/30 rounded-full cursor-pointer">
-                        {/* Chapter markers */}
-                        {currentVideo.chapters.map((chapter, idx) => (
-                          <div
-                            key={idx}
-                            className="absolute w-1 h-full bg-muted-foreground/50 rounded-full"
-                            style={{ left: `${(chapter.startTime / duration) * 100}%` }}
-                          />
-                        ))}
                         {/* Buffered */}
                         <div className="absolute h-full bg-muted-foreground/40 rounded-full" style={{ width: `${buffered}%` }} />
                         {/* Progress */}
@@ -1745,17 +1436,7 @@ export default function VideoPlayerSection({
                             >
                               Off
                             </Button>
-                            {currentVideo.captions.map((caption) => (
-                              <Button
-                                key={caption.language}
-                                variant="ghost"
-                                size="sm"
-                                className={`w-full justify-start ${selectedCaption === caption.language ? "bg-primary/20 text-primary" : "text-foreground"}`}
-                                onClick={() => setSelectedCaption(caption.language)}
-                              >
-                                {caption.label}
-                              </Button>
-                            ))}
+                            <p className="text-muted-foreground text-xs px-2 mt-1">No captions available</p>
                           </PopoverContent>
                         </Popover>
 
@@ -1788,21 +1469,14 @@ export default function VideoPlayerSection({
                             <div className="p-2">
                               {settingsTab === "quality" && (
                                 <div className="space-y-1">
-                                  {currentVideo.quality.map((q) => (
-                                    <Button
-                                      key={q.resolution}
-                                      variant="ghost"
-                                      size="sm"
-                                      className={`w-full justify-between ${selectedQuality === q.resolution ? "bg-primary/20 text-primary" : "text-foreground"}`}
-                                      onClick={() => {
-                                        setSelectedQuality(q.resolution)
-                                        setIsSettingsOpen(false)
-                                      }}
-                                    >
-                                      <span>{q.resolution} {q.label}</span>
-                                      <span className="text-muted-foreground text-xs">{q.bitrate}</span>
-                                    </Button>
-                                  ))}
+                                  <p className="text-muted-foreground text-xs px-2 py-1">Quality is set automatically by the browser for local videos.</p>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-start bg-primary/20 text-primary"
+                                  >
+                                    Auto
+                                  </Button>
                                 </div>
                               )}
                               {settingsTab === "speed" && (
@@ -1881,18 +1555,20 @@ export default function VideoPlayerSection({
               className="mt-4"
             >
               <h1 className="text-xl md:text-2xl font-bold text-foreground mb-2">
-                {currentVideoDetails?.title || currentVideo.title}
+                {currentVideoDetails?.title || localVideoName || videoSource.fileName || "No video loaded"}
               </h1>
 
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                {/* Views and Date */}
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <Eye className="h-4 w-4" />
-                  <span>{formatViews(currentVideoDetails?.viewCount || currentVideo.views)} views</span>
-                  <span>•</span>
-                  <Clock className="h-4 w-4" />
-                  <span>{new Date(currentVideoDetails?.publishedAt || currentVideo.uploadDate).toLocaleDateString()}</span>
-                </div>
+                {/* Views and Date - only show for YouTube videos with data */}
+                {currentVideoDetails && (
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                    <Eye className="h-4 w-4" />
+                    <span>{formatViews(currentVideoDetails.viewCount)} views</span>
+                    <span>•</span>
+                    <Clock className="h-4 w-4" />
+                    <span>{new Date(currentVideoDetails.publishedAt).toLocaleDateString()}</span>
+                  </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex items-center gap-2 flex-wrap">
@@ -1905,7 +1581,7 @@ export default function VideoPlayerSection({
                       data-tabz-action="like"
                     >
                       <ThumbsUp className={`h-4 w-4 mr-2 ${isLiked ? "fill-current" : ""}`} />
-                      {formatViews(likes)}
+                      {likes > 0 ? formatViews(likes) : "Like"}
                     </Button>
                     <Separator orientation="vertical" className="h-6 bg-border" />
                     <Button
@@ -1951,190 +1627,137 @@ export default function VideoPlayerSection({
               </div>
             </motion.div>
 
-            {/* Channel Info & Description */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-            >
-              <Card className="glass border-border mt-4 p-4">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-12 w-12">
-                      <AvatarImage src={channelInfo?.avatar || currentVideo.channel.avatar} />
-                      <AvatarFallback className="bg-primary/20 text-primary">
-                        {(channelInfo?.name || currentVideo.channel.name)[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="flex items-center gap-1">
-                        <h3 className="font-semibold text-foreground">
-                          {currentVideoDetails?.channelTitle || currentVideo.channel.name}
-                        </h3>
-                        {currentVideo.channel.isVerified && (
-                          <CheckCircle2 className="h-4 w-4 text-primary" />
+            {/* Channel Info & Description - only show when we have YouTube data */}
+            {(currentVideoDetails || channelInfo) && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+              >
+                <Card className="glass border-border mt-4 p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={channelInfo?.avatar} />
+                        <AvatarFallback className="bg-primary/20 text-primary">
+                          {(channelInfo?.name || currentVideoDetails?.channelTitle || "C")[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="flex items-center gap-1">
+                          <h3 className="font-semibold text-foreground">
+                            {currentVideoDetails?.channelTitle || channelInfo?.name || "Channel"}
+                          </h3>
+                        </div>
+                        {channelInfo && (
+                          <p className="text-muted-foreground text-sm">
+                            {channelInfo.subscriberCountFormatted} subscribers
+                          </p>
                         )}
                       </div>
-                      <p className="text-muted-foreground text-sm">
-                        {channelInfo
-                          ? channelInfo.subscriberCountFormatted + " subscribers"
-                          : formatSubscribers(currentVideo.channel.subscribers) + " subscribers"}
-                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {isSubscribed && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-foreground"
+                        >
+                          <Bell className="h-5 w-5" />
+                        </Button>
+                      )}
+                      <Button
+                        variant={isSubscribed ? "outline" : "default"}
+                        className={isSubscribed ? "border-border text-foreground" : ""}
+                        onClick={() => setIsSubscribed(!isSubscribed)}
+                        data-tabz-action="subscribe"
+                      >
+                        {isSubscribed ? "Subscribed" : "Subscribe"}
+                      </Button>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    {isSubscribed && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-foreground"
-                      >
-                        <Bell className="h-5 w-5" />
-                      </Button>
-                    )}
-                    <Button
-                      variant={isSubscribed ? "outline" : "default"}
-                      className={isSubscribed ? "border-border text-foreground" : ""}
-                      onClick={() => setIsSubscribed(!isSubscribed)}
-                      data-tabz-action="subscribe"
-                    >
-                      {isSubscribed ? "Subscribed" : "Subscribe"}
-                    </Button>
-                  </div>
-                </div>
-
-                <Collapsible open={isDescriptionExpanded} onOpenChange={setIsDescriptionExpanded}>
-                  <div className="glass-dark rounded-lg p-4">
-                    <p className="text-foreground text-sm whitespace-pre-line">
-                      {(() => {
-                        const description = currentVideoDetails?.description || currentVideo.description
-                        return isDescriptionExpanded
-                          ? description
-                          : description.slice(0, 200) + (description.length > 200 ? "..." : "")
-                      })()}
-                    </p>
-                    <CollapsibleContent>
-                      <div className="mt-4 pt-4 border-t border-border">
-                        <h4 className="text-foreground font-medium mb-2">Chapters</h4>
-                        <div className="space-y-2">
-                          {currentVideo.chapters.map((chapter, idx) => (
-                            <button
-                              key={idx}
-                              className="flex items-center gap-3 w-full text-left hover:bg-primary/10 rounded-lg p-2 transition-colors"
-                              onClick={() => seekTo(chapter.startTime)}
-                            >
-                              <span className="text-primary font-mono text-sm">
-                                {formatTime(chapter.startTime)}
-                              </span>
-                              <span className="text-foreground text-sm">
-                                {chapter.title}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
+                  {currentVideoDetails?.description && (
+                    <Collapsible open={isDescriptionExpanded} onOpenChange={setIsDescriptionExpanded}>
+                      <div className="glass-dark rounded-lg p-4">
+                        <p className="text-foreground text-sm whitespace-pre-line">
+                          {isDescriptionExpanded
+                            ? currentVideoDetails.description
+                            : currentVideoDetails.description.slice(0, 200) + (currentVideoDetails.description.length > 200 ? "..." : "")}
+                        </p>
                       </div>
-                    </CollapsibleContent>
-                  </div>
-                  <CollapsibleTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="mt-2 text-foreground"
-                    >
-                      {isDescriptionExpanded ? (
-                        <>
-                          Show less <ChevronUp className="h-4 w-4 ml-1" />
-                        </>
-                      ) : (
-                        <>
-                          Show more <ChevronDown className="h-4 w-4 ml-1" />
-                        </>
+                      {currentVideoDetails.description.length > 200 && (
+                        <CollapsibleTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="mt-2 text-foreground"
+                          >
+                            {isDescriptionExpanded ? (
+                              <>
+                                Show less <ChevronUp className="h-4 w-4 ml-1" />
+                              </>
+                            ) : (
+                              <>
+                                Show more <ChevronDown className="h-4 w-4 ml-1" />
+                              </>
+                            )}
+                          </Button>
+                        </CollapsibleTrigger>
                       )}
-                    </Button>
-                  </CollapsibleTrigger>
-                </Collapsible>
-              </Card>
-            </motion.div>
+                    </Collapsible>
+                  )}
+                </Card>
+              </motion.div>
+            )}
 
-            {/* Comments Section */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-              className="mt-6"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-primary" />
-                  <h3 className="text-lg font-semibold text-foreground">
-                    {currentYouTubeId && hasApiKey
-                      ? `${commentsData?.totalResults || youtubeComments.length} Comments`
-                      : `${comments.length} Comments`}
-                  </h3>
-                </div>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="ghost" size="sm" className="text-foreground">
-                      Sort by: {commentSort === "top" ? "Top" : "Newest"}
-                      <ChevronDown className="h-4 w-4 ml-1" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="glass border-border w-32 p-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={`w-full justify-start ${commentSort === "top" ? "text-primary" : "text-foreground"}`}
-                      onClick={() => setCommentSort("top")}
-                    >
-                      Top
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={`w-full justify-start ${commentSort === "newest" ? "text-primary" : "text-foreground"}`}
-                      onClick={() => setCommentSort("newest")}
-                    >
-                      Newest
-                    </Button>
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              {/* Add Comment */}
-              <div className="flex gap-3 mb-6">
-                <Avatar className="h-10 w-10">
-                  <AvatarFallback className="bg-primary/20 text-primary">U</AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <Textarea
-                    placeholder="Add a comment..."
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    className="glass border-border min-h-[80px] text-foreground placeholder:text-muted-foreground"
-                    data-tabz-input="comment"
-                  />
-                  {commentText && (
-                    <div className="flex justify-end gap-2 mt-2">
+            {/* Comments Section - only for YouTube videos */}
+            {currentYouTubeId && hasApiKey ? (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+                className="mt-6"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5 text-primary" />
+                    <h3 className="text-lg font-semibold text-foreground">
+                      {commentsData?.totalResults || youtubeComments.length} Comments
+                    </h3>
+                  </div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" size="sm" className="text-foreground">
+                        Sort by: {commentSort === "top" ? "Top" : "Newest"}
+                        <ChevronDown className="h-4 w-4 ml-1" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="glass border-border w-32 p-1">
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setCommentText("")}
-                        className="text-foreground"
+                        className={`w-full justify-start ${commentSort === "top" ? "text-primary" : "text-foreground"}`}
+                        onClick={() => setCommentSort("top")}
                       >
-                        Cancel
+                        Top
                       </Button>
-                      <Button size="sm">Comment</Button>
-                    </div>
-                  )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`w-full justify-start ${commentSort === "newest" ? "text-primary" : "text-foreground"}`}
+                        onClick={() => setCommentSort("newest")}
+                      >
+                        Newest
+                      </Button>
+                    </PopoverContent>
+                  </Popover>
                 </div>
-              </div>
 
-              {/* Comment List */}
-              <div className="space-y-6">
-                {/* YouTube Comments (when playing YouTube video) */}
-                {currentYouTubeId && hasApiKey ? (
-                  commentsLoading ? (
+                {/* Comment List */}
+                <div className="space-y-6">
+                  {commentsLoading ? (
                     <div className="flex items-center justify-center py-8">
                       <LoaderIcon className="h-6 w-6 animate-spin text-primary" />
                       <span className="ml-2 text-muted-foreground">Loading comments...</span>
@@ -2153,15 +1776,15 @@ export default function VideoPlayerSection({
                     youtubeComments.map((comment) => (
                       <YouTubeCommentItem key={comment.id} comment={comment} />
                     ))
-                  )
-                ) : (
-                  /* Mock comments when no YouTube video */
-                  comments.map((comment) => (
-                    <CommentItem key={comment.id} comment={comment} />
-                  ))
-                )}
+                  )}
+                </div>
+              </motion.div>
+            ) : videoSource.type !== 'none' ? (
+              <div className="mt-6 text-center py-8 text-muted-foreground">
+                <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>Play a YouTube video to see comments</p>
               </div>
-            </motion.div>
+            ) : null}
           </div>
 
           {/* Sidebar */}
@@ -2172,80 +1795,48 @@ export default function VideoPlayerSection({
               transition={{ duration: 0.5, delay: 0.2 }}
               className="w-full lg:w-[400px] space-y-4"
             >
-              {/* Channel Videos / Playlist */}
-              <Card className="glass border-border">
-                <div className="p-4 border-b border-border">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <ListVideo className="h-5 w-5 text-primary" />
-                      <h3 className="font-semibold text-foreground line-clamp-1">
-                        {channelInfo?.name && currentYouTubeId
-                          ? `More from ${channelInfo.name}`
-                          : "Next.js 15 Complete Course"}
-                      </h3>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-foreground"
-                      onClick={() => setShowPlaylist(!showPlaylist)}
-                    >
-                      {showPlaylist ? (
-                        <ChevronUp className="h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  <p className="text-muted-foreground text-sm">
-                    {channelInfo && currentYouTubeId
-                      ? `${channelInfo.subscriberCountFormatted} subscribers`
-                      : "CodeCraft Academy • 2/5"}
-                  </p>
-                  <div className="flex items-center gap-4 mt-3">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={`text-foreground ${loopPlaylist ? "text-primary" : ""}`}
-                      onClick={() => setLoopPlaylist(!loopPlaylist)}
-                    >
-                      <Repeat className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={`text-foreground ${shufflePlaylist ? "text-primary" : ""}`}
-                      onClick={() => setShufflePlaylist(!shufflePlaylist)}
-                    >
-                      <Shuffle className="h-4 w-4" />
-                    </Button>
-                    <div className="flex items-center gap-2 ml-auto">
-                      <span className="text-muted-foreground text-sm">Autoplay</span>
-                      <button
-                        className={`w-10 h-5 rounded-full transition-colors ${autoplay ? "bg-primary" : "bg-muted"}`}
-                        onClick={() => setAutoplay(!autoplay)}
+              {/* Channel Videos - only when playing YouTube video */}
+              {currentYouTubeId && hasApiKey && channelVideos.length > 0 && (
+                <Card className="glass border-border">
+                  <div className="p-4 border-b border-border">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <ListVideo className="h-5 w-5 text-primary" />
+                        <h3 className="font-semibold text-foreground line-clamp-1">
+                          {channelInfo?.name ? `More from ${channelInfo.name}` : "More Videos"}
+                        </h3>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-foreground"
+                        onClick={() => setShowPlaylist(!showPlaylist)}
                       >
-                        <div
-                          className={`w-4 h-4 rounded-full bg-foreground transition-transform ${autoplay ? "translate-x-5" : "translate-x-0.5"}`}
-                        />
-                      </button>
+                        {showPlaylist ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </Button>
                     </div>
+                    {channelInfo && (
+                      <p className="text-muted-foreground text-sm">
+                        {channelInfo.subscriberCountFormatted} subscribers
+                      </p>
+                    )}
                   </div>
-                </div>
 
-                <AnimatePresence>
-                  {showPlaylist && (
-                    <motion.div
-                      initial={{ height: 0 }}
-                      animate={{ height: "auto" }}
-                      exit={{ height: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <ScrollArea className="h-[300px]">
-                        <div className="p-2">
-                          {/* Show channel videos when playing YouTube, otherwise show mock playlist */}
-                          {currentYouTubeId && hasApiKey && channelVideos.length > 0 ? (
-                            channelVideosLoading ? (
+                  <AnimatePresence>
+                    {showPlaylist && (
+                      <motion.div
+                        initial={{ height: 0 }}
+                        animate={{ height: "auto" }}
+                        exit={{ height: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <ScrollArea className="h-[300px]">
+                          <div className="p-2">
+                            {channelVideosLoading ? (
                               <div className="flex items-center justify-center py-8">
                                 <LoaderIcon className="h-5 w-5 animate-spin text-primary" />
                               </div>
@@ -2292,64 +1883,33 @@ export default function VideoPlayerSection({
                                     </div>
                                   </div>
                                 ))
-                            )
-                          ) : (
-                            playlist.map((item, idx) => (
-                              <div
-                                key={item.id}
-                                className={`flex items-start gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
-                                  item.isPlaying ? "bg-primary/20" : "hover:bg-muted/20"
-                                }`}
-                              >
-                                <span className="text-muted-foreground text-sm w-6 text-center">
-                                  {item.isPlaying ? (
-                                    <Play className="h-4 w-4 text-primary" fill="currentColor" />
-                                  ) : (
-                                    idx + 1
-                                  )}
-                                </span>
-                                <div className="relative w-[100px] aspect-video rounded overflow-hidden bg-muted flex-shrink-0">
-                                  <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900" />
-                                  <span className="absolute bottom-1 right-1 bg-black/80 text-foreground text-xs px-1 rounded">
-                                    {formatTime(item.duration)}
-                                  </span>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-foreground text-sm line-clamp-2">
-                                    {item.title}
-                                  </p>
-                                  <p className="text-muted-foreground text-xs mt-1">
-                                    {item.channel}
-                                  </p>
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </ScrollArea>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </Card>
+                            )}
+                          </div>
+                        </ScrollArea>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </Card>
+              )}
 
               {/* Recommendations */}
               <div>
-                <h3 className="font-semibold text-foreground mb-4">Up Next</h3>
+                <h3 className="font-semibold text-foreground mb-4">Recommended</h3>
                 <div className="space-y-3" data-tabz-list="recommendations">
                   {recommendations.map((video) => (
                     <div
-                      key={video.id}
+                      key={video.youtubeId}
                       className="flex gap-3 cursor-pointer group"
-                      data-tabz-item={video.id}
+                      data-tabz-item={video.youtubeId}
                       onClick={() => {
-                        setVideoSource({ type: 'youtube', url: `https://www.youtube.com/watch?v=${video.id}`, youtubeId: video.id })
+                        setVideoSource({ type: 'youtube', url: `https://www.youtube.com/watch?v=${video.youtubeId}`, youtubeId: video.youtubeId })
                         setShowSourceInput(false)
                         setVideoError(null)
                       }}
                     >
                       <div className="relative w-[168px] aspect-video rounded-lg overflow-hidden bg-muted flex-shrink-0">
                         <img
-                          src={video.thumbnail}
+                          src={`https://i.ytimg.com/vi/${video.youtubeId}/mqdefault.jpg`}
                           alt={video.title}
                           className="absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity"
                           onError={(e) => {
@@ -2358,7 +1918,7 @@ export default function VideoPlayerSection({
                         />
                         <div className="absolute inset-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 group-hover:opacity-80 transition-opacity" />
                         <span className="absolute bottom-1 right-1 bg-black/80 text-foreground text-xs px-1 rounded">
-                          {formatTime(video.duration)}
+                          {video.duration}
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
@@ -2440,7 +2000,9 @@ export default function VideoPlayerSection({
               <div className="glass-dark rounded-lg p-3 flex items-center gap-2">
                 <input
                   type="text"
-                  value={`https://example.com/watch?v=${currentVideo.id}`}
+                  value={videoSource.type === 'youtube' && videoSource.youtubeId
+                    ? `https://www.youtube.com/watch?v=${videoSource.youtubeId}`
+                    : videoSource.url || ''}
                   readOnly
                   className="flex-1 bg-transparent text-foreground text-sm outline-none"
                 />
@@ -2476,136 +2038,6 @@ export default function VideoPlayerSection({
         downloads={activeDownloads}
         onCancel={cancelDownload}
       />
-    </div>
-  )
-}
-
-// Comment Component
-function CommentItem({ comment, isReply = false }: { comment: Comment; isReply?: boolean }) {
-  const [isLiked, setIsLiked] = useState(comment.isLiked)
-  const [likes, setLikes] = useState(comment.likes)
-  const [showReplies, setShowReplies] = useState(false)
-  const [showReplyInput, setShowReplyInput] = useState(false)
-  const [replyText, setReplyText] = useState("")
-
-  const handleLike = () => {
-    if (isLiked) {
-      setIsLiked(false)
-      setLikes((prev) => prev - 1)
-    } else {
-      setIsLiked(true)
-      setLikes((prev) => prev + 1)
-    }
-  }
-
-  return (
-    <div className={`flex gap-3 ${isReply ? "ml-12" : ""}`}>
-      <Avatar className={isReply ? "h-8 w-8" : "h-10 w-10"}>
-        <AvatarImage src={comment.author.avatar} />
-        <AvatarFallback className="bg-primary/20 text-primary">
-          {comment.author.name[0]}
-        </AvatarFallback>
-      </Avatar>
-      <div className="flex-1">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-foreground text-sm font-medium">
-            {comment.author.name}
-          </span>
-          <span className="text-muted-foreground text-xs">{comment.date}</span>
-        </div>
-        <p className="text-foreground text-sm mb-2">{comment.content}</p>
-        <div className="flex items-center gap-4">
-          <button
-            className={`flex items-center gap-1 text-sm ${isLiked ? "text-primary" : "text-muted-foreground"} hover:text-primary transition-colors`}
-            onClick={handleLike}
-          >
-            <ThumbsUp className={`h-4 w-4 ${isLiked ? "fill-current" : ""}`} />
-            {likes > 0 && <span>{likes}</span>}
-          </button>
-          <button className="text-muted-foreground hover:text-foreground transition-colors">
-            <ThumbsDown className="h-4 w-4" />
-          </button>
-          {!isReply && (
-            <button
-              className="text-muted-foreground text-sm hover:text-foreground transition-colors"
-              onClick={() => setShowReplyInput(!showReplyInput)}
-            >
-              Reply
-            </button>
-          )}
-        </div>
-
-        {/* Reply Input */}
-        <AnimatePresence>
-          {showReplyInput && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mt-3 flex gap-3"
-            >
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary/20 text-primary">U</AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <Textarea
-                  placeholder="Add a reply..."
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  className="glass border-border min-h-[60px] text-foreground placeholder:text-muted-foreground text-sm"
-                />
-                {replyText && (
-                  <div className="flex justify-end gap-2 mt-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setReplyText("")
-                        setShowReplyInput(false)
-                      }}
-                      className="text-foreground"
-                    >
-                      Cancel
-                    </Button>
-                    <Button size="sm">Reply</Button>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Replies */}
-        {comment.replies && comment.replies.length > 0 && (
-          <div className="mt-3">
-            <button
-              className="flex items-center gap-2 text-primary text-sm font-medium"
-              onClick={() => setShowReplies(!showReplies)}
-            >
-              {showReplies ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
-              {comment.replies.length} {comment.replies.length === 1 ? "reply" : "replies"}
-            </button>
-            <AnimatePresence>
-              {showReplies && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mt-3 space-y-4"
-                >
-                  {comment.replies.map((reply) => (
-                    <CommentItem key={reply.id} comment={reply} isReply />
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        )}
-      </div>
     </div>
   )
 }
