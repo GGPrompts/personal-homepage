@@ -52,6 +52,7 @@ import {
   Mail,
   Calendar,
   Shield,
+  Activity,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -103,6 +104,7 @@ const sectionMeta: Record<ToggleableSection, { label: string; icon: React.Elemen
   "music-player": { label: "Music Player", icon: Music, description: "Synthwave music player" },
   flowchart: { label: "Flowchart", icon: GitBranch, description: "Workflow designer" },
   govhound: { label: "GovHound", icon: Shield, description: "Federal IT contracts" },
+  uptime: { label: "Uptime", icon: Activity, description: "Service status monitoring" },
 }
 
 // Agent card type for display
