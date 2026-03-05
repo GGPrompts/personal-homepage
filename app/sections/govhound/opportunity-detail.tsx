@@ -373,7 +373,7 @@ export function OpportunityDetailTab({ opportunityId, onSelectOpportunity, onNav
                     value={saveStatus}
                     onValueChange={(v) => setSaveStatus(v as SavedStatus)}
                   >
-                    <SelectTrigger className="bg-card border-border text-foreground">
+                    <SelectTrigger className="border-border">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-card border-border">
@@ -393,7 +393,7 @@ export function OpportunityDetailTab({ opportunityId, onSelectOpportunity, onNav
                     value={saveNotes}
                     onChange={(e) => setSaveNotes(e.target.value)}
                     rows={4}
-                    className="bg-card border-border text-foreground placeholder:text-muted-foreground/70"
+                    className="border-border placeholder:text-muted-foreground/70"
                   />
                 </div>
                 <div className="flex gap-2">

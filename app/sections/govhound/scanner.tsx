@@ -587,7 +587,7 @@ export function ScannerTab({ onSelectOpportunity, onNavigateTab }: TabProps) {
                         onKeyDown={(e) => {
                           if (e.key === "Enter") handleSaveProfile();
                         }}
-                        className="bg-card border-border text-foreground placeholder:text-muted-foreground/70"
+                        className="border-border placeholder:text-muted-foreground/70"
                       />
                     </div>
                     <div className="rounded-lg border border-border bg-card p-3 text-sm space-y-1">
@@ -637,7 +637,7 @@ export function ScannerTab({ onSelectOpportunity, onNavigateTab }: TabProps) {
               onKeyDown={(e) => {
                 if (e.key === "Enter") fetchOpportunities(1);
               }}
-              className="flex-1 bg-card border-border text-foreground placeholder:text-muted-foreground/70 focus:border-primary"
+              className="flex-1 border-border placeholder:text-muted-foreground/70 focus:border-primary"
             />
             <Button
               onClick={() => fetchOpportunities(1)}
@@ -671,7 +671,7 @@ export function ScannerTab({ onSelectOpportunity, onNavigateTab }: TabProps) {
               <div className="space-y-2">
                 <Label className="text-muted-foreground">NAICS Code</Label>
                 <Select value={naicsCode} onValueChange={setNaicsCode}>
-                  <SelectTrigger className="bg-card border-border text-foreground">
+                  <SelectTrigger className="border-border">
                     <SelectValue placeholder="All IT codes" />
                   </SelectTrigger>
                   <SelectContent className="bg-card border-border">
@@ -688,7 +688,7 @@ export function ScannerTab({ onSelectOpportunity, onNavigateTab }: TabProps) {
               <div className="space-y-2">
                 <Label className="text-muted-foreground">Set-Aside Type</Label>
                 <Select value={setAside} onValueChange={setSetAside}>
-                  <SelectTrigger className="bg-card border-border text-foreground">
+                  <SelectTrigger className="border-border">
                     <SelectValue placeholder="Any" />
                   </SelectTrigger>
                   <SelectContent className="bg-card border-border">
@@ -708,7 +708,7 @@ export function ScannerTab({ onSelectOpportunity, onNavigateTab }: TabProps) {
                   placeholder="e.g., Department of Defense"
                   value={agency}
                   onChange={(e) => setAgency(e.target.value)}
-                  className="bg-card border-border text-foreground placeholder:text-muted-foreground/70"
+                  className="border-border placeholder:text-muted-foreground/70"
                 />
               </div>
 
@@ -718,7 +718,7 @@ export function ScannerTab({ onSelectOpportunity, onNavigateTab }: TabProps) {
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="bg-card border-border text-foreground"
+                  className="border-border"
                 />
               </div>
 
@@ -728,7 +728,7 @@ export function ScannerTab({ onSelectOpportunity, onNavigateTab }: TabProps) {
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="bg-card border-border text-foreground"
+                  className="border-border"
                 />
               </div>
             </div>

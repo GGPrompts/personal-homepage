@@ -253,10 +253,10 @@ export function PastPerformanceTab({ onSelectOpportunity, onNavigateTab }: TabPr
           placeholder="Search contracts..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="max-w-xs bg-card border-border text-foreground placeholder:text-muted-foreground/70"
+          className="max-w-xs border-border placeholder:text-muted-foreground/70"
         />
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-40 bg-card border-border text-foreground">
+          <SelectTrigger className="w-40 border-border">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent className="bg-card border-border">
@@ -358,42 +358,42 @@ function ContractForm({ form, setForm, onSubmit, submitting, isEdit }: {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label className="text-muted-foreground">Title *</Label>
-          <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="IT Modernization Support" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" />
+          <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="IT Modernization Support" className="border-border placeholder:text-muted-foreground/70" />
         </div>
         <div className="space-y-2">
           <Label className="text-muted-foreground">Contract Number *</Label>
-          <Input value={form.contract_number} onChange={(e) => setForm({ ...form, contract_number: e.target.value })} placeholder="GS-35F-0000X" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" />
+          <Input value={form.contract_number} onChange={(e) => setForm({ ...form, contract_number: e.target.value })} placeholder="GS-35F-0000X" className="border-border placeholder:text-muted-foreground/70" />
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label className="text-muted-foreground">Agency *</Label>
-          <Input value={form.agency} onChange={(e) => setForm({ ...form, agency: e.target.value })} placeholder="Department of Defense" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" />
+          <Input value={form.agency} onChange={(e) => setForm({ ...form, agency: e.target.value })} placeholder="Department of Defense" className="border-border placeholder:text-muted-foreground/70" />
         </div>
         <div className="space-y-2">
           <Label className="text-muted-foreground">Sub-Agency</Label>
-          <Input value={form.sub_agency} onChange={(e) => setForm({ ...form, sub_agency: e.target.value })} placeholder="DISA" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" />
+          <Input value={form.sub_agency} onChange={(e) => setForm({ ...form, sub_agency: e.target.value })} placeholder="DISA" className="border-border placeholder:text-muted-foreground/70" />
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="space-y-2">
           <Label className="text-muted-foreground">Task Order</Label>
-          <Input value={form.task_order_number} onChange={(e) => setForm({ ...form, task_order_number: e.target.value })} className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" />
+          <Input value={form.task_order_number} onChange={(e) => setForm({ ...form, task_order_number: e.target.value })} className="border-border placeholder:text-muted-foreground/70" />
         </div>
         <div className="space-y-2">
           <Label className="text-muted-foreground">NAICS Code</Label>
-          <Input value={form.naics_code} onChange={(e) => setForm({ ...form, naics_code: e.target.value })} placeholder="541512" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" />
+          <Input value={form.naics_code} onChange={(e) => setForm({ ...form, naics_code: e.target.value })} placeholder="541512" className="border-border placeholder:text-muted-foreground/70" />
         </div>
         <div className="space-y-2">
           <Label className="text-muted-foreground">Place of Performance</Label>
-          <Input value={form.place_of_performance} onChange={(e) => setForm({ ...form, place_of_performance: e.target.value })} placeholder="Washington, DC" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" />
+          <Input value={form.place_of_performance} onChange={(e) => setForm({ ...form, place_of_performance: e.target.value })} placeholder="Washington, DC" className="border-border placeholder:text-muted-foreground/70" />
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label className="text-muted-foreground">Contract Type</Label>
           <Select value={form.contract_type} onValueChange={(v) => setForm({ ...form, contract_type: v as ContractType })}>
-            <SelectTrigger className="bg-card border-border text-foreground"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="border-border"><SelectValue /></SelectTrigger>
             <SelectContent className="bg-card border-border">
               {Object.entries(CONTRACT_TYPE_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
             </SelectContent>
@@ -402,7 +402,7 @@ function ContractForm({ form, setForm, onSubmit, submitting, isEdit }: {
         <div className="space-y-2">
           <Label className="text-muted-foreground">Status</Label>
           <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as ContractStatus })}>
-            <SelectTrigger className="bg-card border-border text-foreground"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="border-border"><SelectValue /></SelectTrigger>
             <SelectContent className="bg-card border-border">
               {Object.entries(CONTRACT_STATUS_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
             </SelectContent>
@@ -412,34 +412,34 @@ function ContractForm({ form, setForm, onSubmit, submitting, isEdit }: {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label className="text-muted-foreground">Total Value ($)</Label>
-          <Input type="number" value={form.total_value} onChange={(e) => setForm({ ...form, total_value: e.target.value })} placeholder="5000000" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" />
+          <Input type="number" value={form.total_value} onChange={(e) => setForm({ ...form, total_value: e.target.value })} placeholder="5000000" className="border-border placeholder:text-muted-foreground/70" />
         </div>
         <div className="space-y-2">
           <Label className="text-muted-foreground">Annual Value ($)</Label>
-          <Input type="number" value={form.annual_value} onChange={(e) => setForm({ ...form, annual_value: e.target.value })} placeholder="1000000" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" />
+          <Input type="number" value={form.annual_value} onChange={(e) => setForm({ ...form, annual_value: e.target.value })} placeholder="1000000" className="border-border placeholder:text-muted-foreground/70" />
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label className="text-muted-foreground">Period Start</Label>
-          <Input type="date" value={form.period_start} onChange={(e) => setForm({ ...form, period_start: e.target.value })} className="bg-card border-border text-foreground" />
+          <Input type="date" value={form.period_start} onChange={(e) => setForm({ ...form, period_start: e.target.value })} className="border-border" />
         </div>
         <div className="space-y-2">
           <Label className="text-muted-foreground">Period End</Label>
-          <Input type="date" value={form.period_end} onChange={(e) => setForm({ ...form, period_end: e.target.value })} className="bg-card border-border text-foreground" />
+          <Input type="date" value={form.period_end} onChange={(e) => setForm({ ...form, period_end: e.target.value })} className="border-border" />
         </div>
       </div>
       <div className="space-y-2">
         <Label className="text-muted-foreground">Description</Label>
-        <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} placeholder="Describe the work performed..." className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" />
+        <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} placeholder="Describe the work performed..." className="border-border placeholder:text-muted-foreground/70" />
       </div>
       <div className="space-y-2">
         <Label className="text-muted-foreground">Technologies (comma-separated)</Label>
-        <Input value={form.technologies} onChange={(e) => setForm({ ...form, technologies: e.target.value })} placeholder="AWS, Python, React, PostgreSQL" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" />
+        <Input value={form.technologies} onChange={(e) => setForm({ ...form, technologies: e.target.value })} placeholder="AWS, Python, React, PostgreSQL" className="border-border placeholder:text-muted-foreground/70" />
       </div>
       <div className="space-y-2">
         <Label className="text-muted-foreground">Key Personnel (name:role, comma-separated)</Label>
-        <Input value={form.key_personnel} onChange={(e) => setForm({ ...form, key_personnel: e.target.value })} placeholder="Jane Doe:PM, John Smith:Lead Engineer" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" />
+        <Input value={form.key_personnel} onChange={(e) => setForm({ ...form, key_personnel: e.target.value })} placeholder="Jane Doe:PM, John Smith:Lead Engineer" className="border-border placeholder:text-muted-foreground/70" />
       </div>
       <Button onClick={onSubmit} disabled={submitting || !form.title || !form.contract_number || !form.agency} className="w-full bg-primary hover:bg-primary/90 text-white">
         {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

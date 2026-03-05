@@ -192,7 +192,7 @@ function WrapCalculatorView({ onBack }: { onBack: () => void }) {
               <div className="space-y-1">
                 <Label className="text-muted-foreground text-xs">Quick-fill from Labor Category</Label>
                 <Select value={selectedCategory} onValueChange={handleCategorySelect}>
-                  <SelectTrigger className="bg-card border-border text-foreground"><SelectValue placeholder="Select a category..." /></SelectTrigger>
+                  <SelectTrigger className="border-border"><SelectValue placeholder="Select a category..." /></SelectTrigger>
                   <SelectContent className="bg-card border-border">
                     {categories.map((cat) => <SelectItem key={cat.id} value={cat.id}>{cat.category_name} ({cat.abbreviation})</SelectItem>)}
                   </SelectContent>
@@ -202,24 +202,24 @@ function WrapCalculatorView({ onBack }: { onBack: () => void }) {
             <Separator className="bg-border" />
             <div className="space-y-1">
               <Label className="text-muted-foreground text-xs">Base Labor Rate ($/hr)</Label>
-              <Input type="number" step="0.01" value={baseRate || ""} onChange={(e) => setBaseRate(parseFloat(e.target.value) || 0)} className="bg-card border-border text-foreground text-lg font-mono" placeholder="0.00" />
+              <Input type="number" step="0.01" value={baseRate || ""} onChange={(e) => setBaseRate(parseFloat(e.target.value) || 0)} className="border-border text-lg font-mono" placeholder="0.00" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-muted-foreground text-xs">Fringe (%)</Label>
-                <Input type="number" step="0.01" value={fringePercent || ""} onChange={(e) => setFringePercent(parseFloat(e.target.value) || 0)} className="bg-card border-border text-foreground font-mono" />
+                <Input type="number" step="0.01" value={fringePercent || ""} onChange={(e) => setFringePercent(parseFloat(e.target.value) || 0)} className="border-border font-mono" />
               </div>
               <div className="space-y-1">
                 <Label className="text-muted-foreground text-xs">Overhead (%)</Label>
-                <Input type="number" step="0.01" value={overheadPercent || ""} onChange={(e) => setOverheadPercent(parseFloat(e.target.value) || 0)} className="bg-card border-border text-foreground font-mono" />
+                <Input type="number" step="0.01" value={overheadPercent || ""} onChange={(e) => setOverheadPercent(parseFloat(e.target.value) || 0)} className="border-border font-mono" />
               </div>
               <div className="space-y-1">
                 <Label className="text-muted-foreground text-xs">G&A / GSA (%)</Label>
-                <Input type="number" step="0.01" value={gsaPercent || ""} onChange={(e) => setGsaPercent(parseFloat(e.target.value) || 0)} className="bg-card border-border text-foreground font-mono" />
+                <Input type="number" step="0.01" value={gsaPercent || ""} onChange={(e) => setGsaPercent(parseFloat(e.target.value) || 0)} className="border-border font-mono" />
               </div>
               <div className="space-y-1">
                 <Label className="text-muted-foreground text-xs">Profit/Fee (%)</Label>
-                <Input type="number" step="0.01" value={feePercent || ""} onChange={(e) => setFeePercent(parseFloat(e.target.value) || 0)} className="bg-card border-border text-foreground font-mono" />
+                <Input type="number" step="0.01" value={feePercent || ""} onChange={(e) => setFeePercent(parseFloat(e.target.value) || 0)} className="border-border font-mono" />
               </div>
             </div>
           </CardContent>
@@ -350,19 +350,19 @@ function LaborRateTab() {
             <DialogHeader><DialogTitle className="text-foreground">{editing ? "Edit" : "Add"} Labor Category</DialogTitle></DialogHeader>
             <form onSubmit={(e) => { e.preventDefault(); handleSave(new FormData(e.currentTarget)); }} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><Label className="text-muted-foreground text-xs">Category Name</Label><Input name="category_name" defaultValue={editing?.category_name || ""} required className="bg-card border-border text-foreground" /></div>
-                <div className="space-y-1"><Label className="text-muted-foreground text-xs">Abbreviation</Label><Input name="abbreviation" defaultValue={editing?.abbreviation || ""} required className="bg-card border-border text-foreground" /></div>
+                <div className="space-y-1"><Label className="text-muted-foreground text-xs">Category Name</Label><Input name="category_name" defaultValue={editing?.category_name || ""} required className="border-border" /></div>
+                <div className="space-y-1"><Label className="text-muted-foreground text-xs">Abbreviation</Label><Input name="abbreviation" defaultValue={editing?.abbreviation || ""} required className="border-border" /></div>
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1"><Label className="text-muted-foreground text-xs">GSA Rate ($/hr)</Label><Input name="gsa_rate" type="number" step="0.01" defaultValue={editing?.gsa_rate ?? ""} className="bg-card border-border text-foreground" /></div>
-                <div className="space-y-1"><Label className="text-muted-foreground text-xs">Site Rate ($/hr)</Label><Input name="site_rate" type="number" step="0.01" defaultValue={editing?.site_rate ?? ""} className="bg-card border-border text-foreground" /></div>
-                <div className="space-y-1"><Label className="text-muted-foreground text-xs">Remote Rate ($/hr)</Label><Input name="remote_rate" type="number" step="0.01" defaultValue={editing?.remote_rate ?? ""} className="bg-card border-border text-foreground" /></div>
+                <div className="space-y-1"><Label className="text-muted-foreground text-xs">GSA Rate ($/hr)</Label><Input name="gsa_rate" type="number" step="0.01" defaultValue={editing?.gsa_rate ?? ""} className="border-border" /></div>
+                <div className="space-y-1"><Label className="text-muted-foreground text-xs">Site Rate ($/hr)</Label><Input name="site_rate" type="number" step="0.01" defaultValue={editing?.site_rate ?? ""} className="border-border" /></div>
+                <div className="space-y-1"><Label className="text-muted-foreground text-xs">Remote Rate ($/hr)</Label><Input name="remote_rate" type="number" step="0.01" defaultValue={editing?.remote_rate ?? ""} className="border-border" /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><Label className="text-muted-foreground text-xs">Min Education</Label><Input name="min_education" defaultValue={editing?.min_education || ""} placeholder="e.g. Bachelor's" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" /></div>
-                <div className="space-y-1"><Label className="text-muted-foreground text-xs">Min Years Experience</Label><Input name="min_years_experience" type="number" defaultValue={editing?.min_years_experience ?? ""} className="bg-card border-border text-foreground" /></div>
+                <div className="space-y-1"><Label className="text-muted-foreground text-xs">Min Education</Label><Input name="min_education" defaultValue={editing?.min_education || ""} placeholder="e.g. Bachelor's" className="border-border placeholder:text-muted-foreground/70" /></div>
+                <div className="space-y-1"><Label className="text-muted-foreground text-xs">Min Years Experience</Label><Input name="min_years_experience" type="number" defaultValue={editing?.min_years_experience ?? ""} className="border-border" /></div>
               </div>
-              <div className="space-y-1"><Label className="text-muted-foreground text-xs">Description</Label><Textarea name="description" defaultValue={editing?.description || ""} rows={2} className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" /></div>
+              <div className="space-y-1"><Label className="text-muted-foreground text-xs">Description</Label><Textarea name="description" defaultValue={editing?.description || ""} rows={2} className="border-border placeholder:text-muted-foreground/70" /></div>
               <div className="flex gap-2 justify-end">
                 <Button type="button" variant="ghost" onClick={() => { setDialogOpen(false); setEditing(null); }} className="text-muted-foreground hover:text-foreground hover:bg-accent">Cancel</Button>
                 <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white">{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{editing ? "Update" : "Create"}</Button>
@@ -450,16 +450,16 @@ function IndirectRateTab() {
               <div className="space-y-1">
                 <Label className="text-muted-foreground text-xs">Rate Type</Label>
                 <Select name="rate_type" defaultValue={editing?.rate_type || "fringe"}>
-                  <SelectTrigger className="bg-card border-border text-foreground"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="border-border"><SelectValue /></SelectTrigger>
                   <SelectContent className="bg-card border-border">{Object.entries(INDIRECT_RATE_TYPE_LABELS).map(([val, label]) => <SelectItem key={val} value={val}>{label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1"><Label className="text-muted-foreground text-xs">Rate Name</Label><Input name="rate_name" defaultValue={editing?.rate_name || ""} required className="bg-card border-border text-foreground" /></div>
+              <div className="space-y-1"><Label className="text-muted-foreground text-xs">Rate Name</Label><Input name="rate_name" defaultValue={editing?.rate_name || ""} required className="border-border" /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><Label className="text-muted-foreground text-xs">Percentage (%)</Label><Input name="percentage" type="number" step="0.01" defaultValue={editing?.percentage ?? ""} required className="bg-card border-border text-foreground" /></div>
-                <div className="space-y-1"><Label className="text-muted-foreground text-xs">Effective Date</Label><Input name="effective_date" type="date" defaultValue={editing?.effective_date || ""} className="bg-card border-border text-foreground" /></div>
+                <div className="space-y-1"><Label className="text-muted-foreground text-xs">Percentage (%)</Label><Input name="percentage" type="number" step="0.01" defaultValue={editing?.percentage ?? ""} required className="border-border" /></div>
+                <div className="space-y-1"><Label className="text-muted-foreground text-xs">Effective Date</Label><Input name="effective_date" type="date" defaultValue={editing?.effective_date || ""} className="border-border" /></div>
               </div>
-              <div className="space-y-1"><Label className="text-muted-foreground text-xs">Notes</Label><Textarea name="notes" defaultValue={editing?.notes || ""} rows={2} className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" /></div>
+              <div className="space-y-1"><Label className="text-muted-foreground text-xs">Notes</Label><Textarea name="notes" defaultValue={editing?.notes || ""} rows={2} className="border-border placeholder:text-muted-foreground/70" /></div>
               <div className="flex gap-2 justify-end">
                 <Button type="button" variant="ghost" onClick={() => { setDialogOpen(false); setEditing(null); }} className="text-muted-foreground hover:text-foreground hover:bg-accent">Cancel</Button>
                 <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white">{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{editing ? "Update" : "Create"}</Button>
@@ -548,8 +548,8 @@ function BOETemplateTab() {
             <DialogHeader><DialogTitle className="text-foreground">Create BOE Template</DialogTitle></DialogHeader>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><Label className="text-muted-foreground text-xs">Template Name</Label><Input value={newName} onChange={(e) => setNewName(e.target.value)} required className="bg-card border-border text-foreground" /></div>
-                <div className="space-y-1"><Label className="text-muted-foreground text-xs">Description</Label><Input value={newDescription} onChange={(e) => setNewDescription(e.target.value)} className="bg-card border-border text-foreground" /></div>
+                <div className="space-y-1"><Label className="text-muted-foreground text-xs">Template Name</Label><Input value={newName} onChange={(e) => setNewName(e.target.value)} required className="border-border" /></div>
+                <div className="space-y-1"><Label className="text-muted-foreground text-xs">Description</Label><Input value={newDescription} onChange={(e) => setNewDescription(e.target.value)} className="border-border" /></div>
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -559,10 +559,10 @@ function BOETemplateTab() {
                 <div className="space-y-2">
                   {newElements.map((el, i) => (
                     <div key={i} className="grid grid-cols-[80px_1fr_100px_120px_32px] gap-2 items-center">
-                      <Input value={el.wbs_id} onChange={(e) => updateElement(i, "wbs_id", e.target.value)} placeholder="WBS" className="bg-card border-border text-foreground font-mono text-xs" />
-                      <Input value={el.title} onChange={(e) => updateElement(i, "title", e.target.value)} placeholder="Task title" className="bg-card border-border text-foreground text-sm" />
-                      <Input type="number" value={el.default_hours || ""} onChange={(e) => updateElement(i, "default_hours", parseInt(e.target.value) || 0)} placeholder="Hours" className="bg-card border-border text-foreground text-sm" />
-                      <Input value={el.default_category_abbreviation} onChange={(e) => updateElement(i, "default_category_abbreviation", e.target.value)} placeholder="Cat abbrev" className="bg-card border-border text-foreground text-sm" />
+                      <Input value={el.wbs_id} onChange={(e) => updateElement(i, "wbs_id", e.target.value)} placeholder="WBS" className="border-border font-mono text-xs" />
+                      <Input value={el.title} onChange={(e) => updateElement(i, "title", e.target.value)} placeholder="Task title" className="border-border text-sm" />
+                      <Input type="number" value={el.default_hours || ""} onChange={(e) => updateElement(i, "default_hours", parseInt(e.target.value) || 0)} placeholder="Hours" className="border-border text-sm" />
+                      <Input value={el.default_category_abbreviation} onChange={(e) => updateElement(i, "default_category_abbreviation", e.target.value)} placeholder="Cat abbrev" className="border-border text-sm" />
                       <Button type="button" variant="ghost" size="sm" onClick={() => removeElement(i)} className="h-7 w-7 p-0 text-muted-foreground/70 hover:text-destructive hover:bg-accent"><X className="h-3 w-3" /></Button>
                     </div>
                   ))}

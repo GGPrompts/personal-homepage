@@ -404,7 +404,7 @@ export function ProposalEditorTab({ opportunityId, onNavigateTab, onBack }: TabP
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">Upload Document</Label>
                   <Select value={uploadDocType} onValueChange={(v) => setUploadDocType(v as ProposalDocType)}>
-                    <SelectTrigger className="bg-card border-border text-foreground text-xs h-8">
+                    <SelectTrigger className="border-border text-xs h-8">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-card border-border">
@@ -418,7 +418,7 @@ export function ProposalEditorTab({ opportunityId, onNavigateTab, onBack }: TabP
                       type="file"
                       onChange={handleFileUpload}
                       disabled={uploading}
-                      className="bg-card border-border text-foreground text-xs h-8 file:text-muted-foreground file:bg-transparent file:border-0 file:text-xs"
+                      className="border-border text-xs h-8 file:text-muted-foreground file:bg-transparent file:border-0 file:text-xs"
                     />
                     {uploading && <Loader2 className="absolute right-2 top-1.5 h-4 w-4 animate-spin text-muted-foreground/70" />}
                   </div>
@@ -473,7 +473,7 @@ export function ProposalEditorTab({ opportunityId, onNavigateTab, onBack }: TabP
                     value={editContent}
                     onChange={(e) => { setEditContent(e.target.value); setSaved(false); }}
                     rows={30}
-                    className="bg-card border-border text-foreground font-mono text-sm leading-relaxed placeholder:text-muted-foreground/70 resize-y min-h-[500px]"
+                    className="border-border font-mono text-sm leading-relaxed placeholder:text-muted-foreground/70 resize-y min-h-[500px]"
                     placeholder="Section content..."
                   />
                   <p className="text-xs text-muted-foreground/70 mt-2">

@@ -1,8 +1,6 @@
 {
-  "database": "dolt",
-  "jsonl_export": "issues.jsonl",
-  "backend": "dolt",
-  "dolt_mode": "server",
-  "dolt_server_port": 3307,
-  "dolt_database": "beads_personal-homepage"
+  "database": "postgres",
+  "backend": "postgres",
+  "postgres_url_env": "BD_POSTGRES_URL",
+  "postgres_schema": "beads"
 }

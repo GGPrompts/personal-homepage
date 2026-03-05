@@ -155,7 +155,13 @@ export default function GovHoundSection({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="p-6 space-y-4">
+      {/* Header */}
+      <div className="mb-2">
+        <h1 className="text-3xl font-bold font-mono gradient-text-theme terminal-glow">GovHound</h1>
+        <p className="text-muted-foreground">Federal contract scanner &amp; opportunity tracker</p>
+      </div>
+
       {/* Tab Navigation */}
       <div className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-border">
         {TABS.map((tab) => {

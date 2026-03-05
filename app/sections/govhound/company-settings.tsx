@@ -156,29 +156,29 @@ function GeneralTab({ form, setForm, saving, onSave }: { form: ProfileForm; setF
       <CardHeader><CardTitle className="text-foreground">Company Information</CardTitle></CardHeader>
       <CardContent className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2"><Label htmlFor="name" className="text-muted-foreground">Company Name *</Label><Input id="name" value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="Acme Federal Solutions" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" /></div>
-          <div className="space-y-2"><Label htmlFor="website" className="text-muted-foreground">Website</Label><Input id="website" value={form.website} onChange={(e) => update("website", e.target.value)} placeholder="https://example.com" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" /></div>
+          <div className="space-y-2"><Label htmlFor="name" className="text-muted-foreground">Company Name *</Label><Input id="name" value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="Acme Federal Solutions" className="border-border placeholder:text-muted-foreground/70" /></div>
+          <div className="space-y-2"><Label htmlFor="website" className="text-muted-foreground">Website</Label><Input id="website" value={form.website} onChange={(e) => update("website", e.target.value)} placeholder="https://example.com" className="border-border placeholder:text-muted-foreground/70" /></div>
         </div>
         <Separator className="bg-border" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2"><Label htmlFor="uei" className="text-muted-foreground">UEI</Label><Input id="uei" value={form.uei} onChange={(e) => update("uei", e.target.value)} placeholder="Unique Entity ID" className="bg-card border-border text-foreground font-mono placeholder:text-muted-foreground/70" /></div>
-          <div className="space-y-2"><Label htmlFor="cage_code" className="text-muted-foreground">CAGE Code</Label><Input id="cage_code" value={form.cage_code} onChange={(e) => update("cage_code", e.target.value)} placeholder="5-character code" className="bg-card border-border text-foreground font-mono placeholder:text-muted-foreground/70" /></div>
-          <div className="space-y-2"><Label htmlFor="duns" className="text-muted-foreground">DUNS</Label><Input id="duns" value={form.duns} onChange={(e) => update("duns", e.target.value)} placeholder="DUNS number" className="bg-card border-border text-foreground font-mono placeholder:text-muted-foreground/70" /></div>
+          <div className="space-y-2"><Label htmlFor="uei" className="text-muted-foreground">UEI</Label><Input id="uei" value={form.uei} onChange={(e) => update("uei", e.target.value)} placeholder="Unique Entity ID" className="border-border font-mono placeholder:text-muted-foreground/70" /></div>
+          <div className="space-y-2"><Label htmlFor="cage_code" className="text-muted-foreground">CAGE Code</Label><Input id="cage_code" value={form.cage_code} onChange={(e) => update("cage_code", e.target.value)} placeholder="5-character code" className="border-border font-mono placeholder:text-muted-foreground/70" /></div>
+          <div className="space-y-2"><Label htmlFor="duns" className="text-muted-foreground">DUNS</Label><Input id="duns" value={form.duns} onChange={(e) => update("duns", e.target.value)} placeholder="DUNS number" className="border-border font-mono placeholder:text-muted-foreground/70" /></div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label htmlFor="sam_status" className="text-muted-foreground">SAM.gov Status</Label>
             <Select value={form.sam_status} onValueChange={(v) => update("sam_status", v)}>
-              <SelectTrigger className="bg-card border-border text-foreground"><SelectValue placeholder="Select status" /></SelectTrigger>
+              <SelectTrigger className="border-border"><SelectValue placeholder="Select status" /></SelectTrigger>
               <SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="inactive">Inactive</SelectItem><SelectItem value="pending">Pending</SelectItem></SelectContent>
             </Select>
           </div>
-          <div className="space-y-2"><Label htmlFor="sam_expiration" className="text-muted-foreground">SAM Expiration</Label><Input id="sam_expiration" type="date" value={form.sam_expiration} onChange={(e) => update("sam_expiration", e.target.value)} className="bg-card border-border text-foreground" /></div>
-          <div className="space-y-2"><Label htmlFor="founded_date" className="text-muted-foreground">Founded Date</Label><Input id="founded_date" type="date" value={form.founded_date} onChange={(e) => update("founded_date", e.target.value)} className="bg-card border-border text-foreground" /></div>
+          <div className="space-y-2"><Label htmlFor="sam_expiration" className="text-muted-foreground">SAM Expiration</Label><Input id="sam_expiration" type="date" value={form.sam_expiration} onChange={(e) => update("sam_expiration", e.target.value)} className="border-border" /></div>
+          <div className="space-y-2"><Label htmlFor="founded_date" className="text-muted-foreground">Founded Date</Label><Input id="founded_date" type="date" value={form.founded_date} onChange={(e) => update("founded_date", e.target.value)} className="border-border" /></div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2"><Label htmlFor="primary_naics" className="text-muted-foreground">Primary NAICS Code</Label><Input id="primary_naics" value={form.primary_naics} onChange={(e) => update("primary_naics", e.target.value)} placeholder="e.g. 541512" className="bg-card border-border text-foreground font-mono placeholder:text-muted-foreground/70" /></div>
-          <div className="space-y-2"><Label htmlFor="size_standard" className="text-muted-foreground">Size Standard</Label><Input id="size_standard" value={form.size_standard} onChange={(e) => update("size_standard", e.target.value)} placeholder="e.g. Small Business" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" /></div>
+          <div className="space-y-2"><Label htmlFor="primary_naics" className="text-muted-foreground">Primary NAICS Code</Label><Input id="primary_naics" value={form.primary_naics} onChange={(e) => update("primary_naics", e.target.value)} placeholder="e.g. 541512" className="border-border font-mono placeholder:text-muted-foreground/70" /></div>
+          <div className="space-y-2"><Label htmlFor="size_standard" className="text-muted-foreground">Size Standard</Label><Input id="size_standard" value={form.size_standard} onChange={(e) => update("size_standard", e.target.value)} placeholder="e.g. Small Business" className="border-border placeholder:text-muted-foreground/70" /></div>
         </div>
         <div className="flex justify-end">
           <Button onClick={onSave} disabled={saving} className="bg-primary hover:bg-primary/90 text-white">
@@ -226,15 +226,15 @@ function CertificationsTab({ companyId, certifications, onRefresh, onError, onSu
               <div className="space-y-2">
                 <Label className="text-muted-foreground">Type *</Label>
                 <Select value={newCert.cert_type} onValueChange={(v) => setNewCert({ ...newCert, cert_type: v as CertType })}>
-                  <SelectTrigger className="bg-card border-border text-foreground"><SelectValue placeholder="Select certification" /></SelectTrigger>
+                  <SelectTrigger className="border-border"><SelectValue placeholder="Select certification" /></SelectTrigger>
                   <SelectContent>{Object.entries(CERT_TYPE_LABELS).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2"><Label className="text-muted-foreground">Certificate Number</Label><Input value={newCert.cert_number} onChange={(e) => setNewCert({ ...newCert, cert_number: e.target.value })} placeholder="Certificate #" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" /></div>
+              <div className="space-y-2"><Label className="text-muted-foreground">Certificate Number</Label><Input value={newCert.cert_number} onChange={(e) => setNewCert({ ...newCert, cert_number: e.target.value })} placeholder="Certificate #" className="border-border placeholder:text-muted-foreground/70" /></div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label className="text-muted-foreground">Issued Date</Label><Input type="date" value={newCert.issued_date} onChange={(e) => setNewCert({ ...newCert, issued_date: e.target.value })} className="bg-card border-border text-foreground" /></div>
-              <div className="space-y-2"><Label className="text-muted-foreground">Expiration Date</Label><Input type="date" value={newCert.expiration_date} onChange={(e) => setNewCert({ ...newCert, expiration_date: e.target.value })} className="bg-card border-border text-foreground" /></div>
+              <div className="space-y-2"><Label className="text-muted-foreground">Issued Date</Label><Input type="date" value={newCert.issued_date} onChange={(e) => setNewCert({ ...newCert, issued_date: e.target.value })} className="border-border" /></div>
+              <div className="space-y-2"><Label className="text-muted-foreground">Expiration Date</Label><Input type="date" value={newCert.expiration_date} onChange={(e) => setNewCert({ ...newCert, expiration_date: e.target.value })} className="border-border" /></div>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={() => setAdding(false)} className="text-muted-foreground">Cancel</Button>
@@ -293,8 +293,8 @@ function NaicsTab({ companyId, naicsCodes, onRefresh, onError, onSuccess }: { co
         {adding && companyId && (
           <div className="rounded-lg border border-border bg-card p-4 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2"><Label className="text-muted-foreground">NAICS Code *</Label><Input value={newNaics.naics_code} onChange={(e) => setNewNaics({ ...newNaics, naics_code: e.target.value })} placeholder="e.g. 541512" className="bg-card border-border text-foreground font-mono placeholder:text-muted-foreground/70" /></div>
-              <div className="space-y-2"><Label className="text-muted-foreground">Size Standard</Label><Input value={newNaics.size_standard_value} onChange={(e) => setNewNaics({ ...newNaics, size_standard_value: e.target.value })} placeholder="e.g. $30M" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" /></div>
+              <div className="space-y-2"><Label className="text-muted-foreground">NAICS Code *</Label><Input value={newNaics.naics_code} onChange={(e) => setNewNaics({ ...newNaics, naics_code: e.target.value })} placeholder="e.g. 541512" className="border-border font-mono placeholder:text-muted-foreground/70" /></div>
+              <div className="space-y-2"><Label className="text-muted-foreground">Size Standard</Label><Input value={newNaics.size_standard_value} onChange={(e) => setNewNaics({ ...newNaics, size_standard_value: e.target.value })} placeholder="e.g. $30M" className="border-border placeholder:text-muted-foreground/70" /></div>
               <div className="flex items-end space-x-2 pb-0.5">
                 <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
                   <input type="checkbox" checked={newNaics.is_primary} onChange={(e) => setNewNaics({ ...newNaics, is_primary: e.target.checked })} className="rounded border-border" />
@@ -359,9 +359,9 @@ function VehiclesTab({ companyId, vehicles, onRefresh, onError, onSuccess }: { c
         {adding && companyId && (
           <div className="rounded-lg border border-border bg-card p-4 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2"><Label className="text-muted-foreground">Vehicle Name *</Label><Input value={newVehicle.vehicle_name} onChange={(e) => setNewVehicle({ ...newVehicle, vehicle_name: e.target.value })} placeholder="e.g. GSA MAS" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" /></div>
-              <div className="space-y-2"><Label className="text-muted-foreground">Contract Number</Label><Input value={newVehicle.contract_number} onChange={(e) => setNewVehicle({ ...newVehicle, contract_number: e.target.value })} placeholder="Contract #" className="bg-card border-border text-foreground font-mono placeholder:text-muted-foreground/70" /></div>
-              <div className="space-y-2"><Label className="text-muted-foreground">Ordering Period End</Label><Input type="date" value={newVehicle.ordering_period_end} onChange={(e) => setNewVehicle({ ...newVehicle, ordering_period_end: e.target.value })} className="bg-card border-border text-foreground" /></div>
+              <div className="space-y-2"><Label className="text-muted-foreground">Vehicle Name *</Label><Input value={newVehicle.vehicle_name} onChange={(e) => setNewVehicle({ ...newVehicle, vehicle_name: e.target.value })} placeholder="e.g. GSA MAS" className="border-border placeholder:text-muted-foreground/70" /></div>
+              <div className="space-y-2"><Label className="text-muted-foreground">Contract Number</Label><Input value={newVehicle.contract_number} onChange={(e) => setNewVehicle({ ...newVehicle, contract_number: e.target.value })} placeholder="Contract #" className="border-border font-mono placeholder:text-muted-foreground/70" /></div>
+              <div className="space-y-2"><Label className="text-muted-foreground">Ordering Period End</Label><Input type="date" value={newVehicle.ordering_period_end} onChange={(e) => setNewVehicle({ ...newVehicle, ordering_period_end: e.target.value })} className="border-border" /></div>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={() => setAdding(false)} className="text-muted-foreground">Cancel</Button>
@@ -427,25 +427,25 @@ function TeamTab({ companyId, members, onRefresh, onError, onSuccess }: { compan
         {adding && companyId && (
           <div className="rounded-lg border border-border bg-card p-4 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2"><Label className="text-muted-foreground">Name *</Label><Input value={newMember.name} onChange={(e) => setNewMember({ ...newMember, name: e.target.value })} placeholder="Full name" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" /></div>
-              <div className="space-y-2"><Label className="text-muted-foreground">Title</Label><Input value={newMember.title} onChange={(e) => setNewMember({ ...newMember, title: e.target.value })} placeholder="e.g. Senior Developer" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" /></div>
-              <div className="space-y-2"><Label className="text-muted-foreground">Role</Label><Input value={newMember.role} onChange={(e) => setNewMember({ ...newMember, role: e.target.value })} placeholder="e.g. Tech Lead" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" /></div>
+              <div className="space-y-2"><Label className="text-muted-foreground">Name *</Label><Input value={newMember.name} onChange={(e) => setNewMember({ ...newMember, name: e.target.value })} placeholder="Full name" className="border-border placeholder:text-muted-foreground/70" /></div>
+              <div className="space-y-2"><Label className="text-muted-foreground">Title</Label><Input value={newMember.title} onChange={(e) => setNewMember({ ...newMember, title: e.target.value })} placeholder="e.g. Senior Developer" className="border-border placeholder:text-muted-foreground/70" /></div>
+              <div className="space-y-2"><Label className="text-muted-foreground">Role</Label><Input value={newMember.role} onChange={(e) => setNewMember({ ...newMember, role: e.target.value })} placeholder="e.g. Tech Lead" className="border-border placeholder:text-muted-foreground/70" /></div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label className="text-muted-foreground">Clearance Level</Label>
                 <Select value={newMember.clearance_level} onValueChange={(v) => setNewMember({ ...newMember, clearance_level: v as ClearanceLevel })}>
-                  <SelectTrigger className="bg-card border-border text-foreground"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="border-border"><SelectValue /></SelectTrigger>
                   <SelectContent>{Object.entries(CLEARANCE_LABELS).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2"><Label className="text-muted-foreground">Years Experience</Label><Input type="number" value={newMember.years_experience} onChange={(e) => setNewMember({ ...newMember, years_experience: e.target.value })} placeholder="e.g. 10" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" /></div>
+              <div className="space-y-2"><Label className="text-muted-foreground">Years Experience</Label><Input type="number" value={newMember.years_experience} onChange={(e) => setNewMember({ ...newMember, years_experience: e.target.value })} placeholder="e.g. 10" className="border-border placeholder:text-muted-foreground/70" /></div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label className="text-muted-foreground">Certifications <span className="text-muted-foreground/70">(comma-separated)</span></Label><Input value={newMember.certifications} onChange={(e) => setNewMember({ ...newMember, certifications: e.target.value })} placeholder="e.g. PMP, AWS SA Pro, CISSP" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" /></div>
-              <div className="space-y-2"><Label className="text-muted-foreground">Skills <span className="text-muted-foreground/70">(comma-separated)</span></Label><Input value={newMember.skills} onChange={(e) => setNewMember({ ...newMember, skills: e.target.value })} placeholder="e.g. Python, AWS, Terraform, React" className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" /></div>
+              <div className="space-y-2"><Label className="text-muted-foreground">Certifications <span className="text-muted-foreground/70">(comma-separated)</span></Label><Input value={newMember.certifications} onChange={(e) => setNewMember({ ...newMember, certifications: e.target.value })} placeholder="e.g. PMP, AWS SA Pro, CISSP" className="border-border placeholder:text-muted-foreground/70" /></div>
+              <div className="space-y-2"><Label className="text-muted-foreground">Skills <span className="text-muted-foreground/70">(comma-separated)</span></Label><Input value={newMember.skills} onChange={(e) => setNewMember({ ...newMember, skills: e.target.value })} placeholder="e.g. Python, AWS, Terraform, React" className="border-border placeholder:text-muted-foreground/70" /></div>
             </div>
-            <div className="space-y-2"><Label className="text-muted-foreground">Bio</Label><Textarea value={newMember.bio} onChange={(e) => setNewMember({ ...newMember, bio: e.target.value })} placeholder="Brief professional summary..." rows={3} className="bg-card border-border text-foreground placeholder:text-muted-foreground/70" /></div>
+            <div className="space-y-2"><Label className="text-muted-foreground">Bio</Label><Textarea value={newMember.bio} onChange={(e) => setNewMember({ ...newMember, bio: e.target.value })} placeholder="Brief professional summary..." rows={3} className="border-border placeholder:text-muted-foreground/70" /></div>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={() => setAdding(false)} className="text-muted-foreground">Cancel</Button>
               <Button size="sm" onClick={addMember} disabled={saving} className="bg-primary hover:bg-primary/90 text-white">{saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}Save</Button>

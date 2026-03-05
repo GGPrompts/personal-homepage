@@ -49,9 +49,10 @@ interface SamOpportunity {
   typeOfSetAside?: string;
   description?: string;
   placeOfPerformance?: {
-    city?: string;
-    state?: string;
-    country?: string;
+    streetAddress?: string;
+    city?: string | { code?: string; name?: string };
+    state?: string | { code?: string; name?: string };
+    country?: string | { code?: string; name?: string };
     zip?: string;
   };
   award?: {
@@ -89,6 +90,13 @@ function getApiKey(): string {
   return key;
 }
 
+function formatDateForSam(date: Date): string {
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const yyyy = date.getFullYear();
+  return `${mm}/${dd}/${yyyy}`;
+}
+
 function buildSearchUrl(params: ScanParams, offset = 0, limit = 25): string {
   const url = new URL(SAM_API_BASE);
 
@@ -108,13 +116,13 @@ function buildSearchUrl(params: ScanParams, offset = 0, limit = 25): string {
     url.searchParams.set("typeOfSetAside", params.set_aside_types.join(","));
   }
 
-  if (params.date_from) {
-    url.searchParams.set("postedFrom", params.date_from);
-  }
+  // postedFrom and postedTo are required by SAM.gov API
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  if (params.date_to) {
-    url.searchParams.set("postedTo", params.date_to);
-  }
+  url.searchParams.set("postedFrom", params.date_from || formatDateForSam(thirtyDaysAgo));
+  url.searchParams.set("postedTo", params.date_to || formatDateForSam(now));
 
   if (params.agency) {
     url.searchParams.set("deptname", params.agency);
@@ -130,11 +138,21 @@ function buildSearchUrl(params: ScanParams, offset = 0, limit = 25): string {
   return url.toString();
 }
 
+function extractName(field: unknown): string | null {
+  if (!field) return null;
+  if (typeof field === "string") return field;
+  if (typeof field === "object" && field !== null && "name" in field) {
+    return (field as { name?: string }).name || null;
+  }
+  return null;
+}
+
 function formatPlaceOfPerformance(
   pop?: SamOpportunity["placeOfPerformance"]
 ): string | null {
   if (!pop) return null;
-  const parts = [pop.city, pop.state, pop.country].filter(Boolean);
+  if (pop.streetAddress) return pop.streetAddress;
+  const parts = [extractName(pop.city), extractName(pop.state), extractName(pop.country)].filter(Boolean);
   return parts.length > 0 ? parts.join(", ") : null;
 }
 

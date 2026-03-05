@@ -3,6 +3,11 @@
 @tailwind utilities;
 
 @layer base {
+  /* Dark color scheme for native inputs (date pickers, etc.) */
+  :root {
+    color-scheme: dark;
+  }
+
   /* ===== TERMINAL THEME (Default) ===== */
   :root {
     /* Core colors */
