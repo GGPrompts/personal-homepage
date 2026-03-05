@@ -36,8 +36,8 @@ export async function callClaude(
       args.push("--system-prompt", systemPrompt);
     }
 
-    args.push("--max-turns", "1");
-    args.push("-p", prompt);
+    // Prompt is passed as a positional argument
+    args.push(prompt);
 
     const env = { ...process.env };
     // Unset API key to force Max subscription auth
