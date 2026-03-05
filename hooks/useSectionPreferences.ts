@@ -26,7 +26,7 @@ import {
 } from "lucide-react"
 
 // Section IDs that can be toggled (excluding home and settings which are always visible)
-export type ToggleableSection = "weather" | "feed" | "api-playground" | "bookmarks" | "search" | "stocks" | "crypto" | "spacex" | "github-activity" | "disasters" | "tasks" | "projects" | "jobs" | "profile" | "ai-workspace" | "market-pulse" | "kanban" | "photo-gallery" | "music-player" | "video-player" | "files" | "analytics" | "flowchart" | "email" | "calendar"
+export type ToggleableSection = "weather" | "feed" | "api-playground" | "bookmarks" | "search" | "stocks" | "crypto" | "spacex" | "github-activity" | "disasters" | "tasks" | "projects" | "jobs" | "profile" | "ai-workspace" | "market-pulse" | "kanban" | "photo-gallery" | "music-player" | "video-player" | "files" | "analytics" | "flowchart" | "email" | "calendar" | "govhound"
 
 // All sections including non-toggleable ones
 export type Section = "home" | ToggleableSection | "settings"
@@ -148,6 +148,7 @@ export const DEFAULT_CATEGORY_ASSIGNMENTS: Record<ToggleableSection, CategoryId>
   flowchart: "development",
   email: "productivity",
   calendar: "productivity",
+  govhound: "productivity",
 }
 
 // Default collapsed state (all expanded)
@@ -187,6 +188,7 @@ export const DEFAULT_SECTION_ORDER: ToggleableSection[] = [
   "music-player",
   "flowchart",
   "calendar",
+  "govhound",
 ]
 
 // Default visibility (all visible except media players which are opt-in)
@@ -216,6 +218,7 @@ export const DEFAULT_VISIBILITY: Record<ToggleableSection, boolean> = {
   "music-player": false,
   flowchart: true,
   calendar: true,
+  govhound: true,
 }
 
 const STORAGE_KEY = "section-preferences"
@@ -262,6 +265,7 @@ export const DEFAULT_SECTION_AGENTS: Record<ToggleableSection, string | null> = 
   "music-player": null,
   flowchart: null,
   calendar: null,
+  govhound: null,
 }
 
 function loadPreferences(): SectionPreferences {

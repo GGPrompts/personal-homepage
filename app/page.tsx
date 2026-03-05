@@ -38,6 +38,7 @@ import {
   GitBranch,
   Mail,
   Calendar,
+  Shield,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -98,6 +99,7 @@ import FlowchartSection from "./sections/flowchart"
 import EmailSection from "./sections/email"
 import CalendarSection from "./sections/calendar"
 import SettingsSection from "./sections/settings"
+import GovHoundSection from "./sections/govhound"
 import { MusicPlayerSection } from "./sections/music-player"
 import dynamic from "next/dynamic"
 import { useLoginTrigger } from "@/hooks/useLoginTrigger"
@@ -154,6 +156,7 @@ const navigationItems: NavigationItem[] = [
   { id: "flowchart", label: "Flowchart", icon: GitBranch, description: "Workflow designer" },
   { id: "music-player", label: "Music Player", icon: Music, description: "Synthwave music player" },
   { id: "video-player", label: "Video Player", icon: Video, description: "Media playback" },
+  { id: "govhound", label: "GovHound", icon: Shield, description: "Federal IT contracts" },
   { id: "profile", label: "Profile", icon: User, description: "Account & sync" },
   { id: "settings", label: "Settings", icon: Settings, description: "Theme & preferences" },
 ]
@@ -776,6 +779,7 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
             "music-player": { icon: Music, label: "Music Player", description: "Synthwave music player" },
             "video-player": { icon: Video, label: "Video Player", description: "Media playback" },
             profile: { icon: User, label: "Profile", description: "Account & sync status" },
+            govhound: { icon: Shield, label: "GovHound", description: "Federal IT contracts" },
           }
 
           const config = tileConfig[sectionId]
@@ -985,6 +989,11 @@ export default function PersonalHomepage() {
         return <MusicPlayerSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "video-player":
         return <VideoPlayerSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "govhound":
+        if (!isLocal) {
+          return <LocalOnlyOverlay sectionName="GovHound" description="This feature uses Claude CLI for AI analysis and requires localhost to run." />
+        }
+        return <GovHoundSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "profile":
         return <ProfileSection />
       case "settings":

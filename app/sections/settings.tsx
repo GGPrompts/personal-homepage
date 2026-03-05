@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   XCircle,
   Cloud,
+  Shield,
   TrendingUp,
   Github,
   Terminal,
@@ -622,6 +623,7 @@ function ApiKeysTab() {
   const [alphaVantageKey, setAlphaVantageKey] = React.useState(() => getStoredApiKey("alpha-vantage-api-key"))
   const [spotifyClientId, setSpotifyClientId] = React.useState(() => getStoredApiKey("spotify-client-id"))
   const [youtubeKey, setYoutubeKey] = React.useState(() => getStoredApiKey("youtube-api-key"))
+  const [samGovKey, setSamGovKey] = React.useState(() => getStoredApiKey("sam-gov-api-key"))
 
   // Test states
   const [testingFinnhub, setTestingFinnhub] = React.useState(false)
@@ -645,6 +647,10 @@ function ApiKeysTab() {
   React.useEffect(() => {
     setStoredApiKey("youtube-api-key", youtubeKey)
   }, [youtubeKey])
+
+  React.useEffect(() => {
+    setStoredApiKey("sam-gov-api-key", samGovKey)
+  }, [samGovKey])
 
   // Test Finnhub API key
   const testFinnhub = async () => {
@@ -745,6 +751,17 @@ function ApiKeysTab() {
       note: "Free tier: 10,000 units/day. Search: 100 units, Video/Playlist: 1 unit",
       testable: true,
     },
+    {
+      id: "sam-gov",
+      name: "SAM.gov",
+      description: "Federal contract opportunities for GovHound scanner",
+      storageKey: "sam-gov-api-key",
+      icon: Shield,
+      docsUrl: "https://sam.gov/content/entity-registration",
+      linkText: "Register for API key",
+      envVar: "SAM_GOV_API_KEY",
+      note: "Required for GovHound contract scanning. Free API key from SAM.gov.",
+    },
   ]
 
   const getKeyValue = (id: string): string => {
@@ -753,6 +770,7 @@ function ApiKeysTab() {
       case "alpha-vantage": return alphaVantageKey
       case "spotify": return spotifyClientId
       case "youtube": return youtubeKey
+      case "sam-gov": return samGovKey
       default: return ""
     }
   }
@@ -763,6 +781,7 @@ function ApiKeysTab() {
       case "alpha-vantage": setAlphaVantageKey(value); break
       case "spotify": setSpotifyClientId(value); break
       case "youtube": setYoutubeKey(value); break
+      case "sam-gov": setSamGovKey(value); break
     }
   }
 
