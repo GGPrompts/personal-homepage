@@ -173,8 +173,9 @@ export function FileTree({
       try {
         const params = new URLSearchParams({
           path: basePath,
-          depth: maxDepth.toString(),
+          depth: '2',
           showHidden: showHidden.toString(),
+          includeGitStatus: 'true',
         })
         const response = await fetch(`/api/files/tree?${params}`)
 
@@ -188,12 +189,15 @@ export function FileTree({
         const data = await response.json()
         if (cancelled) return
 
-        setFileTree(data)
-        setFileTreePath(data.path)
-        setExpandedFolders(new Set([data.path]))
+        setFileTree(data.tree)
+        setFileTreePath(data.tree.path)
+        setExpandedFolders(new Set([data.tree.path]))
 
-        // Fetch git status after tree loads
-        fetchGitStatus(data.path)
+        // Use git status from combined response
+        if (data.gitStatus) {
+          setIsGitRepo(data.gitStatus.isGitRepo)
+          setGitStatus(data.gitStatus.files || {})
+        }
       } catch (err: unknown) {
         if (cancelled) return
         const errorMessage = err instanceof Error ? err.message : 'Failed to load files'
@@ -229,8 +233,9 @@ export function FileTree({
       try {
         const params = new URLSearchParams({
           path: pendingTreeNavigation,
-          depth: maxDepth.toString(),
+          depth: '2',
           showHidden: showHidden.toString(),
+          includeGitStatus: 'true',
         })
         const response = await fetch(`/api/files/tree?${params}`)
 
@@ -240,13 +245,16 @@ export function FileTree({
         }
 
         const data = await response.json()
-        setFileTree(data)
-        setFileTreePath(data.path)
-        setExpandedFolders(new Set([data.path]))
+        setFileTree(data.tree)
+        setFileTreePath(data.tree.path)
+        setExpandedFolders(new Set([data.tree.path]))
         hasFetchedRef.current = true
 
-        // Fetch git status for new location
-        fetchGitStatus(pendingTreeNavigation)
+        // Use git status from combined response
+        if (data.gitStatus) {
+          setIsGitRepo(data.gitStatus.isGitRepo)
+          setGitStatus(data.gitStatus.files || {})
+        }
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load files'
         setError(errorMessage)
@@ -256,7 +264,7 @@ export function FileTree({
     }
 
     navigateToPath()
-  }, [pendingTreeNavigation, clearPendingNavigation, maxDepth, showHidden, setFileTree, setFileTreePath, fetchGitStatus])
+  }, [pendingTreeNavigation, clearPendingNavigation, maxDepth, showHidden, setFileTree, setFileTreePath])
 
   // Sync tree when basePath (working dir) changes from sidebar
   // This allows users to navigate by changing the global working directory
@@ -279,6 +287,7 @@ export function FileTree({
           path: basePath,
           depth: maxDepth.toString(),
           showHidden: showHidden.toString(),
+          includeGitStatus: 'true',
         })
         const response = await fetch(`/api/files/tree?${params}`)
 
@@ -288,12 +297,15 @@ export function FileTree({
         }
 
         const data = await response.json()
-        setFileTree(data)
-        setFileTreePath(data.path)
-        setExpandedFolders(new Set([data.path]))
+        setFileTree(data.tree)
+        setFileTreePath(data.tree.path)
+        setExpandedFolders(new Set([data.tree.path]))
         hasFetchedRef.current = true
 
-        fetchGitStatus(data.path)
+        if (data.gitStatus) {
+          setIsGitRepo(data.gitStatus.isGitRepo)
+          setGitStatus(data.gitStatus.files || {})
+        }
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load files'
         setError(errorMessage)
@@ -303,7 +315,7 @@ export function FileTree({
     }
 
     syncToBasePath()
-  }, [basePath, maxDepth, showHidden, setFileTree, setFileTreePath, fetchGitStatus])
+  }, [basePath, maxDepth, showHidden, setFileTree, setFileTreePath])
 
   // Toggle folder expansion with lazy loading
   const toggleFolder = useCallback((path: string, hasChildren: boolean) => {
@@ -557,6 +569,7 @@ export function FileTree({
           path,
           depth: maxDepth.toString(),
           showHidden: showHidden.toString(),
+          includeGitStatus: 'true',
         })
         const response = await fetch(`/api/files/tree?${params}`)
 
@@ -566,13 +579,16 @@ export function FileTree({
         }
 
         const data = await response.json()
-        setFileTree(data)
-        setFileTreePath(data.path)
-        setExpandedFolders(new Set([data.path]))
+        setFileTree(data.tree)
+        setFileTreePath(data.tree.path)
+        setExpandedFolders(new Set([data.tree.path]))
         hasFetchedRef.current = true
 
-        // Fetch git status for new location
-        fetchGitStatus(path)
+        // Use git status from combined response
+        if (data.gitStatus) {
+          setIsGitRepo(data.gitStatus.isGitRepo)
+          setGitStatus(data.gitStatus.files || {})
+        }
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load files'
         setError(errorMessage)
@@ -582,7 +598,7 @@ export function FileTree({
     }
 
     doNavigate()
-  }, [fileTree?.path, maxDepth, showHidden, setFileTree, setFileTreePath, fetchGitStatus])
+  }, [fileTree?.path, maxDepth, showHidden, setFileTree, setFileTreePath])
 
   // Keyboard navigation handler
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -764,6 +780,7 @@ export function FileTree({
         path: currentPath,
         depth: maxDepth.toString(),
         showHidden: showHidden.toString(),
+        includeGitStatus: 'true',
       })
       const response = await fetch(`/api/files/tree?${params}`)
 
@@ -773,20 +790,23 @@ export function FileTree({
       }
 
       const data = await response.json()
-      setFileTree(data)
-      setFileTreePath(data.path)
-      setExpandedFolders(new Set([data.path]))
+      setFileTree(data.tree)
+      setFileTreePath(data.tree.path)
+      setExpandedFolders(new Set([data.tree.path]))
       hasFetchedRef.current = true
 
-      // Refresh git status too
-      fetchGitStatus(data.path)
+      // Use git status from combined response
+      if (data.gitStatus) {
+        setIsGitRepo(data.gitStatus.isGitRepo)
+        setGitStatus(data.gitStatus.files || {})
+      }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load files'
       setError(errorMessage)
     } finally {
       setLoading(false)
     }
-  }, [currentPath, maxDepth, showHidden, setFileTree, setFileTreePath, fetchGitStatus])
+  }, [currentPath, maxDepth, showHidden, setFileTree, setFileTreePath])
 
   return (
     <div className={cn('flex h-full flex-col', className)}>

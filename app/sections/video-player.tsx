@@ -1040,7 +1040,7 @@ export default function VideoPlayerSection({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              className={`relative bg-black rounded-xl overflow-hidden ${
+              className={`group/player relative bg-black rounded-xl overflow-hidden ${
                 isTheaterMode ? "aspect-video max-h-[85vh]" : "aspect-video"
               }`}
               onDoubleClick={toggleFullscreen}
@@ -1252,7 +1252,7 @@ export default function VideoPlayerSection({
 
               {/* Source Info Badge */}
               {videoSource.type !== 'none' && !showSourceInput && (
-                <div className="absolute top-4 right-4 flex items-center gap-2">
+                <div className="absolute top-4 right-4 flex items-center gap-2 opacity-0 group-hover/player:opacity-100 transition-opacity duration-300">
                   <Badge variant="secondary" className="glass text-xs max-w-[200px] truncate">
                     {videoSource.type === 'youtube' ? 'YouTube' : videoSource.fileName || 'URL'}
                   </Badge>

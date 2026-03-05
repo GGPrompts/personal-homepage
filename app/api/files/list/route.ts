@@ -83,6 +83,20 @@ function getClaudeFileType(name: string, filePath: string): string | null {
   return null
 }
 
+// Concurrency-limited parallel map to avoid file descriptor exhaustion
+async function parallelMap<T, R>(items: T[], fn: (item: T) => Promise<R>, concurrency: number = 10): Promise<R[]> {
+  const results: R[] = []
+  let index = 0
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (index < items.length) {
+      const i = index++
+      results[i] = await fn(items[i])
+    }
+  })
+  await Promise.all(workers)
+  return results
+}
+
 // Helper to build a filtered tree (only including matching files, but preserving folder structure)
 async function buildFilteredTree(
   dirPath: string,
@@ -114,7 +128,6 @@ async function buildFilteredTree(
     }
 
     const entries = await fs.readdir(dirPath, { withFileTypes: true })
-    const children: FileTreeNode[] = []
 
     // Sort: directories first, then alphabetically
     const sortedEntries = entries
@@ -134,7 +147,7 @@ async function buildFilteredTree(
         return a.name.localeCompare(b.name)
       })
 
-    for (const entry of sortedEntries) {
+    const childResults = await parallelMap(sortedEntries, async (entry) => {
       const childPath = path.join(dirPath, entry.name)
 
       // Handle symlinks
@@ -142,21 +155,20 @@ async function buildFilteredTree(
         try {
           await fs.stat(childPath)
         } catch {
-          continue // Broken symlink
+          return null // Broken symlink
         }
       }
 
-      const child = await buildFilteredTree(
+      return await buildFilteredTree(
         childPath,
         matcher,
         maxDepth,
         currentDepth + 1,
         showHidden
       )
-      if (child) {
-        children.push(child)
-      }
-    }
+    }, 10)
+
+    const children = childResults.filter((child): child is FileTreeNode => child !== null)
 
     // Only include directory if it has matching children
     if (children.length > 0) {
