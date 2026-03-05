@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get("status")
   const priority = searchParams.get("priority")
   const limit = searchParams.get("limit") || "0" // 0 = unlimited
+  const prefix = searchParams.get("prefix")
 
   try {
     const issues = await listIssues({
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
       status: status || undefined,
       priority: priority ? Number(priority) : undefined,
       limit: Number(limit) || undefined,
+      prefix: prefix || undefined,
     })
 
     return NextResponse.json({

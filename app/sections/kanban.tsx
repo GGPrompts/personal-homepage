@@ -9,13 +9,21 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
-import { FolderOpen, ChevronDown, X, Check, Pencil, Globe } from "lucide-react"
+import { FolderOpen, ChevronDown, X, Check, Pencil, Globe, Layers } from "lucide-react"
 import { useWorkingDirectory } from "@/hooks/useWorkingDirectory"
 
 const STORAGE_KEY_WORKSPACE = "kanban-workspace"
 const STORAGE_KEY_WORKSPACE_HISTORY = "kanban-workspace-history"
+const STORAGE_KEY_PROJECT = "kanban-project-prefix"
 const MAX_HISTORY = 10
+
+interface BeadsProject {
+  prefix: string
+  name: string
+  description: string
+}
 
 interface KanbanSectionProps {
   activeSubItem?: string | null
@@ -27,15 +35,18 @@ export default function KanbanSection({ activeSubItem, onSubItemHandled }: Kanba
   const [workspaceHistory, setWorkspaceHistory] = React.useState<string[]>([])
   const [isEditing, setIsEditing] = React.useState(false)
   const [inputValue, setInputValue] = React.useState("")
+  const [selectedPrefix, setSelectedPrefix] = React.useState<string>("")
+  const [projects, setProjects] = React.useState<BeadsProject[]>([])
   const { workingDir: globalWorkingDir } = useWorkingDirectory()
 
   // Compute effective workspace: local override > global working dir > empty
   const effectiveWorkspace = workspace || (globalWorkingDir !== "~" ? globalWorkingDir : "")
 
-  // Load persisted workspace on mount
+  // Load persisted workspace and project on mount
   React.useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY_WORKSPACE)
     const history = localStorage.getItem(STORAGE_KEY_WORKSPACE_HISTORY)
+    const storedPrefix = localStorage.getItem(STORAGE_KEY_PROJECT)
     if (stored) {
       setWorkspace(stored)
       setInputValue(stored)
@@ -47,7 +58,27 @@ export default function KanbanSection({ activeSubItem, onSubItemHandled }: Kanba
         // ignore parse errors
       }
     }
+    if (storedPrefix) {
+      setSelectedPrefix(storedPrefix)
+    }
   }, [])
+
+  // Fetch projects list
+  React.useEffect(() => {
+    fetch("/api/beads/projects")
+      .then((res) => res.ok ? res.json() : { projects: [] })
+      .then((data) => setProjects(data.projects ?? []))
+      .catch(() => {})
+  }, [])
+
+  const selectProject = (prefix: string) => {
+    setSelectedPrefix(prefix)
+    if (prefix) {
+      localStorage.setItem(STORAGE_KEY_PROJECT, prefix)
+    } else {
+      localStorage.removeItem(STORAGE_KEY_PROJECT)
+    }
+  }
 
   // Handle sub-item navigation if needed
   React.useEffect(() => {
@@ -197,11 +228,52 @@ export default function KanbanSection({ activeSubItem, onSubItemHandled }: Kanba
               </DropdownMenu>
             )}
           </div>
+
+          {/* Project filter dropdown */}
+          {projects.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-2 font-mono text-xs"
+                >
+                  <Layers className="h-3 w-3" />
+                  {selectedPrefix
+                    ? projects.find(p => p.prefix === selectedPrefix)?.name || selectedPrefix
+                    : "All projects"}
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64 max-h-80 overflow-y-auto">
+                <DropdownMenuItem
+                  onClick={() => selectProject("")}
+                  className="gap-2"
+                >
+                  <Layers className="h-4 w-4" />
+                  All projects
+                  {!selectedPrefix && <Check className="h-3 w-3 ml-auto" />}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {projects.map((project) => (
+                  <DropdownMenuItem
+                    key={project.prefix}
+                    onClick={() => selectProject(project.prefix)}
+                    className="gap-2 font-mono text-xs"
+                  >
+                    <span className="w-8 text-muted-foreground">{project.prefix}</span>
+                    <span className="truncate flex-1">{project.name}</span>
+                    {selectedPrefix === project.prefix && <Check className="h-3 w-3 ml-auto flex-shrink-0" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
         <p className="text-muted-foreground mb-4">Visual task board for project management</p>
       </div>
       <div className="flex-1 min-h-0">
-        <KanbanBoard workspace={effectiveWorkspace || undefined} />
+        <KanbanBoard workspace={effectiveWorkspace || undefined} prefix={selectedPrefix || undefined} />
       </div>
     </div>
   )

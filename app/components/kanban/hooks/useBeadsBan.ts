@@ -98,7 +98,8 @@ async function fetchBeadsStatus(workspace?: string): Promise<{ available: boolea
 
 async function fetchIssues(
   workspace?: string,
-  status?: string
+  status?: string,
+  prefix?: string
 ): Promise<BeadsListResponse> {
   let url = '/api/beads/issues?all=true&limit=0' // 0 = unlimited for aggregated views
   if (workspace) {
@@ -106,6 +107,9 @@ async function fetchIssues(
   }
   if (status) {
     url += `&status=${encodeURIComponent(status)}`
+  }
+  if (prefix) {
+    url += `&prefix=${encodeURIComponent(prefix)}`
   }
   const res = await fetch(url)
   if (!res.ok) {
@@ -233,6 +237,8 @@ export interface UseBeadsBanOptions {
   workspace?: string
   /** Auto-refresh interval in ms (0 to disable) */
   refreshInterval?: number
+  /** Filter by project prefix (e.g. "hp") */
+  prefix?: string
 }
 
 export interface UseBeadsBanResult {
@@ -264,6 +270,7 @@ export interface UseBeadsBanResult {
 export function useBeadsBan({
   workspace,
   refreshInterval = 30000,
+  prefix,
 }: UseBeadsBanOptions = {}): UseBeadsBanResult {
   const [tasksByColumn, setTasksByColumn] = useState<Map<BeadsBanColumnId, Task[]>>(
     new Map()
@@ -275,6 +282,8 @@ export function useBeadsBan({
 
   const workspaceRef = useRef(workspace)
   workspaceRef.current = workspace
+  const prefixRef = useRef(prefix)
+  prefixRef.current = prefix
 
   // Check if beads CLI is available
   useEffect(() => {
@@ -289,7 +298,7 @@ export function useBeadsBan({
     setError(null)
 
     try {
-      const { issues } = await fetchIssues(workspaceRef.current)
+      const { issues } = await fetchIssues(workspaceRef.current, undefined, prefixRef.current)
 
       // Initialize column map
       const grouped = new Map<BeadsBanColumnId, Task[]>([
@@ -349,7 +358,7 @@ export function useBeadsBan({
     }
 
     setIsLoading(false)
-  }, [isAvailable])
+  }, [isAvailable, prefix])
 
   // Initial fetch and refresh interval
   useEffect(() => {
@@ -361,7 +370,7 @@ export function useBeadsBan({
       const interval = setInterval(refresh, refreshInterval)
       return () => clearInterval(interval)
     }
-  }, [isAvailable, refresh, refreshInterval])
+  }, [isAvailable, refresh, refreshInterval, prefix])
 
   // Move task to a different column
   const moveTask = useCallback(

@@ -31,9 +31,11 @@ import { useBoardStore } from '../lib/store'
 export interface KanbanBoardProps {
   /** Workspace path for beads (project directory with .beads) */
   workspace?: string
+  /** Filter by project prefix (e.g. "hp") */
+  prefix?: string
 }
 
-export function KanbanBoard({ workspace }: KanbanBoardProps) {
+export function KanbanBoard({ workspace, prefix }: KanbanBoardProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   const [activeTask, setActiveTask] = useState<Task | null>(null)
@@ -57,6 +59,7 @@ export function KanbanBoard({ workspace }: KanbanBoardProps) {
   } = useBeadsBan({
     workspace,
     refreshInterval: 30000,
+    prefix,
   })
 
   // Get syncBeadsTasks from store for TaskModal compatibility

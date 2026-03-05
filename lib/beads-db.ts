@@ -198,6 +198,7 @@ export interface ListOptions {
   status?: string
   priority?: number
   limit?: number
+  prefix?: string // filter by project prefix (e.g. "hp")
 }
 
 /**
@@ -222,6 +223,11 @@ export async function listIssues(opts: ListOptions = {}): Promise<BeadsApiIssue[
   if (opts.priority) {
     conditions.push(`i.priority = $${paramIdx++}`)
     params.push(opts.priority)
+  }
+
+  if (opts.prefix) {
+    conditions.push(`i.id LIKE $${paramIdx++} || '-%'`)
+    params.push(opts.prefix)
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
@@ -284,6 +290,29 @@ export async function getIssue(id: string): Promise<BeadsApiIssue | null> {
     blockedBy.get(id) ?? [],
     blocks.get(id) ?? []
   )
+}
+
+// ---------------------------------------------------------------------------
+// Projects
+// ---------------------------------------------------------------------------
+
+export interface BeadsProject {
+  prefix: string
+  name: string
+  description: string
+}
+
+/**
+ * List all registered projects from the beads.projects table.
+ */
+export async function getProjects(): Promise<BeadsProject[]> {
+  const pool = getPool()
+  const res = await pool.query<BeadsProject>(
+    `SELECT prefix, name, COALESCE(description, '') as description
+     FROM beads.projects
+     ORDER BY prefix`
+  )
+  return res.rows
 }
 
 export interface CreateIssueInput {
