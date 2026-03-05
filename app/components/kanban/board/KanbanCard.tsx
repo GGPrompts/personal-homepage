@@ -35,7 +35,8 @@ import { useWorkerStatusContextSafe } from "../contexts/WorkerStatusContext"
 import { WorkerStatusBadge } from "./WorkerStatusBadge"
 
 /**
- * Extract project prefix from issue ID (e.g., "TabzChrome-rsd9" -> "TabzChrome")
+ * Extract project prefix from issue ID (e.g., "hp-3bz7" -> "hp", "beads-1plh" -> "beads")
+ * Beads IDs use the format: <prefix>-<4char suffix>
  */
 function getProjectFromId(id: string): string | null {
   const lastDashIndex = id.lastIndexOf('-')
@@ -44,23 +45,31 @@ function getProjectFromId(id: string): string | null {
 }
 
 /**
- * Generate a consistent color for a project name
+ * Generate a consistent color for a project prefix using a hash.
  */
-const PROJECT_COLORS: Record<string, string> = {
-  'TabzChrome': 'bg-blue-500/20 border-blue-500/40 text-blue-300',
-  'TabzBeads': 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300',
-  'TabzTemplates': 'bg-teal-500/20 border-teal-500/40 text-teal-300',
-  'BeadsHive': 'bg-amber-500/20 border-amber-500/40 text-amber-300',
-  'V4V': 'bg-rose-500/20 border-rose-500/40 text-rose-300',
-  'PD': 'bg-violet-500/20 border-violet-500/40 text-violet-300',
-  'personal': 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300',
-  'tmuxplexer': 'bg-orange-500/20 border-orange-500/40 text-orange-300',
-  'ThumbCommand': 'bg-pink-500/20 border-pink-500/40 text-pink-300',
-  'ai': 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300',
-}
+const COLOR_PALETTE = [
+  'bg-blue-500/20 border-blue-500/40 text-blue-300',
+  'bg-emerald-500/20 border-emerald-500/40 text-emerald-300',
+  'bg-teal-500/20 border-teal-500/40 text-teal-300',
+  'bg-amber-500/20 border-amber-500/40 text-amber-300',
+  'bg-rose-500/20 border-rose-500/40 text-rose-300',
+  'bg-violet-500/20 border-violet-500/40 text-violet-300',
+  'bg-cyan-500/20 border-cyan-500/40 text-cyan-300',
+  'bg-orange-500/20 border-orange-500/40 text-orange-300',
+  'bg-pink-500/20 border-pink-500/40 text-pink-300',
+  'bg-indigo-500/20 border-indigo-500/40 text-indigo-300',
+  'bg-lime-500/20 border-lime-500/40 text-lime-300',
+  'bg-fuchsia-500/20 border-fuchsia-500/40 text-fuchsia-300',
+  'bg-sky-500/20 border-sky-500/40 text-sky-300',
+  'bg-yellow-500/20 border-yellow-500/40 text-yellow-300',
+]
 
-function getProjectColor(project: string): string {
-  return PROJECT_COLORS[project] || 'bg-zinc-500/20 border-zinc-500/40 text-zinc-300'
+function getProjectColor(prefix: string): string {
+  let hash = 0
+  for (let i = 0; i < prefix.length; i++) {
+    hash = (hash * 31 + prefix.charCodeAt(i)) | 0
+  }
+  return COLOR_PALETTE[Math.abs(hash) % COLOR_PALETTE.length]
 }
 
 /**
