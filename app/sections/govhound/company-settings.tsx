@@ -91,11 +91,7 @@ export function CompanySettingsTab({ onSelectOpportunity, onNavigateTab }: TabPr
     try {
       const res = await fetch("/api/govhound/company", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, id: company?.id }) });
       if (!res.ok) throw new Error("Failed to save");
-      const data = await res.json();
       await fetchCompany();
-      if (!company && data.company) {
-        setCompany({ ...data.company, company_certifications: [], company_naics_codes: [], company_contract_vehicles: [], team_members: [] });
-      }
       showSuccess("Company profile saved");
     } catch (err) {
       showError(err instanceof Error ? err.message : "Failed to save");
