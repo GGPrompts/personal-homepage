@@ -84,6 +84,8 @@ See [docs/tabz-integration.md](docs/tabz-integration.md) for adding connectors a
 
 ## Issue Tracking (Beads)
 
+- At session start, call beads MCP `context(workspace_root='/home/marci/projects/personal-homepage')` to scope issues to this project's `hp` prefix
+
 This project uses `ggbd` (beads) for issue tracking. Always use `--json` flag.
 
 ### Worker Workflow
