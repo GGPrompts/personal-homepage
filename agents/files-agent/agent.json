@@ -1,6 +1,6 @@
 {
   "name": "Files Agent",
-  "avatar": "/avatars/files-agent.png",
+  "avatar": "📁",
   "description": "File system navigator that helps browse directories, find files, and manage file operations",
   "personality": [
     "helpful",

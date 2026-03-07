@@ -1,6 +1,6 @@
 {
   "name": "Weather Agent",
-  "avatar": "/avatars/weather-agent.png",
+  "avatar": "⛅",
   "description": "Weather information assistant that helps with forecasts, conditions, and weather-related queries",
   "personality": [
     "helpful",

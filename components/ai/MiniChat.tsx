@@ -11,6 +11,7 @@ import { ChatMessage, TypingIndicator } from "@/components/ai/ChatMessage"
 import { ChatInput } from "@/components/ai/ChatInput"
 import { type AgentProfile, AGENT_META } from "@/app/components/kanban/shared/types"
 import { cn } from "@/lib/utils"
+import { isEmoji, isAvatarUrl } from "@/lib/ai/utils"
 
 // ============================================================================
 // TYPES
@@ -137,7 +138,9 @@ export const MiniChat = React.forwardRef<MiniChatHandle, MiniChatProps>(
         )}
         data-tabz-action="open-mini-chat"
       >
-        {agentAvatar ? (
+        {agentAvatar && isEmoji(agentAvatar) ? (
+          <span className="text-lg">{agentAvatar}</span>
+        ) : agentAvatar && isAvatarUrl(agentAvatar) ? (
           <Avatar className="h-8 w-8">
             <AvatarImage src={agentAvatar} alt={agentName} />
             <AvatarFallback>
@@ -164,14 +167,18 @@ export const MiniChat = React.forwardRef<MiniChatHandle, MiniChatProps>(
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
             <div className="flex items-center gap-3">
-              <Avatar className="h-8 w-8 border border-primary/20">
-                {agentAvatar && <AvatarImage src={agentAvatar} alt={agentName} />}
-                <AvatarFallback
-                  className={cn(agentMeta?.bgColor || "bg-primary/20")}
-                >
-                  <Bot className={cn("h-4 w-4", agentMeta?.color || "text-primary")} />
-                </AvatarFallback>
-              </Avatar>
+              {agentAvatar && isEmoji(agentAvatar) ? (
+                <span className="text-lg w-8 h-8 flex items-center justify-center">{agentAvatar}</span>
+              ) : (
+                <Avatar className="h-8 w-8 border border-primary/20">
+                  {agentAvatar && isAvatarUrl(agentAvatar) && <AvatarImage src={agentAvatar} alt={agentName} />}
+                  <AvatarFallback
+                    className={cn(agentMeta?.bgColor || "bg-primary/20")}
+                  >
+                    <Bot className={cn("h-4 w-4", agentMeta?.color || "text-primary")} />
+                  </AvatarFallback>
+                </Avatar>
+              )}
               <div>
                 <h4 className="text-sm font-medium terminal-glow">{agentName}</h4>
                 {agent?.description && (

@@ -1,6 +1,6 @@
 {
   "name": "Music DJ",
-  "avatar": "/avatars/music-dj.png",
+  "avatar": "🎧",
   "description": "Music playback assistant that controls the player, manages playlists, and helps discover new tracks",
   "personality": [
     "friendly",

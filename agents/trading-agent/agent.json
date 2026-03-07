@@ -1,6 +1,6 @@
 {
   "name": "Trading Assistant",
-  "avatar": "/avatars/trading-agent.png",
+  "avatar": "📈",
   "description": "Stock trading assistant that helps with portfolio management, market analysis, and executing trades",
   "personality": [
     "analytical",
