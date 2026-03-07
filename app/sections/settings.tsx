@@ -652,53 +652,32 @@ function ApiKeysTab() {
     setStoredApiKey("sam-gov-api-key", samGovKey)
   }, [samGovKey])
 
-  // Test Finnhub API key
-  const testFinnhub = async () => {
-    if (!finnhubKey.trim()) return
-    setTestingFinnhub(true)
+  // Test API key via server-side validation
+  const testApiKey = async (
+    service: string,
+    key: string,
+    setStatus: (s: "valid" | "invalid" | null) => void,
+    setTesting: (t: boolean) => void
+  ) => {
+    if (!key.trim()) return
+    setTesting(true)
     try {
-      const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=AAPL&token=${finnhubKey.trim()}`)
-      if (res.ok) {
-        const data = await res.json()
-        if (data.c && data.c > 0) {
-          setFinnhubStatus("valid")
-        } else {
-          setFinnhubStatus("invalid")
-        }
-      } else {
-        setFinnhubStatus("invalid")
-      }
+      const res = await fetch("/api/validate-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ service, key: key.trim() }),
+      })
+      const data = await res.json()
+      setStatus(data.valid ? "valid" : "invalid")
     } catch {
-      setFinnhubStatus("invalid")
+      setStatus("invalid")
     } finally {
-      setTestingFinnhub(false)
+      setTesting(false)
     }
   }
 
-  // Test YouTube API key
-  const testYoutube = async () => {
-    if (!youtubeKey.trim()) return
-    setTestingYoutube(true)
-    try {
-      const res = await fetch(
-        `https://www.googleapis.com/youtube/v3/videos?part=id&id=dQw4w9WgXcQ&key=${youtubeKey.trim()}`
-      )
-      if (res.ok) {
-        const data = await res.json()
-        if (data.items && data.items.length > 0) {
-          setYoutubeStatus("valid")
-        } else {
-          setYoutubeStatus("invalid")
-        }
-      } else {
-        setYoutubeStatus("invalid")
-      }
-    } catch {
-      setYoutubeStatus("invalid")
-    } finally {
-      setTestingYoutube(false)
-    }
-  }
+  const testFinnhub = () => testApiKey("finnhub", finnhubKey, setFinnhubStatus, setTestingFinnhub)
+  const testYoutube = () => testApiKey("youtube", youtubeKey, setYoutubeStatus, setTestingYoutube)
 
   const apiConfigs: ApiKeyConfig[] = [
     {

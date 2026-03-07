@@ -82,50 +82,6 @@ All interactive elements have `data-tabz-*` attributes for MCP automation:
 
 See [docs/tabz-integration.md](docs/tabz-integration.md) for adding connectors and full selector reference.
 
-## Issue Tracking (Beads)
-
-- At session start, call beads MCP `context(workspace_root='/home/marci/projects/personal-homepage')` to scope issues to this project's `hp` prefix
-
-This project uses `ggbd` (beads) for issue tracking. Always use `--json` flag.
-
-### Worker Workflow
-
-1. **Find work**: `ggbd ready --json`
-2. **Claim it**: `ggbd update ID --status in_progress --json`
-3. **Discover new work?** Create linked issue:
-   ```bash
-   ggbd create "Found issue" --deps discovered-from:PARENT-ID --json
-   ```
-4. **Add progress notes** (for context recovery):
-   ```bash
-   ggbd update ID --notes "Implemented X, still need Y"
-   ```
-5. **Complete**: `ggbd close ID --reason "Done: summary" --json`
-6. **Sync**: Supabase auto-syncs (no manual sync needed)
-
-### Essential Commands
-
-```bash
-ggbd ready --json              # Unblocked issues
-ggbd show ID --json            # Details with notes
-ggbd update ID --status in_progress --json  # Claim
-ggbd update ID --notes "Progress notes"     # Context
-ggbd close ID --reason "Done: what was done" --json
-ggbd create "Title" --deps discovered-from:PARENT --json  # Link discovered work
-```
-
-### Session Close Protocol
-
-**CRITICAL**: Session is NOT complete until `git push` succeeds.
-
-```bash
-ggbd close ID --reason "Done: summary" --json  # Close finished work
-# Supabase auto-syncs (no manual sync needed)
-git push                     # MUST succeed before ending
-```
-
-Include issue ID in commits: `git commit -m "Fix bug (bd-abc)"`
-
 ## Local Data Storage
 
 Some sections store data locally on the filesystem:
@@ -151,9 +107,9 @@ The AI Workspace uses Claude CLI (`--print` mode) for chat. Key files:
 **Session persistence**: Claude CLI stores sessions at `~/.claude/projects/{path}/{session-id}.jsonl`. We generate session IDs upfront with `--session-id` for multi-turn conversations.
 
 **Archived: Multi-model conversations** (`lib/ai/_archived/conversation-multimodel.ts`)
-Built but archived due to context overhead. The system supported switching between Claude/Gemini/Codex mid-conversation with identity-aware prompts ("You are Claude, messages marked [Gemini] are from another AI"). This added ~200 tokens per message even for single-model use. See `personal-homepage-qhif` for revival plan.
+Built but archived due to context overhead. The system supported switching between Claude/Gemini/Codex mid-conversation with identity-aware prompts ("You are Claude, messages marked [Gemini] are from another AI"). This added ~200 tokens per message even for single-model use.
 
-**Known limitation**: If page disconnects while Claude is running, the process continues in background but UI can't reconnect. See `personal-homepage-qhif` for process tracking/recovery plan based on vibe-kanban architecture.
+**Known limitation**: If page disconnects while Claude is running, the process continues in background but UI can't reconnect.
 
 ## Quick Reference
 

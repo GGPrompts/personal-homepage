@@ -1,6 +1,6 @@
 # TabzChrome Integration
 
-Personal Homepage integrates with TabzChrome for terminal automation and AI-assisted browsing. This document covers configuration, features, and automation selectors for AI/MCP usage.
+Personal Homepage optionally integrates with [TabzChrome](https://github.com/GGPrompts/tabzchrome) for terminal automation and AI-assisted browsing. This is an optional feature — the homepage works fully without it. This document covers configuration, features, and automation selectors for AI/MCP usage.
 
 ## Quick Start
 

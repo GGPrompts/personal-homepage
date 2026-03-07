@@ -669,7 +669,7 @@ const SAMPLE_COLLECTIONS: Collection[] = [
             type: "json",
             content: `{
   "prompt": "Summarize the README",
-  "projectPaths": ["/home/matt/projects/personal-homepage"],
+  "projectPaths": ["/path/to/your/project"],
   "backend": "claude"
 }`,
           },

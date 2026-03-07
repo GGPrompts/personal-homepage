@@ -129,7 +129,7 @@ interface GitHubUser {
 type EventFilter = "all" | "push" | "pr" | "issue" | "star" | "fork" | "create" | "comment"
 
 const STORAGE_KEY = "github-username"
-const DEFAULT_USERNAME = "mattvr"
+const DEFAULT_USERNAME = process.env.NEXT_PUBLIC_GITHUB_USERNAME || ""
 
 const EVENT_FILTERS: { value: EventFilter; label: string; icon: React.ReactNode }[] = [
   { value: "all", label: "All", icon: <Activity className="h-3 w-3" /> },

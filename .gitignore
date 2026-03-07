@@ -11,6 +11,7 @@
 
 # next.js
 /.next/
+.next
 /out/
 
 # production
@@ -51,144 +52,10 @@ next-env.d.ts
 # AI conversation and jobs data
 .conversations/
 .jobs-data/
-# bd worktree
-personal-homepage-1nv/
-# bd worktree
-personal-homepage-bm4/
-# bd worktree
-personal-homepage-6t7/
-# bd worktree
-personal-homepage-06o/
-# bd worktree
-personal-homepage-jpm/
-# bd worktree
-personal-homepage-cam/
-# bd worktree
-personal-homepage-fd6/
-# bd worktree
-personal-homepage-nmt/
-# bd worktree
-personal-homepage-2bx/
-# bd worktree
-personal-homepage-nzq/
-# bd worktree
-personal-homepage-4gi/
-# bd worktree
-personal-homepage-0wq/
-# bd worktree
-personal-homepage-yf0/
-# bd worktree
-personal-homepage-yni/
-# bd worktree
-personal-homepage-d9r/
-# bd worktree
-personal-homepage-022/
-# bd worktree
-personal-homepage-9a5/
-# bd worktree
-personal-homepage-c6p/
-# bd worktree
-personal-homepage-mag/
-# bd worktree
-personal-homepage-jmg/
-# bd worktree
-personal-homepage-j75/
-# bd worktree
-personal-homepage-gg2/
-# bd worktree
-personal-homepage-o0y/
-# bd worktree
-personal-homepage-2ld/
-# bd worktree
-personal-homepage-ibf/
-# bd worktree
-personal-homepage-ddw/
-# bd worktree
-personal-homepage-ab4/
-# bd worktree
-personal-homepage-5tq/
-# bd worktree
-personal-homepage-oir/
-# bd worktree
-personal-homepage-afg/
-# bd worktree
-personal-homepage-npw/
-# bd worktree
-personal-homepage-6e0/
-# bd worktree
-.worktrees/personal-homepage-aq7/
-# bd worktree
-.worktrees/personal-homepage-4fp/
-# bd worktree
-.worktrees/personal-homepage-esg/
-# bd worktree
-.worktrees/personal-homepage-8ew/
-# bd worktree
-.worktrees/personal-homepage-c9y/
-# bd worktree
-.worktrees/personal-homepage-4gf/
-# bd worktree
-.worktrees/personal-homepage-9cj/
-# bd worktree
-.worktrees/personal-homepage-9y2/
-# bd worktree
-.worktrees/personal-homepage-abv/
-# bd worktree
-.worktrees/personal-homepage-5j8/
-# bd worktree
-.worktrees/personal-homepage-yj4/
-# bd worktree
-.worktrees/personal-homepage-dtv/
-# bd worktree
-.worktrees/personal-homepage-2y4/
-# bd worktree
-.worktrees/personal-homepage-bvu/
-# bd worktree
-.worktrees/personal-homepage-3ns/
-# bd worktree
-.worktrees/personal-homepage-6j8/
-# bd worktree
-.worktrees/personal-homepage-kjv/
-# bd worktree
-.worktrees/personal-homepage-2nn/
-# bd worktree
-.worktrees/personal-homepage-kj9/
-# bd worktree
-.worktrees/personal-homepage-trf/
-# bd worktree
-.worktrees/personal-homepage-kw1/
-# bd worktree
-.worktrees/personal-homepage-jki/
-# bd worktree
-.worktrees/personal-homepage-6zbo/
-.next
-# bd worktree
-.worktrees/personal-homepage-bmi5/
-# bd worktree
-.worktrees/personal-homepage-nlpj/
-# bd worktree
-.worktrees/personal-homepage-mkmn/
-# bd worktree
-.worktrees/personal-homepage-3h58/
-# bd worktree
-.worktrees/personal-homepage-hapi/
-# bd worktree
-.worktrees/personal-homepage-7khz/
-# bd worktree
-.worktrees/personal-homepage-tmtb/
-# bd worktree
-.worktrees/personal-homepage-uif1/
-# bd worktree
-.worktrees/personal-homepage-9btz/
-# bd worktree
-.worktrees/personal-homepage-abqo/
-# bd worktree
-.worktrees/personal-homepage-h2ft/
-# bd worktree
-.worktrees/personal-homepage-sida/
-# bd worktree
-.worktrees/personal-homepage-gx7g/
-# bd worktree
-.worktrees/personal-homepage-esfy/
-# bd worktree
-.worktrees/personal-homepage-61lq/
+
+# Issue tracking (beads) - local workspace data
+.beads/
+
+# Git worktrees
+.worktrees/
+personal-homepage-*/

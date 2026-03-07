@@ -2,7 +2,7 @@
 
 > **Note:** For comprehensive TabzChrome documentation including REST API, MCP selectors, and automation patterns, see [tabz-integration.md](tabz-integration.md).
 
-The homepage supports terminal bookmarks that run commands in the browser's sidebar terminal via the TabzChrome extension.
+The homepage optionally supports terminal bookmarks that run commands via the [TabzChrome](https://github.com/GGPrompts/tabzchrome) browser extension. This feature is entirely optional.
 
 ## Overview
 
