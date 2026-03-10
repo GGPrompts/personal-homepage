@@ -33,6 +33,7 @@ import {
   FileJson,
   ArrowRightLeft,
   Replace,
+  Monitor,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -75,6 +76,7 @@ import { useTerminalExtension } from "@/hooks/useTerminalExtension"
 import { useWorkingDirectory, isPathUnderWorkingDir } from "@/hooks/useWorkingDirectory"
 import { Github, User } from "lucide-react"
 import { toast } from "sonner"
+import { DesktopCanvas } from "@/components/bookmarks/desktop"
 import {
   exportAsTabzProfiles,
   exportAsTabzBookmarks,
@@ -277,7 +279,7 @@ export default function BookmarksSection({
   const [showAuthModal, setShowAuthModal] = React.useState(false)
 
   // UI state
-  const [viewMode, setViewMode] = React.useState<"grid" | "list">(() => {
+  const [viewMode, setViewMode] = React.useState<"grid" | "list" | "desktop">(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(STORAGE_KEY)
       if (saved) {
@@ -854,6 +856,14 @@ export default function BookmarksSection({
               <Grid className="h-4 w-4" />
             </Button>
             <Button
+              variant={viewMode === "desktop" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-none border-x"
+              onClick={() => setViewMode("desktop")}
+            >
+              <Monitor className="h-4 w-4" />
+            </Button>
+            <Button
               variant={viewMode === "list" ? "default" : "ghost"}
               size="sm"
               className="rounded-l-none"
@@ -1040,6 +1050,17 @@ export default function BookmarksSection({
               </Button>
             )}
           </div>
+        ) : viewMode === "desktop" ? (
+          // Desktop View
+          <DesktopCanvas
+            data={data}
+            onEditBookmark={(bookmark) => openEditBookmark(bookmark)}
+            onDeleteBookmark={(id) => setDeleteConfirm({ item: data.bookmarks.find((b) => b.id === id)!, type: "bookmark" })}
+            onEditFolder={(folder) => openEditFolder(folder)}
+            onDeleteFolder={(id) => setDeleteConfirm({ item: data.folders.find((f) => f.id === id)!, type: "folder" })}
+            onOpenAddBookmark={() => { resetForm(); setAddBookmarkOpen(true) }}
+            onOpenAddFolder={() => { setFormName(""); setFormIcon(""); setAddFolderOpen(true) }}
+          />
         ) : viewMode === "grid" ? (
           // Grid View
           <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-3">

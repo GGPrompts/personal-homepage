@@ -13,6 +13,7 @@ export type {
 
 export { BookmarkNode } from "./BookmarkNode";
 export { FolderNode } from "./FolderNode";
+export { DesktopCanvas } from "./DesktopCanvas";
 
 export {
   bookmarksToNodes,
