@@ -4,12 +4,15 @@ export type {
   BookmarksData,
   BookmarkNodeData,
   FolderNodeData,
-  BookmarkNode,
-  FolderNode,
+  BookmarkNode as BookmarkNodeType,
+  FolderNode as FolderNodeType,
   DesktopNode,
   DesktopLayout,
   TerminalContextAction,
 } from "./types";
+
+export { BookmarkNode } from "./BookmarkNode";
+export { FolderNode } from "./FolderNode";
 
 export {
   bookmarksToNodes,
