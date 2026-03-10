@@ -252,6 +252,23 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
     sendMessage(prompt, { projectPath: selectedProjectPath })
   }
 
+  // FAB hover proximity - hidden until mouse enters bottom-right corner
+  const [fabVisible, setFabVisible] = React.useState(false)
+  const fabTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const showFab = React.useCallback(() => {
+    if (fabTimeoutRef.current) clearTimeout(fabTimeoutRef.current)
+    setFabVisible(true)
+  }, [])
+
+  const hideFab = React.useCallback(() => {
+    fabTimeoutRef.current = setTimeout(() => setFabVisible(false), 400)
+  }, [])
+
+  React.useEffect(() => {
+    return () => { if (fabTimeoutRef.current) clearTimeout(fabTimeoutRef.current) }
+  }, [])
+
   // Don't render until mounted to prevent hydration mismatch with localStorage state
   if (!mounted) return null
 
@@ -261,61 +278,74 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
 
   return (
     <>
-      {/* Floating toggle button - visible when drawer is collapsed */}
+      {/* Floating toggle button - hidden until mouse enters bottom-right proximity zone */}
       <AnimatePresence mode="wait">
         {state === "collapsed" && (
-          <motion.div
-            variants={fabVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            whileHover={shouldReduceMotion ? undefined : "hover"}
-            whileTap={shouldReduceMotion ? undefined : "tap"}
-            className="fixed bottom-24 right-4 z-40"
-          >
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    onClick={toggle}
-                    className="h-14 w-14 rounded-full glass border-glow shadow-lg relative transition-shadow hover:shadow-xl hover:shadow-primary/20"
-                    data-tabz-action="toggle-ai-drawer"
-                    data-tabz-region="ai-drawer-toggle"
-                    data-tabz-agent={displayAgent?.id}
-                  >
-                    {/* Show selected/recommended agent avatar or fallback to backend icon */}
-                    {displayAgent ? (
-                      <Avatar className="h-8 w-8">
-                        {isAvatarUrl(displayAgent.avatar) && (
-                          <AvatarImage src={displayAgent.avatar} alt={displayAgent.name} />
-                        )}
-                        <AvatarFallback delayMs={0} className="text-sm bg-transparent">
-                          {isEmoji(displayAgent.avatar)
-                            ? displayAgent.avatar
-                            : <BackendIcon agent={displayAgent} className="h-5 w-5" />}
-                        </AvatarFallback>
-                      </Avatar>
-                    ) : (
-                      <MessageSquare className="h-6 w-6" />
-                    )}
-                    {hasActiveConversation && (
-                      <motion.span
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-primary"
+          <>
+            {/* Invisible proximity zone - reveals FAB on hover */}
+            <div
+              className="fixed bottom-0 right-0 z-39 w-24 h-40"
+              onMouseEnter={showFab}
+              onMouseLeave={hideFab}
+              style={{ pointerEvents: 'auto' }}
+            />
+            {fabVisible && (
+              <motion.div
+                variants={fabVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                whileHover={shouldReduceMotion ? undefined : "hover"}
+                whileTap={shouldReduceMotion ? undefined : "tap"}
+                className="fixed bottom-24 right-4 z-40"
+                onMouseEnter={showFab}
+                onMouseLeave={hideFab}
+              >
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        onClick={toggle}
+                        className="h-14 w-14 rounded-full glass border-glow shadow-lg relative transition-shadow hover:shadow-xl hover:shadow-primary/20"
+                        data-tabz-action="toggle-ai-drawer"
+                        data-tabz-region="ai-drawer-toggle"
+                        data-tabz-agent={displayAgent?.id}
                       >
-                        <span className="absolute inset-0 rounded-full bg-primary animate-ping opacity-75" />
-                      </motion.span>
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="left">
-                  <p>{displayAgent?.name || 'AI Assistant'}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </motion.div>
+                        {/* Show selected/recommended agent avatar or fallback to backend icon */}
+                        {displayAgent ? (
+                          <Avatar className="h-8 w-8">
+                            {isAvatarUrl(displayAgent.avatar) && (
+                              <AvatarImage src={displayAgent.avatar} alt={displayAgent.name} />
+                            )}
+                            <AvatarFallback delayMs={0} className="text-sm bg-transparent">
+                              {isEmoji(displayAgent.avatar)
+                                ? displayAgent.avatar
+                                : <BackendIcon agent={displayAgent} className="h-5 w-5" />}
+                            </AvatarFallback>
+                          </Avatar>
+                        ) : (
+                          <MessageSquare className="h-6 w-6" />
+                        )}
+                        {hasActiveConversation && (
+                          <motion.span
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-primary"
+                          >
+                            <span className="absolute inset-0 rounded-full bg-primary animate-ping opacity-75" />
+                          </motion.span>
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="left">
+                      <p>{displayAgent?.name || 'AI Assistant'}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </motion.div>
+            )}
+          </>
         )}
       </AnimatePresence>
 
