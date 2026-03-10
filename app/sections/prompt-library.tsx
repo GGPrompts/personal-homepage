@@ -13,6 +13,8 @@ import {
   Loader2,
   Sparkles,
   Check,
+  Plus,
+  ArrowLeft,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,6 +36,7 @@ import { useAuth } from "@/components/AuthProvider"
 import { PromptCard } from "@/components/prompts/PromptCard"
 import { PromptDetailModal } from "@/components/prompts/PromptDetailModal"
 import { PromptGridSkeleton } from "@/components/prompts/PromptCardSkeleton"
+import { CreatePromptForm } from "@/components/prompts/CreatePromptForm"
 import {
   fetchPrompts,
   type SortOption,
@@ -97,6 +100,9 @@ export default function PromptLibrarySection({
   // Detail modal
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+
+  // Create / edit form view
+  const [showCreateForm, setShowCreateForm] = useState(false)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -241,6 +247,13 @@ export default function PromptLibrarySection({
     setTotal((prev) => prev - 1)
   }, [])
 
+  // Handle successful prompt creation
+  const handleCreateSuccess = useCallback((newPrompt: Prompt) => {
+    setPrompts((prev) => [newPrompt, ...prev])
+    setTotal((prev) => prev + 1)
+    setShowCreateForm(false)
+  }, [])
+
   // Like/bookmark changes from cards
   const handleLikeChange = useCallback(
     (promptId: string, liked: boolean, newCount: number) => {
@@ -304,13 +317,49 @@ export default function PromptLibrarySection({
   return (
     <div className="p-6 space-y-6" data-tabz-section="prompt-library">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <BookOpen className="h-6 w-6 text-primary" />
-        <h2 className="text-2xl font-bold terminal-glow">Prompt Library</h2>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {showCreateForm && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setShowCreateForm(false)}
+              data-tabz-action="back-to-library"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
+          <BookOpen className="h-6 w-6 text-primary" />
+          <h2 className="text-2xl font-bold terminal-glow">
+            {showCreateForm ? "New Prompt" : "Prompt Library"}
+          </h2>
+        </div>
+        {!showCreateForm && user && (
+          <Button
+            onClick={() => setShowCreateForm(true)}
+            size="sm"
+            className="gap-2"
+            data-tabz-action="create-prompt"
+          >
+            <Plus className="h-4 w-4" />
+            New Prompt
+          </Button>
+        )}
       </div>
 
+      {/* Create Form */}
+      {showCreateForm && (
+        <div className="glass rounded-lg p-6 border border-border/50">
+          <CreatePromptForm
+            onSuccess={handleCreateSuccess}
+            onCancel={() => setShowCreateForm(false)}
+          />
+        </div>
+      )}
+
       {/* Search + Sort + Filters */}
-      <div className="space-y-3">
+      {!showCreateForm && <><div className="space-y-3">
         <div className="flex items-center gap-2">
           {/* Search */}
           <div className="relative flex-1">
@@ -622,6 +671,7 @@ export default function PromptLibrarySection({
           )}
         </>
       )}
+      </>}
 
       <PromptDetailModal
         prompt={selectedPrompt}

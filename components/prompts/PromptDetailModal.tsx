@@ -44,6 +44,8 @@ import {
   Maximize2,
   Minimize2,
   Trash2,
+  Plus,
+  Sparkles,
 } from "lucide-react"
 import { toast } from "sonner"
 import type { Prompt } from "@/lib/prompts/types"
@@ -97,11 +99,53 @@ export function PromptDetailModal({
   const [editedDescription, setEditedDescription] = useState("")
   const [editedCategory, setEditedCategory] = useState("")
   const [editedTags, setEditedTags] = useState("")
+  const editContentRef = useRef<HTMLTextAreaElement>(null)
 
   const isOwner = useMemo(() => {
     if (!user || !prompt) return false
     return user.id === prompt.user_id
   }, [user, prompt])
+
+  // Template field parsing for edit mode
+  const editParsedTemplate = useMemo(
+    () => parseTemplate(editedContent),
+    [editedContent]
+  )
+  const editHasTemplateFields = useMemo(
+    () => isTemplate(editedContent),
+    [editedContent]
+  )
+
+  // Add fillable field at cursor position in edit mode
+  const addEditFillableField = useCallback(() => {
+    const textarea = editContentRef.current
+    const existingNames = editParsedTemplate.fields.map((f) => f.id)
+    const suggestions = ["input", "value", "content", "text", "details", "data"]
+    let fieldName = suggestions[existingNames.length % suggestions.length]
+    let counter = 1
+    while (existingNames.includes(fieldName)) {
+      fieldName = `${suggestions[existingNames.length % suggestions.length]}${counter}`
+      counter++
+    }
+    const fieldSyntax = `{{${fieldName}}}`
+
+    if (textarea) {
+      const start = textarea.selectionStart
+      const end = textarea.selectionEnd
+      const newContent =
+        editedContent.slice(0, start) + fieldSyntax + editedContent.slice(end)
+      setEditedContent(newContent)
+      setTimeout(() => {
+        textarea.focus()
+        const pos = start + fieldSyntax.length
+        textarea.setSelectionRange(pos, pos)
+      }, 0)
+    } else {
+      setEditedContent(
+        editedContent + (editedContent ? " " : "") + fieldSyntax
+      )
+    }
+  }, [editedContent, editParsedTemplate.fields])
 
   // Load interaction state when prompt changes
   useEffect(() => {
@@ -417,15 +461,60 @@ export function PromptDetailModal({
             </div>
 
             <div
-              className={`glass rounded-lg p-4 border border-border/50 ${editMode ? "flex-1 flex flex-col min-h-0" : "flex-1 min-h-[200px] overflow-y-auto"}`}
+              className={`glass rounded-lg p-4 border border-border/50 ${editMode ? "flex-1 flex flex-col min-h-0 gap-3" : "flex-1 min-h-[200px] overflow-y-auto"}`}
             >
               {editMode ? (
-                <Textarea
-                  value={editedContent}
-                  onChange={(e) => setEditedContent(e.target.value)}
-                  placeholder="Write your prompt here..."
-                  className="flex-1 font-mono text-sm resize-none border-0 p-0 focus-visible:ring-0 min-h-0"
-                />
+                <>
+                  <div className="flex items-center justify-between shrink-0">
+                    <p className="text-xs text-muted-foreground">
+                      Use{" "}
+                      <code className="px-1 py-0.5 rounded bg-muted text-[11px]">
+                        {"{{fieldName}}"}
+                      </code>{" "}
+                      for template variables
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addEditFillableField}
+                      className="h-7 text-xs gap-1"
+                      data-tabz-action="add-template-field"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add Field
+                    </Button>
+                  </div>
+                  <Textarea
+                    ref={editContentRef}
+                    value={editedContent}
+                    onChange={(e) => setEditedContent(e.target.value)}
+                    placeholder="Write your prompt here..."
+                    className="flex-1 font-mono text-sm resize-none border-0 p-0 focus-visible:ring-0 min-h-0"
+                  />
+                  {editHasTemplateFields && (
+                    <div className="flex flex-wrap gap-2 shrink-0">
+                      <span className="text-xs text-muted-foreground">
+                        Template fields:
+                      </span>
+                      {editParsedTemplate.fields.map((field) => (
+                        <Badge
+                          key={field.id}
+                          variant="secondary"
+                          className="font-mono text-xs"
+                        >
+                          <Sparkles className="w-3 h-3 mr-1" />
+                          {field.name}
+                          {field.hint && (
+                            <span className="ml-1 text-muted-foreground">
+                              ({field.hint})
+                            </span>
+                          )}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </>
               ) : promptIsTemplate ? (
                 <PromptTemplateRenderer
                   content={prompt.content}
