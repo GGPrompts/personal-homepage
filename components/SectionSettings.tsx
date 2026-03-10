@@ -53,6 +53,7 @@ import {
   Calendar,
   Shield,
   Activity,
+  BookOpen,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -105,6 +106,7 @@ const sectionMeta: Record<ToggleableSection, { label: string; icon: React.Elemen
   flowchart: { label: "Flowchart", icon: GitBranch, description: "Workflow designer" },
   govhound: { label: "GovHound", icon: Shield, description: "Federal IT contracts" },
   uptime: { label: "Uptime", icon: Activity, description: "Service status monitoring" },
+  "prompt-library": { label: "Prompt Library", icon: BookOpen, description: "Browse and manage reusable prompts" },
 }
 
 // Agent card type for display

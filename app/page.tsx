@@ -40,6 +40,7 @@ import {
   Calendar,
   Shield,
   Activity,
+  BookOpen,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -102,6 +103,7 @@ import CalendarSection from "./sections/calendar"
 import SettingsSection from "./sections/settings"
 import GovHoundSection from "./sections/govhound"
 import UptimeSection from "./sections/uptime"
+import PromptLibrarySection from "./sections/prompt-library"
 import { MusicPlayerSection } from "./sections/music-player"
 import dynamic from "next/dynamic"
 import { useLoginTrigger } from "@/hooks/useLoginTrigger"
@@ -154,6 +156,7 @@ const navigationItems: NavigationItem[] = [
   { id: "files", label: "Files", icon: FolderOpen, description: "File browser & plugins" },
   { id: "kanban", label: "Kanban", icon: LayoutGrid, description: "Visual task board" },
   { id: "jobs", label: "Jobs", icon: Play, description: "Claude batch prompts" },
+  { id: "prompt-library", label: "Prompt Library", icon: BookOpen, description: "Browse and manage reusable prompts" },
   { id: "analytics", label: "Analytics", icon: BarChart3, description: "Claude Code usage stats" },
   { id: "flowchart", label: "Flowchart", icon: GitBranch, description: "Workflow designer" },
   { id: "music-player", label: "Music Player", icon: Music, description: "Synthwave music player" },
@@ -784,6 +787,7 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
             profile: { icon: User, label: "Profile", description: "Account & sync status" },
             govhound: { icon: Shield, label: "GovHound", description: "Federal IT contracts" },
             uptime: { icon: Activity, label: "Uptime", description: "Service status monitoring" },
+            "prompt-library": { icon: BookOpen, label: "Prompt Library", description: "Browse and manage reusable prompts" },
           }
 
           const config = tileConfig[sectionId]
@@ -1003,6 +1007,8 @@ export default function PersonalHomepage() {
           return <LocalOnlyOverlay sectionName="Uptime Monitor" description="This feature checks endpoints from localhost." />
         }
         return <UptimeSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "prompt-library":
+        return <PromptLibrarySection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "profile":
         return <ProfileSection />
       case "settings":

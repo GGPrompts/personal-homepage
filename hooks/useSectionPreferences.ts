@@ -26,7 +26,7 @@ import {
 } from "lucide-react"
 
 // Section IDs that can be toggled (excluding home and settings which are always visible)
-export type ToggleableSection = "weather" | "feed" | "api-playground" | "bookmarks" | "search" | "stocks" | "crypto" | "spacex" | "github-activity" | "disasters" | "tasks" | "projects" | "jobs" | "profile" | "ai-workspace" | "market-pulse" | "kanban" | "photo-gallery" | "music-player" | "video-player" | "files" | "analytics" | "flowchart" | "email" | "calendar" | "govhound" | "uptime"
+export type ToggleableSection = "weather" | "feed" | "api-playground" | "bookmarks" | "search" | "stocks" | "crypto" | "spacex" | "github-activity" | "disasters" | "tasks" | "projects" | "jobs" | "profile" | "ai-workspace" | "market-pulse" | "kanban" | "photo-gallery" | "music-player" | "video-player" | "files" | "analytics" | "flowchart" | "email" | "calendar" | "govhound" | "uptime" | "prompt-library"
 
 // All sections including non-toggleable ones
 export type Section = "home" | ToggleableSection | "settings"
@@ -138,6 +138,7 @@ export const DEFAULT_CATEGORY_ASSIGNMENTS: Record<ToggleableSection, CategoryId>
   tasks: "productivity",
   projects: "development",
   jobs: "development",
+  "prompt-library": "development",
   profile: "personal",
   kanban: "productivity",
   "photo-gallery": "entertainment",
@@ -182,6 +183,7 @@ export const DEFAULT_SECTION_ORDER: ToggleableSection[] = [
   "projects",
   "files",
   "jobs",
+  "prompt-library",
   "analytics",
   "profile",
   "kanban",
@@ -222,6 +224,7 @@ export const DEFAULT_VISIBILITY: Record<ToggleableSection, boolean> = {
   calendar: true,
   govhound: true,
   uptime: true,
+  "prompt-library": true,
 }
 
 const STORAGE_KEY = "section-preferences"
@@ -270,6 +273,7 @@ export const DEFAULT_SECTION_AGENTS: Record<ToggleableSection, string | null> = 
   calendar: null,
   govhound: null,
   uptime: null,
+  "prompt-library": null,
 }
 
 function loadPreferences(): SectionPreferences {
