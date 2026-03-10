@@ -26,14 +26,15 @@ function FaviconWithFallback({
   className?: string;
 }) {
   const [hasError, setHasError] = useState(false);
+  const src = getFaviconUrl(url);
 
-  if (hasError) {
+  if (hasError || !src) {
     return <Globe className={className} />;
   }
 
   return (
     <img
-      src={getFaviconUrl(url)}
+      src={src}
       alt=""
       className={className}
       onError={() => setHasError(true)}
@@ -63,14 +64,15 @@ function BookmarkNodeComponent({
   data,
   selected,
 }: NodeProps<Node<BookmarkNodeData>>) {
-  const { bookmark, isTerminal } = data;
+  const { bookmark, isTerminal, terminalActions } = data;
 
   const handleDoubleClick = useCallback(() => {
-    if (!isTerminal && bookmark.url) {
+    if (isTerminal && terminalActions) {
+      terminalActions.spawn(bookmark);
+    } else if (!isTerminal && bookmark.url) {
       window.open(bookmark.url, "_blank");
     }
-    // Terminal spawning is handled at the canvas level
-  }, [isTerminal, bookmark.url]);
+  }, [isTerminal, bookmark, terminalActions]);
 
   return (
     <div

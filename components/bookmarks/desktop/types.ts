@@ -43,9 +43,18 @@ export interface BookmarksData {
 // React Flow node data types
 // ---------------------------------------------------------------------------
 
+export interface TerminalActions {
+  run: (command: string, options?: { workingDir?: string; name?: string }) => void;
+  paste: (command: string, options?: { workingDir?: string; name?: string; profile?: string; color?: string }) => void;
+  sendToChat: (command: string) => void;
+  spawn: (bookmark: BookmarkItem) => void;
+  available: boolean;
+}
+
 export interface BookmarkNodeData {
   bookmark: BookmarkItem;
   isTerminal: boolean;
+  terminalActions?: TerminalActions;
   [key: string]: unknown; // required by @xyflow/react Node generic
 }
 
@@ -54,6 +63,9 @@ export interface FolderNodeData {
   bookmarks: BookmarkItem[];
   collapsed: boolean;
   isDropTarget?: boolean;
+  onEditBookmark?: (bookmark: BookmarkItem) => void;
+  onDeleteBookmark?: (id: string) => void;
+  terminalActions?: TerminalActions;
   [key: string]: unknown; // required by @xyflow/react Node generic
 }
 

@@ -278,29 +278,30 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
 
   return (
     <>
+      {/* Invisible proximity zone - always present when collapsed, reveals FAB on hover */}
+      {state === "collapsed" && (
+        <div
+          className="fixed bottom-0 right-0 z-30 w-24 h-40"
+          onMouseEnter={showFab}
+          onMouseLeave={hideFab}
+        />
+      )}
+
       {/* Floating toggle button - hidden until mouse enters bottom-right proximity zone */}
       <AnimatePresence mode="wait">
-        {state === "collapsed" && (
-          <>
-            {/* Invisible proximity zone - reveals FAB on hover */}
-            <div
-              className="fixed bottom-0 right-0 z-39 w-24 h-40"
-              onMouseEnter={showFab}
-              onMouseLeave={hideFab}
-              style={{ pointerEvents: 'auto' }}
-            />
-            {fabVisible && (
-              <motion.div
-                variants={fabVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                whileHover={shouldReduceMotion ? undefined : "hover"}
-                whileTap={shouldReduceMotion ? undefined : "tap"}
-                className="fixed bottom-24 right-4 z-40"
-                onMouseEnter={showFab}
-                onMouseLeave={hideFab}
-              >
+        {state === "collapsed" && fabVisible && (
+          <motion.div
+            key="fab"
+            variants={fabVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            whileHover={shouldReduceMotion ? undefined : "hover"}
+            whileTap={shouldReduceMotion ? undefined : "tap"}
+            className="fixed bottom-24 right-4 z-40"
+            onMouseEnter={showFab}
+            onMouseLeave={hideFab}
+          >
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -343,9 +344,7 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-              </motion.div>
-            )}
-          </>
+          </motion.div>
         )}
       </AnimatePresence>
 

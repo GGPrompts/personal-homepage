@@ -1066,6 +1066,20 @@ export default function BookmarksSection({
               )
               saveMutation.mutate({ ...data, bookmarks: updated })
             }}
+            terminalActions={{
+              run: handleLaunchTerminal,
+              paste: async (command, options) => {
+                const result = await pasteToTerminal(command, options)
+                if (result.success) {
+                  toast.success("Command pasted to terminal")
+                } else {
+                  toast.error(result.error || "Failed to paste to terminal")
+                }
+              },
+              sendToChat,
+              spawn: handleSpawnBookmark,
+              available: terminalAvailable,
+            }}
           />
         ) : viewMode === "grid" ? (
           // Grid View

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -12,7 +13,19 @@ import {
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Pencil, Trash2, Bookmark, FolderPlus } from "lucide-react";
+import {
+  Bookmark,
+  ClipboardPaste,
+  Copy,
+  ExternalLink,
+  FolderPlus,
+  MessageSquare,
+  Pencil,
+  Play,
+  Terminal,
+  Trash2,
+} from "lucide-react";
+import { toast } from "sonner";
 
 import { BookmarkNode } from "./BookmarkNode";
 import { FolderNode } from "./FolderNode";
@@ -26,6 +39,7 @@ import type {
   BookmarkItem,
   FolderItem,
   DesktopLayout,
+  TerminalActions,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -46,6 +60,41 @@ interface ContextMenuState {
 }
 
 // ---------------------------------------------------------------------------
+// Context menu button helper
+// ---------------------------------------------------------------------------
+
+function CtxButton({
+  icon: Icon,
+  label,
+  onClick,
+  disabled,
+  destructive,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  destructive?: boolean;
+}) {
+  return (
+    <button
+      className={`flex items-center gap-2 w-full px-3 py-1.5 text-sm transition-colors ${
+        disabled
+          ? "opacity-40 cursor-not-allowed"
+          : destructive
+            ? "text-destructive hover:bg-muted/60"
+            : "hover:bg-muted/60"
+      }`}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+    >
+      <Icon className="h-4 w-4" />
+      {label}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
@@ -58,6 +107,7 @@ export interface DesktopCanvasProps {
   onOpenAddBookmark: () => void;
   onOpenAddFolder: () => void;
   onMoveToFolder?: (bookmarkId: string, folderId: string) => void;
+  terminalActions?: TerminalActions;
 }
 
 // ---------------------------------------------------------------------------
@@ -73,17 +123,33 @@ function DesktopCanvasInner({
   onOpenAddBookmark,
   onOpenAddFolder,
   onMoveToFolder,
+  terminalActions,
 }: DesktopCanvasProps) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { getIntersectingNodes } = useReactFlow();
 
+  // Inject callbacks into nodes
+  const injectCallbacks = useCallback(
+    (nodes: Node[]) =>
+      nodes.map((n) => {
+        if (n.type === "folder") {
+          return { ...n, data: { ...n.data, onEditBookmark, onDeleteBookmark, terminalActions } };
+        }
+        if (n.type === "bookmark") {
+          return { ...n, data: { ...n.data, terminalActions } };
+        }
+        return n;
+      }),
+    [onEditBookmark, onDeleteBookmark, terminalActions],
+  );
+
   // Build initial nodes from data + saved layout
   const initialNodes = useMemo(() => {
     const saved = loadDesktopLayout();
     const layout: DesktopLayout = saved ?? { positions: {}, version: 1 };
-    return bookmarksToNodes(data, layout);
-  }, [data]);
+    return injectCallbacks(bookmarksToNodes(data, layout));
+  }, [data, injectCallbacks]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
 
@@ -91,9 +157,9 @@ function DesktopCanvasInner({
   React.useEffect(() => {
     const saved = loadDesktopLayout();
     const layout: DesktopLayout = saved ?? { positions: {}, version: 1 };
-    const updated = bookmarksToNodes(data, layout);
+    const updated = injectCallbacks(bookmarksToNodes(data, layout));
     setNodes(updated);
-  }, [data, setNodes]);
+  }, [data, setNodes, injectCallbacks]);
 
   // Highlight folder drop targets while dragging a bookmark
   const onNodeDrag: NodeMouseHandler = useCallback(
@@ -135,7 +201,6 @@ function DesktopCanvasInner({
         const intersecting = getIntersectingNodes(node);
         const targetFolder = intersecting.find((n) => n.type === "folder");
         if (targetFolder) {
-          // Remove this bookmark's position from the saved layout
           const saved = loadDesktopLayout();
           if (saved) {
             delete saved.positions[node.id];
@@ -191,56 +256,145 @@ function DesktopCanvasInner({
     [],
   );
 
-  // Context menu action helpers
-  const handleContextMenuAction = useCallback(
-    (action: string) => {
-      if (!contextMenu) return;
+  // Find the bookmark for the current context menu
+  const ctxBookmark =
+    contextMenu?.type === "bookmark" && contextMenu.nodeId
+      ? data.bookmarks.find((b) => b.id === contextMenu.nodeId)
+      : null;
 
-      switch (action) {
-        case "new-bookmark":
-          onOpenAddBookmark();
-          break;
-        case "new-folder":
-          onOpenAddFolder();
-          break;
-        case "edit": {
-          if (contextMenu.type === "bookmark" && contextMenu.nodeId) {
-            const bm = data.bookmarks.find((b) => b.id === contextMenu.nodeId);
-            if (bm) onEditBookmark(bm);
-          } else if (contextMenu.type === "folder" && contextMenu.nodeId) {
-            const folder = data.folders.find(
-              (f) => f.id === contextMenu.nodeId,
-            );
-            if (folder) onEditFolder(folder);
-          }
-          break;
-        }
-        case "delete": {
-          if (contextMenu.type === "bookmark" && contextMenu.nodeId) {
-            onDeleteBookmark(contextMenu.nodeId);
-          } else if (contextMenu.type === "folder" && contextMenu.nodeId) {
-            onDeleteFolder(contextMenu.nodeId);
-          }
-          break;
-        }
+  const ctxFolder =
+    contextMenu?.type === "folder" && contextMenu.nodeId
+      ? data.folders.find((f) => f.id === contextMenu.nodeId)
+      : null;
+
+  const closeMenu = useCallback(() => setContextMenu(null), []);
+
+  // -- Render context menu content based on type ----------------------------
+  function renderContextMenuContent() {
+    if (!contextMenu) return null;
+
+    if (contextMenu.type === "canvas") {
+      return (
+        <>
+          <CtxButton icon={Bookmark} label="New Bookmark" onClick={() => { onOpenAddBookmark(); closeMenu(); }} />
+          <CtxButton icon={FolderPlus} label="New Folder" onClick={() => { onOpenAddFolder(); closeMenu(); }} />
+        </>
+      );
+    }
+
+    if (contextMenu.type === "folder" && ctxFolder) {
+      return (
+        <>
+          <CtxButton icon={Pencil} label="Edit" onClick={() => { onEditFolder(ctxFolder); closeMenu(); }} />
+          <CtxButton icon={Trash2} label="Delete" destructive onClick={() => { onDeleteFolder(ctxFolder.id); closeMenu(); }} />
+        </>
+      );
+    }
+
+    if (contextMenu.type === "bookmark" && ctxBookmark) {
+      if (ctxBookmark.type === "terminal") {
+        return (
+          <>
+            {ctxBookmark.command && (
+              <>
+                <CtxButton
+                  icon={Play}
+                  label="Run in Terminal"
+                  disabled={!terminalActions?.available}
+                  onClick={() => {
+                    terminalActions?.run(ctxBookmark.command!, {
+                      workingDir: ctxBookmark.workingDir,
+                      name: ctxBookmark.name,
+                    });
+                    closeMenu();
+                  }}
+                />
+                <CtxButton
+                  icon={ClipboardPaste}
+                  label="Paste to Terminal"
+                  disabled={!terminalActions?.available}
+                  onClick={() => {
+                    terminalActions?.paste(ctxBookmark.command!, {
+                      workingDir: ctxBookmark.workingDir,
+                      name: ctxBookmark.name,
+                      profile: ctxBookmark.profile,
+                      color: ctxBookmark.color,
+                    });
+                    closeMenu();
+                  }}
+                />
+                <CtxButton
+                  icon={MessageSquare}
+                  label="Send to Chat"
+                  disabled={!terminalActions?.available}
+                  onClick={() => {
+                    terminalActions?.sendToChat(ctxBookmark.command!);
+                    toast.success("Sent to TabzChrome chat");
+                    closeMenu();
+                  }}
+                />
+              </>
+            )}
+            <div className="h-px bg-border/40 my-1" />
+            <CtxButton
+              icon={Copy}
+              label="Copy Command"
+              onClick={() => {
+                navigator.clipboard.writeText(ctxBookmark.command || "");
+                toast.success("Command copied");
+                closeMenu();
+              }}
+            />
+            {ctxBookmark.contextActions && ctxBookmark.contextActions.length > 0 && (
+              <>
+                <div className="h-px bg-border/40 my-1" />
+                {ctxBookmark.contextActions.map((action, idx) => (
+                  <CtxButton
+                    key={idx}
+                    icon={Terminal}
+                    label={action.label}
+                    disabled={!terminalActions?.available}
+                    onClick={() => {
+                      terminalActions?.run(action.command, {
+                        workingDir: ctxBookmark.workingDir,
+                        name: action.label,
+                      });
+                      closeMenu();
+                    }}
+                  />
+                ))}
+              </>
+            )}
+            <div className="h-px bg-border/40 my-1" />
+            <CtxButton icon={Pencil} label="Edit" onClick={() => { onEditBookmark(ctxBookmark); closeMenu(); }} />
+            <CtxButton icon={Trash2} label="Delete" destructive onClick={() => { onDeleteBookmark(ctxBookmark.id); closeMenu(); }} />
+          </>
+        );
       }
 
-      setContextMenu(null);
-    },
-    [
-      contextMenu,
-      data,
-      onEditBookmark,
-      onDeleteBookmark,
-      onEditFolder,
-      onDeleteFolder,
-      onOpenAddBookmark,
-      onOpenAddFolder,
-    ],
-  );
+      // Web link bookmark
+      return (
+        <>
+          <CtxButton
+            icon={ExternalLink}
+            label="Open in New Tab"
+            onClick={() => {
+              window.open(ctxBookmark.url, "_blank");
+              closeMenu();
+            }}
+          />
+          <div className="h-px bg-border/40 my-1" />
+          <CtxButton icon={Pencil} label="Edit" onClick={() => { onEditBookmark(ctxBookmark); closeMenu(); }} />
+          <CtxButton icon={Trash2} label="Delete" destructive onClick={() => { onDeleteBookmark(ctxBookmark.id); closeMenu(); }} />
+        </>
+      );
+    }
+
+    return null;
+  }
 
   return (
-    <div ref={containerRef} className="relative w-full h-[600px] rounded-lg border border-border/40 overflow-hidden">
+    <div ref={containerRef} className="relative w-full h-[calc(100vh-12rem)] min-h-[400px] rounded-lg border border-border/40 overflow-hidden">
       <ReactFlow
         nodes={nodes}
         edges={[]}
@@ -267,56 +421,20 @@ function DesktopCanvasInner({
         <Controls showInteractive={false} />
       </ReactFlow>
 
-      {/* Context Menu Overlay */}
-      {contextMenu && (
-        <>
-          {/* Invisible backdrop to catch clicks */}
-          <div
-            className="fixed inset-0 z-50"
-            onClick={() => setContextMenu(null)}
-          />
-          <div
-            className="fixed z-50 min-w-[160px] bg-popover/95 backdrop-blur-sm border border-border rounded-md shadow-lg py-1"
-            style={{ left: contextMenu.x, top: contextMenu.y }}
-          >
-            {contextMenu.type === "canvas" ? (
-              <>
-                <button
-                  className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-muted/60 transition-colors"
-                  onClick={() => handleContextMenuAction("new-bookmark")}
-                >
-                  <Bookmark className="h-4 w-4" />
-                  New Bookmark
-                </button>
-                <button
-                  className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-muted/60 transition-colors"
-                  onClick={() => handleContextMenuAction("new-folder")}
-                >
-                  <FolderPlus className="h-4 w-4" />
-                  New Folder
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-muted/60 transition-colors"
-                  onClick={() => handleContextMenuAction("edit")}
-                >
-                  <Pencil className="h-4 w-4" />
-                  Edit
-                </button>
-                <button
-                  className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-destructive hover:bg-muted/60 transition-colors"
-                  onClick={() => handleContextMenuAction("delete")}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete
-                </button>
-              </>
-            )}
-          </div>
-        </>
-      )}
+      {/* Context Menu — portaled to body to escape React Flow transforms */}
+      {contextMenu &&
+        createPortal(
+          <>
+            <div className="fixed inset-0 z-[100]" onClick={closeMenu} />
+            <div
+              className="fixed z-[100] min-w-[180px] bg-popover/95 backdrop-blur-sm border border-border rounded-md shadow-lg py-1"
+              style={{ left: contextMenu.x, top: contextMenu.y }}
+            >
+              {renderContextMenuContent()}
+            </div>
+          </>,
+          document.body,
+        )}
     </div>
   );
 }
