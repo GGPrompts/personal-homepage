@@ -39,6 +39,7 @@ Next.js 15 personal dashboard with accordion sidebar navigation. Features weathe
 | Music Player | `app/sections/music-player.tsx` | [docs/sections/music-player.md](docs/sections/music-player.md) |
 | Photo Gallery | `app/sections/photo-gallery.tsx` | [docs/sections/photo-gallery.md](docs/sections/photo-gallery.md) |
 | Profile | `app/sections/profile.tsx` | [docs/sections/profile.md](docs/sections/profile.md) |
+| Prompt Library | `app/sections/prompt-library.tsx` | [docs/sections/prompt-library.md](docs/sections/prompt-library.md) |
 | Projects | `app/sections/projects-dashboard.tsx` | [docs/sections/projects-dashboard.md](docs/sections/projects-dashboard.md) |
 | Search Hub | `app/sections/search-hub.tsx` | [docs/sections/search-hub.md](docs/sections/search-hub.md) |
 | Scratchpad | `app/sections/tasks.tsx` | Tasks + Notes tabs (see below) |
