@@ -1060,6 +1060,12 @@ export default function BookmarksSection({
             onDeleteFolder={(id) => setDeleteConfirm({ item: data.folders.find((f) => f.id === id)!, type: "folder" })}
             onOpenAddBookmark={() => { resetForm(); setAddBookmarkOpen(true) }}
             onOpenAddFolder={() => { setFormName(""); setFormIcon(""); setAddFolderOpen(true) }}
+            onMoveToFolder={(bookmarkId, folderId) => {
+              const updated = data.bookmarks.map((b) =>
+                b.id === bookmarkId ? { ...b, folderId } : b
+              )
+              saveMutation.mutate({ ...data, bookmarks: updated })
+            }}
           />
         ) : viewMode === "grid" ? (
           // Grid View

@@ -7,6 +7,7 @@ import {
   Background,
   Controls,
   useNodesState,
+  useReactFlow,
   type NodeMouseHandler,
   type Node,
 } from "@xyflow/react";
@@ -56,6 +57,7 @@ export interface DesktopCanvasProps {
   onDeleteFolder: (id: string) => void;
   onOpenAddBookmark: () => void;
   onOpenAddFolder: () => void;
+  onMoveToFolder?: (bookmarkId: string, folderId: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -70,9 +72,11 @@ function DesktopCanvasInner({
   onDeleteFolder,
   onOpenAddBookmark,
   onOpenAddFolder,
+  onMoveToFolder,
 }: DesktopCanvasProps) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { getIntersectingNodes } = useReactFlow();
 
   // Build initial nodes from data + saved layout
   const initialNodes = useMemo(() => {
@@ -91,16 +95,68 @@ function DesktopCanvasInner({
     setNodes(updated);
   }, [data, setNodes]);
 
-  // Save layout on drag stop
+  // Highlight folder drop targets while dragging a bookmark
+  const onNodeDrag: NodeMouseHandler = useCallback(
+    (_event, node) => {
+      if (node.type !== "bookmark") return;
+
+      const intersecting = getIntersectingNodes(node);
+      const overlappingFolderId = intersecting.find((n) => n.type === "folder")?.id ?? null;
+
+      setNodes((currentNodes) =>
+        currentNodes.map((n) => {
+          if (n.type !== "folder") return n;
+          const shouldHighlight = n.id === overlappingFolderId;
+          if ((n.data as Record<string, unknown>).isDropTarget === shouldHighlight) return n;
+          return {
+            ...n,
+            data: { ...n.data, isDropTarget: shouldHighlight },
+          };
+        }),
+      );
+    },
+    [getIntersectingNodes, setNodes],
+  );
+
+  // Save layout on drag stop + handle drop onto folder
   const onNodeDragStop: NodeMouseHandler = useCallback(
-    (_event, _node) => {
-      // Use a callback to read current nodes from state
+    (_event, node) => {
+      // Clear all drop-target highlights
+      setNodes((currentNodes) =>
+        currentNodes.map((n) =>
+          n.type === "folder" && (n.data as Record<string, unknown>).isDropTarget
+            ? { ...n, data: { ...n.data, isDropTarget: false } }
+            : n,
+        ),
+      );
+
+      // Check if a bookmark was dropped on a folder
+      if (node.type === "bookmark" && onMoveToFolder) {
+        const intersecting = getIntersectingNodes(node);
+        const targetFolder = intersecting.find((n) => n.type === "folder");
+        if (targetFolder) {
+          // Remove this bookmark's position from the saved layout
+          const saved = loadDesktopLayout();
+          if (saved) {
+            delete saved.positions[node.id];
+            try {
+              localStorage.setItem("bookmarks-desktop-layout", JSON.stringify(saved));
+            } catch {
+              // ignore
+            }
+          }
+          onMoveToFolder(node.id, targetFolder.id);
+          return;
+        }
+      }
+
+      // Normal drag — just persist positions
       setNodes((currentNodes) => {
         saveDesktopLayout(currentNodes);
         return currentNodes;
       });
     },
-    [setNodes],
+    [setNodes, getIntersectingNodes, onMoveToFolder],
   );
 
   // Close context menu on pane click
@@ -190,6 +246,7 @@ function DesktopCanvasInner({
         edges={[]}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
+        onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         onPaneClick={onPaneClick}
         onPaneContextMenu={onPaneContextMenu}
