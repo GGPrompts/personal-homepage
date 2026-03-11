@@ -1,0 +1,5 @@
+prefix: hp
+project_name: Personal Homepage
+description: Next.js 15 personal dashboard with accordion sidebar navigation
+
+issue-prefix: "hp"
