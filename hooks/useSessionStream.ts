@@ -13,6 +13,7 @@ interface UseSessionStreamReturn {
   messages: ParsedMessage[]
   isStreaming: boolean
   isConnected: boolean
+  isWaiting: boolean
   error: string | null
   reconnect: () => void
 }
@@ -22,6 +23,7 @@ export function useSessionStream({ path, enabled = true }: UseSessionStreamOptio
   const [isStreaming, setIsStreaming] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isWaiting, setIsWaiting] = useState(false)
   const [messages, setMessages] = useState<ParsedMessage[]>([])
   const [reconnectKey, setReconnectKey] = useState(0)
 
@@ -70,6 +72,12 @@ export function useSessionStream({ path, enabled = true }: UseSessionStreamOptio
     const es = new EventSource(`/api/ai/stream?path=${encodeURIComponent(path)}`)
     eventSourceRef.current = es
 
+    es.addEventListener('waiting', () => {
+      setIsWaiting(true)
+      setIsConnected(true)
+      setError(null)
+    })
+
     es.addEventListener('initial', (event) => {
       try {
         const data = JSON.parse(event.data)
@@ -77,6 +85,7 @@ export function useSessionStream({ path, enabled = true }: UseSessionStreamOptio
         setEntries(initialEntries)
         setMessages(entriesToMessages(initialEntries))
         setIsConnected(true)
+        setIsWaiting(false)
         setError(null)
       } catch {
         setError('Failed to parse initial data')
@@ -150,5 +159,5 @@ export function useSessionStream({ path, enabled = true }: UseSessionStreamOptio
     setError(null)
   }, [])
 
-  return { messages, isStreaming, isConnected, error, reconnect }
+  return { messages, isStreaming, isConnected, isWaiting, error, reconnect }
 }

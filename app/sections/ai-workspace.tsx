@@ -61,7 +61,7 @@ export default function AIWorkspaceSection({
   const [showSidebar, setShowSidebar] = React.useState(true)
   const [spawningSession, setSpawningSession] = React.useState(false)
 
-  const { messages, isStreaming, isConnected, error } = useSessionStream({
+  const { messages, isStreaming, isConnected, isWaiting, error } = useSessionStream({
     path: selectedPath,
     enabled: !!selectedPath,
   })
@@ -360,16 +360,7 @@ export default function AIWorkspaceSection({
                 </Button>
               </div>
             </div>
-          ) : error && messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
-              <WifiOff className="h-8 w-8 text-muted-foreground/40" />
-              <p className="text-sm text-muted-foreground">{error}</p>
-              <Button variant="outline" size="sm" onClick={fetchSessions}>
-                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                Retry
-              </Button>
-            </div>
-          ) : messages.length === 0 ? (
+          ) : isWaiting || (messages.length === 0 && !error) ? (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
               <motion.div
                 animate={{ opacity: [0.3, 0.7, 0.3] }}
@@ -378,8 +369,19 @@ export default function AIWorkspaceSection({
                 <Radio className="h-8 w-8 text-orange-400/40" />
               </motion.div>
               <p className="text-sm text-muted-foreground">
-                Waiting for conversation data...
+                {isWaiting
+                  ? "Session started — waiting for first message in terminal..."
+                  : "Waiting for conversation data..."}
               </p>
+            </div>
+          ) : error && messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
+              <WifiOff className="h-8 w-8 text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground">{error}</p>
+              <Button variant="outline" size="sm" onClick={fetchSessions}>
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                Retry
+              </Button>
             </div>
           ) : (
             <ConversationViewer messages={messages} isStreaming={isStreaming} />

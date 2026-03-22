@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
       let offset = 0
       let pollTimer: ReturnType<typeof setInterval> | null = null
       let closed = false
+      let fileFound = false
 
       function sendEvent(event: string, data: unknown) {
         if (closed) return
@@ -48,12 +49,14 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      function initialRead() {
+      function tryReadFile() {
         let fd: number
         try {
           fd = openSync(path!, 'r')
         } catch {
-          sendEvent('error', { message: 'File not found. Waiting for session to start...' })
+          if (!fileFound) {
+            sendEvent('waiting', { message: 'Waiting for session to start...' })
+          }
           return
         }
 
@@ -61,27 +64,31 @@ export async function GET(request: NextRequest) {
           const stat = fstatSync(fd)
           const fileSize = stat.size
 
-          let readFrom = 0
-          if (fileSize > INITIAL_READ_SIZE) {
-            readFrom = fileSize - INITIAL_READ_SIZE
-          }
-
-          const bufSize = fileSize - readFrom
-          const buf = Buffer.alloc(bufSize)
-          readSync(fd, buf, 0, bufSize, readFrom)
-
-          let text = buf.toString('utf-8')
-
-          if (readFrom > 0) {
-            const newlineIdx = text.indexOf('\n')
-            if (newlineIdx !== -1) {
-              text = text.slice(newlineIdx + 1)
+          if (!fileFound) {
+            fileFound = true
+            let readFrom = 0
+            if (fileSize > INITIAL_READ_SIZE) {
+              readFrom = fileSize - INITIAL_READ_SIZE
             }
-          }
 
-          const entries = parseJsonlEntries(text)
-          sendEvent('initial', { entries })
-          offset = fileSize
+            const bufSize = fileSize - readFrom
+            const buf = Buffer.alloc(bufSize)
+            readSync(fd, buf, 0, bufSize, readFrom)
+
+            let text = buf.toString('utf-8')
+
+            if (readFrom > 0) {
+              const newlineIdx = text.indexOf('\n')
+              if (newlineIdx !== -1) {
+                text = text.slice(newlineIdx + 1)
+              }
+            }
+
+            const entries = parseJsonlEntries(text)
+            sendEvent('initial', { entries })
+            offset = fileSize
+            return
+          }
         } finally {
           closeSync(fd)
         }
@@ -89,6 +96,11 @@ export async function GET(request: NextRequest) {
 
       function poll() {
         if (closed) return
+
+        if (!fileFound) {
+          tryReadFile()
+          return
+        }
 
         let fd: number
         try {
@@ -125,7 +137,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      initialRead()
+      tryReadFile()
       pollTimer = setInterval(poll, POLL_INTERVAL)
 
       request.signal.addEventListener('abort', cleanup)
