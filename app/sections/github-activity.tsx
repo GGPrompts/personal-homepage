@@ -853,7 +853,7 @@ export default function GitHubActivity({ activeSubItem, onSubItemHandled }: GitH
             <div className="flex flex-wrap gap-1">
               {activityData.map((day, i) => (
                 <motion.div
-                  key={day.day}
+                  key={`${day.day}-${i}`}
                   initial={{ opacity: 0, scale: 0 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: i * 0.005 }}

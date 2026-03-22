@@ -476,9 +476,9 @@ export function FilteredFileList({
       {/* Tree sections */}
       <ScrollArea className="flex-1">
         <div className="p-2">
-          {filteredTrees.map((source) => (
+          {filteredTrees.map((source, i) => (
             <TreeSection
-              key={source.basePath}
+              key={`${source.basePath}-${i}`}
               source={source}
               onFileSelect={handleFileSelect}
               selectedPath={selectedPath}

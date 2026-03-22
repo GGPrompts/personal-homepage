@@ -11,7 +11,7 @@
   "keywords": [],
   "main": "index.js",
   "scripts": {
-    "dev": "next dev -p 3001 -H localhost",
+    "dev": "next dev -p 3001 -H 0.0.0.0",
     "build": "next build",
     "start": "next start -p 3001",
     "lint": "next lint",
@@ -96,6 +96,7 @@
     "@types/pg": "^8.18.0",
     "@vitejs/plugin-react": "^5.1.2",
     "autoprefixer": "^10.4.22",
+    "baseline-browser-mapping": "^2.10.10",
     "jsdom": "^27.4.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.18",

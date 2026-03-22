@@ -114,6 +114,7 @@ function ApiKeyInput({
   status,
   onTest,
   testing,
+  envConfigured,
 }: {
   config: ApiKeyConfig
   value: string
@@ -121,6 +122,7 @@ function ApiKeyInput({
   status: "valid" | "invalid" | "unknown" | "free" | "saved"
   onTest?: () => void
   testing?: boolean
+  envConfigured?: boolean
 }) {
   const [showKey, setShowKey] = React.useState(false)
   const Icon = config.icon
@@ -171,7 +173,13 @@ function ApiKeyInput({
             <p className="text-xs text-muted-foreground mb-3 italic">{config.note}</p>
           )}
 
-          {!config.free && (
+          {!config.free && envConfigured && (
+            <p className="text-xs text-emerald-500 font-mono">
+              Set via {config.envVar} in .env.local
+            </p>
+          )}
+
+          {!config.free && !envConfigured && (
             <div className="space-y-2">
               <div className="flex gap-2">
                 <div className="relative flex-1">
@@ -607,7 +615,8 @@ function ApiKeysTab() {
 
   // Fetch server-side API status
   const { data: apiStatus, isLoading } = useQuery<{
-    apis: { finnhub: boolean; alphaVantage: boolean; github: boolean }
+    apis: { finnhub: boolean; alphaVantage: boolean; github: boolean; samGov: boolean }
+    projectRoot: string
   }>({
     queryKey: ["api-status"],
     queryFn: async () => {
@@ -656,7 +665,7 @@ function ApiKeysTab() {
   const testApiKey = async (
     service: string,
     key: string,
-    setStatus: (s: "valid" | "invalid" | null) => void,
+    setStatus: (s: "valid" | "invalid" | "unknown") => void,
     setTesting: (t: boolean) => void
   ) => {
     if (!key.trim()) return
@@ -743,6 +752,16 @@ function ApiKeysTab() {
     },
   ]
 
+  const isEnvConfigured = (id: string): boolean => {
+    if (!apiStatus) return false
+    switch (id) {
+      case "finnhub": return apiStatus.apis.finnhub
+      case "alpha-vantage": return apiStatus.apis.alphaVantage
+      case "sam-gov": return apiStatus.apis.samGov
+      default: return false
+    }
+  }
+
   const getKeyValue = (id: string): string => {
     switch (id) {
       case "finnhub": return finnhubKey
@@ -766,14 +785,14 @@ function ApiKeysTab() {
 
   const getStatus = (id: string): "valid" | "invalid" | "unknown" | "free" | "saved" => {
     if (id === "open-meteo") return "free"
+    if (isEnvConfigured(id)) return "valid"
     if (id === "finnhub") {
-      if (apiStatus?.apis.finnhub) return "valid"
       if (finnhubStatus === "valid") return "valid"
       if (finnhubStatus === "invalid") return "invalid"
       return finnhubKey.trim() ? "saved" : "unknown"
     }
     if (id === "alpha-vantage") {
-      return apiStatus?.apis.alphaVantage ? "valid" : alphaVantageKey.trim() ? "saved" : "unknown"
+      return alphaVantageKey.trim() ? "saved" : "unknown"
     }
     if (id === "youtube") {
       if (youtubeStatus === "valid") return "valid"
@@ -847,6 +866,7 @@ function ApiKeysTab() {
             value={getKeyValue(config.id)}
             onChange={(v) => setKeyValue(config.id, v)}
             status={getStatus(config.id)}
+            envConfigured={isEnvConfigured(config.id)}
             onTest={
               config.id === "finnhub" ? testFinnhub :
               config.id === "youtube" ? testYoutube :
@@ -861,9 +881,23 @@ function ApiKeysTab() {
         ))}
       </div>
 
-      <p className="text-sm text-muted-foreground pt-4">
-        Environment variable API keys (from .env.local) take precedence over stored keys.
-      </p>
+      <div className="flex items-center gap-2 pt-4">
+        <p className="text-sm text-muted-foreground">
+          Environment variable API keys (from .env.local) take precedence over stored keys.
+        </p>
+        {apiStatus?.projectRoot && (
+          <Button
+            variant="link"
+            size="sm"
+            className="text-xs px-0 h-auto"
+            onClick={() => {
+              window.location.hash = '#/files?path=' + encodeURIComponent(`${apiStatus.projectRoot}/.env.local`)
+            }}
+          >
+            View file
+          </Button>
+        )}
+      </div>
     </div>
   )
 }
