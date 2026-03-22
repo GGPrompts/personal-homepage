@@ -272,10 +272,6 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
   // Don't render until mounted to prevent hydration mismatch with localStorage state
   if (!mounted) return null
 
-  // Hide drawer when on AI Workspace (workspace manages its own chat UI)
-  const isOnWorkspace = context.currentSection === 'ai-workspace'
-  if (isOnWorkspace) return null
-
   return (
     <>
       {/* Invisible proximity zone - always present when collapsed, reveals FAB on hover */}
@@ -1224,9 +1220,6 @@ export function AIDrawerToggle({ className = "", currentSection }: AIDrawerToggl
 
   // Don't render if context is not available
   if (!context) return null
-
-  // Hide toggle when on AI Workspace
-  if (mounted && context.currentSection === 'ai-workspace') return null
 
   const { toggle, isOpen, hasActiveConversation } = context
 

@@ -109,6 +109,7 @@ import dynamic from "next/dynamic"
 import { useLoginTrigger } from "@/hooks/useLoginTrigger"
 import { useMusicPlayerSafe } from "@/components/MusicPlayerProvider"
 import { AIDrawerToggle } from "@/components/ai/AIDrawer"
+import { useAIDrawerSafe } from "@/components/ai/AIDrawerProvider"
 
 // Lazy-loaded sections
 const VideoPlayerSection = dynamic(() => import("./sections/video-player"), {
@@ -860,6 +861,7 @@ export default function PersonalHomepage() {
     clearWorkingDir,
     isLoaded: workingDirLoaded,
   } = useWorkingDirectory()
+  const aiDrawer = useAIDrawerSafe()
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
   const [activeSection, setActiveSection] = React.useState<Section>("home")
@@ -883,6 +885,11 @@ export default function PersonalHomepage() {
       localStorage.setItem("active-section", activeSection)
     }
   }, [activeSection, sectionRestored])
+
+  // Sync active section to AI drawer context so it stays current across navigation
+  React.useEffect(() => {
+    aiDrawer?.setCurrentSection(activeSection)
+  }, [activeSection, aiDrawer])
 
   // Set CSS variable for sidebar width (used by PersistentMusicDrawer)
   React.useEffect(() => {
