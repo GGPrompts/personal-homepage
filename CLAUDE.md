@@ -100,17 +100,23 @@ The Scratchpad section (`app/sections/tasks.tsx`) has two tabs:
 
 ## AI Workspace Architecture
 
-The AI Workspace uses Claude CLI (`--print` mode) for chat. Key files:
-- `lib/ai/claude.ts` - Spawns Claude CLI with streaming
-- `app/api/ai/chat/route.ts` - Chat API endpoint
-- `hooks/useAIChat.ts` - Client-side chat hook
+The AI Workspace is a live JSONL session viewer — it watches real Claude CLI sessions running in external terminals. Key files:
+- `app/api/ai/sessions/route.ts` - Lists sessions, spawns new tmux+claude sessions
+- `app/api/ai/stream/route.ts` - SSE endpoint that tails JSONL files with offset-based polling
+- `lib/ai/jsonl-parser.ts` - Parses JSONL entries into typed messages
+- `components/ai/ConversationViewer.tsx` - Renders messages with collapsible tool/thinking blocks
+- `hooks/useSessionStream.ts` - Client hook for SSE stream consumption
 
-**Session persistence**: Claude CLI stores sessions at `~/.claude/projects/{path}/{session-id}.jsonl`. We generate session IDs upfront with `--session-id` for multi-turn conversations.
+Sessions are read from `~/.claude/projects/{path}/{session-id}.jsonl` files written by Claude CLI running externally.
 
-**Archived: Multi-model conversations** (`lib/ai/_archived/conversation-multimodel.ts`)
-Built but archived due to context overhead. The system supported switching between Claude/Gemini/Codex mid-conversation with identity-aware prompts ("You are Claude, messages marked [Gemini] are from another AI"). This added ~200 tokens per message even for single-model use.
+**AI Drawer sidebar** (`components/ai/AIDrawer.tsx`) is a separate system that still uses the old `--print` mode chat via `hooks/useAIChat.ts` and `app/api/ai/chat/route.ts`.
 
-**Known limitation**: If page disconnects while Claude is running, the process continues in background but UI can't reconnect.
+**Archived implementations** in `lib/ai/_archived/`:
+- `ai-workspace-print-mode.tsx` - Old chat UI
+- `claude-print-mode.ts` - Old Claude CLI spawner
+- `chat-route-print-mode.ts` - Old chat API route
+- `useAIChat-print-mode.ts` - Old chat hook
+- `conversation-multimodel.ts` - Multi-model conversation system
 
 ## Quick Reference
 

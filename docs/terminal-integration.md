@@ -2,14 +2,29 @@
 
 > **Note:** For comprehensive TabzChrome documentation including REST API, MCP selectors, and automation patterns, see [tabz-integration.md](tabz-integration.md).
 
-The homepage optionally supports terminal bookmarks that run commands via the [TabzChrome](https://github.com/GGPrompts/tabzchrome) browser extension. This feature is entirely optional.
+The homepage supports terminal bookmarks that run commands via two backends:
+
+1. **Native (Kitty)** — Default. Spawns Kitty terminal windows via `POST /api/terminal`. No setup required.
+2. **TabzChrome** — Legacy. Uses a Chrome extension + localhost backend on port 8129.
 
 ## Overview
 
-Terminal bookmarks allow you to save and quickly execute shell commands directly from the bookmarks section. When clicked, commands are sent to the TabzChrome Chrome extension which spawns them in a terminal panel.
+Terminal bookmarks allow you to save and quickly execute shell commands directly from the bookmarks section. When clicked, commands are sent to the configured backend which spawns them in a terminal.
+
+## Backend Selection
+
+Configure in **Profile > Terminal Integration**:
+- Toggle between "Native (Kitty)" and "TabzChrome"
+- Stored in localStorage key `terminal-backend-type`
+- Auto-detects: if TabzChrome is unreachable, defaults to Native
 
 ## Requirements
 
+### Native Backend (Default)
+- **Kitty terminal** installed and in PATH
+- No additional setup needed
+
+### TabzChrome Backend
 - **Chrome browser** with TabzChrome-simplified extension installed
 - Extension must be configured with `externally_connectable` for your homepage URL
 
@@ -296,14 +311,20 @@ This prevents users from creating terminal bookmarks they can't use.
 
 | Key | Location | Purpose |
 |-----|----------|---------|
-| `terminal-extension-id` | localStorage | Chrome extension ID |
+| `terminal-backend-type` | localStorage | `"native"` or `"tabzchrome"` (default: native) |
+| `terminal-extension-id` | localStorage | Chrome extension ID (TabzChrome only) |
+| `tabz-api-token` | localStorage | TabzChrome API token (TabzChrome only) |
+| `tabz-default-workdir` | localStorage | Default working directory |
 | Bookmarks with `type: "terminal"` | GitHub repo | Synced terminal commands |
 
 ## File Locations
 
 | File | Purpose |
 |------|---------|
-| `hooks/useTerminalExtension.ts` | Extension communication hook |
+| `hooks/useTerminalExtension.ts` | Terminal hook (dual backend: native + TabzChrome) |
+| `app/api/terminal/route.ts` | Native Kitty terminal API endpoint |
+| `lib/terminal-native.ts` | Kitty spawn, workdir validation |
+| `app/sections/profile.tsx` | Backend selector UI |
 | `app/sections/bookmarks.tsx` | Bookmark UI with terminal support |
 
 ## See Also

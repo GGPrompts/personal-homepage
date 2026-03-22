@@ -23,7 +23,7 @@ File browser with tree navigation, syntax-highlighted content viewer, and plugin
 - Git status indicators (staged/modified/untracked)
 - Breadcrumb navigation
 - Keyboard navigation (arrow keys, Enter)
-- Drag-and-drop file paths
+- ~~Drag-and-drop file paths~~ (disabled — Wayland DnD from browser crashes Hyprland)
 - Expand/collapse all directories
 - File pinning (preview vs pinned tabs)
 - Plugin management sidebar
@@ -133,7 +133,7 @@ Plugin sidebar visibility persists per session (toggle button in viewer header).
 ## Integration
 - **Auth**: GitHub OAuth for remote file browsing
 - **Working Directory**: Shared context for project-aware file browsing
-- **TabzChrome**: TTS reading, file path drag-drop
+- **TabzChrome**: TTS reading (drag-drop disabled due to Hyprland/Wayland crash)
 - **Terminal Hyperlinks**: Direct file opening via URL hash
 
 ## TabzChrome Selectors

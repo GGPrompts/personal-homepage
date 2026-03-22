@@ -7,7 +7,7 @@ User authentication and service configuration.
 - `components/AuthProvider.tsx` - Auth context
 - `components/AuthModal.tsx` - Login modal
 - `components/RepoSelector.tsx` - GitHub repo picker
-- `hooks/useTerminalExtension.ts` - TabzChrome status
+- `hooks/useTerminalExtension.ts` - Terminal backend status (TabzChrome + Native Kitty)
 
 ## Features
 - GitHub OAuth login (Supabase)
@@ -16,15 +16,16 @@ User authentication and service configuration.
   - Quick Notes repo
   - Bookmarks repo
   - Last sync times
-- TabzChrome configuration:
-  - API token setup
-  - Connection status
-  - Default working directory
+- Terminal backend configuration:
+  - Backend selector (Native Kitty vs TabzChrome)
+  - Native: Kitty terminal ready status
+  - TabzChrome: API token setup, connection status
+  - Default working directory (shared between backends)
 - Sign out
 
 ## Integration
 - **Supabase**: GitHub OAuth provider
-- **TabzChrome**: Token validation, status check
+- **Terminal**: Native Kitty backend (`/api/terminal`) or TabzChrome
 
 ## TabzChrome Selectors
 - `data-tabz-section="profile"` - Container

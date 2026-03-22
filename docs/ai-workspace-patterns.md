@@ -103,27 +103,28 @@ NormalizedEntry      → Unified format across agent types
 Executor             → Spawns process, handles lifecycle
 ```
 
-### Our Current Implementation
+### Current Implementation (JSONL Session Viewer)
+
+The AI Workspace section is now a read-only JSONL session viewer:
 
 ```
-lib/ai/claude.ts           → Spawns Claude, parses stream, extracts usage
-app/api/ai/chat/route.ts   → SSE bridge, forwards usage to client
-lib/ai-workspace.ts        → Types (Conversation, TokenUsage)
-app/sections/ai-workspace.tsx → UI, context calculation, display
+app/api/ai/sessions/route.ts     → Lists JSONL sessions, spawns tmux+claude sessions
+app/api/ai/stream/route.ts       → SSE stream tailing a JSONL file (offset-based)
+lib/ai/jsonl-parser.ts           → Parses JSONL entries to typed messages
+hooks/useSessionStream.ts        → Client hook for SSE stream + batching
+components/ai/ConversationViewer.tsx → Renders messages with collapsible blocks
+app/sections/ai-workspace.tsx    → Session browser + viewer shell
 ```
 
-### Potential Refactoring
+The old chat UI (`--print` mode) is archived in `lib/ai/_archived/` but still powers the AI Drawer sidebar via `hooks/useAIChat.ts`.
 
-Extract from `ai-workspace.tsx` (currently ~25k tokens):
+### Previous Implementation (Archived)
 
-| Component | Purpose |
-|-----------|---------|
-| `hooks/useAIChat.ts` | Chat state, streaming, message handling |
-| `hooks/useConversations.ts` | Conversation CRUD, persistence |
-| `components/ai-workspace/ChatMessage.tsx` | Message rendering, tool uses |
-| `components/ai-workspace/ConversationSidebar.tsx` | Sidebar list |
-| `components/ai-workspace/ChatInput.tsx` | Input area, prompts |
-| `components/ai-workspace/ContextIndicator.tsx` | Context % display |
+The old `--print` mode chat system files are in `lib/ai/_archived/`:
+- `ai-workspace-print-mode.tsx` — Old chat UI component
+- `claude-print-mode.ts` — Claude CLI spawner with streaming
+- `chat-route-print-mode.ts` — Chat API route
+- `useAIChat-print-mode.ts` — Chat state hook
 
 ## Multi-Turn Conversations
 

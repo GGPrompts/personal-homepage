@@ -267,20 +267,13 @@ All interactive elements have `data-tabz-*` attributes for reliable MCP tool tar
 | `[data-tabz-action="filter-github"]` | Filter to GitHub |
 | `[data-tabz-action="open-link"]` | Open feed item link |
 
-### AI Workspace Section
+### AI Workspace Section (Session Viewer)
 
 | Selector | Purpose |
 |----------|---------|
 | `[data-tabz-section="ai-workspace"]` | Workspace container |
-| `[data-tabz-input="chat-message"]` | Chat input textarea |
-| `[data-tabz-action="submit-message"]` | Send message button |
-| `[data-tabz-list="conversations"]` | Conversation list |
-| `[data-tabz-item^="conversation-"]` | Conversation items |
-| `[data-tabz-action="new-conversation"]` | New conversation button |
-| `[data-tabz-input="project-selector"]` | Project dropdown |
-| `[data-tabz-input="model-selector"]` | Model dropdown |
-| `[data-tabz-action="open-settings"]` | Settings button |
-| `[data-tabz-bridge="true"]` | TabzChrome bridge elements |
+
+Note: The AI Workspace is now a read-only JSONL session viewer. The old chat selectors (chat-message, submit-message, conversations, etc.) no longer exist.
 
 ### Bookmarks Section
 
@@ -363,14 +356,6 @@ tabz_click('[data-tabz-section="weather"][data-tabz-action="navigate"]')
 tabz_fill('[data-tabz-input="weather-location"]', 'Seattle, WA')
 tabz_click('[data-tabz-action="search-location"]')
 tabz_click('[data-tabz-action="select-location"]')  # First result
-```
-
-**Send Chat Message in AI Workspace:**
-
-```python
-tabz_click('[data-tabz-section="ai-workspace"][data-tabz-action="navigate"]')
-tabz_fill('[data-tabz-input="chat-message"]', 'Explain async/await in JavaScript')
-tabz_click('[data-tabz-action="submit-message"]')
 ```
 
 **Run Terminal Bookmark:**
@@ -649,8 +634,10 @@ Check the browser console for `[useTerminalExtension]` prefixed messages.
 
 | File | Purpose |
 |------|---------|
-| `hooks/useTerminalExtension.ts` | TabzChrome integration hook |
-| `app/sections/profile.tsx` | TabzChrome configuration UI |
+| `hooks/useTerminalExtension.ts` | Terminal integration hook (TabzChrome + Native Kitty) |
+| `app/api/terminal/route.ts` | Native Kitty terminal API endpoint |
+| `lib/terminal-native.ts` | Kitty spawn implementation |
+| `app/sections/profile.tsx` | Terminal backend configuration UI |
 | `app/sections/bookmarks.tsx` | Terminal bookmark UI |
 | `docs/terminal-integration.md` | Original terminal bookmark docs (superseded) |
 

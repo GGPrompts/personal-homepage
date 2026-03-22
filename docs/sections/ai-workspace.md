@@ -1,56 +1,47 @@
 # AI Workspace
 
-Multi-model AI chat interface with project context, powered by CLI tools.
+Live JSONL session viewer for Claude CLI sessions running in external terminals.
 
 ## Files
-- `app/sections/ai-workspace.tsx` - Main component
-- `lib/ai-workspace.ts` - Types and utilities
-- `hooks/useAIChat.ts` - Chat state management
-- `app/api/ai/chat/route.ts` - Chat API (routes to CLI backends)
+- `app/sections/ai-workspace.tsx` - Main component (session browser + viewer)
+- `app/api/ai/sessions/route.ts` - List sessions, spawn new tmux+claude sessions
+- `app/api/ai/stream/route.ts` - SSE endpoint tailing JSONL files
+- `lib/ai/jsonl-parser.ts` - Parses JSONL entries into typed messages
+- `components/ai/ConversationViewer.tsx` - Renders messages with collapsible blocks
+- `hooks/useSessionStream.ts` - Client hook for SSE stream consumption
 
 ## Features
-- **CLI-based backends** (subscription-based, no API keys):
-  - Claude Code CLI (Sonnet, Opus, Haiku) - full tool use, JSONL persistence
-  - Codex CLI (OpenAI)
-  - Gemini CLI
-  - Docker models (for local experimentation)
-- Conversation management:
-  - Persistent JSONL storage (Claude backend)
-  - Create/rename/delete
-  - Export to markdown
-- Project context:
-  - Attach local project as working directory
-  - Include codebase context
-- Tool use display with real-time status
-- **Accurate token tracking** via Claude CLI usage data:
-  - Cumulative context tracking across messages
-  - Input/output/cache token breakdown
-  - Real-time context percentage indicator
-  - Automatic fallback to estimation for non-Claude backends
-- Agent system with specialized prompts
-- Streaming responses
+- **Session browser**: Lists all `.jsonl` sessions from `~/.claude/projects/`, grouped by project
+- **Live streaming**: Watches active session files via offset-based SSE polling (500ms)
+- **Rich rendering**:
+  - User/assistant message display
+  - Collapsible thinking blocks
+  - Collapsible tool use/result blocks with category coloring
+  - Code block extraction with syntax detection
+  - Auto-scroll during streaming with pulsing indicator
+- **New session**: Spawns a detached tmux session running `claude --session-id <uuid>`
+- **Session metadata**: Shows file size, last modified time, message count
 
-## Integration
-- **Projects**: Working directory context from Projects Dashboard
-- **TabzChrome**: Bi-directional messaging
-- **Agents**: Specialized AI personas from `agents/` directory
+## Architecture
+
+The viewer is read-only — users interact with Claude in their terminal, and the web UI renders the conversation in real-time.
+
+```
+~/.claude/projects/{path}/{session-id}.jsonl  ← Claude CLI writes here
+         ↓
+app/api/ai/stream/route.ts                    ← SSE polls file, sends new entries
+         ↓
+hooks/useSessionStream.ts                     ← Client batches updates (500ms throttle)
+         ↓
+components/ai/ConversationViewer.tsx           ← Renders messages
+```
+
+## AI Drawer (Sidebar)
+
+The AI Drawer (`components/ai/AIDrawer.tsx`) is a separate system that provides a chat interface using `claude --print` mode. It uses `hooks/useAIChat.ts` and `app/api/ai/chat/route.ts`. Select the model from the dropdown in the drawer settings (defaults to first available non-mock backend).
 
 ## TabzChrome Selectors
 - `data-tabz-section="ai-workspace"` - Container
-- `data-tabz-input="message"` - Chat input
-- `data-tabz-action="send"` - Send message
-- `data-tabz-action="new-conversation"` - Create new
-- `data-tabz-action="select-conversation"` - Switch
-- `data-tabz-action="delete-conversation"` - Remove
-- `data-tabz-action="export-conversation"` - Export MD
-- `data-tabz-action="change-model"` - Model selector
-- `data-tabz-action="attach-project"` - Add context
-- `data-tabz-list="conversations"` - Sidebar list
-- `data-tabz-list="messages"` - Message thread
 
 ## Configuration
-No API keys required - uses CLI tools with your existing subscriptions:
-- **Claude**: Requires Claude Code CLI (`claude`) and Claude Max/Pro subscription
-- **Codex**: Requires Codex CLI (`codex`)
-- **Gemini**: Requires Gemini CLI (`gemini`)
-- **Docker**: Local models via Docker Desktop (temperature/system prompt configurable)
+No API keys required — reads JSONL files from Claude CLI sessions using your existing subscription.
