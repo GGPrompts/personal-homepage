@@ -67,7 +67,7 @@ export type ParsedBlock =
   | { kind: 'tool_use'; toolName: string; toolId: string; input: unknown }
   | { kind: 'tool_result'; toolId: string; text: string; isError: boolean }
 
-function isRealUserMessage(entry: UserEntry): boolean {
+export function isRealUserMessage(entry: UserEntry): boolean {
   if (entry.isMeta) return false
   const content = entry.message?.content
   if (!content) return false
@@ -224,4 +224,51 @@ export function entriesToMessages(entries: ConversationEntry[]): ParsedMessage[]
     if (msg) messages.push(msg)
   }
   return messages
+}
+
+/**
+ * Extract the first real user message text from raw JSONL content.
+ * Designed to work on a small prefix (e.g. first 4KB) of a session file.
+ * Returns the message text truncated to 100 chars, or null if none found.
+ */
+export function extractFirstUserMessage(text: string): string | null {
+  const lines = text.split('\n')
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (!parsed || parsed.type !== 'user') continue
+      if (!isRealUserMessage(parsed as UserEntry)) continue
+
+      const content = parsed.message?.content
+      let msgText = ''
+
+      if (typeof content === 'string') {
+        msgText = content
+      } else if (Array.isArray(content)) {
+        for (const block of content) {
+          if (block && block.type === 'text' && typeof block.text === 'string') {
+            msgText = block.text
+            break
+          }
+        }
+      }
+
+      msgText = msgText.trim()
+      if (!msgText) continue
+
+      if (msgText.length > 100) {
+        msgText = msgText.slice(0, 100)
+      }
+
+      return msgText
+    } catch {
+      // skip malformed lines (including truncated last line from partial read)
+    }
+  }
+
+  return null
 }

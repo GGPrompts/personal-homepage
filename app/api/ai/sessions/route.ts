@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { readdirSync, statSync } from 'fs'
+import { readdirSync, statSync, openSync, readSync, closeSync } from 'fs'
 import { join } from 'path'
-import { execSync } from 'child_process'
+import { execSync, spawn } from 'child_process'
 import { randomUUID } from 'crypto'
+import { extractFirstUserMessage } from '@/lib/ai/jsonl-parser'
 
 const CLAUDE_PROJECTS_DIR = join(process.env.HOME || '', '.claude', 'projects')
 
@@ -11,9 +12,11 @@ interface SessionInfo {
   sessionId: string
   project: string
   projectSlug: string
+  projectPath: string
   size: number
   mtime: number
   isSubagent: boolean
+  firstMessage: string | null
 }
 
 function walkJsonl(dir: string, results: SessionInfo[], projectSlug: string): void {
@@ -35,14 +38,33 @@ function walkJsonl(dir: string, results: SessionInfo[], projectSlug: string): vo
 
           const isSubagent = fullPath.includes('/subagents/')
 
+          let firstMessage: string | null = null
+          try {
+            const fd = openSync(fullPath, 'r')
+            const buf = Buffer.alloc(4096)
+            const bytesRead = readSync(fd, buf, 0, 4096, 0)
+            closeSync(fd)
+            if (bytesRead > 0) {
+              firstMessage = extractFirstUserMessage(buf.toString('utf-8', 0, bytesRead))
+            }
+          } catch {
+            // skip if we can't read the file
+          }
+
+          // Decode projectSlug back to filesystem path
+          // Slug is the absolute path with '/' replaced by '-', e.g. -home-builder-projects-foo
+          const projectPath = '/' + projectSlug.slice(1).replace(/-/g, '/')
+
           results.push({
             path: fullPath,
             sessionId,
             project: projectName,
             projectSlug,
+            projectPath,
             size: stat.size,
             mtime: Math.floor(stat.mtimeMs),
             isSubagent,
+            firstMessage,
           })
         } catch {
           // skip files we can't stat
@@ -78,26 +100,39 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const projectPath = body.projectPath as string | undefined
 
-    const sessionId = randomUUID()
+    const cwd = projectPath || process.env.HOME || '/home'
 
-    let tmuxSessionName = `claude-viewer-${sessionId.slice(0, 8)}`
-
-    let claudeCmd = `claude --session-id ${sessionId}`
-    let cwd = process.env.HOME || '/home'
-
-    if (projectPath) {
-      cwd = projectPath
-    }
-
+    // Try thc first (Thermal Conductor daemon)
+    let hasThc = false
     try {
-      execSync('which tmux', { stdio: 'ignore' })
+      execSync('which thc', { stdio: 'ignore' })
+      hasThc = true
     } catch {
-      return NextResponse.json(
-        { error: 'tmux is required but not installed' },
-        { status: 500 }
-      )
+      // thc not installed
     }
 
+    if (hasThc) {
+      try {
+        const output = execSync(`thc spawn -p '${cwd}'`, {
+          encoding: 'utf-8',
+          timeout: 5000,
+        }).trim()
+
+        // thc handles session creation — JSONL discovery will pick up the new session
+        return NextResponse.json({
+          sessionId: null,
+          jsonlPath: null,
+          projectPath: cwd,
+          spawner: 'thc',
+          thcOutput: output,
+        })
+      } catch (thcErr) {
+        // thc failed (daemon not running, etc.) — fall through to Kitty
+        console.warn('thc spawn failed, falling back to Kitty:', thcErr instanceof Error ? thcErr.message : thcErr)
+      }
+    }
+
+    // Fallback: spawn Claude in a detached Kitty terminal
     try {
       execSync('which claude', { stdio: 'ignore' })
     } catch {
@@ -107,22 +142,70 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const sessionId = randomUUID()
     const encodedPath = cwd.replace(/\//g, '-')
     const jsonlPath = join(CLAUDE_PROJECTS_DIR, encodedPath, `${sessionId}.jsonl`)
 
-    execSync(
-      `tmux new-session -d -s '${tmuxSessionName}' -c '${cwd}' '${claudeCmd}'`,
-      { stdio: 'ignore' }
-    )
+    const child = spawn('kitty', [
+      '--detach',
+      '--title', `claude-${sessionId.slice(0, 8)}`,
+      '--working-directory', cwd,
+      '--', 'claude', '--session-id', sessionId,
+    ], {
+      detached: true,
+      stdio: 'ignore',
+    })
+    child.unref()
 
     return NextResponse.json({
       sessionId,
-      tmuxSession: tmuxSessionName,
       jsonlPath,
       projectPath: cwd,
+      spawner: 'kitty',
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to spawn session'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { sessionId, prompt } = body as { sessionId?: string; prompt?: string }
+
+    if (!sessionId || !prompt) {
+      return NextResponse.json(
+        { error: 'sessionId and prompt are required' },
+        { status: 400 }
+      )
+    }
+
+    // Check if thc is available
+    let hasThc = false
+    try {
+      execSync('which thc', { stdio: 'ignore' })
+      hasThc = true
+    } catch {
+      // thc not installed
+    }
+
+    if (!hasThc) {
+      return NextResponse.json(
+        { error: 'thc is not available — install Thermal Conductor to send input to sessions' },
+        { status: 500 }
+      )
+    }
+
+    // Shell-escape the prompt by passing it via stdin to avoid injection
+    const output = execSync(`thc send ${sessionId} ${JSON.stringify(prompt)}`, {
+      encoding: 'utf-8',
+      timeout: 10000,
+    }).trim()
+
+    return NextResponse.json({ ok: true, output })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to send prompt'
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

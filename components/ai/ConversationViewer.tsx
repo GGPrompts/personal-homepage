@@ -168,10 +168,36 @@ function ThinkingBlock({ text }: { text: string }) {
   )
 }
 
+function getToolSummary(toolName: string, input: unknown): string | null {
+  if (!input || typeof input !== 'object') return null
+  const inp = input as Record<string, unknown>
+  switch (toolName) {
+    case 'Read':
+    case 'Write':
+    case 'Edit':
+      return typeof inp.file_path === 'string' ? inp.file_path.split('/').pop() || null : null
+    case 'Glob':
+      return typeof inp.pattern === 'string' ? inp.pattern : null
+    case 'Grep':
+      return typeof inp.pattern === 'string' ? inp.pattern : null
+    case 'Bash': {
+      const c = inp.command
+      return typeof c === 'string' ? (c.length > 50 ? c.slice(0, 50) + '…' : c) : null
+    }
+    case 'Agent':
+      return typeof inp.description === 'string' ? inp.description : null
+    case 'ToolSearch':
+      return typeof inp.query === 'string' ? inp.query : null
+    default:
+      return null
+  }
+}
+
 function ToolUseBlockView({ toolName, input }: { toolName: string; input: unknown }) {
   const [isOpen, setIsOpen] = React.useState(false)
   const inputStr = typeof input === 'string' ? input : JSON.stringify(input, null, 2)
   const truncated = inputStr.length > 300 ? inputStr.slice(0, 300) + '...' : inputStr
+  const summary = getToolSummary(toolName, input)
 
   return (
     <details
@@ -182,7 +208,8 @@ function ToolUseBlockView({ toolName, input }: { toolName: string; input: unknow
       <summary className="px-3 py-2 cursor-pointer text-sm flex items-center gap-2 text-blue-400 hover:bg-blue-500/10 select-none">
         <Wrench className="h-3.5 w-3.5 shrink-0" />
         <span className="font-mono text-xs">{toolName}</span>
-        <ChevronRight className={`h-3 w-3 ml-auto transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+        {summary && <span className="text-xs text-muted-foreground/60 truncate font-mono">{summary}</span>}
+        <ChevronRight className={`h-3 w-3 ml-auto shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
       </summary>
       <pre className="px-3 pb-3 text-xs text-muted-foreground overflow-x-auto whitespace-pre-wrap font-mono">
         {isOpen ? inputStr : truncated}
@@ -287,6 +314,72 @@ function MessageView({ message }: { message: ParsedMessage }) {
   )
 }
 
+function isToolOnlyMessage(msg: ParsedMessage): boolean {
+  return msg.role === 'assistant' && msg.blocks.length > 0 &&
+    msg.blocks.every(b => b.kind === 'tool_use' || b.kind === 'tool_result' || b.kind === 'thinking')
+}
+
+type RenderItem =
+  | { type: 'single'; message: ParsedMessage }
+  | { type: 'group'; messages: ParsedMessage[] }
+
+function groupConsecutiveToolMessages(messages: ParsedMessage[]): RenderItem[] {
+  const items: RenderItem[] = []
+  let toolGroup: ParsedMessage[] = []
+
+  const flushGroup = () => {
+    if (toolGroup.length === 0) return
+    if (toolGroup.length === 1) {
+      items.push({ type: 'single', message: toolGroup[0] })
+    } else {
+      items.push({ type: 'group', messages: [...toolGroup] })
+    }
+    toolGroup = []
+  }
+
+  for (const msg of messages) {
+    if (isToolOnlyMessage(msg)) {
+      toolGroup.push(msg)
+    } else {
+      flushGroup()
+      items.push({ type: 'single', message: msg })
+    }
+  }
+  flushGroup()
+
+  return items
+}
+
+function ToolGroupView({ messages }: { messages: ParsedMessage[] }) {
+  const timestamp = messages[0]?.timestamp
+
+  return (
+    <div className="flex gap-3">
+      <div className="shrink-0 h-8 w-8 rounded-full flex items-center justify-center bg-orange-500/10 border border-orange-500/20">
+        <Bot className="h-4 w-4 text-orange-400" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-xs font-medium text-orange-400">Claude</span>
+          {timestamp && (
+            <span className="text-[10px] text-muted-foreground/60" suppressHydrationWarning>
+              {new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+          <span className="text-[10px] text-muted-foreground/40">{messages.length} tool calls</span>
+        </div>
+        <div className="space-y-1">
+          {messages.map((msg) =>
+            msg.blocks.map((block, i) => (
+              <BlockRenderer key={`${msg.id}-b-${i}`} block={block} keyPrefix={`${msg.id}-b-${i}`} />
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ConversationViewer({ messages, isStreaming }: ConversationViewerProps) {
   const scrollRef = React.useRef<HTMLDivElement>(null)
   const bottomRef = React.useRef<HTMLDivElement>(null)
@@ -318,9 +411,13 @@ export function ConversationViewer({ messages, isStreaming }: ConversationViewer
   return (
     <div ref={scrollRef} className="h-full overflow-y-auto">
       <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-4xl mx-auto w-full">
-        {messages.map((msg) => (
-          <MessageView key={msg.id} message={msg} />
-        ))}
+        {groupConsecutiveToolMessages(messages).map((item, idx) =>
+          item.type === 'single' ? (
+            <MessageView key={item.message.id} message={item.message} />
+          ) : (
+            <ToolGroupView key={`group-${idx}`} messages={item.messages} />
+          )
+        )}
 
         {isStreaming && (
           <div className="flex items-center gap-2 text-muted-foreground pl-11">
