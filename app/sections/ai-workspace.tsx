@@ -66,6 +66,34 @@ export default function AIWorkspaceSection({
     enabled: !!selectedPath,
   })
 
+  // Poll context % from Claude's state file
+  const [contextPercent, setContextPercent] = React.useState<number | null>(null)
+  const selectedSessionId = React.useMemo(() => {
+    if (!selectedPath) return null
+    const match = selectedPath.match(/([a-f0-9-]{36})\.jsonl$/)
+    return match?.[1] ?? null
+  }, [selectedPath])
+
+  React.useEffect(() => {
+    if (!selectedSessionId) {
+      setContextPercent(null)
+      return
+    }
+    let mounted = true
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/ai/context?sessionId=${selectedSessionId}`)
+        if (res.ok && mounted) {
+          const data = await res.json()
+          setContextPercent(data.contextPercent)
+        }
+      } catch { /* ignore */ }
+    }
+    poll()
+    const interval = setInterval(poll, 3000)
+    return () => { mounted = false; clearInterval(interval) }
+  }, [selectedSessionId])
+
   const fetchSessions = React.useCallback(async () => {
     setIsLoadingSessions(true)
     try {
@@ -317,6 +345,17 @@ export default function AIWorkspaceSection({
             {selectedSession && (
               <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20 text-[10px] font-mono">
                 {selectedSession.sessionId.slice(0, 12)}...
+              </span>
+            )}
+            {contextPercent !== null && (
+              <span className={`hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-mono ${
+                contextPercent >= 80
+                  ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                  : contextPercent >= 50
+                    ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                    : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+              }`}>
+                ctx {contextPercent}%
               </span>
             )}
             <Badge variant="secondary" className="text-xs">
