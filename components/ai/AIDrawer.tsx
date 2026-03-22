@@ -369,15 +369,15 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
             }
             animate={shouldReduceMotion
               ? panelVariantsReduced.visible
-              : { x: 0, opacity: 1, width: isExpanded ? expandedWidth : DRAWER_MINIMIZED_WIDTH }
+              : { x: 0, opacity: 1 }
             }
             exit={shouldReduceMotion
               ? panelVariantsReduced.exit
               : { x: expandedWidth, opacity: 0 }
             }
             transition={shouldReduceMotion ? quickTransition : drawerSpring}
-            className={`fixed top-0 right-0 bottom-0 z-50 flex flex-col ${className}`}
-            style={shouldReduceMotion ? { width: isExpanded ? expandedWidth : DRAWER_MINIMIZED_WIDTH } : undefined}
+            className={`fixed top-0 right-0 bottom-0 z-50 flex flex-col overflow-hidden ${className}`}
+            style={{ width: isExpanded ? expandedWidth : DRAWER_MINIMIZED_WIDTH }}
             data-tabz-region="ai-drawer"
             data-tabz-section="ai-drawer"
           >
@@ -828,7 +828,7 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                 )}
 
                 {/* Chat content area */}
-                <ScrollArea className="flex-1 min-w-0">
+                <ScrollArea className="flex-1 overflow-hidden [&_[data-radix-scroll-area-viewport]]:!overflow-x-hidden [&_[data-radix-scroll-area-viewport]>div]:!block [&_[data-radix-scroll-area-viewport]>div]:!min-w-0">
                   <div className="p-2 sm:p-3 space-y-3 overflow-hidden">
                     {activeConv.messages.length === 0 ? (
                       /* Empty state */
@@ -921,8 +921,8 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                     textareaRef={textareaRef}
                     placeholder="Ask me anything..."
                     showHint={false}
-                    minHeight="36px"
-                    maxHeight="80px"
+                    minHeight="44px"
+                    maxHeight="120px"
                     className="text-sm"
                   />
                 </div>

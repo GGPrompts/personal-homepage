@@ -67,44 +67,40 @@ const toolUseVariants = {
 // HELPER FUNCTIONS
 // ============================================================================
 
-/** Render text with clickable links (markdown and plain URLs) */
-function renderTextWithLinks(text: string, keyPrefix: string): React.ReactNode[] {
-  const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)|(https?:\/\/[^\s<>\[\]]+)/g
+/** Render inline markdown: bold, inline code, and links */
+function renderInlineMarkdown(text: string, keyPrefix: string): React.ReactNode[] {
+  const inlineRegex = /\*\*(.+?)\*\*|`([^`]+)`|\[([^\]]+)\]\((https?:\/\/[^)]+)\)|(https?:\/\/[^\s<>\[\]]+)/g
 
   const parts: React.ReactNode[] = []
   let lastIndex = 0
   let match
 
-  while ((match = linkRegex.exec(text)) !== null) {
+  while ((match = inlineRegex.exec(text)) !== null) {
     if (match.index > lastIndex) {
       parts.push(text.slice(lastIndex, match.index))
     }
 
-    if (match[1] && match[2]) {
-      // Markdown-style link: [text](url)
+    if (match[1]) {
+      // **bold**
+      parts.push(<strong key={`${keyPrefix}-b-${match.index}`}>{match[1]}</strong>)
+    } else if (match[2]) {
+      // `inline code`
       parts.push(
-        <a
-          key={`${keyPrefix}-link-${match.index}`}
-          href={match[2]}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
-        >
-          {match[1]}
-        </a>
+        <code key={`${keyPrefix}-ic-${match.index}`} className="px-1 py-0.5 rounded bg-muted/50 text-xs font-mono">
+          {match[2]}
+        </code>
       )
-    } else if (match[3]) {
+    } else if (match[3] && match[4]) {
+      // [text](url)
+      parts.push(
+        <a key={`${keyPrefix}-link-${match.index}`} href={match[4]} target="_blank" rel="noopener noreferrer"
+          className="text-primary underline underline-offset-2 hover:text-primary/80 transition-colors">{match[3]}</a>
+      )
+    } else if (match[5]) {
       // Plain URL
       parts.push(
-        <a
-          key={`${keyPrefix}-link-${match.index}`}
-          href={match[3]}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
-        >
-          {match[3]}
-        </a>
+        <a key={`${keyPrefix}-link-${match.index}`} href={match[5]} target="_blank" rel="noopener noreferrer"
+          className="text-primary underline underline-offset-2 hover:text-primary/80 transition-colors">{match[5]}</a>
       )
     }
 
@@ -116,6 +112,90 @@ function renderTextWithLinks(text: string, keyPrefix: string): React.ReactNode[]
   }
 
   return parts.length > 0 ? parts : [text]
+}
+
+/** Render text with markdown formatting: headings, bold, code, links, lists */
+function renderTextWithLinks(text: string, keyPrefix: string): React.ReactNode[] {
+  const lines = text.split('\n')
+  const parts: React.ReactNode[] = []
+  let currentParagraph: string[] = []
+  let listItems: string[] = []
+  let listType: 'ul' | 'ol' | null = null
+
+  const flushParagraph = () => {
+    if (currentParagraph.length > 0) {
+      const pText = currentParagraph.join('\n')
+      if (pText.trim()) {
+        parts.push(
+          <p key={`${keyPrefix}-p-${parts.length}`} className="whitespace-pre-wrap">
+            {renderInlineMarkdown(pText, `${keyPrefix}-p-${parts.length}`)}
+          </p>
+        )
+      }
+      currentParagraph = []
+    }
+  }
+
+  const flushList = () => {
+    if (listItems.length > 0 && listType) {
+      const Tag = listType
+      parts.push(
+        <Tag key={`${keyPrefix}-list-${parts.length}`} className={`${listType === 'ol' ? 'list-decimal' : 'list-disc'} pl-5 space-y-0.5`}>
+          {listItems.map((item, i) => (
+            <li key={i}>{renderInlineMarkdown(item, `${keyPrefix}-li-${parts.length}-${i}`)}</li>
+          ))}
+        </Tag>
+      )
+      listItems = []
+      listType = null
+    }
+  }
+
+  for (const line of lines) {
+    // Headings
+    const headingMatch = line.match(/^(#{1,4})\s+(.+)$/)
+    if (headingMatch) {
+      flushParagraph()
+      flushList()
+      const level = headingMatch[1].length
+      const sizes = ['text-lg font-bold', 'text-base font-bold', 'text-sm font-semibold', 'text-sm font-medium']
+      parts.push(
+        <p key={`${keyPrefix}-h-${parts.length}`} className={`${sizes[level - 1] || sizes[3]} mt-2 mb-1`}>
+          {renderInlineMarkdown(headingMatch[2], `${keyPrefix}-h-${parts.length}`)}
+        </p>
+      )
+      continue
+    }
+
+    // Unordered list items
+    const ulMatch = line.match(/^\s*[-*]\s+(.+)$/)
+    if (ulMatch) {
+      flushParagraph()
+      if (listType === 'ol') flushList()
+      listType = 'ul'
+      listItems.push(ulMatch[1])
+      continue
+    }
+
+    // Ordered list items
+    const olMatch = line.match(/^\s*\d+\.\s+(.+)$/)
+    if (olMatch) {
+      flushParagraph()
+      if (listType === 'ul') flushList()
+      listType = 'ol'
+      listItems.push(olMatch[1])
+      continue
+    }
+
+    // Regular text
+    flushList()
+    currentParagraph.push(line)
+  }
+
+  flushList()
+  flushParagraph()
+
+  return parts
 }
 
 // ============================================================================
@@ -326,9 +406,9 @@ export function ChatMessage({
       if (match.index > lastIndex) {
         const textBefore = content.slice(lastIndex, match.index)
         parts.push(
-          <p key={`text-${lastIndex}`} className="whitespace-pre-wrap">
+          <React.Fragment key={`text-${lastIndex}`}>
             {renderTextWithLinks(textBefore, `msg-${lastIndex}`)}
-          </p>
+          </React.Fragment>
         )
       }
 
@@ -404,17 +484,13 @@ export function ChatMessage({
     if (lastIndex < content.length) {
       const remainingText = content.slice(lastIndex)
       parts.push(
-        <p key={`text-${lastIndex}`} className="whitespace-pre-wrap">
+        <React.Fragment key={`text-${lastIndex}`}>
           {renderTextWithLinks(remainingText, `msg-${lastIndex}`)}
-        </p>
+        </React.Fragment>
       )
     }
 
-    return parts.length > 0 ? parts : (
-      <p className="whitespace-pre-wrap">
-        {renderTextWithLinks(content, 'msg-full')}
-      </p>
-    )
+    return parts.length > 0 ? parts : renderTextWithLinks(content, 'msg-full')
   }
 
   return (
