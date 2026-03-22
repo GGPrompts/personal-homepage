@@ -8,6 +8,25 @@ const TOKEN_STORAGE_KEY = "tabz-api-token"
 // Use same key as global working directory for sync
 const GLOBAL_WORKDIR_KEY = "global-working-directory"
 const DEFAULT_WORKDIR = "~"
+const BACKEND_TYPE_KEY = "terminal-backend-type"
+
+export type TerminalBackendType = "tabzchrome" | "native"
+
+function getStoredBackendType(): TerminalBackendType {
+  if (typeof window === "undefined") return "native"
+  try {
+    const stored = localStorage.getItem(BACKEND_TYPE_KEY)
+    if (stored === "tabzchrome" || stored === "native") return stored
+  } catch {}
+  return "native"
+}
+
+function setStoredBackendType(type: TerminalBackendType): void {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(BACKEND_TYPE_KEY, type)
+  } catch {}
+}
 
 function getDefaultWorkDir(): string {
   if (typeof window === "undefined") return DEFAULT_WORKDIR
@@ -99,6 +118,7 @@ export function useTerminalExtension() {
   const [token, setToken] = useState<string | null>(null)
   const [defaultWorkDir, setDefaultWorkDirState] = useState<string>(() => getDefaultWorkDir())
   const [isLoaded, setIsLoaded] = useState(false)
+  const [backendType, setBackendTypeState] = useState<TerminalBackendType>(() => getStoredBackendType())
 
   // Try to fetch token from backend (only when on localhost to avoid permission prompts)
   const fetchTokenFromBackend = useCallback(async (): Promise<string | null> => {
@@ -215,6 +235,19 @@ export function useTerminalExtension() {
   // Initialize - try to get token and check backend
   useEffect(() => {
     const init = async () => {
+      const currentBackendType = getStoredBackendType()
+
+      if (currentBackendType === "native") {
+        setState({
+          available: true,
+          backendRunning: true,
+          authenticated: true,
+          error: null,
+        })
+        setIsLoaded(true)
+        return
+      }
+
       const onLocalhost = isLocalhost()
 
       // First, try to fetch token from backend (only on localhost)
@@ -232,6 +265,21 @@ export function useTerminalExtension() {
 
       // Skip network probe from remote sites to avoid permission prompts
       const newState = await checkBackend(authToken, !onLocalhost)
+
+      // Auto-detect: if TabzChrome is not available, switch to native
+      if (!newState.backendRunning && onLocalhost) {
+        setStoredBackendType("native")
+        setBackendTypeState("native")
+        setState({
+          available: true,
+          backendRunning: true,
+          authenticated: true,
+          error: null,
+        })
+        setIsLoaded(true)
+        return
+      }
+
       setState(newState)
       setIsLoaded(true)
     }
@@ -242,6 +290,32 @@ export function useTerminalExtension() {
   // Run a command in the terminal via REST API
   const runCommand = useCallback(
     async (command: string, options?: { workingDir?: string; name?: string }): Promise<SpawnResult> => {
+      const workingDir = options?.workingDir || defaultWorkDir || getDefaultWorkDir()
+
+      // Native backend: call our own API route
+      if (backendType === "native") {
+        try {
+          const response = await fetch("/api/terminal", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              command,
+              workingDir,
+              name: options?.name || "Terminal",
+            }),
+          })
+          const data = await response.json()
+          if (data.success) {
+            return { success: true }
+          }
+          return { success: false, error: data.error || "Failed to spawn terminal" }
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : "Unknown error"
+          return { success: false, error: errorMessage }
+        }
+      }
+
+      // TabzChrome backend
       const currentToken = token || getStoredToken()
 
       if (!currentToken) {
@@ -252,9 +326,6 @@ export function useTerminalExtension() {
       }
 
       try {
-        // Use default workDir if none provided
-        const workingDir = options?.workingDir || defaultWorkDir || getDefaultWorkDir()
-
         const response = await fetch(`${TABZ_API_BASE}/api/spawn`, {
           method: "POST",
           headers: {
@@ -271,7 +342,6 @@ export function useTerminalExtension() {
         const data = await response.json()
 
         if (response.status === 401 || response.status === 403) {
-          // Token is invalid
           setState(prev => ({
             ...prev,
             authenticated: false,
@@ -306,14 +376,13 @@ export function useTerminalExtension() {
         const errorMessage = err instanceof Error ? err.message : "Unknown error"
         console.error("[useTerminalExtension] Spawn error:", err)
 
-        // Check if it's a network/CORS/Private Network Access error
         const isNetworkError =
           errorMessage.includes("fetch") ||
           errorMessage.includes("network") ||
           errorMessage.includes("Failed to fetch") ||
           errorMessage.includes("NetworkError") ||
           errorMessage.includes("CORS") ||
-          err instanceof TypeError // fetch throws TypeError for network issues
+          err instanceof TypeError
 
         if (isNetworkError) {
           setState({
@@ -334,12 +403,38 @@ export function useTerminalExtension() {
         }
       }
     },
-    [token, defaultWorkDir]
+    [token, defaultWorkDir, backendType]
   )
 
   // Spawn terminal with full options (TabzChrome API)
   const spawnWithOptions = useCallback(
     async (options: SpawnOptions): Promise<SpawnResult> => {
+      const workingDir = options.workingDir || defaultWorkDir || getDefaultWorkDir()
+
+      // Native backend: route through our API
+      if (backendType === "native") {
+        try {
+          const response = await fetch("/api/terminal", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              command: options.command,
+              workingDir,
+              name: options.name || "Terminal",
+            }),
+          })
+          const data = await response.json()
+          if (data.success) {
+            return { success: true }
+          }
+          return { success: false, error: data.error || "Failed to spawn terminal" }
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : "Unknown error"
+          return { success: false, error: errorMessage }
+        }
+      }
+
+      // TabzChrome backend
       const currentToken = token || getStoredToken()
 
       if (!currentToken) {
@@ -350,9 +445,6 @@ export function useTerminalExtension() {
       }
 
       try {
-        // Use default workDir if none provided
-        const workingDir = options.workingDir || defaultWorkDir || getDefaultWorkDir()
-
         const response = await fetch(`${TABZ_API_BASE}/api/spawn`, {
           method: "POST",
           headers: {
@@ -364,7 +456,7 @@ export function useTerminalExtension() {
             workingDir,
             command: options.command,
             profile: options.profile,
-            autoExecute: options.autoExecute !== false, // default true
+            autoExecute: options.autoExecute !== false,
             color: options.color,
           }),
         })
@@ -433,7 +525,7 @@ export function useTerminalExtension() {
         }
       }
     },
-    [token, defaultWorkDir]
+    [token, defaultWorkDir, backendType]
   )
 
   // Paste command to terminal without executing (autoExecute: false)
@@ -615,10 +707,50 @@ export function useTerminalExtension() {
     }))
   }, [])
 
+  const setBackendType = useCallback((type: TerminalBackendType) => {
+    setStoredBackendType(type)
+    setBackendTypeState(type)
+
+    if (type === "native") {
+      setState({
+        available: true,
+        backendRunning: true,
+        authenticated: true,
+        error: null,
+      })
+    } else {
+      // Switching to tabzchrome — re-check status
+      setState({
+        available: false,
+        backendRunning: false,
+        authenticated: false,
+        error: null,
+      })
+      // Trigger re-init by checking backend
+      const init = async () => {
+        let authToken = await fetchTokenFromBackend()
+        if (!authToken) authToken = getStoredToken()
+        else setStoredToken(authToken)
+        setToken(authToken)
+        const newState = await checkBackend(authToken, !isLocalhost())
+        setState(newState)
+      }
+      init()
+    }
+  }, [fetchTokenFromBackend, checkBackend])
+
   // Refresh connection status
   // When user explicitly clicks refresh, always try to validate (don't skip probe)
   const refreshStatus = useCallback(async () => {
-    const onLocalhost = isLocalhost()
+    if (backendType === "native") {
+      setState({
+        available: true,
+        backendRunning: true,
+        authenticated: true,
+        error: null,
+      })
+      return true
+    }
 
     // Try to fetch token from backend first (only on localhost)
     let authToken = await fetchTokenFromBackend()
@@ -630,13 +762,11 @@ export function useTerminalExtension() {
     }
 
     setToken(authToken)
-    // User explicitly requested refresh - always probe to validate token
-    // Private Network Access headers allow this from HTTPS sites
     const newState = await checkBackend(authToken, false)
     setState(newState)
 
     return newState.available
-  }, [fetchTokenFromBackend, checkBackend])
+  }, [fetchTokenFromBackend, checkBackend, backendType])
 
   return {
     // Status
@@ -647,6 +777,7 @@ export function useTerminalExtension() {
     isLoaded,
     hasToken: !!token,
     defaultWorkDir,
+    backendType,
 
     // Actions
     runCommand,
@@ -657,5 +788,6 @@ export function useTerminalExtension() {
     clearApiToken,
     refreshStatus,
     updateDefaultWorkDir,
+    setBackendType,
   }
 }
