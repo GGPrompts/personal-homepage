@@ -78,6 +78,9 @@ export function isRealUserMessage(entry: UserEntry): boolean {
     if (trimmed.startsWith('<command-name>') || trimmed.startsWith('<command-message>')) return false
     if (trimmed === '<local-command-stdout></local-command-stdout>') return false
     if (trimmed.startsWith('<local-command-caveat>')) return false
+    // Reject messages that are entirely XML tags with no meaningful text
+    const stripped = trimmed.replace(/<[^>]+>/g, '').trim()
+    if (!stripped) return false
     return true
   }
 
@@ -257,7 +260,8 @@ export function extractFirstUserMessage(text: string): string | null {
         }
       }
 
-      msgText = msgText.trim()
+      // Strip all XML/HTML-like tags from the message text
+      msgText = msgText.replace(/<[^>]+>/g, '').trim()
       if (!msgText) continue
 
       if (msgText.length > 100) {

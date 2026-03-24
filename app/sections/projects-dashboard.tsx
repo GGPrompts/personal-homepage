@@ -114,6 +114,7 @@ import {
   type Project,
   type GitHubRepo,
   type LocalProject,
+  type PinnedProjectInfo,
 } from "@/lib/projects"
 import { useAllProjectsMeta } from "@/hooks/useProjectMeta"
 import type { JobStreamEvent, CreateJobRequest } from "@/lib/jobs/types"
@@ -164,7 +165,7 @@ export default function ProjectsDashboard({
 }) {
   const { user, getGitHubToken } = useAuth()
   const { available: terminalAvailable, runCommand } = useTerminalExtension()
-  const { isPinned, togglePinned, isConfigured: metaConfigured, isSyncing: metaSyncing } = useAllProjectsMeta()
+  const { meta: projectsMeta, isPinned, togglePinned, getPinnedProjectStubs, backfillPinnedInfo, isConfigured: metaConfigured, isSyncing: metaSyncing } = useAllProjectsMeta()
   const { workingDir, isLoaded: workingDirLoaded } = useWorkingDirectory()
 
   // Handler for launching terminals with toast feedback
@@ -334,10 +335,46 @@ export default function ProjectsDashboard({
     gcTime: 5 * 60 * 1000,
   })
 
-  // Merge projects
+  // Merge projects, then inject pinned projects from other directories
   const projects = React.useMemo(() => {
-    return mergeProjects(githubData?.repos || [], localData?.projects || [])
-  }, [githubData?.repos, localData?.projects])
+    const merged = mergeProjects(githubData?.repos || [], localData?.projects || [])
+    const mergedSlugs = new Set(merged.map((p) => p.slug))
+
+    // Add pinned project stubs that aren't already in the current list
+    const pinnedStubs = getPinnedProjectStubs()
+    for (const stub of pinnedStubs) {
+      if (!mergedSlugs.has(stub.slug)) {
+        merged.push(stub)
+      }
+    }
+
+    return merged
+  }, [githubData?.repos, localData?.projects, getPinnedProjectStubs])
+
+  // Backfill pinnedInfo for projects pinned before this field existed
+  const backfillDone = React.useRef(false)
+  React.useEffect(() => {
+    if (backfillDone.current || !metaConfigured || !projectsMeta || metaSyncing) return
+    if (!githubData && !localData) return
+    const merged = mergeProjects(githubData?.repos || [], localData?.projects || [])
+    const needsBackfill = merged.filter((p) => {
+      const meta = projectsMeta.projects[p.slug]
+      return meta?.pinned && !meta.pinnedInfo
+    })
+    if (needsBackfill.length > 0) {
+      backfillDone.current = true
+      for (const project of needsBackfill) {
+        backfillPinnedInfo(project.slug, {
+          name: project.name,
+          localPath: project.local?.path,
+          source: project.source,
+          description: project.description,
+          techStack: project.techStack,
+          githubFullName: project.github?.full_name,
+        })
+      }
+    }
+  }, [metaConfigured, projectsMeta, metaSyncing, githubData, localData, backfillPinnedInfo])
 
   // Find selected project for detail view
   const selectedProject = React.useMemo(() => {
@@ -646,7 +683,14 @@ export default function ProjectsDashboard({
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
-                        onClick={() => togglePinned(project.slug)}
+                        onClick={() => togglePinned(project.slug, {
+                          name: project.name,
+                          localPath: project.local?.path,
+                          source: project.source,
+                          description: project.description,
+                          techStack: project.techStack,
+                          githubFullName: project.github?.full_name,
+                        })}
                         disabled={metaSyncing}
                         data-tabz-action={pinned ? "unpin" : "pin"}
                       >

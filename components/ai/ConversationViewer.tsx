@@ -251,7 +251,7 @@ function BlockRenderer({ block, keyPrefix }: { block: ParsedBlock; keyPrefix: st
     case 'text':
       return <div key={keyPrefix}>{renderMarkdownText(block.text, keyPrefix)}</div>
     case 'thinking':
-      return <ThinkingBlock key={keyPrefix} text={block.text} />
+      return block.text.trim() ? <ThinkingBlock key={keyPrefix} text={block.text} /> : null
     case 'tool_use':
       return <ToolUseBlockView key={keyPrefix} toolName={block.toolName} input={block.input} />
     case 'tool_result':

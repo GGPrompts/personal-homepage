@@ -10,6 +10,8 @@ import {
   type ProjectLink,
   type ProjectCommand,
   type KanbanColumn,
+  type PinnedProjectInfo,
+  type Project,
   DEFAULT_PROJECT_META,
   DEFAULT_PROJECTS_META,
   DEFAULT_KANBAN_COLUMNS,
@@ -602,8 +604,10 @@ export function useAllProjectsMeta(): {
   isSyncing: boolean
   isConfigured: boolean
   getPinnedSlugs: () => string[]
+  getPinnedProjectStubs: () => Project[]
   isPinned: (slug: string) => boolean
-  togglePinned: (slug: string) => void
+  togglePinned: (slug: string, projectInfo?: PinnedProjectInfo) => void
+  backfillPinnedInfo: (slug: string, info: PinnedProjectInfo) => void
 } {
   const queryClient = useQueryClient()
   const { user, getGitHubToken } = useAuth()
@@ -691,17 +695,20 @@ export function useAllProjectsMeta(): {
   )
 
   const togglePinned = useCallback(
-    (slug: string) => {
+    (slug: string, projectInfo?: PinnedProjectInfo) => {
       if (!isConfigured || !data) return
 
       const currentMeta = data.projects[slug] || DEFAULT_PROJECT_META
+      const newPinned = !currentMeta.pinned
       const newData: ProjectsMetaFile = {
         ...data,
         projects: {
           ...data.projects,
           [slug]: {
             ...currentMeta,
-            pinned: !currentMeta.pinned,
+            pinned: newPinned,
+            // Store project info when pinning so we can show it across working dirs
+            pinnedInfo: newPinned ? (projectInfo || currentMeta.pinnedInfo) : undefined,
           },
         },
         updatedAt: new Date().toISOString(),
@@ -716,13 +723,58 @@ export function useAllProjectsMeta(): {
     [isConfigured, data, repo, queryClient, saveMutation]
   )
 
+  const backfillPinnedInfo = useCallback(
+    (slug: string, info: PinnedProjectInfo) => {
+      if (!isConfigured || !data) return
+      const currentMeta = data.projects[slug]
+      if (!currentMeta?.pinned || currentMeta.pinnedInfo) return // Only backfill pinned projects missing info
+
+      const newData: ProjectsMetaFile = {
+        ...data,
+        projects: {
+          ...data.projects,
+          [slug]: {
+            ...currentMeta,
+            pinnedInfo: info,
+          },
+        },
+        updatedAt: new Date().toISOString(),
+      }
+
+      queryClient.setQueryData([QUERY_KEY, repo], newData)
+      saveMutation.mutate(newData)
+    },
+    [isConfigured, data, repo, queryClient, saveMutation]
+  )
+
+  const getPinnedProjectStubs = useCallback((): Project[] => {
+    if (!data) return []
+    return Object.entries(data.projects)
+      .filter(([_, meta]) => meta.pinned && meta.pinnedInfo)
+      .map(([slug, meta]) => {
+        const info = meta.pinnedInfo!
+        return {
+          id: `pinned-${slug}`,
+          name: info.name,
+          slug,
+          source: info.source,
+          description: info.description || "",
+          techStack: info.techStack || [],
+          pinned: true,
+          ...(info.localPath ? { local: { name: info.name, path: info.localPath, techStack: info.techStack || [], git: null, lastModified: "" } } : {}),
+        } as Project
+      })
+  }, [data])
+
   return {
     meta: data || null,
     isLoading,
     isSyncing: saveMutation.isPending,
     isConfigured,
     getPinnedSlugs,
+    getPinnedProjectStubs,
     isPinned,
     togglePinned,
+    backfillPinnedInfo,
   }
 }

@@ -47,9 +47,21 @@ export interface ProjectCommand {
   category: "dev" | "build" | "test" | "deploy" | "custom"
 }
 
+// Snapshot of project info stored alongside pin state so pinned projects
+// can be displayed even when outside the current working directory.
+export interface PinnedProjectInfo {
+  name: string
+  localPath?: string
+  source: "github" | "local" | "both"
+  description?: string
+  techStack?: string[]
+  githubFullName?: string
+}
+
 // Metadata for a single project (stored in sync repo)
 export interface ProjectMeta {
   pinned: boolean
+  pinnedInfo?: PinnedProjectInfo  // Stored when pinned, used to reconstruct stub entries
   columns?: KanbanColumn[]  // Optional for backwards compatibility
   tasks: ProjectTask[]
   links: ProjectLink[]

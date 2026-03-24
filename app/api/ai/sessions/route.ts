@@ -181,7 +181,32 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    // Check if thc is available
+    const sessionPrefix = sessionId.slice(0, 8)
+
+    // Try kitty @ send-text first (primary — works with any Kitty-spawned session)
+    let hasKitty = false
+    try {
+      execSync('which kitty', { stdio: 'ignore' })
+      hasKitty = true
+    } catch {
+      // kitty not available
+    }
+
+    if (hasKitty) {
+      try {
+        // Escape the prompt for kitty send-text: newline at end to submit
+        const escapedPrompt = prompt.replace(/\\/g, '\\\\').replace(/'/g, "'\\''")
+        execSync(
+          `kitty @ send-text --match 'title:^claude-${sessionPrefix}' '${escapedPrompt}\n'`,
+          { encoding: 'utf-8', timeout: 10000 }
+        )
+        return NextResponse.json({ ok: true, method: 'kitty' })
+      } catch {
+        // kitty send-text failed — window not found or remote control disabled
+      }
+    }
+
+    // Fall back to thc send (if thc daemon is running)
     let hasThc = false
     try {
       execSync('which thc', { stdio: 'ignore' })
@@ -190,20 +215,27 @@ export async function PUT(request: NextRequest) {
       // thc not installed
     }
 
-    if (!hasThc) {
-      return NextResponse.json(
-        { error: 'thc is not available — install Thermal Conductor to send input to sessions' },
-        { status: 500 }
-      )
+    if (hasThc) {
+      try {
+        const output = execSync(`thc send ${sessionId} ${JSON.stringify(prompt)}`, {
+          encoding: 'utf-8',
+          timeout: 10000,
+        }).trim()
+        return NextResponse.json({ ok: true, method: 'thc', output })
+      } catch {
+        // thc send failed
+      }
     }
 
-    // Shell-escape the prompt by passing it via stdin to avoid injection
-    const output = execSync(`thc send ${sessionId} ${JSON.stringify(prompt)}`, {
-      encoding: 'utf-8',
-      timeout: 10000,
-    }).trim()
-
-    return NextResponse.json({ ok: true, output })
+    // Both methods failed
+    const methods = [
+      hasKitty ? 'kitty (window not found — ensure session is running in a Kitty window with matching title, and allow_remote_control is enabled in kitty.conf)' : 'kitty (not installed)',
+      hasThc ? 'thc (send failed — is the daemon running?)' : 'thc (not installed)',
+    ]
+    return NextResponse.json(
+      { error: `Failed to send input. Tried: ${methods.join('; ')}` },
+      { status: 500 }
+    )
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to send prompt'
     return NextResponse.json({ error: message }, { status: 500 })

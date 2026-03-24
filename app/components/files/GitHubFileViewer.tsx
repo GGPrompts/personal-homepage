@@ -331,21 +331,41 @@ export function GitHubFileViewer({
     if (!activeEditor?.content) return ''
 
     let html = activeEditor.content
+
+    // Extract code blocks first and replace with placeholders to protect from other processing
+    const codeBlocks: string[] = []
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_match, _lang, code) => {
+      const normalizedCode = code
+        .split('\n')
+        .map((line: string) => line.trimEnd())
+        .join('\n')
+        .replace(/\n{2,}/g, '\n')
+        .trim()
+      const placeholder = `\x00CODEBLOCK${codeBlocks.length}\x00`
+      codeBlocks.push(`<pre class="bg-muted p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm" style="line-height:1.4;white-space:pre"><code>${normalizedCode.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></pre>`)
+      return placeholder
+    })
+
+    html = html
       .replace(/^### (.*$)/gm, '<h3 class="text-lg font-semibold mt-4 mb-2 text-foreground">$1</h3>')
       .replace(/^## (.*$)/gm, '<h2 class="text-xl font-semibold mt-6 mb-3 text-foreground">$1</h2>')
       .replace(/^# (.*$)/gm, '<h1 class="text-2xl font-bold mt-8 mb-4 text-foreground">$1</h1>')
       .replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>')
       .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold">$1</strong>')
       .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
-      .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre class="bg-muted p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm"><code>$2</code></pre>')
       .replace(/`([^`]+)`/g, '<code class="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">$1</code>')
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-cyan-500 hover:underline cursor-pointer" data-md-link>$1</a>')
       .replace(/^- (.*$)/gm, '<li class="ml-4">$1</li>')
       .replace(/^> (.*$)/gm, '<blockquote class="border-l-4 border-cyan-500 pl-4 my-4 text-muted-foreground italic">$1</blockquote>')
       .replace(/^---$/gm, '<hr class="my-6 border-border" />')
-      .replace(/^(?!<[hpuolba]|<\/|<li|<hr|<pre|<block)(.*$)/gm, (match, p1) => {
+      .replace(/^(?!<[hpuolba]|<\/|<li|<hr|<pre|<code|\x00)(.*$)/gm, (_match, p1) => {
         return p1.trim() ? `<p class="my-2 text-foreground/90">${p1}</p>` : ''
       })
+
+    // Restore code blocks from placeholders
+    codeBlocks.forEach((block, i) => {
+      html = html.replace(`\x00CODEBLOCK${i}\x00`, block)
+    })
 
     return html
   }, [activeEditor?.content])

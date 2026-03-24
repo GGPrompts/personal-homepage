@@ -329,6 +329,22 @@ function MarkdownViewer({ content, fontSize = 16, filePath }: MarkdownViewerProp
   const renderMarkdown = useMemo(() => {
     // Basic markdown transformations with better dark theme colors
     let html = content
+
+    // Extract code blocks first and replace with placeholders to protect from other processing
+    const codeBlocks: string[] = []
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_match, _lang, code) => {
+      const normalizedCode = code
+        .split('\n')
+        .map((line: string) => line.trimEnd())
+        .join('\n')
+        .replace(/\n{2,}/g, '\n')
+        .trim()
+      const placeholder = `\x00CODEBLOCK${codeBlocks.length}\x00`
+      codeBlocks.push(`<pre class="bg-zinc-900/80 border border-border/50 p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm text-emerald-400" style="line-height:1.4;white-space:pre"><code>${normalizedCode.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></pre>`)
+      return placeholder
+    })
+
+    html = html
       // Headers - cyan accent for visibility, with id for anchor links
       .replace(/^### (.*$)/gm, (_match, p1) => {
         const id = slugify(p1)
@@ -346,8 +362,6 @@ function MarkdownViewer({ content, fontSize = 16, filePath }: MarkdownViewerProp
       .replace(/\*\*\*(.*?)\*\*\*/g, '<strong class="text-foreground"><em>$1</em></strong>')
       .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-foreground">$1</strong>')
       .replace(/\*(.*?)\*/g, '<em class="italic text-foreground/90">$1</em>')
-      // Code blocks - better contrast
-      .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre class="bg-zinc-900/80 border border-border/50 p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm text-emerald-400"><code>$2</code></pre>')
       // Inline code - cyan tint
       .replace(/`([^`]+)`/g, '<code class="bg-zinc-800 text-pink-400 px-1.5 py-0.5 rounded text-sm font-mono">$1</code>')
       // Links - bright cyan (no target="_blank" — handled by click handler)
@@ -361,9 +375,14 @@ function MarkdownViewer({ content, fontSize = 16, filePath }: MarkdownViewerProp
       // Horizontal rules
       .replace(/^---$/gm, '<hr class="my-8 border-border/50" />')
       // Paragraphs (wrap remaining text)
-      .replace(/^(?!<[hpuolba]|<\/|<li|<hr|<pre|<block)(.*$)/gm, (match, p1) => {
+      .replace(/^(?!<[hpuolba]|<\/|<li|<hr|<pre|<code|\x00)(.*$)/gm, (_match, p1) => {
         return p1.trim() ? `<p class="my-3 text-foreground/85 leading-relaxed">${p1}</p>` : ''
       })
+
+    // Restore code blocks from placeholders
+    codeBlocks.forEach((block, i) => {
+      html = html.replace(`\x00CODEBLOCK${i}\x00`, block)
+    })
 
     return html
   }, [content])

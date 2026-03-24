@@ -244,7 +244,7 @@ export default function AIWorkspaceSection({
         body: JSON.stringify({
           command: `claude --resume --session-id ${session.sessionId}`,
           workingDir: session.projectPath,
-          name: `Claude Resume ${session.sessionId.slice(0, 8)}`,
+          name: `claude-${session.sessionId.slice(0, 8)}`,
         }),
       })
     } catch {
