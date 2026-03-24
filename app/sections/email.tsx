@@ -1291,7 +1291,7 @@ export default function EmailSection({
                   <div className="max-w-none">
                     {selectedEmail.body.includes("<") ? (
                       <iframe
-                        srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;line-height:1.6;color:#e4e4e7;background:transparent;}a{color:#60a5fa;}img{max-width:100%;height:auto;}</style></head><body>${selectedEmail.body}</body></html>`}
+                        srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a;background:transparent;}body,p,div,span,td,th,li,a,h1,h2,h3,h4,h5,h6,blockquote,pre,code,label,strong,em,b,i,u{color:#1a1a1a !important;}a{color:#2563eb !important;}img{max-width:100%;height:auto;}</style></head><body>${selectedEmail.body}</body></html>`}
                         className="w-full border-0 min-h-[200px]"
                         sandbox="allow-same-origin"
                         title="Email content"
