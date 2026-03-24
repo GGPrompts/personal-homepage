@@ -1198,12 +1198,8 @@ export function AIDrawerToggle({ className = "", currentSection }: AIDrawerToggl
     setMounted(true)
   }, [])
 
-  // Sync currentSection to context when it changes
-  React.useEffect(() => {
-    if (context && currentSection) {
-      context.setCurrentSection(currentSection)
-    }
-  }, [context, currentSection])
+  // Section sync to context is disabled to prevent agent/conversation switching on navigation.
+  // The drawer now persists its state across section changes.
 
   // Get selected agent from context
   const selectedAgent = React.useMemo(() => {

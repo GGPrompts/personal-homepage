@@ -208,14 +208,9 @@ export function AIDrawerProvider({
     return findForSection(currentSection)
   }, [currentSection, findForSection])
 
-  // Auto-select agent when section changes (only if user hasn't manually selected)
-  // Skip auto-selection when on AI Workspace - it handles agent selection itself
-  useEffect(() => {
-    if (currentSection === 'ai-workspace') return
-    if (!userHasSelectedAgent && recommendedAgent) {
-      setSelectedAgentId(recommendedAgent.id)
-    }
-  }, [recommendedAgent, userHasSelectedAgent, currentSection])
+  // Auto-agent-selection on section change is disabled.
+  // The drawer now persists its active agent/conversation across navigation.
+  // Users can still manually switch agents via the dropdown.
 
   // When agent changes, find and switch to most recent conversation with that agent
   useEffect(() => {

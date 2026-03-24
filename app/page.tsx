@@ -886,10 +886,9 @@ export default function PersonalHomepage() {
     }
   }, [activeSection, sectionRestored])
 
-  // Sync active section to AI drawer context so it stays current across navigation
-  React.useEffect(() => {
-    aiDrawer?.setCurrentSection(activeSection)
-  }, [activeSection, aiDrawer])
+  // NOTE: We no longer auto-sync activeSection to the AI drawer.
+  // This was causing the drawer to switch agents/conversations on every navigation.
+  // The drawer now persists its conversation across section changes.
 
   // Set CSS variable for sidebar width (used by PersistentMusicDrawer)
   React.useEffect(() => {
