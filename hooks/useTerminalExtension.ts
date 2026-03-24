@@ -266,8 +266,10 @@ export function useTerminalExtension() {
       // Skip network probe from remote sites to avoid permission prompts
       const newState = await checkBackend(authToken, !onLocalhost)
 
-      // Auto-detect: if TabzChrome is not available, switch to native
-      if (!newState.backendRunning && onLocalhost) {
+      // Auto-detect: only on first load when no backend type was explicitly stored.
+      // If the user has explicitly chosen a backend, respect that choice.
+      const hasExplicitChoice = localStorage.getItem(BACKEND_TYPE_KEY) !== null
+      if (!newState.backendRunning && onLocalhost && !hasExplicitChoice) {
         setStoredBackendType("native")
         setBackendTypeState("native")
         setState({
