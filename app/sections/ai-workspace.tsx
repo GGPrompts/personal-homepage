@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Bot, FolderOpen, Plus, RefreshCw, Radio, WifiOff,
   Eye, Clock, HardDrive, ChevronRight, ChevronDown,
-  Terminal, Send,
+  Terminal, Send, List,
 } from "lucide-react"
 import { ConversationViewer } from "@/components/ai/ConversationViewer"
 import { useSessionStream } from "@/hooks/useSessionStream"
@@ -66,6 +66,13 @@ export default function AIWorkspaceSection({
   const [spawningSession, setSpawningSession] = React.useState(false)
   const [collapsedGroups, setCollapsedGroups] = React.useState<Record<string, boolean>>({})
   const [expandedGroups, setExpandedGroups] = React.useState<Record<string, boolean>>({})
+  const [viewMode, setViewMode] = React.useState<'projects' | 'recent'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('ai-workspace-view-mode')
+      if (saved === 'projects' || saved === 'recent') return saved
+    }
+    return 'projects'
+  })
 
   // Auto-expand project group matching the current working directory
   const wdCtx = useWorkingDirSafe()
@@ -148,6 +155,11 @@ export default function AIWorkspaceSection({
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
+  // Persist view mode
+  React.useEffect(() => {
+    localStorage.setItem('ai-workspace-view-mode', viewMode)
+  }, [viewMode])
+
   const grouped = React.useMemo<GroupedSessions>(() => {
     const groups: GroupedSessions = {}
     for (const session of sessions) {
@@ -158,6 +170,13 @@ export default function AIWorkspaceSection({
     }
     return groups
   }, [sessions])
+
+  const recentSessions = React.useMemo(
+    () => sessions
+      .filter(s => !s.isSubagent)
+      .sort((a, b) => b.mtime - a.mtime),
+    [sessions]
+  )
 
   const selectedSession = React.useMemo(
     () => sessions.find(s => s.path === selectedPath) || null,
@@ -319,12 +338,100 @@ export default function AIWorkspaceSection({
               </div>
             </div>
 
+            {/* View mode toggle */}
+            <div className="px-3 py-2 border-b border-border/40 flex">
+              <div className="flex border rounded-md w-full">
+                <Button
+                  variant={viewMode === 'projects' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="rounded-r-none flex-1 h-7 text-xs gap-1.5"
+                  onClick={() => setViewMode('projects')}
+                >
+                  <FolderOpen className="h-3 w-3" />
+                  By Project
+                </Button>
+                <Button
+                  variant={viewMode === 'recent' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="rounded-l-none flex-1 h-7 text-xs gap-1.5"
+                  onClick={() => setViewMode('recent')}
+                >
+                  <List className="h-3 w-3" />
+                  Recent
+                </Button>
+              </div>
+            </div>
+
             <ScrollArea className="flex-1">
               <div className="p-2 space-y-3">
                 {isLoadingSessions ? (
                   <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
                     Loading sessions...
                   </div>
+                ) : viewMode === 'recent' ? (
+                  recentSessions.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
+                      <FolderOpen className="h-8 w-8 text-muted-foreground/40" />
+                      <p className="text-sm text-muted-foreground">No sessions found</p>
+                      <p className="text-xs text-muted-foreground/60">
+                        Run <code className="px-1 py-0.5 rounded bg-muted/50">claude</code> in your terminal to start
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-0.5">
+                      {recentSessions.map((session) => {
+                        const isSelected = session.path === selectedPath
+                        const title = session.firstMessage || 'Untitled session'
+                        return (
+                          <button
+                            key={session.path}
+                            onClick={() => setSelectedPath(session.path)}
+                            className={`w-full text-left px-3 pr-2 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 group min-w-0 overflow-hidden ${
+                              isSelected
+                                ? 'bg-primary/10 border border-primary/20 text-primary'
+                                : 'hover:bg-muted/30 text-muted-foreground'
+                            }`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-xs truncate leading-snug flex-1 min-w-0" title={session.firstMessage || session.sessionId}>
+                                  {title}
+                                </span>
+                                <Badge variant="secondary" className="text-[9px] h-4 px-1 shrink-0">
+                                  {session.project || 'unknown'}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-0.5 flex-nowrap whitespace-nowrap text-[10px] text-muted-foreground/60 leading-none">
+                                <Clock className="h-2.5 w-2.5 shrink-0" />
+                                <span>{formatTimeAgo(session.mtime)}</span>
+                                <span className="opacity-40">·</span>
+                                <HardDrive className="h-2.5 w-2.5 shrink-0" />
+                                <span>{formatBytes(session.size)}</span>
+                              </div>
+                            </div>
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleResumeInTerminal(session)
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.stopPropagation()
+                                  handleResumeInTerminal(session)
+                                }
+                              }}
+                              title="Resume in terminal"
+                              className="shrink-0 p-0.5 rounded hover:bg-primary/20 transition-opacity opacity-0 group-hover:opacity-70 hover:!opacity-100 cursor-pointer"
+                            >
+                              <Terminal className="h-3 w-3" />
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )
                 ) : Object.keys(grouped).length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
                     <FolderOpen className="h-8 w-8 text-muted-foreground/40" />
