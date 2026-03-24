@@ -24,6 +24,7 @@ interface SessionInfo {
   mtime: number
   isSubagent: boolean
   firstMessage: string | null
+  contextPercent?: number | null
 }
 
 interface GroupedSessions {
@@ -120,13 +121,33 @@ export default function AIWorkspaceSection({
   const fetchSessions = React.useCallback(async () => {
     setIsLoadingSessions(true)
     try {
-      const res = await fetch('/api/ai/sessions')
-      if (res.ok) {
-        const data = await res.json()
-        setSessions(data.sessions || [])
+      const [sessionsRes, contextRes] = await Promise.all([
+        fetch('/api/ai/sessions'),
+        fetch('/api/ai/context').catch(() => null),
+      ])
+      if (sessionsRes.ok) {
+        const data = await sessionsRes.json()
+        let sessionList: SessionInfo[] = data.sessions || []
 
-        if (!selectedPath && data.sessions?.length > 0) {
-          setSelectedPath(data.sessions[0].path)
+        // Merge context % into session objects
+        if (contextRes?.ok) {
+          const contextData = await contextRes.json()
+          const ctxMap: Record<string, number | null> = {}
+          if (contextData.sessions) {
+            for (const [sid, info] of Object.entries(contextData.sessions)) {
+              ctxMap[sid] = (info as { contextPercent: number | null }).contextPercent
+            }
+          }
+          sessionList = sessionList.map(s => ({
+            ...s,
+            contextPercent: ctxMap[s.sessionId] ?? null,
+          }))
+        }
+
+        setSessions(sessionList)
+
+        if (!selectedPath && sessionList.length > 0) {
+          setSelectedPath(sessionList[0].path)
         }
       }
     } catch {
@@ -415,6 +436,20 @@ export default function AIWorkspaceSection({
                                 <span className="opacity-40">·</span>
                                 <HardDrive className="h-2.5 w-2.5 shrink-0" />
                                 <span>{formatBytes(session.size)}</span>
+                                {!session.isSubagent && session.contextPercent != null && (
+                                  <>
+                                    <span className="opacity-40">·</span>
+                                    <span className={`font-mono ${
+                                      session.contextPercent >= 80
+                                        ? 'text-red-400'
+                                        : session.contextPercent >= 50
+                                          ? 'text-yellow-400'
+                                          : 'text-emerald-400'
+                                    }`}>
+                                      {session.contextPercent}%
+                                    </span>
+                                  </>
+                                )}
                               </div>
                             </div>
                             {!session.isSubagent && (
@@ -517,6 +552,20 @@ export default function AIWorkspaceSection({
                                       <span className="opacity-40">·</span>
                                       <HardDrive className="h-2.5 w-2.5 shrink-0" />
                                       <span>{formatBytes(session.size)}</span>
+                                      {!session.isSubagent && session.contextPercent != null && (
+                                        <>
+                                          <span className="opacity-40">·</span>
+                                          <span className={`font-mono ${
+                                            session.contextPercent >= 80
+                                              ? 'text-red-400'
+                                              : session.contextPercent >= 50
+                                                ? 'text-yellow-400'
+                                                : 'text-emerald-400'
+                                          }`}>
+                                            {session.contextPercent}%
+                                          </span>
+                                        </>
+                                      )}
                                     </div>
                                   </div>
                                   {!session.isSubagent && (
