@@ -387,15 +387,12 @@ export default function AIWorkspaceSection({
                                     <div className="text-xs truncate leading-snug" title={session.firstMessage || session.sessionId}>
                                       {title}
                                     </div>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                      <span className="text-[10px] flex items-center gap-1 text-muted-foreground/60">
-                                        <Clock className="h-2.5 w-2.5" />
-                                        {formatTimeAgo(session.mtime)}
-                                      </span>
-                                      <span className="text-[10px] flex items-center gap-1 text-muted-foreground/60">
-                                        <HardDrive className="h-2.5 w-2.5" />
-                                        {formatBytes(session.size)}
-                                      </span>
+                                    <div className="flex items-center gap-1.5 mt-0.5 flex-nowrap whitespace-nowrap text-[10px] text-muted-foreground/60 leading-none">
+                                      <Clock className="h-2.5 w-2.5 shrink-0" />
+                                      <span>{formatTimeAgo(session.mtime)}</span>
+                                      <span className="opacity-40">·</span>
+                                      <HardDrive className="h-2.5 w-2.5 shrink-0" />
+                                      <span>{formatBytes(session.size)}</span>
                                     </div>
                                   </div>
                                   <div
