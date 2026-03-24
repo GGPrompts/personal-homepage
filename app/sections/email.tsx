@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useMemo, useCallback } from "react"
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -354,6 +354,18 @@ export default function EmailSection({
     return result.sort((a, b) => b.date.getTime() - a.date.getTime())
   }, [emails, filterLabel])
 
+  // Debounced label invalidation ref
+  const labelInvalidationTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const debouncedInvalidateLabels = useCallback(() => {
+    if (labelInvalidationTimer.current) {
+      clearTimeout(labelInvalidationTimer.current)
+    }
+    labelInvalidationTimer.current = setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ["gmail-labels"] })
+      labelInvalidationTimer.current = null
+    }, 1000)
+  }, [queryClient])
+
   // Mutations
   const modifyEmailMutation = useMutation({
     mutationFn: async ({
@@ -383,9 +395,52 @@ export default function EmailSection({
 
       return response.json()
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["gmail-messages"] })
-      queryClient.invalidateQueries({ queryKey: ["gmail-labels"] })
+    onSuccess: (_data, variables) => {
+      const { id, addLabelIds, removeLabelIds } = variables
+
+      // Helper to update an email's labels and read/starred state
+      const updateEmail = (email: Email): Email => {
+        let updatedLabelIds = [...email.labelIds]
+        if (removeLabelIds) {
+          updatedLabelIds = updatedLabelIds.filter(l => !removeLabelIds.includes(l))
+        }
+        if (addLabelIds) {
+          updatedLabelIds = [...updatedLabelIds, ...addLabelIds.filter(l => !updatedLabelIds.includes(l))]
+        }
+        return {
+          ...email,
+          labelIds: updatedLabelIds,
+          isRead: removeLabelIds?.includes("UNREAD") ? true : addLabelIds?.includes("UNREAD") ? false : email.isRead,
+          isStarred: addLabelIds?.includes("STARRED") ? true : removeLabelIds?.includes("STARRED") ? false : email.isStarred,
+        }
+      }
+
+      // Optimistically update the cached email list
+      queryClient.setQueriesData<{ messages: Email[]; nextPageToken?: string }>(
+        { queryKey: ["gmail-messages"] },
+        (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            messages: old.messages.map((email) =>
+              email.id === id ? updateEmail(email) : email
+            ),
+          }
+        }
+      )
+
+      // Update local allEmails state
+      setAllEmails(prev => prev.map(email =>
+        email.id === id ? updateEmail(email) : email
+      ))
+
+      // Update selectedEmail if it's the one being modified
+      setSelectedEmail(prev =>
+        prev && prev.id === id ? updateEmail(prev) : prev
+      )
+
+      // Debounce label count refresh
+      debouncedInvalidateLabels()
     },
   })
 
