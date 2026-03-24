@@ -366,6 +366,15 @@ export default function EmailSection({
     }, 1000)
   }, [queryClient])
 
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (labelInvalidationTimer.current) {
+        clearTimeout(labelInvalidationTimer.current)
+      }
+    }
+  }, [])
+
   // Mutations
   const modifyEmailMutation = useMutation({
     mutationFn: async ({

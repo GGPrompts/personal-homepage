@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { readdirSync, statSync, openSync, readSync, closeSync } from 'fs'
 import { join } from 'path'
-import { execSync, spawn } from 'child_process'
+import { execSync, execFileSync, spawn } from 'child_process'
 import { randomUUID } from 'crypto'
 import { extractFirstUserMessage } from '@/lib/ai/jsonl-parser'
 
 const CLAUDE_PROJECTS_DIR = join(process.env.HOME || '', '.claude', 'projects')
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const SAFE_PATH_RE = /^\/[\w.\-/]+$/
 
 interface SessionInfo {
   path: string
@@ -106,6 +108,14 @@ export async function POST(request: NextRequest) {
 
     const cwd = projectPath || process.env.HOME || '/home'
 
+    // Validate cwd to prevent command injection
+    if (!SAFE_PATH_RE.test(cwd)) {
+      return NextResponse.json(
+        { error: 'Invalid project path' },
+        { status: 400 }
+      )
+    }
+
     // Try thc first (Thermal Conductor daemon)
     let hasThc = false
     try {
@@ -117,7 +127,7 @@ export async function POST(request: NextRequest) {
 
     if (hasThc) {
       try {
-        const output = execSync(`thc spawn -p '${cwd}'`, {
+        const output = execFileSync('thc', ['spawn', '-p', cwd], {
           encoding: 'utf-8',
           timeout: 5000,
         }).trim()
@@ -185,6 +195,13 @@ export async function PUT(request: NextRequest) {
       )
     }
 
+    if (!UUID_RE.test(sessionId)) {
+      return NextResponse.json(
+        { error: 'Invalid sessionId format' },
+        { status: 400 }
+      )
+    }
+
     const sessionPrefix = sessionId.slice(0, 8)
 
     // Try kitty @ send-text first (primary — works with any Kitty-spawned session)
@@ -198,10 +215,8 @@ export async function PUT(request: NextRequest) {
 
     if (hasKitty) {
       try {
-        // Escape the prompt for kitty send-text: newline at end to submit
-        const escapedPrompt = prompt.replace(/\\/g, '\\\\').replace(/'/g, "'\\''")
-        execSync(
-          `kitty @ send-text --match 'title:^claude-${sessionPrefix}' '${escapedPrompt}\n'`,
+        execFileSync(
+          'kitty', ['@', 'send-text', '--match', `title:^claude-${sessionPrefix}`, prompt + '\n'],
           { encoding: 'utf-8', timeout: 10000 }
         )
         return NextResponse.json({ ok: true, method: 'kitty' })
@@ -221,7 +236,7 @@ export async function PUT(request: NextRequest) {
 
     if (hasThc) {
       try {
-        const output = execSync(`thc send ${sessionId} ${JSON.stringify(prompt)}`, {
+        const output = execFileSync('thc', ['send', sessionId, prompt], {
           encoding: 'utf-8',
           timeout: 10000,
         }).trim()

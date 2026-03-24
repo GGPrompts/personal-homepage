@@ -381,7 +381,7 @@ function MarkdownViewer({ content, fontSize = 16, filePath }: MarkdownViewerProp
 
     // Restore code blocks from placeholders
     codeBlocks.forEach((block, i) => {
-      html = html.replace(`\x00CODEBLOCK${i}\x00`, block)
+      html = html.split(`\x00CODEBLOCK${i}\x00`).join(block)
     })
 
     return html

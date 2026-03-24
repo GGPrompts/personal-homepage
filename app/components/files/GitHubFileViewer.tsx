@@ -364,7 +364,7 @@ export function GitHubFileViewer({
 
     // Restore code blocks from placeholders
     codeBlocks.forEach((block, i) => {
-      html = html.replace(`\x00CODEBLOCK${i}\x00`, block)
+      html = html.split(`\x00CODEBLOCK${i}\x00`).join(block)
     })
 
     return html
