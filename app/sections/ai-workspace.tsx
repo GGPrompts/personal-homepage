@@ -372,16 +372,12 @@ export default function AIWorkspaceSection({
                           <div className="space-y-0.5">
                             {visibleSessions.map((session) => {
                               const isSelected = session.path === selectedPath
-                              const title = session.firstMessage
-                                ? (session.firstMessage.length > 60
-                                  ? session.firstMessage.slice(0, 60) + '...'
-                                  : session.firstMessage)
-                                : 'Untitled session'
+                              const title = session.firstMessage || 'Untitled session'
                               return (
                                 <button
                                   key={session.path}
                                   onClick={() => setSelectedPath(session.path)}
-                                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 group ${
+                                  className={`w-full text-left px-3 pr-2 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 group min-w-0 overflow-hidden ${
                                     isSelected
                                       ? 'bg-primary/10 border border-primary/20 text-primary'
                                       : 'hover:bg-muted/30 text-muted-foreground'
