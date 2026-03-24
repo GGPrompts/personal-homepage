@@ -376,7 +376,7 @@ export default function AIWorkspaceSection({
                                 ? (session.firstMessage.length > 60
                                   ? session.firstMessage.slice(0, 60) + '...'
                                   : session.firstMessage)
-                                : `${session.sessionId.slice(0, 8)}...`
+                                : 'Untitled session'
                               return (
                                 <button
                                   key={session.path}

@@ -41,12 +41,16 @@ function walkJsonl(dir: string, results: SessionInfo[], projectSlug: string): vo
           let firstMessage: string | null = null
           try {
             const fd = openSync(fullPath, 'r')
-            const buf = Buffer.alloc(4096)
-            const bytesRead = readSync(fd, buf, 0, 4096, 0)
-            closeSync(fd)
-            if (bytesRead > 0) {
-              firstMessage = extractFirstUserMessage(buf.toString('utf-8', 0, bytesRead))
+            // Try progressively larger reads: 4KB, then 16KB if no user message found
+            for (const size of [4096, 16384]) {
+              const buf = Buffer.alloc(size)
+              const bytesRead = readSync(fd, buf, 0, size, 0)
+              if (bytesRead > 0) {
+                firstMessage = extractFirstUserMessage(buf.toString('utf-8', 0, bytesRead))
+              }
+              if (firstMessage || bytesRead < size) break
             }
+            closeSync(fd)
           } catch {
             // skip if we can't read the file
           }
