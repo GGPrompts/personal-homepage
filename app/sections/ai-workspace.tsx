@@ -163,18 +163,21 @@ export default function AIWorkspaceSection({
   const grouped = React.useMemo<GroupedSessions>(() => {
     const groups: GroupedSessions = {}
     for (const session of sessions) {
-      if (session.isSubagent) continue
       const key = session.project || 'unknown'
       if (!groups[key]) groups[key] = []
       groups[key].push(session)
+    }
+    // Sort each group: main sessions first (by mtime desc), then subagents (by mtime desc)
+    for (const key of Object.keys(groups)) {
+      const main = groups[key].filter(s => !s.isSubagent).sort((a, b) => b.mtime - a.mtime)
+      const sub = groups[key].filter(s => s.isSubagent).sort((a, b) => b.mtime - a.mtime)
+      groups[key] = [...main, ...sub]
     }
     return groups
   }, [sessions])
 
   const recentSessions = React.useMemo(
-    () => sessions
-      .filter(s => !s.isSubagent)
-      .sort((a, b) => b.mtime - a.mtime),
+    () => [...sessions].sort((a, b) => b.mtime - a.mtime),
     [sessions]
   )
 
@@ -386,12 +389,17 @@ export default function AIWorkspaceSection({
                           <button
                             key={session.path}
                             onClick={() => setSelectedPath(session.path)}
-                            className={`w-full text-left px-3 pr-2 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 group min-w-0 overflow-hidden ${
+                            className={`w-full text-left pr-2 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 group min-w-0 overflow-hidden ${
+                              session.isSubagent ? 'pl-7' : 'px-3'
+                            } ${
                               isSelected
                                 ? 'bg-primary/10 border border-primary/20 text-primary'
                                 : 'hover:bg-muted/30 text-muted-foreground'
                             }`}
                           >
+                            {session.isSubagent && (
+                              <Bot className="h-3 w-3 shrink-0 text-blue-400/70" />
+                            )}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <span className="text-xs truncate leading-snug flex-1 min-w-0" title={session.firstMessage || session.sessionId}>
@@ -409,24 +417,26 @@ export default function AIWorkspaceSection({
                                 <span>{formatBytes(session.size)}</span>
                               </div>
                             </div>
-                            <div
-                              role="button"
-                              tabIndex={0}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleResumeInTerminal(session)
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
+                            {!session.isSubagent && (
+                              <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={(e) => {
                                   e.stopPropagation()
                                   handleResumeInTerminal(session)
-                                }
-                              }}
-                              title="Resume in terminal"
-                              className="shrink-0 p-0.5 rounded hover:bg-primary/20 transition-opacity opacity-0 group-hover:opacity-70 hover:!opacity-100 cursor-pointer"
-                            >
-                              <Terminal className="h-3 w-3" />
-                            </div>
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.stopPropagation()
+                                    handleResumeInTerminal(session)
+                                  }
+                                }}
+                                title="Resume in terminal"
+                                className="shrink-0 p-0.5 rounded hover:bg-primary/20 transition-opacity opacity-0 group-hover:opacity-70 hover:!opacity-100 cursor-pointer"
+                              >
+                                <Terminal className="h-3 w-3" />
+                              </div>
+                            )}
                           </button>
                         )
                       })}
@@ -442,6 +452,8 @@ export default function AIWorkspaceSection({
                   </div>
                 ) : (
                   Object.entries(grouped).map(([project, projectSessions]) => {
+                    const mainCount = projectSessions.filter(s => !s.isSubagent).length
+                    const subCount = projectSessions.length - mainCount
                     const collapsed = isGroupCollapsed(project, projectSessions.length)
                     const showAll = expandedGroups[project] || false
                     const SESSION_LIMIT = 5
@@ -472,7 +484,7 @@ export default function AIWorkspaceSection({
                             {project}
                           </span>
                           <Badge variant="secondary" className="ml-auto text-[10px] h-4 px-1">
-                            {projectSessions.length}
+                            {mainCount}{subCount > 0 && <span className="text-blue-400/70">+{subCount}</span>}
                           </Badge>
                         </button>
                         {!collapsed && (
@@ -484,12 +496,17 @@ export default function AIWorkspaceSection({
                                 <button
                                   key={session.path}
                                   onClick={() => setSelectedPath(session.path)}
-                                  className={`w-full text-left px-3 pr-2 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 group min-w-0 overflow-hidden ${
+                                  className={`w-full text-left pr-2 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 group min-w-0 overflow-hidden ${
+                                    session.isSubagent ? 'pl-7' : 'px-3'
+                                  } ${
                                     isSelected
                                       ? 'bg-primary/10 border border-primary/20 text-primary'
                                       : 'hover:bg-muted/30 text-muted-foreground'
                                   }`}
                                 >
+                                  {session.isSubagent && (
+                                    <Bot className="h-3 w-3 shrink-0 text-blue-400/70" />
+                                  )}
                                   <div className="flex-1 min-w-0">
                                     <div className="text-xs truncate leading-snug" title={session.firstMessage || session.sessionId}>
                                       {title}
@@ -502,24 +519,26 @@ export default function AIWorkspaceSection({
                                       <span>{formatBytes(session.size)}</span>
                                     </div>
                                   </div>
-                                  <div
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleResumeInTerminal(session)
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter' || e.key === ' ') {
+                                  {!session.isSubagent && (
+                                    <div
+                                      role="button"
+                                      tabIndex={0}
+                                      onClick={(e) => {
                                         e.stopPropagation()
                                         handleResumeInTerminal(session)
-                                      }
-                                    }}
-                                    title="Resume in terminal"
-                                    className="shrink-0 p-0.5 rounded hover:bg-primary/20 transition-opacity opacity-0 group-hover:opacity-70 hover:!opacity-100 cursor-pointer"
-                                  >
-                                    <Terminal className="h-3 w-3" />
-                                  </div>
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                          e.stopPropagation()
+                                          handleResumeInTerminal(session)
+                                        }
+                                      }}
+                                      title="Resume in terminal"
+                                      className="shrink-0 p-0.5 rounded hover:bg-primary/20 transition-opacity opacity-0 group-hover:opacity-70 hover:!opacity-100 cursor-pointer"
+                                    >
+                                      <Terminal className="h-3 w-3" />
+                                    </div>
+                                  )}
                                 </button>
                               )
                             })}
@@ -697,8 +716,8 @@ export default function AIWorkspaceSection({
             )}
           </div>
 
-          {/* Send Prompt Input */}
-          {selectedPath && selectedSessionId && (
+          {/* Send Prompt Input (hidden for subagent sessions) */}
+          {selectedPath && selectedSessionId && !selectedSession?.isSubagent && (
             <div className="shrink-0 border-t border-border/40 glass-dark px-3 sm:px-4 py-2 sm:py-3">
               <form
                 onSubmit={(e) => {
