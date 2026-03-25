@@ -44,6 +44,8 @@ interface FileTreeProps {
   maxDepth?: number
   showHidden?: boolean
   className?: string
+  treeFontSize?: number
+  treeFontFamily?: string
 }
 
 export function FileTree({
@@ -51,7 +53,18 @@ export function FileTree({
   maxDepth = 5,
   showHidden = false,
   className,
+  treeFontSize,
+  treeFontFamily,
 }: FileTreeProps) {
+  // Build font style for the tree container
+  const treeFontStyle = useMemo(() => {
+    const style: React.CSSProperties = {}
+    if (treeFontSize) style.fontSize = `${treeFontSize}px`
+    if (treeFontFamily && treeFontFamily !== 'system') {
+      style.fontFamily = `"${treeFontFamily}", ui-monospace, monospace`
+    }
+    return style
+  }, [treeFontSize, treeFontFamily])
   const {
     fileTree,
     setFileTree,
@@ -685,7 +698,7 @@ export function FileTree({
             <CollapsibleTrigger asChild>
               <button
                 className={cn(
-                  'flex w-full items-center gap-1.5 rounded px-2 py-1 text-sm transition-colors',
+                  'flex w-full items-center gap-1.5 rounded px-2 py-1 text-[1em] transition-colors',
                   'hover:bg-primary/10',
                   isSelected && 'bg-primary/20 text-primary',
                   isFocused && 'ring-2 ring-primary/50 ring-inset'
@@ -734,7 +747,7 @@ export function FileTree({
       >
         <button
           className={cn(
-            'flex w-full items-center gap-1.5 rounded px-2 py-1 text-sm transition-colors',
+            'flex w-full items-center gap-1.5 rounded px-2 py-1 text-[1em] transition-colors',
             'hover:bg-primary/10',
             isSelected && 'bg-primary/20 text-primary',
             isFocused && 'ring-2 ring-primary/50 ring-inset'
@@ -798,10 +811,10 @@ export function FileTree({
   }, [currentPath, maxDepth, showHidden, setFileTree, setFileTreePath])
 
   return (
-    <div className={cn('flex h-full flex-col', className)}>
+    <div className={cn('flex h-full flex-col', className)} style={treeFontStyle}>
       {/* Header with controls */}
       <div className="flex items-center justify-between border-b border-border/50 px-3 py-2">
-        <h3 className="text-sm font-semibold terminal-glow">Files</h3>
+        <h3 className="text-[1em] font-semibold terminal-glow">Files</h3>
         <div className="flex items-center gap-1">
           <button
             onClick={handleExpandAll}
@@ -832,7 +845,7 @@ export function FileTree({
 
       {/* Breadcrumb navigation */}
       {breadcrumbSegments.length > 0 && (
-        <div className="flex items-center gap-1 px-3 py-1.5 text-xs text-muted-foreground border-b border-border/30 overflow-x-auto scrollbar-hide">
+        <div className="flex items-center gap-1 px-3 py-1.5 text-[0.85em] text-muted-foreground border-b border-border/30 overflow-x-auto scrollbar-hide">
           <button
             onClick={() => handleBreadcrumbClick('~')}
             className="hover:text-foreground transition-colors flex-shrink-0"
@@ -885,7 +898,7 @@ export function FileTree({
           )}
 
           {error && (
-            <div className="px-3 py-4 text-center text-sm text-destructive">
+            <div className="px-3 py-4 text-center text-[1em] text-destructive">
               {error}
             </div>
           )}
@@ -893,7 +906,7 @@ export function FileTree({
           {!loading && !error && fileTree && renderNode(fileTree)}
 
           {!loading && !error && !fileTree && (
-            <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+            <div className="px-3 py-4 text-center text-[1em] text-muted-foreground">
               No files found
             </div>
           )}

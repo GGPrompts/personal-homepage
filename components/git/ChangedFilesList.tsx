@@ -30,6 +30,8 @@ interface ChangedFilesListProps {
   repoPath: string
   onRefresh: () => void
   className?: string
+  treeFontSize?: number
+  treeFontFamily?: string
 }
 
 const statusIcons: Record<GitFile['status'], React.ReactNode> = {
@@ -81,7 +83,7 @@ function CollapsibleSection({
       <div className="flex items-center gap-1.5 px-2 py-1">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-1.5 flex-1 min-w-0 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 flex-1 min-w-0 text-[0.85em] font-medium text-muted-foreground hover:text-foreground transition-colors"
         >
           {isOpen ? (
             <ChevronDown className="h-3 w-3" />
@@ -89,7 +91,7 @@ function CollapsibleSection({
             <ChevronRight className="h-3 w-3" />
           )}
           <span>{title}</span>
-          <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4">
+          <Badge variant="secondary" className="text-[0.75em] px-1 py-0 h-4">
             {count}
           </Badge>
         </button>
@@ -163,7 +165,7 @@ function FileRow({
         className="flex items-center gap-1.5 flex-1 min-w-0 text-left"
       >
         {statusIcons[file.status]}
-        <span className="flex-1 min-w-0 truncate text-xs font-mono">
+        <span className="flex-1 min-w-0 truncate text-[0.85em] font-mono">
           {dirPath && (
             <span className="text-muted-foreground">{dirPath}/</span>
           )}
@@ -172,7 +174,7 @@ function FileRow({
         <Badge
           variant="outline"
           className={cn(
-            'text-[9px] px-1 py-0 h-3.5 flex-shrink-0',
+            'text-[0.7em] px-1 py-0 h-3.5 flex-shrink-0',
             statusColors[file.status]
           )}
         >
@@ -299,7 +301,7 @@ export function ChangedFilesList({
     return (
       <div className={cn('flex flex-col items-center justify-center py-6 text-muted-foreground', className)}>
         <File className="h-8 w-8 mb-2 opacity-50" />
-        <span className="text-xs">Working tree clean</span>
+        <span className="text-[0.85em]">Working tree clean</span>
       </div>
     )
   }
@@ -313,7 +315,7 @@ export function ChangedFilesList({
           <button
             onClick={handleUnstageAll}
             disabled={bulkLoading === 'unstage-all'}
-            className="flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground rounded hover:bg-muted transition-colors disabled:opacity-50"
+            className="flex items-center gap-0.5 px-1.5 py-0.5 text-[0.75em] text-muted-foreground hover:text-foreground rounded hover:bg-muted transition-colors disabled:opacity-50"
             title="Unstage all"
           >
             {bulkLoading === 'unstage-all' ? (
@@ -348,7 +350,7 @@ export function ChangedFilesList({
           <button
             onClick={handleStageAll}
             disabled={bulkLoading === 'stage-all'}
-            className="flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground rounded hover:bg-muted transition-colors disabled:opacity-50"
+            className="flex items-center gap-0.5 px-1.5 py-0.5 text-[0.75em] text-muted-foreground hover:text-foreground rounded hover:bg-muted transition-colors disabled:opacity-50"
             title="Stage all"
           >
             {bulkLoading === 'stage-all' ? (
@@ -383,7 +385,7 @@ export function ChangedFilesList({
           <button
             onClick={handleStageAll}
             disabled={bulkLoading === 'stage-all'}
-            className="flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground rounded hover:bg-muted transition-colors disabled:opacity-50"
+            className="flex items-center gap-0.5 px-1.5 py-0.5 text-[0.75em] text-muted-foreground hover:text-foreground rounded hover:bg-muted transition-colors disabled:opacity-50"
             title="Stage all untracked"
           >
             {bulkLoading === 'stage-all' ? (

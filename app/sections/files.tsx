@@ -309,6 +309,8 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
                   maxDepth={viewerSettings.maxDepth}
                   showHidden={false}
                   className="h-full"
+                  treeFontSize={viewerSettings.treeFontSize}
+                  treeFontFamily={viewerSettings.treeFontFamily}
                 />
               ) : (
                 <FilteredFileList
@@ -328,6 +330,8 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
                   onCommitFileSelect={handleCommitFileSelect}
                   onShowGraph={handleShowGraph}
                   className="h-full"
+                  treeFontSize={viewerSettings.treeFontSize}
+                  treeFontFamily={viewerSettings.treeFontFamily}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center text-muted-foreground text-xs px-4 text-center">
@@ -338,6 +342,8 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
               <GitHubFileTree
                 className="h-full"
                 onFileSelect={handleGitHubFileSelect}
+                treeFontSize={viewerSettings.treeFontSize}
+                treeFontFamily={viewerSettings.treeFontFamily}
               />
             )}
           </div>

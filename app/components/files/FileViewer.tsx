@@ -58,7 +58,7 @@ function FileTab({ file, isActive, onSelect, onClose, onPin }: FileTabProps) {
   return (
     <div
       className={cn(
-        'group relative flex items-center gap-1.5 px-3 py-1.5 text-sm cursor-pointer',
+        'group relative flex items-center gap-1.5 px-3 py-1.5 text-[1em] cursor-pointer',
         'border-r border-border transition-colors',
         isActive
           ? 'bg-background text-foreground'
@@ -74,7 +74,7 @@ function FileTab({ file, isActive, onSelect, onClose, onPin }: FileTabProps) {
       <Icon className={cn("h-3.5 w-3.5 flex-shrink-0", isDiff && "text-orange-400")} />
       <span className="max-w-[120px] truncate">{file.name}</span>
       {isDiff && (
-        <span className="text-[9px] font-mono text-orange-400/80 flex-shrink-0">DIFF</span>
+        <span className="text-[0.7em] font-mono text-orange-400/80 flex-shrink-0">DIFF</span>
       )}
       {file.pinned && (
         <Pin className="h-3 w-3 text-cyan-500 flex-shrink-0" />
@@ -766,6 +766,16 @@ export function FileViewer() {
     return openFiles.find(f => f.id === activeFileId)
   }, [openFiles, activeFileId])
 
+  // Build font style for the tab bar (uses tree font settings since tabs are navigation chrome)
+  const tabBarFontStyle = useMemo(() => {
+    const style: React.CSSProperties = {}
+    if (viewerSettings.treeFontSize) style.fontSize = `${viewerSettings.treeFontSize}px`
+    if (viewerSettings.treeFontFamily && viewerSettings.treeFontFamily !== 'system') {
+      style.fontFamily = `"${viewerSettings.treeFontFamily}", ui-monospace, monospace`
+    }
+    return style
+  }, [viewerSettings.treeFontSize, viewerSettings.treeFontFamily])
+
   // Separate pinned and unpinned files for tab ordering
   const { pinnedFiles, previewFile } = useMemo(() => {
     const pinned = openFiles.filter(f => f.pinned)
@@ -787,7 +797,7 @@ export function FileViewer() {
   return (
     <div className="h-full flex flex-col glass-dark rounded-lg border border-border overflow-hidden" data-tabz-region="file-viewer">
       {/* Tab Bar */}
-      <div className="flex items-center border-b border-border bg-muted/30 overflow-x-auto" data-tabz-list="file-tabs">
+      <div className="flex items-center border-b border-border bg-muted/30 overflow-x-auto" data-tabz-list="file-tabs" style={tabBarFontStyle}>
         {/* Pinned tabs first */}
         {pinnedFiles.map(file => (
           <FileTab

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import {
   ChevronRight,
   ChevronDown,
@@ -44,11 +44,23 @@ interface GitHubFileTreeNode extends GitHubFile {
 interface GitHubFileTreeProps {
   className?: string
   onFileSelect?: (path: string, sha: string, name: string) => void
+  treeFontSize?: number
+  treeFontFamily?: string
 }
 
-export function GitHubFileTree({ className, onFileSelect }: GitHubFileTreeProps) {
+export function GitHubFileTree({ className, onFileSelect, treeFontSize, treeFontFamily }: GitHubFileTreeProps) {
   const { user, getGitHubToken } = useAuth()
   const { openFile } = useFilesContext()
+
+  // Build font style for the tree container
+  const treeFontStyle = useMemo(() => {
+    const style: React.CSSProperties = {}
+    if (treeFontSize) style.fontSize = `${treeFontSize}px`
+    if (treeFontFamily && treeFontFamily !== 'system') {
+      style.fontFamily = `"${treeFontFamily}", ui-monospace, monospace`
+    }
+    return style
+  }, [treeFontSize, treeFontFamily])
 
   // GitHub config
   const [token, setToken] = useState<string | null>(null)
@@ -275,7 +287,7 @@ export function GitHubFileTree({ className, onFileSelect }: GitHubFileTreeProps)
             <CollapsibleTrigger asChild>
               <button
                 className={cn(
-                  'flex w-full items-center gap-1.5 rounded px-2 py-1 text-sm transition-colors',
+                  'flex w-full items-center gap-1.5 rounded px-2 py-1 text-[1em] transition-colors',
                   'hover:bg-primary/10',
                   isSelected && 'bg-primary/20 text-primary'
                 )}
@@ -319,7 +331,7 @@ export function GitHubFileTree({ className, onFileSelect }: GitHubFileTreeProps)
       >
         <button
           className={cn(
-            'group flex w-full items-center gap-1.5 rounded px-2 py-1 text-sm transition-colors',
+            'group flex w-full items-center gap-1.5 rounded px-2 py-1 text-[1em] transition-colors',
             'hover:bg-primary/10',
             isSelected && 'bg-primary/20 text-primary'
           )}
@@ -369,9 +381,9 @@ export function GitHubFileTree({ className, onFileSelect }: GitHubFileTreeProps)
   // No config message
   if (!user) {
     return (
-      <div className={cn('flex h-full flex-col', className)}>
+      <div className={cn('flex h-full flex-col', className)} style={treeFontStyle}>
         <div className="flex items-center justify-between border-b border-border/50 px-3 py-2">
-          <h3 className="text-sm font-semibold terminal-glow flex items-center gap-1.5">
+          <h3 className="text-[1em] font-semibold terminal-glow flex items-center gap-1.5">
             <Github className="h-4 w-4" />
             GitHub
           </h3>
@@ -379,8 +391,8 @@ export function GitHubFileTree({ className, onFileSelect }: GitHubFileTreeProps)
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center">
             <User className="h-8 w-8 text-primary mx-auto mb-3 opacity-50" />
-            <p className="text-sm font-medium mb-1">Sign in to browse GitHub</p>
-            <p className="text-xs text-muted-foreground mb-4">
+            <p className="text-[1em] font-medium mb-1">Sign in to browse GitHub</p>
+            <p className="text-[0.85em] text-muted-foreground mb-4">
               Access your repositories
             </p>
             <Button
@@ -400,9 +412,9 @@ export function GitHubFileTree({ className, onFileSelect }: GitHubFileTreeProps)
 
   if (!repo) {
     return (
-      <div className={cn('flex h-full flex-col', className)}>
+      <div className={cn('flex h-full flex-col', className)} style={treeFontStyle}>
         <div className="flex items-center justify-between border-b border-border/50 px-3 py-2">
-          <h3 className="text-sm font-semibold terminal-glow flex items-center gap-1.5">
+          <h3 className="text-[1em] font-semibold terminal-glow flex items-center gap-1.5">
             <Github className="h-4 w-4" />
             GitHub
           </h3>
@@ -410,13 +422,13 @@ export function GitHubFileTree({ className, onFileSelect }: GitHubFileTreeProps)
         <div className="flex-1 flex flex-col p-4">
           <div className="text-center mb-4">
             <AlertCircle className="h-8 w-8 text-primary mx-auto mb-3 opacity-50" />
-            <p className="text-sm font-medium mb-1">Select a repository</p>
-            <p className="text-xs text-muted-foreground mb-4">
+            <p className="text-[1em] font-medium mb-1">Select a repository</p>
+            <p className="text-[0.85em] text-muted-foreground mb-4">
               Choose a repo to browse files
             </p>
           </div>
           <div>
-            <label className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
+            <label className="text-[0.85em] text-muted-foreground mb-1.5 flex items-center gap-1">
               <GitBranch className="h-3 w-3" />
               Repository
             </label>
@@ -432,10 +444,10 @@ export function GitHubFileTree({ className, onFileSelect }: GitHubFileTreeProps)
   }
 
   return (
-    <div className={cn('flex h-full flex-col', className)}>
+    <div className={cn('flex h-full flex-col', className)} style={treeFontStyle}>
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border/50 px-3 py-2">
-        <h3 className="text-sm font-semibold terminal-glow flex items-center gap-1.5">
+        <h3 className="text-[1em] font-semibold terminal-glow flex items-center gap-1.5">
           <Github className="h-4 w-4" />
           GitHub
         </h3>
@@ -451,7 +463,7 @@ export function GitHubFileTree({ className, onFileSelect }: GitHubFileTreeProps)
 
       {/* Repo selector */}
       <div className="px-3 py-2 border-b border-border/50">
-        <label className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+        <label className="text-[0.85em] text-muted-foreground mb-1 flex items-center gap-1">
           <GitBranch className="h-3 w-3" />
           Repository
         </label>
@@ -472,7 +484,7 @@ export function GitHubFileTree({ className, onFileSelect }: GitHubFileTreeProps)
           )}
 
           {error && (
-            <div className="px-3 py-4 text-center text-sm text-destructive">
+            <div className="px-3 py-4 text-center text-[1em] text-destructive">
               {error}
             </div>
           )}
@@ -480,7 +492,7 @@ export function GitHubFileTree({ className, onFileSelect }: GitHubFileTreeProps)
           {!loading && !error && rootFiles && rootFiles.map(node => renderNode(node))}
 
           {!loading && !error && !rootFiles && (
-            <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+            <div className="px-3 py-4 text-center text-[1em] text-muted-foreground">
               No files found
             </div>
           )}
@@ -493,7 +505,7 @@ export function GitHubFileTree({ className, onFileSelect }: GitHubFileTreeProps)
           href={`https://github.com/${repo}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
+          className="text-[0.85em] text-muted-foreground hover:text-primary flex items-center gap-1"
         >
           <Github className="h-3 w-3" />
           <span className="truncate flex-1">{repo}</span>

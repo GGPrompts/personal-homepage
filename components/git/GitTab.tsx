@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   GitBranch,
@@ -49,6 +49,8 @@ interface GitTabProps {
   onCommitFileSelect?: (commitSha: string, filePath: string) => void
   onShowGraph: () => void
   className?: string
+  treeFontSize?: number
+  treeFontFamily?: string
 }
 
 type CommitViewMode = 'list' | 'graph'
@@ -81,7 +83,18 @@ export function GitTab({
   onCommitFileSelect,
   onShowGraph,
   className,
+  treeFontSize,
+  treeFontFamily,
 }: GitTabProps) {
+  // Build font style for the git tab container
+  const treeFontStyle = useMemo(() => {
+    const style: React.CSSProperties = {}
+    if (treeFontSize) style.fontSize = `${treeFontSize}px`
+    if (treeFontFamily && treeFontFamily !== 'system') {
+      style.fontFamily = `"${treeFontFamily}", ui-monospace, monospace`
+    }
+    return style
+  }, [treeFontSize, treeFontFamily])
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const [commitsOpen, setCommitsOpen] = useState(true)
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null)
@@ -215,10 +228,10 @@ export function GitTab({
   // Loading state
   if (statusLoading && !gitStatus) {
     return (
-      <div className={cn('flex items-center justify-center h-full', className)}>
+      <div className={cn('flex items-center justify-center h-full', className)} style={treeFontStyle}>
         <div className="flex items-center gap-2 text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-xs">Loading...</span>
+          <span className="text-[0.85em]">Loading...</span>
         </div>
       </div>
     )
@@ -227,14 +240,14 @@ export function GitTab({
   // Error state
   if (statusError && !gitStatus) {
     return (
-      <div className={cn('flex flex-col items-center justify-center h-full gap-2 px-4', className)}>
+      <div className={cn('flex flex-col items-center justify-center h-full gap-2 px-4', className)} style={treeFontStyle}>
         <AlertCircle className="h-8 w-8 text-destructive" />
-        <p className="text-xs text-center text-muted-foreground">
+        <p className="text-[0.85em] text-center text-muted-foreground">
           {(statusError as Error).message}
         </p>
         <button
           onClick={handleRefresh}
-          className="flex items-center gap-1 text-xs text-primary hover:underline"
+          className="flex items-center gap-1 text-[0.85em] text-primary hover:underline"
         >
           <RefreshCw className="h-3 w-3" />
           Retry
@@ -249,14 +262,14 @@ export function GitTab({
   // If showing commit detail, render that instead of the normal view
   if (showCommitDetail && selectedCommitInfo) {
     return (
-      <div className={cn('flex flex-col h-full', className)}>
+      <div className={cn('flex flex-col h-full', className)} style={treeFontStyle}>
         {/* Branch header (always visible) */}
         {gitStatus && (
           <div className="px-3 py-2 border-b border-border/50">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 min-w-0">
                 <GitBranch className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                <span className="text-xs font-mono font-medium truncate">
+                <span className="text-[0.85em] font-mono font-medium truncate">
                   {gitStatus.branch}
                 </span>
               </div>
@@ -282,26 +295,26 @@ export function GitTab({
   }
 
   return (
-    <div className={cn('flex flex-col h-full', className)}>
+    <div className={cn('flex flex-col h-full', className)} style={treeFontStyle}>
       {/* Branch header */}
       {gitStatus && (
         <div className="px-3 py-2 border-b border-border/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 min-w-0">
               <GitBranch className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-              <span className="text-xs font-mono font-medium truncate">
+              <span className="text-[0.85em] font-mono font-medium truncate">
                 {gitStatus.branch}
               </span>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
               {gitStatus.ahead > 0 && (
-                <span className="text-emerald-500 flex items-center gap-0.5 text-[10px]">
+                <span className="text-emerald-500 flex items-center gap-0.5 text-[0.75em]">
                   <ArrowUp className="h-2.5 w-2.5" />
                   {gitStatus.ahead}
                 </span>
               )}
               {gitStatus.behind > 0 && (
-                <span className="text-amber-500 flex items-center gap-0.5 text-[10px]">
+                <span className="text-amber-500 flex items-center gap-0.5 text-[0.75em]">
                   <ArrowDown className="h-2.5 w-2.5" />
                   {gitStatus.behind}
                 </span>
@@ -326,11 +339,11 @@ export function GitTab({
         {/* Changed files section */}
         <div className="px-2 py-2">
           <div className="flex items-center justify-between px-1 mb-1">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            <span className="text-[0.75em] font-medium uppercase tracking-wider text-muted-foreground">
               Changed Files
             </span>
             {changedCount > 0 && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+              <Badge variant="secondary" className="text-[0.75em] px-1.5 py-0 h-4">
                 {changedCount}
               </Badge>
             )}
@@ -372,7 +385,7 @@ export function GitTab({
               ) : (
                 <ChevronRight className="h-3 w-3 text-muted-foreground" />
               )}
-              <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              <span className="text-[0.75em] font-medium uppercase tracking-wider text-muted-foreground">
                 Recent Commits
               </span>
             </button>
@@ -406,7 +419,7 @@ export function GitTab({
             </div>
 
             {logData?.totalCommits != null && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0">
+              <Badge variant="secondary" className="text-[0.75em] px-1.5 py-0 h-4 flex-shrink-0">
                 {logData.totalCommits}
               </Badge>
             )}
@@ -417,12 +430,12 @@ export function GitTab({
               {logLoading && !logData && (
                 <div className="flex items-center gap-2 px-2 py-3 text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  <span className="text-xs">Loading commits...</span>
+                  <span className="text-[0.85em]">Loading commits...</span>
                 </div>
               )}
 
               {logError && !logData && (
-                <p className="text-xs text-destructive px-2 py-2">
+                <p className="text-[0.85em] text-destructive px-2 py-2">
                   {(logError as Error).message}
                 </p>
               )}
@@ -443,15 +456,15 @@ export function GitTab({
                     <div className="flex items-center gap-1.5">
                       <Badge
                         variant="outline"
-                        className="text-[9px] px-1 py-0 h-3.5 font-mono flex-shrink-0"
+                        className="text-[0.7em] px-1 py-0 h-3.5 font-mono flex-shrink-0"
                       >
                         {commit.shortSha}
                       </Badge>
-                      <span className="text-[10px] text-muted-foreground flex-shrink-0">
+                      <span className="text-[0.75em] text-muted-foreground flex-shrink-0">
                         {timeAgo(commit.date)}
                       </span>
                     </div>
-                    <p className="text-xs truncate mt-0.5 text-foreground">
+                    <p className="text-[0.85em] truncate mt-0.5 text-foreground">
                       {commit.message}
                     </p>
                   </div>
@@ -461,7 +474,7 @@ export function GitTab({
               {logData && logData.commits.length > 0 && (
                 <button
                   onClick={onShowGraph}
-                  className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded text-xs text-muted-foreground hover:text-primary hover:bg-muted/50 transition-colors"
+                  className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded text-[0.85em] text-muted-foreground hover:text-primary hover:bg-muted/50 transition-colors"
                 >
                   <History className="h-3 w-3" />
                   View full graph
