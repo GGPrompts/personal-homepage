@@ -15,9 +15,17 @@ function validatePath(path: string): boolean {
   return resolved.startsWith(PROJECTS_DIR) || resolved.startsWith(homedir())
 }
 
-// Check if directory is a git repo
-function isGitRepo(path: string): boolean {
-  return existsSync(join(path, ".git"))
+// Find the git root by walking up from the given path
+function findGitRoot(path: string): string | null {
+  try {
+    return execSync("git rev-parse --show-toplevel", {
+      cwd: path,
+      encoding: "utf-8",
+      timeout: 3000,
+    }).trim()
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -102,7 +110,7 @@ function parseLogLine(line: string): Commit | null {
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
-  const path = params.get("path")
+  let path = params.get("path")
   const limit = Math.min(Math.max(parseInt(params.get("limit") || "50", 10) || 50, 1), 500)
   const skip = Math.max(parseInt(params.get("skip") || "0", 10) || 0, 0)
   const branch = params.get("branch")
@@ -120,9 +128,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Path does not exist" }, { status: 404 })
   }
 
-  if (!isGitRepo(path)) {
+  const gitRoot = findGitRoot(path)
+  if (!gitRoot) {
     return NextResponse.json({ error: "Not a git repository" }, { status: 400 })
   }
+
+  // Use the git root for all operations (path may be a subdirectory)
+  path = gitRoot
 
   try {
     // Build git log command

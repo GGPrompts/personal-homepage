@@ -17,9 +17,17 @@ function validatePath(path: string): boolean {
   return resolved.startsWith(PROJECTS_DIR) || resolved.startsWith(homedir())
 }
 
-// Check if directory is a git repo
-function isGitRepo(path: string): boolean {
-  return existsSync(join(path, ".git"))
+// Find the git root by walking up from the given path
+function findGitRoot(path: string): string | null {
+  try {
+    return execSync("git rev-parse --show-toplevel", {
+      cwd: path,
+      encoding: "utf-8",
+      timeout: 3000,
+    }).trim()
+  } catch {
+    return null
+  }
 }
 
 interface GitFile {
@@ -206,12 +214,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Path does not exist" }, { status: 404 })
   }
 
-  if (!isGitRepo(path)) {
+  const gitRoot = findGitRoot(path)
+  if (!gitRoot) {
     return NextResponse.json({ error: "Not a git repository" }, { status: 400 })
   }
 
   try {
-    const status = await getDetailedGitStatus(path)
+    const status = await getDetailedGitStatus(gitRoot)
     return NextResponse.json(status)
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to get git status"
@@ -243,9 +252,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Path does not exist" }, { status: 404 })
     }
 
-    if (!isGitRepo(path)) {
+    const gitRootPost = findGitRoot(path)
+    if (!gitRootPost) {
       return NextResponse.json({ error: "Not a git repository" }, { status: 400 })
     }
+    path = gitRootPost
 
     const execOpts = { cwd: path, encoding: "utf-8" as const, timeout: 60000 }
     let output = ""
