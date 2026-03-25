@@ -86,6 +86,9 @@ export function TabzConnectionStatus({
     return "Ready to spawn terminals and run commands."
   }
 
+  // Hide entirely when not connected — no need to advertise a disconnected optional feature
+  if (isLoaded && !isConnected) return null
+
   return (
     <TooltipProvider>
       <Tooltip>

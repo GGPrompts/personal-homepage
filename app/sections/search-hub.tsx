@@ -823,7 +823,7 @@ export default function SearchHubSection({
               </li>
               <li className="flex items-center gap-2">
                 <ExternalLink className="h-3.5 w-3.5 text-primary" />
-                <span>Click a result to open in browser via TabzChrome</span>
+                <span>Click a result to open in browser</span>
               </li>
               <li className="flex items-center gap-2">
                 <Plus className="h-3.5 w-3.5 text-primary" />

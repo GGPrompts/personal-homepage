@@ -442,15 +442,6 @@ export function FileTree({
     return null
   }, [gitStatus])
 
-  // DISABLED: Drag-to-TabzChrome. Wayland DnD from browser crashes Hyprland.
-  // Re-enable when TabzChrome or native Kitty integration is active.
-  // const handleDragStart = useCallback((e: React.DragEvent, node: FileNode) => {
-  //   e.dataTransfer.setData('text/plain', node.path)
-  //   e.dataTransfer.setData('application/x-tabz-file-path', node.path)
-  //   e.dataTransfer.setData('application/x-tabz-file-type', node.type)
-  //   e.dataTransfer.effectAllowed = 'copyMove'
-  // }, [])
-
   // Get folder git status indicator
   const getFolderGitStatusIndicator = useCallback((folderPath: string) => {
     const status = getFolderGitStatus(folderPath)

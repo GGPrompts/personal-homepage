@@ -44,7 +44,7 @@ ReactFlow-based workflow editor for visualizing Claude Code automation pipelines
 | `hooks/useLocalStorage.ts` | Persist data to localStorage |
 | `hooks/useFileStorage.ts` | Sync data with file-based API |
 | `hooks/useHistory.ts` | Undo/redo state management |
-| `hooks/useTabzConnection.ts` | TabzChrome WebSocket connection |
+| `hooks/useTabzConnection.ts` | Kitty terminal connection (spawn/queue via `/api/terminal`) |
 | `hooks/useDragAndDrop.ts` | Drag nodes from sidebar to canvas |
 | `hooks/useContextMenu.ts` | Context menu positioning |
 | `hooks/useKeyboardShortcuts.ts` | Keyboard shortcut handling |

@@ -422,7 +422,7 @@ export function ChatMessage({
           <div className="bg-muted/30 px-2 sm:px-4 py-1.5 sm:py-2 flex items-center justify-between gap-1 sm:gap-2">
             <span className="text-[10px] sm:text-xs text-muted-foreground font-mono truncate">{language}</span>
             <div className="flex items-center gap-1">
-              {isTerminalCode && onSendToTerminal && (
+              {isTerminalCode && onSendToTerminal && tabzConnected && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -430,19 +430,17 @@ export function ChatMessage({
                         variant="ghost"
                         size="sm"
                         onClick={() => onSendToTerminal(code.trim(), language)}
-                        className={`h-6 px-2 shrink-0 ${tabzConnected ? 'text-emerald-500 hover:text-emerald-400' : 'text-muted-foreground'}`}
+                        className="h-6 px-2 shrink-0 text-emerald-500 hover:text-emerald-400"
                         data-tabz-action="spawn-terminal"
                       >
                         <Terminal className="h-3 w-3" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>
-                      {tabzConnected ? 'Run in terminal' : 'TabzChrome not connected'}
-                    </TooltipContent>
+                    <TooltipContent>Run in terminal</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               )}
-              {onSendToChat && (
+              {onSendToChat && tabzConnected && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -450,15 +448,13 @@ export function ChatMessage({
                         variant="ghost"
                         size="sm"
                         onClick={() => onSendToChat(code.trim())}
-                        className={`h-6 px-2 shrink-0 ${tabzConnected ? 'text-blue-500 hover:text-blue-400' : 'text-muted-foreground'}`}
+                        className="h-6 px-2 shrink-0 text-blue-500 hover:text-blue-400"
                         data-tabz-action="send-chat"
                       >
                         <ExternalLink className="h-3 w-3" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>
-                      {tabzConnected ? 'Send to Claude session' : 'No active Claude session'}
-                    </TooltipContent>
+                    <TooltipContent>Send to Claude session</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               )}
