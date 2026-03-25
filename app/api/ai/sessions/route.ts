@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { readdirSync, statSync, openSync, readSync, closeSync, existsSync } from 'fs'
 import { join } from 'path'
-import { execSync, execFileSync, spawn } from 'child_process'
+import { execSync, spawn } from 'child_process'
 import { randomUUID } from 'crypto'
 import { extractFirstUserMessage } from '@/lib/ai/jsonl-parser'
+import { kittyRemote, kittyListAllWindows } from '@/lib/terminal-native'
 
 const CLAUDE_PROJECTS_DIR = join(process.env.HOME || '', '.claude', 'projects')
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -154,7 +155,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const projectPath = body.projectPath as string | undefined
-    const backend = (body.backend as string) || 'native'
+    const resume = body.resume as boolean | undefined
+    const resumeSessionId = body.sessionId as string | undefined
+    const prompt = body.prompt as string | undefined
 
     const cwd = projectPath || process.env.HOME || '/home'
 
@@ -162,6 +165,13 @@ export async function POST(request: NextRequest) {
     if (!SAFE_PATH_RE.test(cwd)) {
       return NextResponse.json(
         { error: 'Invalid project path' },
+        { status: 400 }
+      )
+    }
+
+    if (resume && resumeSessionId && !UUID_RE.test(resumeSessionId)) {
+      return NextResponse.json(
+        { error: 'Invalid sessionId format' },
         { status: 400 }
       )
     }
@@ -176,26 +186,36 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const sessionId = randomUUID()
+    const sessionId = resume && resumeSessionId ? resumeSessionId : randomUUID()
     const encodedPath = cwd.replace(/\//g, '-')
     const jsonlPath = join(CLAUDE_PROJECTS_DIR, encodedPath, `${sessionId}.jsonl`)
+
+    const claudeArgs = resume
+      ? ['claude', '--resume', '--session-id', sessionId]
+      : ['claude', '--session-id', sessionId]
 
     const child = spawn('kitty', [
       '--detach',
       '--title', `claude-${sessionId.slice(0, 8)}`,
       '--working-directory', cwd,
-      '--', 'claude', '--session-id', sessionId,
+      '--', ...claudeArgs,
     ], {
       detached: true,
       stdio: 'ignore',
     })
     child.unref()
 
+    // If a prompt was provided, wait for Claude to start then send it
+    if (prompt) {
+      sendPromptAfterStartup(sessionId, prompt).catch(() => {})
+    }
+
     return NextResponse.json({
       sessionId,
       jsonlPath,
       projectPath: cwd,
       spawner: 'kitty',
+      resumed: !!resume,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to spawn session'
@@ -204,22 +224,54 @@ export async function POST(request: NextRequest) {
 }
 
 /**
+ * Wait for a kitty window with the given session title to appear, then send a prompt.
+ * Polls kitty @ ls up to ~8 seconds for the window to be ready.
+ */
+async function sendPromptAfterStartup(sessionId: string, prompt: string): Promise<void> {
+  const prefix = sessionId.slice(0, 8)
+  const maxAttempts = 8
+
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    try {
+      const windows = kittyListAllWindows()
+
+      for (const win of windows) {
+        const isClaudeWindow = win.title.startsWith(`claude-${prefix}`) ||
+          (win.foreground_processes.some(p =>
+            p.cmdline.some(arg => arg === 'claude' || arg.endsWith('/claude'))
+          ) && win.title.includes(prefix))
+
+        if (!isClaudeWindow) continue
+
+        const claudeRunning = win.foreground_processes.some(p =>
+          p.cmdline.some(arg => arg === 'claude' || arg.endsWith('/claude'))
+        )
+        if (!claudeRunning) continue
+
+        // Give Claude CLI a moment to render its prompt
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        await kittySendText(win.id, prompt, win.socket)
+        return
+      }
+    } catch {
+      // kitty not ready yet, retry
+    }
+  }
+}
+
+/**
  * Send text to a kitty window, then press Enter after a short delay.
  * Claude CLI needs time to process pasted input before the newline submits it.
  */
-async function kittySendText(windowId: number, text: string): Promise<void> {
+async function kittySendText(windowId: number, text: string, socket?: string): Promise<void> {
   // Send the prompt text (without newline)
-  execFileSync(
-    'kitty', ['@', 'send-text', '--match', `id:${windowId}`, text],
-    { encoding: 'utf-8', timeout: 10000 }
-  )
+  kittyRemote(['send-text', '--match', `id:${windowId}`, text], 10000, socket)
   // Wait for Claude CLI to process the input
   await new Promise(resolve => setTimeout(resolve, 400))
   // Send Enter to submit
-  execFileSync(
-    'kitty', ['@', 'send-key', '--match', `id:${windowId}`, 'Return'],
-    { encoding: 'utf-8', timeout: 10000 }
-  )
+  kittyRemote(['send-key', '--match', `id:${windowId}`, 'Return'], 10000, socket)
 }
 
 export async function PUT(request: NextRequest) {
@@ -243,52 +295,38 @@ export async function PUT(request: NextRequest) {
 
     const projectPath = (body as { projectPath?: string }).projectPath
 
-    // Use kitty @ ls to find the right window
+    // Find the right kitty window across all instances
     try {
-      const lsOutput = execFileSync('kitty', ['@', 'ls'], { encoding: 'utf-8', timeout: 5000 })
-      const osWindows = JSON.parse(lsOutput) as Array<{
-        tabs: Array<{
-          windows: Array<{
-            id: number
-            title: string
-            cwd: string
-            foreground_processes: Array<{ cmdline: string[] }>
-          }>
-        }>
-      }>
+      const windows = kittyListAllWindows()
 
       const sessionPrefix = sessionId.slice(0, 8)
-      let cwdMatch: number | null = null
+      let cwdMatch: (typeof windows)[number] | null = null
 
-      for (const osWin of osWindows) {
-        for (const tab of osWin.tabs) {
-          for (const win of tab.windows) {
-            // Strategy 1: title match (homepage-spawned sessions)
-            if (win.title.startsWith(`claude-${sessionPrefix}`)) {
-              await kittySendText(win.id, prompt)
-              return NextResponse.json({ ok: true, method: 'kitty-title', windowId: win.id })
-            }
+      for (const win of windows) {
+        // Strategy 1: title match (homepage-spawned sessions)
+        if (win.title.startsWith(`claude-${sessionPrefix}`)) {
+          await kittySendText(win.id, prompt, win.socket)
+          return NextResponse.json({ ok: true, method: 'kitty-title', windowId: win.id })
+        }
 
-            // Strategy 2: track cwd + claude process match for fallback
-            if (projectPath && !cwdMatch) {
-              const resolvedProject = projectPath.startsWith('~')
-                ? projectPath.replace('~', process.env.HOME || '')
-                : projectPath
-              const isClaudeRunning = win.foreground_processes.some(p =>
-                p.cmdline.some(arg => arg === 'claude' || arg.endsWith('/claude'))
-              )
-              if (isClaudeRunning && win.cwd === resolvedProject) {
-                cwdMatch = win.id
-              }
-            }
+        // Strategy 2: track cwd + claude process match for fallback
+        if (projectPath && !cwdMatch) {
+          const resolvedProject = projectPath.startsWith('~')
+            ? projectPath.replace('~', process.env.HOME || '')
+            : projectPath
+          const isClaudeRunning = win.foreground_processes.some(p =>
+            p.cmdline.some(arg => arg === 'claude' || arg.endsWith('/claude'))
+          )
+          if (isClaudeRunning && win.cwd === resolvedProject) {
+            cwdMatch = win
           }
         }
       }
 
       // Use cwd match if no title match found
       if (cwdMatch) {
-        await kittySendText(cwdMatch, prompt)
-        return NextResponse.json({ ok: true, method: 'kitty-cwd', windowId: cwdMatch })
+        await kittySendText(cwdMatch.id, prompt, cwdMatch.socket)
+        return NextResponse.json({ ok: true, method: 'kitty-cwd', windowId: cwdMatch.id })
       }
     } catch (err) {
       // kitty @ ls or send-text failed

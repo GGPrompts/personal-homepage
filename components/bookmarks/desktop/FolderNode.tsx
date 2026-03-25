@@ -91,10 +91,16 @@ function MiniBookmarkItem({
       onContextMenu={handleContextMenu}
       title={bookmark.name}
     >
-      <MiniFavicon
-        url={bookmark.url}
-        className="h-8 w-8 rounded object-contain pointer-events-none"
-      />
+      {bookmark.icon ? (
+        <span className="text-xl pointer-events-none">{bookmark.icon}</span>
+      ) : bookmark.type === "terminal" ? (
+        <Terminal className="h-6 w-6 text-emerald-400 pointer-events-none" />
+      ) : (
+        <MiniFavicon
+          url={bookmark.url}
+          className="h-8 w-8 rounded object-contain pointer-events-none"
+        />
+      )}
       <span className="text-[9px] text-muted-foreground leading-tight text-center truncate w-full pointer-events-none">
         {bookmark.name}
       </span>

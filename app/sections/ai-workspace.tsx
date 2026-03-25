@@ -88,7 +88,7 @@ export default function AIWorkspaceSection({
   const workingDir = wdCtx?.workingDir || '~'
   const didAutoExpandRef = React.useRef(false)
 
-  const [activeSessionPrefixes, setActiveSessionPrefixes] = React.useState<Set<string>>(new Set())
+  const [activeSessionIds, setActiveSessionIds] = React.useState<Set<string>>(new Set())
   const [filterActive, setFilterActive] = React.useState(false)
 
   const [promptInput, setPromptInput] = React.useState("")
@@ -134,11 +134,11 @@ export default function AIWorkspaceSection({
       const res = await fetch('/api/ai/sessions/active')
       if (res.ok) {
         const data = await res.json()
-        const prefixes = new Set<string>()
+        const ids = new Set<string>()
         for (const a of data.active || []) {
-          if (a.sessionId) prefixes.add(a.sessionId)
+          if (a.sessionId) ids.add(a.sessionId)
         }
-        setActiveSessionPrefixes(prefixes)
+        setActiveSessionIds(ids)
       }
     } catch {
       // ignore
@@ -232,9 +232,17 @@ export default function AIWorkspaceSection({
   }, [sessions])
 
   const isSessionActive = React.useCallback((session: SessionInfo) => {
-    // Active endpoint returns first 8 chars of session UUID
-    return activeSessionPrefixes.has(session.sessionId.slice(0, 8))
-  }, [activeSessionPrefixes])
+    // Active endpoint returns full UUID or 8-char prefix (homepage-spawned)
+    return activeSessionIds.has(session.sessionId) ||
+      activeSessionIds.has(session.sessionId.slice(0, 8))
+  }, [activeSessionIds])
+
+  // Derive current project name from working dir for prioritization
+  const currentProject = React.useMemo(() => {
+    const expandedDir = expandTilde(workingDir)
+    const match = sessions.find(s => s.projectPath === expandedDir)
+    return match?.project || null
+  }, [workingDir, sessions])
 
   const grouped = React.useMemo<GroupedSessions>(() => {
     const groups: GroupedSessions = {}
@@ -252,8 +260,17 @@ export default function AIWorkspaceSection({
       const sub = groups[key].filter(s => s.isSubagent).sort((a, b) => b.mtime - a.mtime)
       groups[key] = [...main, ...sub]
     }
+    // Re-order: current working dir project first, then by most recent session
+    if (currentProject && groups[currentProject]) {
+      const ordered: GroupedSessions = {}
+      ordered[currentProject] = groups[currentProject]
+      for (const key of Object.keys(groups)) {
+        if (key !== currentProject) ordered[key] = groups[key]
+      }
+      return ordered
+    }
     return groups
-  }, [sessions, filterActive, isSessionActive])
+  }, [sessions, filterActive, isSessionActive, currentProject])
 
   const recentSessions = React.useMemo(() => {
     // Only include top-level sessions (main + orphan subagents without a parent)
@@ -377,24 +394,44 @@ export default function AIWorkspaceSection({
   const handleSendPrompt = async () => {
     if (!promptInput.trim() || !selectedSessionId || isSending) return
 
+    const active = selectedSession ? isSessionActive(selectedSession) : false
     setIsSending(true)
     if (sendStatusTimerRef.current) clearTimeout(sendStatusTimerRef.current)
 
     let failed = false
     try {
-      const res = await fetch('/api/ai/sessions', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: selectedSessionId, prompt: promptInput.trim(), backend: backendType, projectPath: selectedSession?.projectPath }),
-      })
-      const data = await res.json()
-      if (res.ok && data.ok) {
-        setSendStatus({ type: 'success', message: 'Sent' })
-        setPromptInput("")
+      if (active) {
+        // Session has a live terminal — send directly
+        const res = await fetch('/api/ai/sessions', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: selectedSessionId, prompt: promptInput.trim(), backend: backendType, projectPath: selectedSession?.projectPath }),
+        })
+        const data = await res.json()
+        if (res.ok && data.ok) {
+          setSendStatus({ type: 'success', message: 'Sent' })
+          setPromptInput("")
+        } else {
+          failed = true
+          setSendStatus({ type: 'error', message: (data.error || 'Failed to send').slice(0, 80) })
+        }
       } else {
-        failed = true
-        const shortError = (data.error || 'Failed to send').slice(0, 80)
-        setSendStatus({ type: 'error', message: shortError })
+        // Session is inactive — resume in a new terminal and send the prompt
+        const res = await fetch('/api/ai/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resume: true, sessionId: selectedSessionId, projectPath: selectedSession?.projectPath, prompt: promptInput.trim() }),
+        })
+        const data = await res.json()
+        if (res.ok && data.sessionId) {
+          setSendStatus({ type: 'success', message: 'Resumed & sent' })
+          setPromptInput("")
+          // Refresh active sessions so the green dot appears
+          setTimeout(() => fetchActiveSessions(), 3000)
+        } else {
+          failed = true
+          setSendStatus({ type: 'error', message: (data.error || 'Failed to resume').slice(0, 80) })
+        }
       }
     } catch {
       failed = true
@@ -475,8 +512,8 @@ export default function AIWorkspaceSection({
                 title={filterActive ? 'Showing active sessions only' : 'Filter to active sessions'}
               >
                 <Zap className="h-3 w-3" />
-                {activeSessionPrefixes.size > 0 && (
-                  <span className="tabular-nums">{activeSessionPrefixes.size}</span>
+                {activeSessionIds.size > 0 && (
+                  <span className="tabular-nums">{activeSessionIds.size}</span>
                 )}
               </Button>
             </div>
@@ -985,7 +1022,7 @@ export default function AIWorkspaceSection({
                   type="text"
                   value={promptInput}
                   onChange={(e) => setPromptInput(e.target.value)}
-                  placeholder={`Send a prompt to this session via ${backendType === 'native' ? 'Kitty' : 'TabzChrome'}...`}
+                  placeholder={selectedSession && isSessionActive(selectedSession) ? 'Send to active session...' : 'Resume session and send...'}
                   className="flex-1 bg-muted/20 border border-border/40 rounded-lg px-3 py-2 text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
                   disabled={isSending}
                 />

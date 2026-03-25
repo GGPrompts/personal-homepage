@@ -89,7 +89,9 @@ function BookmarkNodeComponent({
             : "bg-white/15"
         }`}
       >
-        {isTerminal ? (
+        {bookmark.icon ? (
+          <span className="text-2xl">{bookmark.icon}</span>
+        ) : isTerminal ? (
           <TerminalIcon bookmark={bookmark} />
         ) : (
           <FaviconWithFallback url={bookmark.url} className="h-6 w-6" />
