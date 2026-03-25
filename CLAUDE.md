@@ -100,14 +100,15 @@ The Scratchpad section (`app/sections/tasks.tsx`) has two tabs:
 
 ## AI Workspace Architecture
 
-The AI Workspace is a live JSONL session viewer — it watches real Claude CLI sessions running in external terminals. Key files:
-- `app/api/ai/sessions/route.ts` - Lists sessions, spawns new tmux+claude sessions
+The AI Workspace is a live JSONL session viewer — it watches real Claude CLI sessions running in Kitty terminals. Key files:
+- `app/api/ai/sessions/route.ts` - Lists sessions (GET), spawns Kitty+claude sessions (POST), sends prompts to terminals (PUT)
+- `app/api/ai/sessions/active/route.ts` - Detects active sessions via `kitty @ ls` (windows running claude)
 - `app/api/ai/stream/route.ts` - SSE endpoint that tails JSONL files with offset-based polling
 - `lib/ai/jsonl-parser.ts` - Parses JSONL entries into typed messages
 - `components/ai/ConversationViewer.tsx` - Renders messages with collapsible tool/thinking blocks
 - `hooks/useSessionStream.ts` - Client hook for SSE stream consumption
 
-Sessions are read from `~/.claude/projects/{path}/{session-id}.jsonl` files written by Claude CLI running externally.
+Sessions are read from `~/.claude/projects/{path}/{session-id}.jsonl` files written by Claude CLI running externally. Active sessions (with a live Kitty terminal) show a pulsing green dot and can be filtered with the Active toggle. Prompts can be sent to active sessions via `kitty @ send-text`.
 
 **AI Drawer sidebar** (`components/ai/AIDrawer.tsx`) is a separate system that still uses the old `--print` mode chat via `hooks/useAIChat.ts` and `app/api/ai/chat/route.ts`.
 

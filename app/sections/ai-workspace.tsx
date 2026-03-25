@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Bot, FolderOpen, Plus, RefreshCw, Radio, WifiOff,
   Eye, Clock, HardDrive, ChevronRight, ChevronDown,
-  Terminal, Send, List,
+  Terminal, Send, List, Zap,
 } from "lucide-react"
 import { ConversationViewer } from "@/components/ai/ConversationViewer"
 import { useSessionStream } from "@/hooks/useSessionStream"
@@ -88,6 +88,9 @@ export default function AIWorkspaceSection({
   const workingDir = wdCtx?.workingDir || '~'
   const didAutoExpandRef = React.useRef(false)
 
+  const [activeSessionPrefixes, setActiveSessionPrefixes] = React.useState<Set<string>>(new Set())
+  const [filterActive, setFilterActive] = React.useState(false)
+
   const [promptInput, setPromptInput] = React.useState("")
   const [sendStatus, setSendStatus] = React.useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [isSending, setIsSending] = React.useState(false)
@@ -126,12 +129,29 @@ export default function AIWorkspaceSection({
     return () => { mounted = false; clearInterval(interval) }
   }, [selectedSessionId])
 
+  const fetchActiveSessions = React.useCallback(async () => {
+    try {
+      const res = await fetch('/api/ai/sessions/active')
+      if (res.ok) {
+        const data = await res.json()
+        const prefixes = new Set<string>()
+        for (const a of data.active || []) {
+          if (a.sessionId) prefixes.add(a.sessionId)
+        }
+        setActiveSessionPrefixes(prefixes)
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
+
   const fetchSessions = React.useCallback(async () => {
     setIsLoadingSessions(true)
     try {
       const [sessionsRes, contextRes] = await Promise.all([
         fetch('/api/ai/sessions'),
         fetch('/api/ai/context').catch(() => null),
+        fetchActiveSessions(),
       ])
       if (sessionsRes.ok) {
         const data = await sessionsRes.json()
@@ -163,11 +183,17 @@ export default function AIWorkspaceSection({
     } finally {
       setIsLoadingSessions(false)
     }
-  }, [selectedPath])
+  }, [selectedPath, fetchActiveSessions])
 
   React.useEffect(() => {
     fetchSessions()
   }, [])
+
+  // Poll active sessions every 10s
+  React.useEffect(() => {
+    const interval = setInterval(fetchActiveSessions, 10000)
+    return () => clearInterval(interval)
+  }, [fetchActiveSessions])
 
   React.useEffect(() => {
     if (activeSubItem) {
@@ -205,11 +231,17 @@ export default function AIWorkspaceSection({
     return map
   }, [sessions])
 
+  const isSessionActive = React.useCallback((session: SessionInfo) => {
+    // Active endpoint returns first 8 chars of session UUID
+    return activeSessionPrefixes.has(session.sessionId.slice(0, 8))
+  }, [activeSessionPrefixes])
+
   const grouped = React.useMemo<GroupedSessions>(() => {
     const groups: GroupedSessions = {}
     for (const session of sessions) {
       // Skip subagents that have a known parent — they'll be nested
       if (session.isSubagent && session.parentSessionId) continue
+      if (filterActive && !isSessionActive(session)) continue
       const key = session.project || 'unknown'
       if (!groups[key]) groups[key] = []
       groups[key].push(session)
@@ -221,11 +253,12 @@ export default function AIWorkspaceSection({
       groups[key] = [...main, ...sub]
     }
     return groups
-  }, [sessions])
+  }, [sessions, filterActive, isSessionActive])
 
   const recentSessions = React.useMemo(() => {
     // Only include top-level sessions (main + orphan subagents without a parent)
-    const topLevel = sessions.filter(s => !(s.isSubagent && s.parentSessionId))
+    let topLevel = sessions.filter(s => !(s.isSubagent && s.parentSessionId))
+    if (filterActive) topLevel = topLevel.filter(s => isSessionActive(s))
     // Sort by effective mtime: max(own mtime, max subagent mtime)
     return topLevel.sort((a, b) => {
       const aSubMax = (subagentMap[a.sessionId] || []).reduce((m, s) => Math.max(m, s.mtime), 0)
@@ -234,7 +267,7 @@ export default function AIWorkspaceSection({
       const bEffective = Math.max(b.mtime, bSubMax)
       return bEffective - aEffective
     })
-  }, [sessions, subagentMap])
+  }, [sessions, subagentMap, filterActive, isSessionActive])
 
   const selectedSession = React.useMemo(
     () => sessions.find(s => s.path === selectedPath) || null,
@@ -413,8 +446,8 @@ export default function AIWorkspaceSection({
             </div>
 
             {/* View mode toggle */}
-            <div className="px-3 py-2 border-b border-border/40 flex">
-              <div className="flex border rounded-md w-full">
+            <div className="px-3 py-2 border-b border-border/40 flex gap-1.5">
+              <div className="flex border rounded-md flex-1">
                 <Button
                   variant={viewMode === 'projects' ? 'default' : 'ghost'}
                   size="sm"
@@ -434,6 +467,18 @@ export default function AIWorkspaceSection({
                   Recent
                 </Button>
               </div>
+              <Button
+                variant={filterActive ? 'default' : 'ghost'}
+                size="sm"
+                className={`h-7 text-xs gap-1 px-2 ${filterActive ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`}
+                onClick={() => setFilterActive(f => !f)}
+                title={filterActive ? 'Showing active sessions only' : 'Filter to active sessions'}
+              >
+                <Zap className="h-3 w-3" />
+                {activeSessionPrefixes.size > 0 && (
+                  <span className="tabular-nums">{activeSessionPrefixes.size}</span>
+                )}
+              </Button>
             </div>
 
             <ScrollArea className="flex-1">
@@ -459,6 +504,7 @@ export default function AIWorkspaceSection({
                         const childSubs = subagentMap[session.sessionId] || []
                         const hasSubagents = childSubs.length > 0
                         const isExpanded = expandedSubagents.has(session.sessionId)
+                        const active = isSessionActive(session)
                         return (
                           <React.Fragment key={session.path}>
                             <button
@@ -473,6 +519,12 @@ export default function AIWorkspaceSection({
                             >
                               {session.isSubagent && (
                                 <Bot className="h-3 w-3 shrink-0 text-blue-400/70" />
+                              )}
+                              {active && (
+                                <span className="relative flex h-2 w-2 shrink-0" title="Active terminal">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                                </span>
                               )}
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5 min-w-0">
@@ -626,6 +678,7 @@ export default function AIWorkspaceSection({
                               const childSubs = subagentMap[session.sessionId] || []
                               const hasSubagents = !session.isSubagent && childSubs.length > 0
                               const isSubExpanded = expandedSubagents.has(session.sessionId)
+                              const active = isSessionActive(session)
                               return (
                                 <React.Fragment key={session.path}>
                                   <button
@@ -640,6 +693,12 @@ export default function AIWorkspaceSection({
                                   >
                                     {session.isSubagent && (
                                       <Bot className="h-3 w-3 shrink-0 text-blue-400/70" />
+                                    )}
+                                    {active && (
+                                      <span className="relative flex h-2 w-2 shrink-0" title="Active terminal">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                                      </span>
                                     )}
                                     <div className="flex-1 min-w-0">
                                       <div className="text-xs truncate leading-snug" title={session.firstMessage || session.sessionId}>
@@ -804,6 +863,12 @@ export default function AIWorkspaceSection({
                         <span>Disconnected</span>
                       </>
                     )}
+                  </span>
+                )}
+                {selectedSession && isSessionActive(selectedSession) && (
+                  <span className="flex items-center gap-1 text-emerald-400">
+                    <Zap className="h-3 w-3" />
+                    <span>Terminal</span>
                   </span>
                 )}
                 {isStreaming && (

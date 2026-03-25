@@ -401,6 +401,7 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                   activeConvId={activeConvId}
                   onSelectConversation={setActiveConvId}
                   onNewConversation={createNewConversation}
+                  onDeleteConversation={deleteConversation}
                   generatingConvs={generatingConvs}
                   selectedAgent={selectedAgent}
                 />
@@ -739,7 +740,7 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                           {conversations.map(conv => (
                             <div
                               key={conv.id}
-                              className={`flex items-center justify-between gap-2 p-2 rounded cursor-pointer text-xs transition-colors ${
+                              className={`group flex items-center justify-between gap-2 p-2 rounded cursor-pointer text-xs transition-colors ${
                                 conv.id === activeConvId
                                   ? 'bg-primary/20 border border-primary/40'
                                   : 'hover:bg-muted/50'
@@ -1006,6 +1007,7 @@ interface MinimizedDrawerProps {
   activeConvId: string
   onSelectConversation: (id: string) => void
   onNewConversation: () => void
+  onDeleteConversation: (id: string) => void
   generatingConvs: Record<string, { startedAt: number; model: string }>
   selectedAgent?: SelectedAgent | null
 }
@@ -1019,6 +1021,7 @@ function MinimizedDrawer({
   activeConvId,
   onSelectConversation,
   onNewConversation,
+  onDeleteConversation,
   generatingConvs,
   selectedAgent,
 }: MinimizedDrawerProps) {
@@ -1128,51 +1131,61 @@ function MinimizedDrawer({
             const projectName = conv.projectPath?.split('/').pop()
 
             return (
-              <motion.button
-                key={conv.id}
-                className={`w-full flex flex-col gap-1 p-2 rounded-md text-left text-xs transition-colors ${
-                  isActive
-                    ? 'bg-primary/20 border border-primary/40'
-                    : 'hover:bg-muted/50 border border-transparent'
-                }`}
-                onClick={() => {
-                  onSelectConversation(conv.id)
-                  onExpand()
-                }}
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
-              >
-                {/* Title row */}
-                <div className="flex items-center gap-1.5 w-full">
-                  <MessageSquare className="h-3 w-3 text-muted-foreground shrink-0" />
-                  <span className="font-medium truncate flex-1">{conv.title}</span>
-                  {isConvGenerating && (
-                    <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />
-                  )}
-                </div>
+              <div key={conv.id} className="group relative">
+                <motion.button
+                  className={`w-full flex flex-col gap-1 p-2 pr-7 rounded-md text-left text-xs transition-colors ${
+                    isActive
+                      ? 'bg-primary/20 border border-primary/40'
+                      : 'hover:bg-muted/50 border border-transparent'
+                  }`}
+                  onClick={() => {
+                    onSelectConversation(conv.id)
+                    onExpand()
+                  }}
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                >
+                  {/* Title row */}
+                  <div className="flex items-center gap-1.5 w-full">
+                    <MessageSquare className="h-3 w-3 text-muted-foreground shrink-0" />
+                    <span className="font-medium truncate flex-1">{conv.title}</span>
+                    {isConvGenerating && (
+                      <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />
+                    )}
+                  </div>
 
-                {/* Meta row: model, time, project */}
-                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground pl-4.5">
-                  {shortModel && (
-                    <span className="px-1 py-0.5 rounded bg-muted/50 font-medium">
-                      {shortModel}
-                    </span>
-                  )}
-                  <span>{timeAgo}</span>
-                  {projectName && (
-                    <>
-                      <span className="text-border">·</span>
-                      <span className="flex items-center gap-0.5 truncate">
-                        <FolderOpen className="h-2.5 w-2.5 shrink-0" />
-                        <span className="truncate">{projectName}</span>
+                  {/* Meta row: model, time, project */}
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground pl-4.5">
+                    {shortModel && (
+                      <span className="px-1 py-0.5 rounded bg-muted/50 font-medium">
+                        {shortModel}
                       </span>
-                    </>
-                  )}
-                  {!shortModel && !projectName && (
-                    <span>{conv.messages.length} msg{conv.messages.length !== 1 ? 's' : ''}</span>
-                  )}
-                </div>
-              </motion.button>
+                    )}
+                    <span>{timeAgo}</span>
+                    {projectName && (
+                      <>
+                        <span className="text-border">·</span>
+                        <span className="flex items-center gap-0.5 truncate">
+                          <FolderOpen className="h-2.5 w-2.5 shrink-0" />
+                          <span className="truncate">{projectName}</span>
+                        </span>
+                      </>
+                    )}
+                    {!shortModel && !projectName && (
+                      <span>{conv.messages.length} msg{conv.messages.length !== 1 ? 's' : ''}</span>
+                    )}
+                  </div>
+                </motion.button>
+                <button
+                  className="absolute right-1.5 top-1.5 h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/20 hover:text-destructive text-muted-foreground"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDeleteConversation(conv.id)
+                  }}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
             )
           })}
 
