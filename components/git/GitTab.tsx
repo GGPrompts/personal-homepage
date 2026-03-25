@@ -20,6 +20,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { ChangedFilesList, type GitFile } from './ChangedFilesList'
+import { CommitInput } from './CommitInput'
 import { CommitDetail } from './CommitDetail'
 import { GitGraph } from './GitGraph'
 
@@ -243,6 +244,7 @@ export function GitTab({
   }
 
   const changedCount = gitStatus?.files.length ?? 0
+  const stagedCount = gitStatus?.files.filter(f => f.staged).length ?? 0
 
   // If showing commit detail, render that instead of the normal view
   if (showCommitDetail && selectedCommitInfo) {
@@ -337,8 +339,23 @@ export function GitTab({
             files={gitStatus?.files ?? []}
             onFileSelect={handleFileSelect}
             selectedFile={selectedFile}
+            repoPath={workingDir}
+            onRefresh={handleRefresh}
           />
         </div>
+
+        {/* Commit input - shown when there are staged files */}
+        {stagedCount > 0 && gitStatus && (
+          <>
+            <div className="border-t border-border/50 mx-2" />
+            <CommitInput
+              repoPath={workingDir}
+              branch={gitStatus.branch}
+              stagedCount={stagedCount}
+              onRefresh={handleRefresh}
+            />
+          </>
+        )}
 
         {/* Divider */}
         <div className="border-t border-border/50 mx-2" />
