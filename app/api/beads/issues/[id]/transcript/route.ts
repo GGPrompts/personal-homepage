@@ -78,16 +78,18 @@ export async function GET(
       path: transcriptPath,
     })
   } catch (error) {
-    console.error(`Failed to get transcript for issue ${id}:`, error)
-
     const message = error instanceof Error ? error.message : "Failed to get transcript"
 
+    // Don't log expected cases (missing workspace/beads dir) — these happen
+    // when the board shows issues from projects not matching the workspace
     if (message.includes("does not exist") || message.includes("No .beads")) {
       return NextResponse.json(
         { error: message },
         { status: 400 }
       )
     }
+
+    console.error(`Failed to get transcript for issue ${id}:`, error)
 
     return NextResponse.json(
       { error: message },

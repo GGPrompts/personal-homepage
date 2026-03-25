@@ -506,13 +506,13 @@ See `docs/ai-backend-integration-notes.md` for detailed implementation notes and
 ### Phase 3: Multi-Provider Support ✅ COMPLETED
 - [x] Gemini CLI integration with model selection (2.5 Pro, 2.5 Flash, 2.5 Flash Lite, 2.0 Flash)
 - [x] OpenAI Codex CLI integration with model selection + Reasoning Effort + Sandbox Mode
-- [x] Claude Agent support (`--agent` flag, reads from `~/.claude/agents/`)
+- [x] Launch profiles for CLI backends (Claude, Codex, Copilot, Gemini)
 - [x] Provider-specific settings (only show relevant options per backend)
 - [x] Temperature/Max Tokens only shown for Docker models (CLI tools don't support these)
 
 **Settings Improvements (Dec 2024):**
 - ✅ Claude model options: Opus, Sonnet, Haiku (simplified, no version numbers)
-- ✅ Claude agents dropdown (loads from `~/.claude/agents/*.md`)
+- ✅ Launch profile selector in AI Drawer (stored in localStorage)
 - ✅ Gemini model dropdown with current models
 - ✅ Codex model dropdown (GPT-5, GPT-5.1, Codex Mini variants)
 - ✅ Codex Reasoning Effort (Low/Medium/High)
@@ -520,9 +520,6 @@ See `docs/ai-backend-integration-notes.md` for detailed implementation notes and
 - ✅ "Append System Prompt" - empty by default, clearly labeled
 - ✅ Editable Quick Prompts (customize the 4 starter prompts in Settings)
 - ✅ Empty conversations refresh to current date on load
-
-**API Endpoints Added:**
-- `/api/ai/agents` - Lists agents from `~/.claude/agents/`
 
 **Infrastructure:**
 - Claude CLI uses `~/.claude/local/claude` path directly (supports v2.0.59+ features)

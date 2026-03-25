@@ -99,9 +99,13 @@ export function useGoogleAuth(): UseGoogleAuthReturn {
   }, [checkStatus])
 
   // Check on window focus (in case tokens were updated in another tab)
+  // Only re-check if not already connected, to avoid re-render cascades
   React.useEffect(() => {
     const handleFocus = () => {
-      checkStatus()
+      const storedTokens = getTokens()
+      if (!storedTokens || isTokenExpired(storedTokens)) {
+        checkStatus()
+      }
     }
 
     window.addEventListener('focus', handleFocus)

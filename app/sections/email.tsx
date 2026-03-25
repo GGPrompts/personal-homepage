@@ -185,6 +185,7 @@ export default function EmailSection({
     },
     enabled: isConnected,
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   })
 
   // Build folders from labels
@@ -302,7 +303,9 @@ export default function EmailSection({
       return { ...data, messages }
     },
     enabled: isConnected,
-    staleTime: 1 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev: any) => prev,
   })
 
   // Load more emails (pagination)
@@ -562,6 +565,42 @@ export default function EmailSection({
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }, [])
+
+  // Download attachment
+  const downloadAttachment = useCallback(
+    async (emailId: string, attachment: Attachment) => {
+      try {
+        const token = await getAccessToken()
+        if (!token) throw new Error("Not authenticated")
+
+        const params = new URLSearchParams({
+          messageId: emailId,
+          attachmentId: attachment.id,
+          filename: attachment.name,
+          mimeType: attachment.mimeType,
+        })
+        const res = await fetch(
+          `/api/gmail/attachments?${params}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+
+        if (!res.ok) throw new Error("Failed to download attachment")
+
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = attachment.name
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      } catch (err) {
+        console.error("Download attachment error:", err)
+      }
+    },
+    [getAccessToken]
+  )
 
   // Toggle star
   const toggleStar = useCallback(
@@ -1332,6 +1371,7 @@ export default function EmailSection({
                               <Card
                                 key={attachment.id}
                                 className="glass-dark p-3 flex items-center gap-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                                onClick={() => downloadAttachment(selectedEmail.id, attachment)}
                               >
                                 <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center flex-shrink-0">
                                   <Icon className="h-5 w-5 text-primary" />

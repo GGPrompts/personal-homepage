@@ -1,180 +1,138 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
-import { useMemo, useCallback } from "react"
-import type { AgentCard, AIBackend } from "@/lib/agents/types"
+import { useState, useMemo, useCallback, useEffect } from "react"
+import type { LaunchProfile, AIBackend } from "@/lib/agents/types"
+
+// Keep for backwards compat
+export type { LaunchProfile as AgentCard } from "@/lib/agents/types"
+
+const STORAGE_KEY = "launch-profiles"
 
 // ============================================================================
-// VANILLA AGENTS
+// DEFAULT PROFILES
 // ============================================================================
 
-/**
- * Create a vanilla (no custom config) agent for a CLI backend
- */
-function createVanillaAgent(backend: AIBackend): AgentCard {
-  const configs: Record<AIBackend, { name: string; avatar: string; description: string }> = {
-    claude: {
-      name: 'Claude',
-      avatar: '🤖',
-      description: 'Anthropic Claude - no custom configuration',
-    },
-    codex: {
-      name: 'Codex',
-      avatar: '💻',
-      description: 'OpenAI Codex - no custom configuration',
-    },
-    copilot: {
-      name: 'Copilot',
-      avatar: '✈️',
-      description: 'GitHub Copilot - no custom configuration',
-    },
-    gemini: {
-      name: 'Gemini',
-      avatar: '💎',
-      description: 'Google Gemini - no custom configuration',
-    },
-  }
-
-  const config = configs[backend]
-  const now = new Date().toISOString()
-
-  return {
-    id: `__vanilla_${backend}__`,
-    name: config.name,
-    description: config.description,
-    avatar: config.avatar,
-    backend,
+const DEFAULT_PROFILES: LaunchProfile[] = [
+  {
+    id: "claude",
+    name: "Claude",
+    avatar: "🤖",
+    description: "Anthropic Claude Code",
+    backend: "claude",
     flags: [],
-    sections: [],
     enabled: true,
-    created_at: now,
-    updated_at: now,
-  }
-}
-
-/** Pre-built vanilla agents for each CLI backend */
-const VANILLA_AGENTS: AgentCard[] = [
-  createVanillaAgent('claude'),
-  createVanillaAgent('codex'),
-  createVanillaAgent('copilot'),
-  createVanillaAgent('gemini'),
+  },
+  {
+    id: "codex",
+    name: "Codex",
+    avatar: "💻",
+    description: "OpenAI Codex",
+    backend: "codex",
+    flags: [],
+    enabled: true,
+  },
+  {
+    id: "copilot",
+    name: "Copilot",
+    avatar: "✈️",
+    description: "GitHub Copilot",
+    backend: "copilot",
+    flags: [],
+    enabled: true,
+  },
+  {
+    id: "gemini",
+    name: "Gemini",
+    avatar: "💎",
+    description: "Google Gemini",
+    backend: "gemini",
+    flags: [],
+    enabled: true,
+  },
 ]
 
 // ============================================================================
-// TYPES
+// STORAGE
 // ============================================================================
 
-export interface UseAgentsReturn {
-  /** All available agents (enabled only) */
-  agents: AgentCard[]
-  /** All agents including disabled */
-  allAgents: AgentCard[]
-  /** Whether agents are loading */
-  isLoading: boolean
-  /** Error if fetch failed */
-  error: Error | null
-  /** Get an agent by ID */
-  getById: (agentId: string | null | undefined) => AgentCard | null
-  /** Get agents for a specific section */
-  getForSection: (section: string | null | undefined) => AgentCard[]
-  /** Find the first agent matching a section (for auto-selection) */
-  findForSection: (section: string | null | undefined) => AgentCard | null
-  /** Refetch agents */
-  refetch: () => void
+function loadProfiles(): LaunchProfile[] {
+  if (typeof window === "undefined") return DEFAULT_PROFILES
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (!stored) return DEFAULT_PROFILES
+    const parsed = JSON.parse(stored) as LaunchProfile[]
+    return parsed.length > 0 ? parsed : DEFAULT_PROFILES
+  } catch {
+    return DEFAULT_PROFILES
+  }
 }
 
-// ============================================================================
-// QUERY KEY
-// ============================================================================
-
-export const AGENTS_QUERY_KEY = ['agent-registry']
+function saveProfiles(profiles: LaunchProfile[]) {
+  if (typeof window === "undefined") return
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles))
+}
 
 // ============================================================================
 // HOOK
 // ============================================================================
 
-/**
- * Hook for fetching and working with AI agents from the registry
- *
- * @example
- * ```tsx
- * const { agents, isLoading, getById, getForSection } = useAgents()
- *
- * // Get a specific agent
- * const agent = getById('page-assistant')
- *
- * // Get agents that specialize in a section
- * const sectionAgents = getForSection('ai-workspace')
- * ```
- */
+export interface UseAgentsReturn {
+  /** All enabled profiles */
+  agents: LaunchProfile[]
+  /** All profiles including disabled */
+  allAgents: LaunchProfile[]
+  /** Always false (no async loading) */
+  isLoading: boolean
+  /** Always null */
+  error: Error | null
+  /** Get a profile by ID */
+  getById: (id: string | null | undefined) => LaunchProfile | null
+  /** Update profiles */
+  setProfiles: (profiles: LaunchProfile[]) => void
+  /** Reset to defaults */
+  resetProfiles: () => void
+  /** No-op for compat */
+  refetch: () => void
+}
+
+export const AGENTS_QUERY_KEY = ["launch-profiles"]
+
 export function useAgents(): UseAgentsReturn {
-  const {
-    data: agentsData,
-    isLoading,
-    error,
-    refetch,
-  } = useQuery<{ agents: AgentCard[] }>({
-    queryKey: AGENTS_QUERY_KEY,
-    queryFn: async () => {
-      const res = await fetch('/api/ai/agents/registry')
-      if (!res.ok) {
-        throw new Error('Failed to fetch agents')
-      }
-      return res.json()
-    },
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-  })
+  const [profiles, setProfilesState] = useState<LaunchProfile[]>(loadProfiles)
 
-  // Get all registered agents (including disabled)
-  const registeredAgents = useMemo(() => {
-    return agentsData?.agents ?? []
-  }, [agentsData?.agents])
+  // Sync from storage on mount (handles SSR hydration)
+  useEffect(() => {
+    setProfilesState(loadProfiles())
+  }, [])
 
-  // Combine vanilla agents with registered agents
-  const allAgents = useMemo(() => {
-    return [...VANILLA_AGENTS, ...registeredAgents]
-  }, [registeredAgents])
+  const agents = useMemo(() => profiles.filter((p) => p.enabled), [profiles])
 
-  // Get enabled agents only (vanilla agents are always enabled)
-  const agents = useMemo(() => {
-    return [...VANILLA_AGENTS, ...registeredAgents.filter(a => a.enabled)]
-  }, [registeredAgents])
-
-  // Get agent by ID
   const getById = useCallback(
-    (agentId: string | null | undefined): AgentCard | null => {
-      if (!agentId) return null
-      return agents.find(a => a.id === agentId) ?? null
+    (id: string | null | undefined): LaunchProfile | null => {
+      if (!id) return null
+      return profiles.find((p) => p.id === id) ?? null
     },
-    [agents]
+    [profiles]
   )
 
-  // Get agents for a section
-  const getForSection = useCallback(
-    (section: string | null | undefined): AgentCard[] => {
-      if (!section) return []
-      return agents.filter(a => a.sections?.includes(section))
-    },
-    [agents]
-  )
+  const setProfiles = useCallback((newProfiles: LaunchProfile[]) => {
+    setProfilesState(newProfiles)
+    saveProfiles(newProfiles)
+  }, [])
 
-  // Find first agent matching section (for auto-selection)
-  const findForSection = useCallback(
-    (section: string | null | undefined): AgentCard | null => {
-      if (!section) return null
-      return agents.find(a => a.sections?.includes(section)) ?? null
-    },
-    [agents]
-  )
+  const resetProfiles = useCallback(() => {
+    setProfilesState(DEFAULT_PROFILES)
+    saveProfiles(DEFAULT_PROFILES)
+  }, [])
 
   return {
     agents,
-    allAgents,
-    isLoading,
-    error: error as Error | null,
+    allAgents: profiles,
+    isLoading: false,
+    error: null,
     getById,
-    getForSection,
-    findForSection,
-    refetch,
+    setProfiles,
+    resetProfiles,
+    refetch: () => {},
   }
 }

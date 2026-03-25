@@ -1,29 +1,19 @@
 /**
  * Backend Icon Configuration and Utilities
- *
- * Shared configuration for AI backend icons used across components.
- * Matches the CATEGORY_CONFIG in AgentGallery for consistency.
  */
 
 import * as React from 'react'
-import { Bot, Code, Gem, Plane, Layout, type LucideIcon } from 'lucide-react'
-import type { AIBackend, AgentCard } from '@/lib/agents/types'
+import { Bot, Code, Gem, Plane, type LucideIcon } from 'lucide-react'
+import type { AIBackend, LaunchProfile } from '@/lib/agents/types'
 
-// ============================================================================
-// Types
-// ============================================================================
+// Keep for backwards compat
+export type { LaunchProfile as AgentCard } from '@/lib/agents/types'
 
-export type BackendKey = AIBackend | 'page-assistant'
+export type BackendKey = AIBackend
 
-/**
- * Minimal agent info needed to derive backend icon
- * Allows use with both full AgentCard and minimal agent references
- */
 export interface MinimalAgentInfo {
   id: string
   backend?: AIBackend
-  category?: 'page-assistant'
-  sections?: string[]
 }
 
 export interface BackendConfig {
@@ -33,14 +23,6 @@ export interface BackendConfig {
   bgColor: string
 }
 
-// ============================================================================
-// Configuration
-// ============================================================================
-
-/**
- * Backend configuration with icons and colors
- * Matches CATEGORY_CONFIG in AgentGallery for visual consistency
- */
 export const BACKEND_CONFIG: Record<BackendKey, BackendConfig> = {
   claude: {
     label: 'Claude',
@@ -66,86 +48,24 @@ export const BACKEND_CONFIG: Record<BackendKey, BackendConfig> = {
     color: 'text-blue-400',
     bgColor: 'bg-blue-400/10',
   },
-  'page-assistant': {
-    label: 'Page Assistant',
-    icon: Layout,
-    color: 'text-cyan-400',
-    bgColor: 'bg-cyan-400/10',
-  },
 }
 
-// ============================================================================
-// Utilities
-// ============================================================================
-
-/**
- * Get the backend key from an agent
- *
- * Derives the backend from:
- * 1. Vanilla agent ID pattern (__vanilla_<backend>__)
- * 2. Page assistant (has sections or category)
- * 3. Explicit backend property
- * 4. Falls back to 'claude'
- *
- * Accepts either a full AgentCard or minimal agent info
- */
-export function getAgentBackend(agent: MinimalAgentInfo | AgentCard | null | undefined): BackendKey {
+export function getAgentBackend(agent: MinimalAgentInfo | LaunchProfile | null | undefined): BackendKey {
   if (!agent) return 'claude'
-
-  // Vanilla agents: extract from ID
-  if (agent.id.startsWith('__vanilla_')) {
-    const backend = agent.id.replace('__vanilla_', '').replace('__', '')
-    if (['claude', 'codex', 'copilot', 'gemini'].includes(backend)) {
-      return backend as BackendKey
-    }
-  }
-
-  // Page assistants: explicit category or has sections
-  if (agent.category === 'page-assistant') {
-    return 'page-assistant'
-  }
-  if (agent.sections && agent.sections.length > 0) {
-    return 'page-assistant'
-  }
-
-  // Explicit backend
-  if (agent.backend && ['claude', 'codex', 'copilot', 'gemini'].includes(agent.backend)) {
-    return agent.backend
-  }
-
-  // Default to claude
+  if (agent.backend && agent.backend in BACKEND_CONFIG) return agent.backend
   return 'claude'
 }
 
-/**
- * Get backend config for an agent
- */
-export function getAgentBackendConfig(agent: MinimalAgentInfo | AgentCard | null | undefined): BackendConfig {
-  const backend = getAgentBackend(agent)
-  return BACKEND_CONFIG[backend]
+export function getAgentBackendConfig(agent: MinimalAgentInfo | LaunchProfile | null | undefined): BackendConfig {
+  return BACKEND_CONFIG[getAgentBackend(agent)]
 }
 
-// ============================================================================
-// Components
-// ============================================================================
-
 export interface BackendIconProps {
-  /** The agent to get the backend icon for (accepts full AgentCard or minimal info with id) */
-  agent: MinimalAgentInfo | AgentCard | null | undefined
-  /** Icon size class (default: h-4 w-4) */
+  agent: MinimalAgentInfo | LaunchProfile | null | undefined
   className?: string
-  /** Whether to include the color class (default: true) */
   colored?: boolean
 }
 
-/**
- * Render the appropriate backend icon for an agent
- *
- * Usage:
- * ```tsx
- * <BackendIcon agent={agent} className="h-5 w-5" />
- * ```
- */
 export function BackendIcon({ agent, className = 'h-4 w-4', colored = true }: BackendIconProps) {
   const config = getAgentBackendConfig(agent)
   const Icon = config.icon

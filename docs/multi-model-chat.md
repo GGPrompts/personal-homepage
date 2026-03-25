@@ -66,9 +66,9 @@ Each assistant message displays a colored badge:
 | Docker | 🐳 | Purple |
 | Mock | 🎭 | Gray |
 
-### Project Context
+### Working Directory
 
-All models run from the selected project directory, giving them access to:
+All models run from the selected working directory, giving them access to:
 - File contents
 - Git history
 - Package dependencies

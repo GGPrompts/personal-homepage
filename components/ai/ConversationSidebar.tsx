@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { isEmoji, isAvatarUrl } from "@/lib/ai/utils"
 import { BackendIcon } from "@/lib/ai/backend-icons"
 import type { Conversation, ModelInfo, GeneratingConversations } from "@/lib/ai-workspace"
-import type { AgentCard } from "@/lib/agents/types"
+import type { LaunchProfile as AgentCard } from "@/lib/agents/types"
 
 // ============================================================================
 // TYPES

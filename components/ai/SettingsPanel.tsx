@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Bot, Plus, X, Pencil, FolderOpen, Settings, ChevronDown } from "lucide-react"
-import type { AgentCard } from "@/lib/agents/types"
+import { Bot, Plus, X, Pencil, Settings, ChevronDown } from "lucide-react"
+import type { LaunchProfile } from "@/lib/agents/types"
 import { DEFAULT_SUGGESTED_PROMPTS, DEFAULT_SETTINGS, type ChatSettings } from "@/lib/ai-workspace"
 
 // ============================================================================
@@ -21,11 +21,9 @@ export interface SettingsPanelProps {
   /** Called when settings change */
   onSettingsChange: (settings: ChatSettings) => void
   /** Currently selected agent */
-  selectedAgent: AgentCard | null
+  selectedAgent: LaunchProfile | null
   /** List of all available agents */
-  registryAgents: AgentCard[]
-  /** Called to navigate to a section (e.g., files) */
-  onNavigateToSection?: (section: string, path?: string) => void
+  registryAgents: LaunchProfile[]
   /** Called when close button is clicked */
   onClose: () => void
 }
@@ -39,7 +37,6 @@ export function SettingsPanel({
   onSettingsChange,
   selectedAgent,
   registryAgents,
-  onNavigateToSection,
   onClose,
 }: SettingsPanelProps) {
   return (
@@ -66,66 +63,34 @@ export function SettingsPanel({
 
         <Separator />
 
-        <p className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
-          Agents are configured via files. Use Settings &gt; Sections to assign default agents per section.
-        </p>
-
-        {/* Agent Configuration */}
+        {/* Current Profile */}
         <Collapsible className="space-y-3" defaultOpen={!!selectedAgent}>
           <CollapsibleTrigger className="flex items-center justify-between w-full">
             <Label className="flex items-center gap-2">
               <Bot className="h-3 w-3" />
-              Agent Configuration
+              Current Profile
             </Label>
             <ChevronDown className="h-4 w-4" />
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-3 pt-2">
-            <p className="text-xs text-muted-foreground">
-              Agents are configured via files in the <code className="bg-muted px-1 rounded">agents/</code> directory.
-              Each agent has a <code className="bg-muted px-1 rounded">CLAUDE.md</code> (system prompt) and <code className="bg-muted px-1 rounded">agent.json</code> (config).
-            </p>
-
-            {/* Open current agent's settings if one is selected */}
-            {selectedAgent && selectedAgent.workingDir && (
-              <Button
-                variant="default"
-                size="sm"
-                className="w-full"
-                onClick={() => {
-                  if (selectedAgent.workingDir && onNavigateToSection) {
-                    onNavigateToSection('files', selectedAgent.workingDir)
-                  }
-                }}
-                data-tabz-action="open-agent-settings"
-              >
-                <Settings className="h-3 w-3 mr-2" />
-                Open {selectedAgent.name} Settings
-              </Button>
+            {selectedAgent ? (
+              <div className="p-3 glass rounded-lg space-y-1">
+                <div className="flex items-center gap-2">
+                  <span>{selectedAgent.avatar}</span>
+                  <span className="font-medium text-sm">{selectedAgent.name}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">{selectedAgent.description}</p>
+                {selectedAgent.flags.length > 0 && (
+                  <p className="text-xs text-muted-foreground font-mono">
+                    Flags: {selectedAgent.flags.join(" ")}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No profile selected</p>
             )}
-
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full glass"
-              onClick={async () => {
-                try {
-                  const res = await fetch('/api/ai/agents/directory')
-                  const data = await res.json()
-                  if (data.path && onNavigateToSection) {
-                    // Navigate to Files section with agents folder path
-                    onNavigateToSection('files', data.path)
-                  }
-                } catch (error) {
-                  console.error('Failed to open agents folder:', error)
-                }
-              }}
-              data-tabz-action="open-agents-folder"
-            >
-              <FolderOpen className="h-3 w-3 mr-2" />
-              Open Agents Folder
-            </Button>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>{registryAgents.length} agents loaded</span>
+              <span>{registryAgents.length} profiles available</span>
             </div>
           </CollapsibleContent>
         </Collapsible>

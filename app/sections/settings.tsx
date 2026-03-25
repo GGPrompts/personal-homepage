@@ -1004,16 +1004,6 @@ function IntegrationsTab({ onSwitchTab }: { onSwitchTab: (tab: string) => void }
       statusMessage: "Free public API, no configuration required",
       docsUrl: "https://github.com/r-spacex/SpaceX-API",
     },
-    {
-      id: "claude-cli",
-      name: "Claude CLI",
-      description: "AI Workspace and Claude Jobs powered by Claude Code CLI",
-      icon: Terminal,
-      category: "api",
-      status: "connected",
-      statusMessage: "Uses local Claude CLI installation",
-      docsUrl: "https://docs.anthropic.com/en/docs/claude-code",
-    },
   ]
 
   // Group by category
@@ -1163,7 +1153,7 @@ function TerminalBackendTab() {
     setTestingSpawn(true)
     setSpawnResult(null)
     try {
-      const result = await runCommand("echo 'Terminal test - connection working!'", {
+      const result = await runCommand("echo 'Terminal test - connection working!'; echo; echo 'Press Enter to close...'; read", {
         name: "Connection Test",
         workingDir: workDirInput || defaultWorkDir,
       })

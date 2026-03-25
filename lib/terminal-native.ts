@@ -34,7 +34,8 @@ export function spawnKittyTerminal(opts: {
   args.push("--working-directory", cwd)
 
   if (opts.command) {
-    args.push("--", "bash", "-c", opts.command)
+    const shell = process.env.SHELL || "sh"
+    args.push("--", shell, "-c", opts.command)
   }
 
   const child = spawn("kitty", args, {

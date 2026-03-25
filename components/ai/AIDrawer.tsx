@@ -36,6 +36,7 @@ import { ChatMessage, TypingIndicator } from "./ChatMessage"
 import { ChatInput } from "./ChatInput"
 import { useAuth } from "@/components/AuthProvider"
 import { useProjects } from "@/hooks/useProjects"
+import { useWorkingDirSafe } from "@/components/WorkingDirProvider"
 import { isAvatarUrl, isEmoji } from "@/lib/ai/utils"
 import { BackendIcon, getAgentBackendConfig } from "@/lib/ai/backend-icons"
 
@@ -234,6 +235,13 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
 
   // Use shared hook for projects
   const { projects: availableProjects, isPinned } = useProjects()
+
+  // Get global working directory for display
+  const workingDirCtx = useWorkingDirSafe()
+  const globalWorkingDir = workingDirCtx?.workingDir || null
+  const workingDirLabel = globalWorkingDir && globalWorkingDir !== "~"
+    ? globalWorkingDir.replace(/^~\//, "").replace(/^\/home\/[^/]+\//, "~/")
+    : null
 
   // Auto-scroll to bottom when new messages arrive
   React.useEffect(() => {
@@ -666,20 +674,22 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                         </div>
 
                         {/* Project Selection */}
-                        {availableProjects.length > 0 && (
-                          <div className="space-y-1">
-                            <label className="text-xs text-muted-foreground">Project Context</label>
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground">Working Directory</label>
+                          {availableProjects.length > 0 ? (
                             <Select
-                              value={selectedProjectPath || "none"}
-                              onValueChange={(value) => setSelectedProjectPath(value === "none" ? null : value)}
+                              value={selectedProjectPath || "default"}
+                              onValueChange={(value) => setSelectedProjectPath(value === "default" ? null : value)}
                             >
                               <SelectTrigger className="glass h-8 text-xs">
                                 <FolderOpen className="h-3 w-3 mr-1" />
-                                <SelectValue placeholder="No project" />
+                                <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="none">
-                                  <span className="text-muted-foreground text-xs">No project</span>
+                                <SelectItem value="default">
+                                  <span className="text-xs">
+                                    {workingDirLabel || globalWorkingDir || "~ (home)"}
+                                  </span>
                                 </SelectItem>
                                 {availableProjects.map(project => (
                                   <SelectItem key={project.local!.path} value={project.local!.path}>
@@ -691,8 +701,13 @@ export function AIDrawer({ className = "" }: AIDrawerProps) {
                                 ))}
                               </SelectContent>
                             </Select>
-                          </div>
-                        )}
+                          ) : (
+                            <div className="glass px-2 py-1.5 text-xs rounded flex items-center gap-1.5">
+                              <FolderOpen className="h-3 w-3 text-muted-foreground" />
+                              <span>{workingDirLabel || globalWorkingDir || "~ (home)"}</span>
+                            </div>
+                          )}
+                        </div>
 
                         {/* Clear conversation */}
                         <Button

@@ -4,6 +4,7 @@ import * as React from "react"
 import { createContext, useContext, useState, useCallback, useEffect, useMemo } from "react"
 import { useAIChat, type UseAIChatReturn } from "@/hooks/useAIChat"
 import { useAgents } from "@/hooks/useAgents"
+import { useWorkingDirSafe } from "@/components/WorkingDirProvider"
 import type { AgentCard } from "@/lib/agents/types"
 
 // ============================================================================
@@ -149,6 +150,10 @@ export function AIDrawerProvider({
   // Use the chat hook for all chat functionality
   const chat = useAIChat()
 
+  // Get global working directory as fallback for project context
+  const workingDirCtx = useWorkingDirSafe()
+  const globalWorkingDir = workingDirCtx?.workingDir || null
+
   // Load initial state from localStorage
   const [state, setState] = useState<AIDrawerState>(() => {
     if (typeof window === "undefined") return defaultState
@@ -196,21 +201,14 @@ export function AIDrawerProvider({
     return "default"
   })
 
-  // Use shared hook for agents
+  // Use shared hook for launch profiles
   const {
     agents: availableAgents,
     isLoading: agentsLoading,
-    findForSection,
   } = useAgents()
 
-  // Find recommended agent based on current section
-  const recommendedAgent = useMemo(() => {
-    return findForSection(currentSection)
-  }, [currentSection, findForSection])
-
-  // Auto-agent-selection on section change is disabled.
-  // The drawer now persists its active agent/conversation across navigation.
-  // Users can still manually switch agents via the dropdown.
+  // No auto-selection — user picks their profile manually
+  const recommendedAgent = null
 
   // When agent changes, find and switch to most recent conversation with that agent
   useEffect(() => {
@@ -230,10 +228,8 @@ export function AIDrawerProvider({
     }
   }, [selectedAgentId, chat.conversations, chat.activeConvId, chat.setActiveConvId])
 
-  // Determine if current selection is auto-selected
-  const isAgentAutoSelected = useMemo(() => {
-    return !userHasSelectedAgent && selectedAgentId === recommendedAgent?.id
-  }, [userHasSelectedAgent, selectedAgentId, recommendedAgent?.id])
+  // No auto-selection in simplified system
+  const isAgentAutoSelected = false
 
   // Wrapper for setSelectedAgentId that tracks manual selection
   const handleSetSelectedAgentId = useCallback((agentId: string | null) => {
@@ -352,6 +348,9 @@ export function AIDrawerProvider({
     }
   }, [chat, selectedAgentId])
 
+  // Effective project path: explicit selection > global working dir
+  const effectiveProjectPath = selectedProjectPath || globalWorkingDir
+
   // Wrapper for sendMessage that tags conversation with agent on first message
   const sendMessage = useCallback(async (
     content: string,
@@ -363,11 +362,15 @@ export function AIDrawerProvider({
         conv.id === chat.activeConvId ? { ...conv, agentId: selectedAgentId } : conv
       ))
     }
-    return chat.sendMessage(content, options)
-  }, [chat, selectedAgentId])
+    // Use effective project path as fallback when no explicit projectPath provided
+    const resolvedOptions = {
+      ...options,
+      projectPath: options?.projectPath ?? effectiveProjectPath,
+    }
+    return chat.sendMessage(content, resolvedOptions)
+  }, [chat, selectedAgentId, effectiveProjectPath])
 
   // Open drawer with a message
-  // TODO: [code-review] sendMessage promise not caught - verify error handling in chat.sendMessage
   const openWithMessage = useCallback(async (
     content: string,
     options?: { projectPath?: string | null }
@@ -375,8 +378,8 @@ export function AIDrawerProvider({
     setState("expanded")
     // Small delay to let drawer animation start
     await new Promise(resolve => setTimeout(resolve, 50))
-    await sendMessage(content, { projectPath: options?.projectPath ?? selectedProjectPath })
-  }, [sendMessage, selectedProjectPath])
+    await sendMessage(content, { projectPath: options?.projectPath ?? effectiveProjectPath })
+  }, [sendMessage, effectiveProjectPath])
 
   // Build system prompt from task context
   const buildTaskSystemPrompt = useCallback((task: TaskContext): string => {
