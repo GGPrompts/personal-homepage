@@ -14,7 +14,6 @@ import { ConversationViewer } from "@/components/ai/ConversationViewer"
 import { useSessionStream } from "@/hooks/useSessionStream"
 import { useWorkingDirSafe, expandTilde } from "@/hooks/useWorkingDirectory"
 import { useAuth } from "@/components/AuthProvider"
-import { useTerminalExtension } from "@/hooks/useTerminalExtension"
 
 interface SessionInfo {
   path: string
@@ -65,7 +64,6 @@ export default function AIWorkspaceSection({
 }) {
   const { user } = useAuth()
   const userAvatarUrl = user?.user_metadata?.avatar_url || null
-  const { backendType } = useTerminalExtension()
 
   const [sessions, setSessions] = React.useState<SessionInfo[]>([])
   const [selectedPath, setSelectedPath] = React.useState<string | null>(null)
@@ -357,7 +355,7 @@ export default function AIWorkspaceSection({
       const res = await fetch('/api/ai/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ backend: backendType }),
+        body: JSON.stringify({}),
       })
       if (res.ok) {
         const data = await res.json()
@@ -405,7 +403,7 @@ export default function AIWorkspaceSection({
         const res = await fetch('/api/ai/sessions', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: selectedSessionId, prompt: promptInput.trim(), backend: backendType, projectPath: selectedSession?.projectPath }),
+          body: JSON.stringify({ sessionId: selectedSessionId, prompt: promptInput.trim(), projectPath: selectedSession?.projectPath }),
         })
         const data = await res.json()
         if (res.ok && data.ok) {

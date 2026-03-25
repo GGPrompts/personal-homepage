@@ -690,29 +690,27 @@ describe('useTerminalExtension', () => {
     localStorageMock.clear()
     mockFetch.mockReset()
     vi.clearAllMocks()
-    // Reset to localhost
-    mockLocation.hostname = 'localhost'
   })
 
   afterEach(() => {
     vi.clearAllMocks()
   })
 
-  it('returns initial state before loading', () => {
-    // Don't resolve fetch so we can check initial state
-    mockFetch.mockImplementation(() => new Promise(() => {}))
-
+  it('is always available (native kitty)', async () => {
     const { result } = renderHook(() => useTerminalExtension())
 
-    expect(result.current.available).toBe(false)
-    expect(result.current.authenticated).toBe(false)
-    expect(result.current.hasToken).toBe(false)
-    expect(result.current.isLoaded).toBe(false)
+    await waitFor(() => {
+      expect(result.current.isLoaded).toBe(true)
+    })
+
+    expect(result.current.available).toBe(true)
+    expect(result.current.backendRunning).toBe(true)
+    expect(result.current.authenticated).toBe(true)
+    expect(result.current.error).toBeNull()
   })
 
-  it('loads default working directory from localStorage', async () => {
+  it('loads default working directory from localStorage', () => {
     localStorageMock.setItem('global-working-directory', '/home/user/projects')
-    mockFetch.mockRejectedValue(new Error('Network error'))
 
     const { result } = renderHook(() => useTerminalExtension())
 
@@ -720,16 +718,12 @@ describe('useTerminalExtension', () => {
   })
 
   it('returns ~ as default working directory when not set', () => {
-    mockFetch.mockRejectedValue(new Error('Network error'))
-
     const { result } = renderHook(() => useTerminalExtension())
 
     expect(result.current.defaultWorkDir).toBe('~')
   })
 
   it('updates default working directory', async () => {
-    mockFetch.mockRejectedValue(new Error('Network error'))
-
     const { result } = renderHook(() => useTerminalExtension())
 
     await waitFor(() => {
@@ -747,335 +741,73 @@ describe('useTerminalExtension', () => {
     )
   })
 
-  it('clears API token', async () => {
-    localStorageMock.setItem('tabz-api-token', 'test-token')
-    mockFetch.mockRejectedValue(new Error('Network error'))
-
-    const { result } = renderHook(() => useTerminalExtension())
-
-    await waitFor(() => {
-      expect(result.current.isLoaded).toBe(true)
-    })
-
-    act(() => {
-      result.current.clearApiToken()
-    })
-
-    expect(localStorageMock.removeItem).toHaveBeenCalledWith('tabz-api-token')
-    expect(result.current.authenticated).toBe(false)
-  })
-
-  it('runCommand returns error when no token', async () => {
-    mockFetch.mockRejectedValue(new Error('Network error'))
-
-    const { result } = renderHook(() => useTerminalExtension())
-
-    await waitFor(() => {
-      expect(result.current.isLoaded).toBe(true)
-    })
-
-    const spawnResult = await result.current.runCommand('echo test')
-
-    expect(spawnResult.success).toBe(false)
-    expect(spawnResult.error).toContain('API token required')
-  })
-
-  it('runCommand calls API with token and succeeds', async () => {
-    localStorageMock.setItem('tabz-api-token', 'valid-token')
-
-    // Mock init sequence
-    mockFetch
-      .mockResolvedValueOnce({ // token fetch during init
-        ok: true,
-        json: () => Promise.resolve({ token: 'valid-token' }),
-      })
-      .mockResolvedValueOnce({ ok: true }) // health check during init
-      .mockResolvedValueOnce({ // token validation during init
-        ok: true,
-        json: () => Promise.resolve({ token: 'valid-token' }),
-      })
-
-    const { result } = renderHook(() => useTerminalExtension())
-
-    await waitFor(() => {
-      expect(result.current.isLoaded).toBe(true)
-    })
-
-    // Mock spawn call
+  it('runCommand calls /api/terminal and returns success', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      status: 200,
-      json: () => Promise.resolve({ success: true, terminal: { id: '1', name: 'Terminal' } }),
+      json: () => Promise.resolve({ success: true }),
+    })
+
+    const { result } = renderHook(() => useTerminalExtension())
+
+    await waitFor(() => {
+      expect(result.current.isLoaded).toBe(true)
     })
 
     const spawnResult = await result.current.runCommand('echo hello')
 
     expect(spawnResult.success).toBe(true)
-    expect(spawnResult.terminal?.id).toBe('1')
+    expect(mockFetch).toHaveBeenCalledWith('/api/terminal', expect.objectContaining({
+      method: 'POST',
+    }))
   })
 
-  it('handles 401 authentication failure in runCommand', async () => {
-    localStorageMock.setItem('tabz-api-token', 'invalid-token')
-
-    // Mock init - fails to get token from backend, uses stored
-    mockFetch
-      .mockRejectedValueOnce(new Error('Network error')) // token fetch
-      .mockResolvedValueOnce({ ok: true }) // health check
-      .mockResolvedValueOnce({ // token validation - mismatch
-        ok: true,
-        json: () => Promise.resolve({ token: 'different-token' }),
-      })
-
-    const { result } = renderHook(() => useTerminalExtension())
-
-    await waitFor(() => {
-      expect(result.current.isLoaded).toBe(true)
-    })
-
-    // Mock spawn - returns 401
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 401,
-      json: () => Promise.resolve({ error: 'Unauthorized' }),
-    })
-
-    const spawnResult = await result.current.runCommand('echo test')
-
-    expect(spawnResult.success).toBe(false)
-    expect(spawnResult.error).toContain('Authentication failed')
-  })
-
-  it('handles network errors in runCommand', async () => {
-    localStorageMock.setItem('tabz-api-token', 'valid-token')
-
-    // Mock init
-    mockFetch
-      .mockRejectedValueOnce(new Error('Network error')) // token fetch
-      .mockResolvedValueOnce({ ok: true }) // health
-      .mockResolvedValueOnce({ // token validation
-        ok: true,
-        json: () => Promise.resolve({ token: 'valid-token' }),
-      })
-
-    const { result } = renderHook(() => useTerminalExtension())
-
-    await waitFor(() => {
-      expect(result.current.isLoaded).toBe(true)
-    })
-
-    // Mock spawn - network failure
-    mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'))
-
-    const spawnResult = await result.current.runCommand('echo test')
-
-    expect(spawnResult.success).toBe(false)
-    expect(spawnResult.error).toContain('Cannot connect to TabzChrome')
-  })
-
-  it('pasteToTerminal sets autoExecute to false', async () => {
-    localStorageMock.setItem('tabz-api-token', 'valid-token')
-
-    // Mock init
-    mockFetch
-      .mockRejectedValueOnce(new Error('Network error')) // token fetch
-      .mockResolvedValueOnce({ ok: true }) // health
-      .mockResolvedValueOnce({ // token validation
-        ok: true,
-        json: () => Promise.resolve({ token: 'valid-token' }),
-      })
-
-    const { result } = renderHook(() => useTerminalExtension())
-
-    await waitFor(() => {
-      expect(result.current.isLoaded).toBe(true)
-    })
-
-    // Mock spawn
+  it('runCommand returns error on failure', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      status: 200,
-      json: () => Promise.resolve({ success: true, terminal: { id: '1', name: 'Terminal' } }),
+      json: () => Promise.resolve({ success: false, error: 'Kitty not found' }),
+    })
+
+    const { result } = renderHook(() => useTerminalExtension())
+
+    await waitFor(() => {
+      expect(result.current.isLoaded).toBe(true)
+    })
+
+    const spawnResult = await result.current.runCommand('echo test')
+
+    expect(spawnResult.success).toBe(false)
+    expect(spawnResult.error).toBe('Kitty not found')
+  })
+
+  it('pasteToTerminal sends PUT with execute: false', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ success: true }),
+    })
+
+    const { result } = renderHook(() => useTerminalExtension())
+
+    await waitFor(() => {
+      expect(result.current.isLoaded).toBe(true)
     })
 
     await result.current.pasteToTerminal('echo hello')
 
-    // Check the last call had autoExecute: false
     const lastCall = mockFetch.mock.calls[mockFetch.mock.calls.length - 1]
-    expect(lastCall[1].body).toContain('"autoExecute":false')
+    expect(lastCall[0]).toBe('/api/terminal')
+    expect(lastCall[1].method).toBe('PUT')
+    expect(lastCall[1].body).toContain('"execute":false')
   })
 
-  it('setApiToken validates and stores token on success', async () => {
-    // Mock init - no token initially
-    mockFetch
-      .mockRejectedValueOnce(new Error('Network error')) // token fetch
-      .mockResolvedValueOnce({ ok: true }) // health check
-      .mockResolvedValueOnce({ // token validation - no token
-        ok: true,
-        json: () => Promise.resolve({ token: null }),
-      })
-
+  it('refreshStatus always returns true for native kitty', async () => {
     const { result } = renderHook(() => useTerminalExtension())
 
     await waitFor(() => {
       expect(result.current.isLoaded).toBe(true)
     })
-
-    // Mock setApiToken validation - create proper mock responses
-    const healthResponse = { ok: true }
-    const tokenResponse = {
-      ok: true,
-      json: () => Promise.resolve({ token: 'new-valid-token' }),
-    }
-
-    mockFetch
-      .mockResolvedValueOnce(healthResponse) // health during setApiToken
-      .mockResolvedValueOnce(tokenResponse) // token validation during setApiToken
-
-    let success: boolean
-    await act(async () => {
-      success = await result.current.setApiToken('new-valid-token')
-    })
-
-    expect(success!).toBe(true)
-    expect(result.current.authenticated).toBe(true)
-    expect(localStorageMock.setItem).toHaveBeenCalledWith('tabz-api-token', 'new-valid-token')
-  })
-
-  it('setApiToken rejects empty token', async () => {
-    mockFetch.mockRejectedValue(new Error('Network error'))
-
-    const { result } = renderHook(() => useTerminalExtension())
-
-    await waitFor(() => {
-      expect(result.current.isLoaded).toBe(true)
-    })
-
-    const success = await result.current.setApiToken('')
-
-    expect(success).toBe(false)
-  })
-
-  it('setApiToken sanitizes non-ASCII characters', async () => {
-    // Mock init
-    mockFetch
-      .mockRejectedValueOnce(new Error('Network error'))
-      .mockResolvedValueOnce({ ok: true })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ token: null }),
-      })
-
-    const { result } = renderHook(() => useTerminalExtension())
-
-    await waitFor(() => {
-      expect(result.current.isLoaded).toBe(true)
-    })
-
-    // Mock setApiToken validation
-    mockFetch
-      .mockResolvedValueOnce({ ok: true })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ token: 'cleantoken' }),
-      })
-
-    // Token with unicode characters that should be stripped
-    await result.current.setApiToken('cleantoken\u2019')
-
-    // Should store sanitized version
-    expect(localStorageMock.setItem).toHaveBeenCalledWith('tabz-api-token', 'cleantoken')
-  })
-
-  it('skips probe from non-localhost sites during init', async () => {
-    mockLocation.hostname = 'example.com'
-    localStorageMock.setItem('tabz-api-token', 'stored-token')
-
-    mockFetch.mockClear()
-
-    const { result } = renderHook(() => useTerminalExtension())
-
-    await waitFor(() => {
-      expect(result.current.isLoaded).toBe(true)
-    })
-
-    // Should not have made any fetch calls from remote site during init
-    // (isLocalhost returns false, so fetchTokenFromBackend returns null immediately)
-    expect(mockFetch).not.toHaveBeenCalled()
-  })
-
-  it('refreshStatus probes backend and returns availability', async () => {
-    localStorageMock.setItem('tabz-api-token', 'test-token')
-
-    // Mock init
-    mockFetch
-      .mockResolvedValueOnce({ // token fetch
-        ok: true,
-        json: () => Promise.resolve({ token: 'test-token' }),
-      })
-      .mockResolvedValueOnce({ ok: true }) // health
-      .mockResolvedValueOnce({ // token validation
-        ok: true,
-        json: () => Promise.resolve({ token: 'test-token' }),
-      })
-
-    const { result } = renderHook(() => useTerminalExtension())
-
-    await waitFor(() => {
-      expect(result.current.isLoaded).toBe(true)
-    })
-
-    // Mock refresh
-    mockFetch
-      .mockResolvedValueOnce({ // token fetch during refresh
-        ok: true,
-        json: () => Promise.resolve({ token: 'test-token' }),
-      })
-      .mockResolvedValueOnce({ ok: true }) // health during refresh
-      .mockResolvedValueOnce({ // token validation during refresh
-        ok: true,
-        json: () => Promise.resolve({ token: 'test-token' }),
-      })
 
     const available = await result.current.refreshStatus()
 
     expect(available).toBe(true)
-    expect(result.current.authenticated).toBe(true)
-  })
-
-  it('detects when backend is not running', async () => {
-    mockFetch.mockRejectedValue(new Error('Network error'))
-
-    const { result } = renderHook(() => useTerminalExtension())
-
-    await waitFor(() => {
-      expect(result.current.isLoaded).toBe(true)
-    })
-
-    expect(result.current.backendRunning).toBe(false)
-    expect(result.current.available).toBe(false)
-  })
-
-  it('hasToken reflects token presence', async () => {
-    mockFetch.mockRejectedValue(new Error('Network error'))
-
-    const { result: result1 } = renderHook(() => useTerminalExtension())
-
-    await waitFor(() => {
-      expect(result1.current.isLoaded).toBe(true)
-    })
-
-    expect(result1.current.hasToken).toBe(false)
-
-    // Now with token
-    localStorageMock.setItem('tabz-api-token', 'test-token')
-
-    const { result: result2 } = renderHook(() => useTerminalExtension())
-
-    await waitFor(() => {
-      expect(result2.current.isLoaded).toBe(true)
-    })
-
-    // hasToken should be true after init loads the stored token
-    expect(result2.current.hasToken).toBe(true)
   })
 })

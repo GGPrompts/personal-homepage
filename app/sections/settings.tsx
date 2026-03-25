@@ -1104,50 +1104,18 @@ function IntegrationsTab({ onSwitchTab }: { onSwitchTab: (tab: string) => void }
 
 function TerminalBackendTab() {
   const {
-    backendRunning,
-    authenticated,
-    error,
-    hasToken,
     defaultWorkDir,
-    backendType,
-    setApiToken,
-    clearApiToken,
-    refreshStatus,
     updateDefaultWorkDir,
     runCommand,
-    setBackendType,
   } = useTerminalExtension()
 
-  const [tokenInput, setTokenInput] = React.useState("")
-  const [showToken, setShowToken] = React.useState(false)
-  const [tokenError, setTokenError] = React.useState<string | null>(null)
   const [workDirInput, setWorkDirInput] = React.useState(defaultWorkDir)
-  const [refreshing, setRefreshing] = React.useState(false)
   const [testingSpawn, setTestingSpawn] = React.useState(false)
   const [spawnResult, setSpawnResult] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     setWorkDirInput(defaultWorkDir)
   }, [defaultWorkDir])
-
-  const handleTokenSubmit = async () => {
-    if (!tokenInput.trim()) return
-    setTokenError(null)
-    const success = await setApiToken(tokenInput.trim())
-    if (success) {
-      setTokenInput("")
-      setShowToken(false)
-    } else {
-      setTokenError("Could not verify token. Make sure the TabzChrome backend is running.")
-    }
-  }
-
-  const handleRefresh = async () => {
-    setRefreshing(true)
-    setTokenError(null)
-    await refreshStatus()
-    setRefreshing(false)
-  }
 
   const handleTestSpawn = async () => {
     setTestingSpawn(true)
@@ -1177,201 +1145,28 @@ function TerminalBackendTab() {
           Terminal Backend
         </h3>
         <p className="text-muted-foreground">
-          Choose how terminals are spawned from the dashboard.
+          Terminals are spawned natively via Kitty.
         </p>
       </div>
 
-      {/* Backend Type Selector */}
-      <Card className="glass p-4" data-tabz-card="backend-selector">
-        <Label className="text-sm mb-3 block font-medium">Backend Type</Label>
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => setBackendType("native")}
-            className={`p-4 rounded-lg border-2 text-left transition-all ${
-              backendType === "native"
-                ? "border-primary bg-primary/5"
-                : "border-border/50 hover:border-border glass-dark"
-            }`}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <Terminal className={`h-4 w-4 ${backendType === "native" ? "text-primary" : "text-muted-foreground"}`} />
-              <span className="font-medium">Native (Kitty)</span>
+      {/* Kitty Status */}
+      <Card className="glass p-4">
+        <div className="flex items-center justify-between p-3 glass-dark rounded-lg">
+          <div className="flex items-center gap-3">
+            <Terminal className="h-5 w-5 text-emerald-400" />
+            <div>
+              <p className="font-medium">Kitty Terminal</p>
+              <p className="text-xs text-muted-foreground">Spawns via /api/terminal server route</p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Spawn terminals directly via Kitty. No extension needed.
-            </p>
-          </button>
-          <button
-            onClick={() => setBackendType("tabzchrome")}
-            className={`p-4 rounded-lg border-2 text-left transition-all ${
-              backendType === "tabzchrome"
-                ? "border-primary bg-primary/5"
-                : "border-border/50 hover:border-border glass-dark"
-            }`}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <Server className={`h-4 w-4 ${backendType === "tabzchrome" ? "text-primary" : "text-muted-foreground"}`} />
-              <span className="font-medium">TabzChrome</span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Use TabzChrome extension backend on localhost:8129.
-            </p>
-          </button>
+          </div>
+          <Badge variant="secondary" className="bg-emerald-500/20 text-emerald-400">
+            Available
+          </Badge>
         </div>
       </Card>
 
-      {/* Native (Kitty) Status */}
-      {backendType === "native" && (
-        <Card className="glass p-4" data-tabz-card="native-status">
-          <div className="flex items-center justify-between p-3 glass-dark rounded-lg">
-            <div className="flex items-center gap-3">
-              <Terminal className="h-5 w-5 text-emerald-400" />
-              <div>
-                <p className="font-medium">Kitty Terminal</p>
-                <p className="text-xs text-muted-foreground">Spawns via /api/terminal server route</p>
-              </div>
-            </div>
-            <Badge variant="secondary" className="bg-emerald-500/20 text-emerald-400">
-              Available
-            </Badge>
-          </div>
-        </Card>
-      )}
-
-      {/* TabzChrome Status */}
-      {backendType === "tabzchrome" && (
-        <>
-          <Card className="glass p-4" data-tabz-card="connection-status">
-            <div className="space-y-4">
-              {/* Backend Status */}
-              <div className="flex items-center justify-between p-3 glass-dark rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Server className={`h-5 w-5 ${backendRunning ? "text-emerald-400" : "text-muted-foreground"}`} />
-                  <div>
-                    <p className="font-medium">Backend Server</p>
-                    <p className="text-xs text-muted-foreground">localhost:8129</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge
-                    variant="secondary"
-                    className={backendRunning
-                      ? "bg-emerald-500/20 text-emerald-400"
-                      : "bg-muted text-muted-foreground"
-                    }
-                  >
-                    {backendRunning ? "Running" : "Not Running"}
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={handleRefresh}
-                    disabled={refreshing}
-                    data-tabz-button="refresh-status"
-                  >
-                    <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Auth Status */}
-              <div className="flex items-center justify-between p-3 glass-dark rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Key className={`h-5 w-5 ${authenticated ? "text-emerald-400" : hasToken ? "text-amber-400" : "text-muted-foreground"}`} />
-                  <div>
-                    <p className="font-medium">API Token</p>
-                    <p className="text-xs text-muted-foreground">
-                      {authenticated
-                        ? "Authenticated"
-                        : hasToken
-                        ? "Token stored (not verified)"
-                        : "Not configured"}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {authenticated ? (
-                    <>
-                      <Badge variant="secondary" className="bg-emerald-500/20 text-emerald-400">
-                        Connected
-                      </Badge>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={clearApiToken}
-                        data-tabz-button="clear-token"
-                      >
-                        <XCircle className="h-4 w-4" />
-                      </Button>
-                    </>
-                  ) : (
-                    <Badge variant="outline" className="text-muted-foreground">
-                      Required
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          {/* Error Message */}
-          {error && !authenticated && (
-            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-              <p className="text-sm text-amber-400">{error}</p>
-            </div>
-          )}
-
-          {/* Token Input */}
-          {!authenticated && (
-            <Card className="glass p-4" data-tabz-card="token-input">
-              <Label className="text-sm mb-2 block">API Token</Label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Input
-                    type={showToken ? "text" : "password"}
-                    value={tokenInput}
-                    onChange={(e) => {
-                      setTokenInput(e.target.value)
-                      setTokenError(null)
-                    }}
-                    placeholder="Paste your TabzChrome API token"
-                    className="font-mono text-sm pr-10"
-                    data-tabz-input="tabz-api-token"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full px-3 z-10 text-muted-foreground hover:text-foreground"
-                    onClick={() => setShowToken(!showToken)}
-                    data-tabz-button="toggle-token-visibility"
-                  >
-                    {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-                <Button
-                  onClick={handleTokenSubmit}
-                  disabled={!tokenInput.trim()}
-                  data-tabz-button="save-token"
-                >
-                  Save
-                </Button>
-              </div>
-              {tokenError && (
-                <p className="text-xs text-destructive mt-2">{tokenError}</p>
-              )}
-              <p className="text-xs text-muted-foreground mt-2">
-                Get your API token from TabzChrome extension: <strong>Settings &rarr; API Token &rarr; Copy</strong>
-              </p>
-            </Card>
-          )}
-        </>
-      )}
-
-      {/* Default Working Directory (shared by both backends) */}
-      <Card className="glass p-4" data-tabz-card="default-workdir">
+      {/* Default Working Directory */}
+      <Card className="glass p-4">
         <Label className="text-sm mb-2 block">Default Working Directory</Label>
         <div className="flex gap-2">
           <Input
@@ -1379,13 +1174,11 @@ function TerminalBackendTab() {
             onChange={(e) => setWorkDirInput(e.target.value)}
             placeholder="~/projects"
             className="font-mono text-sm"
-            data-tabz-input="default-workdir"
           />
           <Button
             onClick={() => updateDefaultWorkDir(workDirInput)}
             disabled={workDirInput === defaultWorkDir}
             variant={workDirInput === defaultWorkDir ? "outline" : "default"}
-            data-tabz-button="save-workdir"
           >
             {workDirInput === defaultWorkDir ? "Saved" : "Save"}
           </Button>
@@ -1396,59 +1189,41 @@ function TerminalBackendTab() {
       </Card>
 
       {/* Test Spawn Button */}
-      {(backendType === "native" || authenticated) && (
-        <Card className="glass p-4" data-tabz-card="test-spawn">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-medium">Test Terminal Spawn</h4>
-              <p className="text-sm text-muted-foreground">
-                Spawn a test terminal to verify everything is working
-              </p>
-            </div>
-            <Button
-              onClick={handleTestSpawn}
-              disabled={testingSpawn}
-              data-tabz-button="test-spawn"
-            >
-              {testingSpawn ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Testing...
-                </>
-              ) : (
-                <>
-                  <Terminal className="h-4 w-4 mr-2" />
-                  Test Spawn
-                </>
-              )}
-            </Button>
+      <Card className="glass p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h4 className="font-medium">Test Terminal Spawn</h4>
+            <p className="text-sm text-muted-foreground">
+              Spawn a test terminal to verify everything is working
+            </p>
           </div>
-          {spawnResult && (
-            <div className={`mt-3 p-2 rounded text-sm ${
-              spawnResult === "success"
-                ? "bg-emerald-500/10 text-emerald-400"
-                : "bg-red-500/10 text-red-400"
-            }`}>
-              {spawnResult === "success" ? "Terminal spawned successfully!" : spawnResult}
-            </div>
-          )}
-        </Card>
-      )}
-
-      {/* Extension Link (only for TabzChrome) */}
-      {backendType === "tabzchrome" && (
-        <div className="text-center text-sm text-muted-foreground">
-          <a
-            href="https://github.com/anthropics/tabz-chrome"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline inline-flex items-center gap-1"
-            data-tabz-link="extension-install"
+          <Button
+            onClick={handleTestSpawn}
+            disabled={testingSpawn}
           >
-            Install TabzChrome Extension <ExternalLink className="h-3 w-3" />
-          </a>
+            {testingSpawn ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Testing...
+              </>
+            ) : (
+              <>
+                <Terminal className="h-4 w-4 mr-2" />
+                Test Spawn
+              </>
+            )}
+          </Button>
         </div>
-      )}
+        {spawnResult && (
+          <div className={`mt-3 p-2 rounded text-sm ${
+            spawnResult === "success"
+              ? "bg-emerald-500/10 text-emerald-400"
+              : "bg-red-500/10 text-red-400"
+          }`}>
+            {spawnResult === "success" ? "Terminal spawned successfully!" : spawnResult}
+          </div>
+        )}
+      </Card>
     </div>
   )
 }
@@ -1671,8 +1446,7 @@ function ImportExportTab() {
           visibility,
           order,
         },
-        tabzChrome: {
-          token: getStoredApiKey("tabz-api-token") ? "***configured***" : null,
+        terminal: {
           defaultWorkDir,
         },
         agents,
@@ -1721,9 +1495,10 @@ function ImportExportTab() {
           }
         }
 
-        // Import TabzChrome settings
-        if (config.tabzChrome?.defaultWorkDir) {
-          updateDefaultWorkDir(config.tabzChrome.defaultWorkDir)
+        // Import terminal settings (supports both old 'tabzChrome' and new 'terminal' keys)
+        const terminalConfig = config.terminal || config.tabzChrome
+        if (terminalConfig?.defaultWorkDir) {
+          updateDefaultWorkDir(terminalConfig.defaultWorkDir)
         }
 
         // Import agents (version 2+)
