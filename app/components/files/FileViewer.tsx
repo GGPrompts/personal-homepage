@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useCallback, useMemo } from 'react'
-import { X, Pin, FileCode, FileText, Image, Video, FileJson, Table2, Eye, ZoomIn, ZoomOut, RotateCcw, Download, Loader2, Volume2, VolumeX, Square, Sparkles } from 'lucide-react'
+import { X, Pin, FileCode, FileText, Image, Video, FileJson, Table2, Eye, ZoomIn, ZoomOut, RotateCcw, Download, Loader2, Volume2, VolumeX, Square, Sparkles, GitCompare } from 'lucide-react'
 import { toast } from 'sonner'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils'
 import type { FileType } from '@/lib/fileTypeUtils'
 import { PromptyViewer } from './PromptyViewer'
+import { DiffViewer } from '@/components/git/DiffViewer'
 
 // File type icons
 const FILE_TYPE_ICONS: Record<FileType, typeof FileCode> = {
@@ -51,7 +52,8 @@ interface FileTabProps {
 }
 
 function FileTab({ file, isActive, onSelect, onClose, onPin }: FileTabProps) {
-  const Icon = FILE_TYPE_ICONS[file.fileType]
+  const isDiff = file.viewerType === 'diff'
+  const Icon = isDiff ? GitCompare : FILE_TYPE_ICONS[file.fileType]
 
   return (
     <div
@@ -69,8 +71,11 @@ function FileTab({ file, isActive, onSelect, onClose, onPin }: FileTabProps) {
       data-tabz-item="file-tab"
       data-tabz-file={file.path}
     >
-      <Icon className="h-3.5 w-3.5 flex-shrink-0" />
+      <Icon className={cn("h-3.5 w-3.5 flex-shrink-0", isDiff && "text-orange-400")} />
       <span className="max-w-[120px] truncate">{file.name}</span>
+      {isDiff && (
+        <span className="text-[9px] font-mono text-orange-400/80 flex-shrink-0">DIFF</span>
+      )}
       {file.pinned && (
         <Pin className="h-3 w-3 text-cyan-500 flex-shrink-0" />
       )}
@@ -546,54 +551,31 @@ interface TTSControlsProps {
 
 function TTSControls({ content, className }: TTSControlsProps) {
   const [isSpeaking, setIsSpeaking] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
 
   const handleSpeak = async () => {
-    if (isLoading) return
+    if (!content) return
 
     if (isSpeaking) {
-      // Stop speaking - we can't actually stop TTS mid-speech via API
-      // but we'll toggle the state to indicate user wants to stop
+      await fetch('/api/tts', { method: 'DELETE' }).catch(() => {})
       setIsSpeaking(false)
-      toast.info('TTS cannot be stopped mid-speech')
       return
     }
 
-    setIsLoading(true)
+    setIsSpeaking(true)
     try {
-      const response = await fetch('/api/tabz/speak', {
+      const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: content, priority: 'low' }),
+        body: JSON.stringify({ text: content.slice(0, 5000) }),
       })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        if (response.status === 503) {
-          toast.error(data.hint || data.error || 'TTS not available')
-        } else {
-          toast.error(data.error || 'Failed to read aloud')
-        }
-        return
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data.error || 'TTS failed')
       }
-
-      if (data.success) {
-        setIsSpeaking(true)
-        toast.success('Reading aloud...')
-        // Auto-reset speaking state after estimated duration
-        // Rough estimate: 150 words per minute, 5 chars per word
-        const wordCount = content.length / 5
-        const durationMs = (wordCount / 150) * 60 * 1000
-        setTimeout(() => setIsSpeaking(false), Math.min(durationMs, 60000))
-      } else {
-        toast.error(data.error || 'Failed to read aloud')
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to read aloud'
-      toast.error(message)
+    } catch {
+      toast.error('TTS failed')
     } finally {
-      setIsLoading(false)
+      setIsSpeaking(false)
     }
   }
 
@@ -606,12 +588,10 @@ function TTSControls({ content, className }: TTSControlsProps) {
             size="icon"
             className={cn('h-8 w-8', className)}
             onClick={handleSpeak}
-            disabled={isLoading || !content}
+            disabled={!content}
             data-tabz-action="read-aloud"
           >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : isSpeaking ? (
+            {isSpeaking ? (
               <VolumeX className="h-4 w-4 text-cyan-400" />
             ) : (
               <Volume2 className="h-4 w-4" />
@@ -619,7 +599,7 @@ function TTSControls({ content, className }: TTSControlsProps) {
           </Button>
         </TooltipTrigger>
         <TooltipContent>
-          {isLoading ? 'Starting...' : isSpeaking ? 'Speaking...' : 'Read Aloud'}
+          {isSpeaking ? 'Speaking...' : 'Read Aloud'}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -637,6 +617,16 @@ interface FileContentProps {
 }
 
 function FileContent({ file, fontSize, fontFamily }: FileContentProps) {
+  const { setOpenFiles } = useFilesContext()
+
+  // Diff mode toggle handler — persists preference to localStorage and updates file state
+  const handleDiffModeChange = useCallback((mode: 'split' | 'unified') => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('diff-viewer-mode', mode)
+    }
+    setOpenFiles(prev => prev.map(f => f.id === file.id ? { ...f, diffMode: mode } : f))
+  }, [file.id, setOpenFiles])
+
   if (file.loading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -655,6 +645,32 @@ function FileContent({ file, fontSize, fontFamily }: FileContentProps) {
           <X className="h-8 w-8" />
           <span className="text-sm">Error loading file: {file.error}</span>
         </div>
+      </div>
+    )
+  }
+
+  // Diff viewer
+  if (file.viewerType === 'diff' && file.diff) {
+    const ext = file.name.split('.').pop()?.toLowerCase() || ''
+    const langMap: Record<string, string> = {
+      js: 'javascript', jsx: 'jsx', ts: 'typescript', tsx: 'tsx',
+      py: 'python', rb: 'ruby', go: 'go', rs: 'rust', java: 'java',
+      cpp: 'cpp', c: 'c', cs: 'csharp', php: 'php', swift: 'swift',
+      css: 'css', scss: 'scss', html: 'html', xml: 'xml',
+      yaml: 'yaml', yml: 'yaml', json: 'json', md: 'markdown',
+      sh: 'bash', bash: 'bash', sql: 'sql', lua: 'lua', toml: 'toml',
+    }
+    const lang = langMap[ext] || undefined
+
+    return (
+      <div className="h-full" data-tabz-region="diff-viewer">
+        <DiffViewer
+          diff={file.diff}
+          mode={file.diffMode || 'split'}
+          onModeChange={handleDiffModeChange}
+          fileName={file.name}
+          language={lang}
+        />
       </div>
     )
   }

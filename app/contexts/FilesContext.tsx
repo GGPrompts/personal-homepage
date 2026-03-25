@@ -103,6 +103,9 @@ interface OpenFile {
   pinned: boolean
   lineCount?: number
   modified?: string
+  viewerType?: 'default' | 'diff'
+  diff?: string
+  diffMode?: 'split' | 'unified'
 }
 
 interface FilesContextType {
@@ -153,6 +156,7 @@ interface FilesContextType {
 
   // Actions
   openFile: (path: string, pin?: boolean) => Promise<void>
+  openDiffFile: (path: string, diff: string, pin?: boolean) => void
   closeFile: (id: string) => void
   pinFile: (id: string) => void
 
@@ -600,6 +604,50 @@ export function FilesProvider({ children }: { children: ReactNode }) {
     }
   }, [openFiles])
 
+  const openDiffFile = useCallback((path: string, diff: string, pin: boolean = false) => {
+    // Use a stable diff-specific id so re-selecting the same file reuses the tab
+    const diffId = `diff-${path}`
+
+    // Check if already open as a diff
+    const existing = openFiles.find(f => f.id === diffId)
+    if (existing) {
+      // Update the diff content (it may have changed) and activate
+      setOpenFiles(prev => prev.map(f => f.id === diffId ? { ...f, diff, loading: false } : f))
+      setActiveFileId(diffId)
+      return
+    }
+
+    const name = path.split('/').pop() || path
+    const { type: fileType } = getFileTypeAndLanguage(path)
+
+    // Read saved diff mode preference
+    const savedMode = typeof window !== 'undefined'
+      ? (localStorage.getItem('diff-viewer-mode') as 'split' | 'unified') || 'split'
+      : 'split'
+
+    const newFile: OpenFile = {
+      id: diffId,
+      path,
+      name,
+      content: null,
+      fileType,
+      loading: false,
+      pinned: pin,
+      viewerType: 'diff',
+      diff,
+      diffMode: savedMode,
+    }
+
+    // Find existing unpinned preview to replace
+    const existingPreview = openFiles.find(f => !f.pinned)
+    if (existingPreview && !pin) {
+      setOpenFiles(prev => prev.map(f => f.id === existingPreview.id ? newFile : f))
+    } else {
+      setOpenFiles(prev => [...prev, newFile])
+    }
+    setActiveFileId(diffId)
+  }, [openFiles])
+
   const pinFile = useCallback((id: string) => {
     setOpenFiles(prev => prev.map(f => f.id === id ? { ...f, pinned: true } : f))
   }, [])
@@ -688,6 +736,7 @@ export function FilesProvider({ children }: { children: ReactNode }) {
       updateAllPlugins,
       pruneCache,
       openFile,
+      openDiffFile,
       closeFile,
       pinFile,
       viewerSettings,

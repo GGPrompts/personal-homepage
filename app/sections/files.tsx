@@ -49,6 +49,7 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
     filteredFilesLoading,
     loadFilteredFiles,
     openFile,
+    openDiffFile,
     viewerSettings,
     setFontSize,
     setFontFamily,
@@ -102,17 +103,73 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
   const [gitViewMode, setGitViewMode] = useState<'file' | 'graph'>('file')
   const [selectedGitCommit, setSelectedGitCommit] = useState<string | null>(null)
 
-  // Handle Git file selection (from changed files list)
-  const handleGitFileSelect = useCallback((filePath: string) => {
-    openFile(filePath)
+  // Handle Git file selection (from changed files list) — fetch diff and open in DiffViewer
+  const handleGitFileSelect = useCallback(async (filePath: string) => {
     setGitViewMode('file')
-  }, [openFile])
+
+    // filePath arrives as an absolute path (resolved in GitTab.handleFileSelect)
+    // We need the relative path for the git diff API
+    const relativePath = filePath.startsWith(workingDir + '/')
+      ? filePath.slice(workingDir.length + 1)
+      : filePath
+
+    try {
+      const res = await fetch(
+        `/api/git/diff?${new URLSearchParams({
+          path: workingDir,
+          file: relativePath,
+        })}`
+      )
+      if (!res.ok) {
+        // Fallback: open as normal file if diff fails (e.g. untracked file)
+        openFile(filePath)
+        return
+      }
+      const data = await res.json()
+      if (data.diff) {
+        openDiffFile(filePath, data.diff)
+      } else {
+        // No diff content (new untracked file, etc.) — open normally
+        openFile(filePath)
+      }
+    } catch {
+      // Network error — fall back to normal file open
+      openFile(filePath)
+    }
+  }, [workingDir, openFile, openDiffFile])
 
   // Handle Git commit selection (from commit log)
   const handleGitCommitSelect = useCallback((sha: string) => {
     setSelectedGitCommit(sha)
-    setGitViewMode('graph')
   }, [])
+
+  // Handle commit file selection (from CommitDetail) — fetch commit-specific diff
+  const handleCommitFileSelect = useCallback(async (commitSha: string, filePath: string) => {
+    setGitViewMode('file')
+
+    try {
+      const res = await fetch(
+        `/api/git/diff?${new URLSearchParams({
+          path: workingDir,
+          commit: commitSha,
+          file: filePath,
+        })}`
+      )
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Failed to get diff' }))
+        console.error('Commit diff error:', err.error)
+        return
+      }
+      const data = await res.json()
+      if (data.diff) {
+        // Use a commit-prefixed path so it doesn't collide with working tree diffs
+        const displayPath = `${filePath} (${commitSha.substring(0, 7)})`
+        openDiffFile(displayPath, data.diff)
+      }
+    } catch (err) {
+      console.error('Failed to fetch commit diff:', err)
+    }
+  }, [workingDir, openDiffFile])
 
   // Handle show graph view
   const handleShowGraph = useCallback(() => {
@@ -266,6 +323,7 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
                   workingDir={workingDir}
                   onFileSelect={handleGitFileSelect}
                   onCommitSelect={handleGitCommitSelect}
+                  onCommitFileSelect={handleCommitFileSelect}
                   onShowGraph={handleShowGraph}
                   className="h-full"
                 />
