@@ -6,6 +6,8 @@ export interface FileViewerSettings {
   fontSize: number
   fontFamily: string
   maxDepth: number
+  treeFontSize: number
+  treeFontFamily: string
 }
 
 const STORAGE_KEY = "file-viewer-settings"
@@ -14,6 +16,8 @@ const DEFAULT_SETTINGS: FileViewerSettings = {
   fontSize: 16,
   fontFamily: "JetBrains Mono",
   maxDepth: 5,
+  treeFontSize: 13,
+  treeFontFamily: "system",
 }
 
 export function useFileViewerSettings() {
@@ -30,6 +34,8 @@ export function useFileViewerSettings() {
           fontSize: parsed.fontSize ?? DEFAULT_SETTINGS.fontSize,
           fontFamily: parsed.fontFamily ?? DEFAULT_SETTINGS.fontFamily,
           maxDepth: parsed.maxDepth ?? DEFAULT_SETTINGS.maxDepth,
+          treeFontSize: parsed.treeFontSize ?? DEFAULT_SETTINGS.treeFontSize,
+          treeFontFamily: parsed.treeFontFamily ?? DEFAULT_SETTINGS.treeFontFamily,
         })
       }
     } catch (error) {
@@ -61,11 +67,21 @@ export function useFileViewerSettings() {
     setSettings(prev => ({ ...prev, maxDepth }))
   }, [])
 
+  const setTreeFontSize = useCallback((treeFontSize: number) => {
+    setSettings(prev => ({ ...prev, treeFontSize }))
+  }, [])
+
+  const setTreeFontFamily = useCallback((treeFontFamily: string) => {
+    setSettings(prev => ({ ...prev, treeFontFamily }))
+  }, [])
+
   return {
     settings,
     loaded,
     setFontSize,
     setFontFamily,
     setMaxDepth,
+    setTreeFontSize,
+    setTreeFontFamily,
   }
 }

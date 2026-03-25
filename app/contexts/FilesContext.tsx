@@ -165,13 +165,15 @@ interface FilesContextType {
   setFontSize: (fontSize: number) => void
   setFontFamily: (fontFamily: string) => void
   setMaxDepth: (maxDepth: number) => void
+  setTreeFontSize: (treeFontSize: number) => void
+  setTreeFontFamily: (treeFontFamily: string) => void
 }
 
 const FilesContext = createContext<FilesContextType | null>(null)
 
 export function FilesProvider({ children }: { children: ReactNode }) {
   // File viewer settings
-  const { settings: viewerSettings, setFontSize, setFontFamily, setMaxDepth } = useFileViewerSettings()
+  const { settings: viewerSettings, setFontSize, setFontFamily, setMaxDepth, setTreeFontSize, setTreeFontFamily } = useFileViewerSettings()
 
   // File tree cache - persist path to localStorage for reload persistence
   const [fileTree, setFileTree] = useState<FileNode | null>(null)
@@ -743,6 +745,8 @@ export function FilesProvider({ children }: { children: ReactNode }) {
       setFontSize,
       setFontFamily,
       setMaxDepth,
+      setTreeFontSize,
+      setTreeFontFamily,
     }}>
       {children}
     </FilesContext.Provider>
