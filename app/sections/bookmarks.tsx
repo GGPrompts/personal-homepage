@@ -25,20 +25,15 @@ import {
   Terminal,
   Play,
   MessageSquare,
-  Palette,
   ClipboardPaste,
   Download,
   Upload,
-  FileJson,
   ArrowRightLeft,
   Replace,
   Monitor,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
 import {
   Dialog,
   DialogContent,
@@ -77,27 +72,13 @@ import { Github, User } from "lucide-react"
 import { toast } from "sonner"
 import { DesktopCanvas } from "@/components/bookmarks/desktop"
 import {
-  exportAsTabzProfiles,
-  exportAsTabzBookmarks,
-  parseTabzProfileExport,
-  parseTabzBookmarkExport,
-  importTabzProfiles,
-  importTabzBookmarks,
-  prepareProfilesForSpawn,
   downloadJson,
   readJsonFile,
-  generateFilename,
 } from "@/lib/tabz-import-export"
 
 // ============================================================================
 // TYPES
 // ============================================================================
-
-// Context action for terminal bookmarks
-interface TerminalContextAction {
-  label: string
-  command: string
-}
 
 interface BookmarkItem {
   id: string
@@ -111,12 +92,6 @@ interface BookmarkItem {
   type?: "link" | "terminal"
   command?: string
   workingDir?: string
-  // TabzChrome-specific fields
-  profile?: string           // TabzChrome terminal profile name
-  autoExecute?: boolean      // Run command immediately vs paste only (default true)
-  sendToChat?: boolean       // Queue in TabzChrome chat input instead
-  color?: string             // Terminal tab color
-  contextActions?: TerminalContextAction[]  // Additional context menu items
 }
 
 interface FolderItem {
@@ -221,7 +196,6 @@ export default function BookmarksSection({
     error: terminalError,
     defaultWorkDir,
     runCommand,
-    spawnWithOptions,
     pasteToTerminal,
     sendToChat,
   } = useTerminalExtension()
@@ -242,34 +216,14 @@ export default function BookmarksSection({
     }
   }, [runCommand])
 
-  // Handler for spawning terminal bookmarks (supports profile parameter)
+  // Handler for spawning terminal bookmarks
   const handleSpawnBookmark = React.useCallback(async (bookmark: BookmarkItem) => {
     console.log("[Bookmarks] Spawning bookmark:", bookmark)
-
-    // Profile bookmarks need spawnWithOptions to pass the profile parameter
-    if (bookmark.profile) {
-      const result = await spawnWithOptions({
-        name: bookmark.name,
-        command: bookmark.command,
-        workingDir: bookmark.workingDir,
-        profile: bookmark.profile,
-        color: bookmark.color,
-        autoExecute: bookmark.autoExecute !== false,
-      })
-      console.log("[Bookmarks] Spawn result:", result)
-      if (result.success) {
-        toast.success(`Spawned: ${bookmark.name}`)
-      } else {
-        toast.error(result.error || "Failed to spawn terminal")
-      }
-    } else {
-      // Non-profile bookmarks use runCommand
-      await handleLaunchTerminal(bookmark.command || "", {
-        workingDir: bookmark.workingDir,
-        name: bookmark.name,
-      })
-    }
-  }, [spawnWithOptions, handleLaunchTerminal])
+    await handleLaunchTerminal(bookmark.command || "", {
+      workingDir: bookmark.workingDir,
+      name: bookmark.name,
+    })
+  }, [handleLaunchTerminal])
 
   // GitHub config
   const [token, setToken] = React.useState<string | null>(null)
@@ -301,10 +255,9 @@ export default function BookmarksSection({
 
   // Import/Export state
   const [importDialogOpen, setImportDialogOpen] = React.useState(false)
-  const [importType, setImportType] = React.useState<"bookmarks" | "profiles">("bookmarks")
-  const [importMode, setImportMode] = React.useState<"merge" | "replace" | "spawn">("merge")
+  const [importMode, setImportMode] = React.useState<"merge" | "replace">("merge")
   const [importFile, setImportFile] = React.useState<File | null>(null)
-  const [importPreview, setImportPreview] = React.useState<{ profiles?: number; bookmarks?: number; folders?: number } | null>(null)
+  const [importPreview, setImportPreview] = React.useState<{ bookmarks?: number; folders?: number } | null>(null)
   const [isImporting, setIsImporting] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
@@ -317,12 +270,6 @@ export default function BookmarksSection({
   const [formType, setFormType] = React.useState<"link" | "terminal">("link")
   const [formCommand, setFormCommand] = React.useState("")
   const [formWorkingDir, setFormWorkingDir] = React.useState("")
-  // TabzChrome-specific form fields
-  const [formProfile, setFormProfile] = React.useState("")
-  const [formAutoExecute, setFormAutoExecute] = React.useState(true)
-  const [formSendToChat, setFormSendToChat] = React.useState(false)
-  const [formColor, setFormColor] = React.useState("")
-  const [formContextActions, setFormContextActions] = React.useState<TerminalContextAction[]>([])
 
   // Load token from auth, repo from localStorage
   React.useEffect(() => {
@@ -478,12 +425,6 @@ export default function BookmarksSection({
       type: formType,
       command: formType === "terminal" ? formCommand : undefined,
       workingDir: formType === "terminal" && formWorkingDir ? formWorkingDir : undefined,
-      // TabzChrome-specific fields
-      profile: formType === "terminal" && formProfile ? formProfile : undefined,
-      autoExecute: formType === "terminal" ? formAutoExecute : undefined,
-      sendToChat: formType === "terminal" && formSendToChat ? formSendToChat : undefined,
-      color: formType === "terminal" && formColor ? formColor : undefined,
-      contextActions: formType === "terminal" && formContextActions.length > 0 ? formContextActions : undefined,
     }
     const newData = { ...data, bookmarks: [...data.bookmarks, newBookmark] }
     saveMutation.mutate(newData)
@@ -518,12 +459,6 @@ export default function BookmarksSection({
             type: formType,
             command: formType === "terminal" ? formCommand : undefined,
             workingDir: formType === "terminal" && formWorkingDir ? formWorkingDir : undefined,
-            // TabzChrome-specific fields
-            profile: formType === "terminal" && formProfile ? formProfile : undefined,
-            autoExecute: formType === "terminal" ? formAutoExecute : undefined,
-            sendToChat: formType === "terminal" && formSendToChat ? formSendToChat : undefined,
-            color: formType === "terminal" && formColor ? formColor : undefined,
-            contextActions: formType === "terminal" && formContextActions.length > 0 ? formContextActions : undefined,
           }
         : b
     )
@@ -583,12 +518,6 @@ export default function BookmarksSection({
     setFormType("link")
     setFormCommand("")
     setFormWorkingDir("")
-    // Reset TabzChrome-specific fields
-    setFormProfile("")
-    setFormAutoExecute(true)
-    setFormSendToChat(false)
-    setFormColor("")
-    setFormContextActions([])
   }
 
   // ============================================================================
@@ -596,20 +525,15 @@ export default function BookmarksSection({
   // ============================================================================
 
   const handleExportBookmarks = () => {
-    const exportData = exportAsTabzBookmarks(data)
-    downloadJson(exportData, generateFilename("bookmarks"))
-    toast.success(`Exported ${data.bookmarks.length} bookmarks`)
-  }
-
-  const handleExportProfiles = () => {
-    const terminalCount = data.bookmarks.filter(b => b.type === "terminal").length
-    if (terminalCount === 0) {
-      toast.error("No terminal commands to export as profiles")
-      return
+    const exportData = {
+      bookmarks: data.bookmarks,
+      folders: data.folders,
+      exportedAt: new Date().toISOString(),
+      version: "1.0",
     }
-    const exportData = exportAsTabzProfiles(data)
-    downloadJson(exportData, generateFilename("profiles"))
-    toast.success(`Exported ${exportData.profiles.length} terminal profiles`)
+    const date = new Date().toISOString().split("T")[0]
+    downloadJson(exportData, `bookmarks-${date}.json`)
+    toast.success(`Exported ${data.bookmarks.length} bookmarks`)
   }
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -621,33 +545,15 @@ export default function BookmarksSection({
 
     try {
       const content = await readJsonFile(file)
+      const parsed = JSON.parse(content)
 
-      // Try to detect and parse the file type
-      if (importType === "profiles") {
-        const parsed = parseTabzProfileExport(content)
+      if (parsed.bookmarks && Array.isArray(parsed.bookmarks)) {
         setImportPreview({
-          profiles: parsed.profiles.length,
+          bookmarks: parsed.bookmarks.length,
+          folders: parsed.folders?.length || 0,
         })
       } else {
-        const parsed = parseTabzBookmarkExport(content)
-        // Count items recursively
-        let bookmarkCount = 0
-        let folderCount = 0
-        const countItems = (nodes: any[]) => {
-          nodes.forEach(node => {
-            if (node.children) {
-              folderCount++
-              countItems(node.children)
-            } else if (node.url) {
-              bookmarkCount++
-            }
-          })
-        }
-        countItems(parsed.bookmarks)
-        setImportPreview({
-          bookmarks: bookmarkCount,
-          folders: folderCount,
-        })
+        throw new Error("Invalid format")
       }
     } catch (err) {
       toast.error("Invalid file format")
@@ -661,63 +567,33 @@ export default function BookmarksSection({
     setIsImporting(true)
     try {
       const content = await readJsonFile(importFile)
+      const parsed = JSON.parse(content)
 
-      if (importType === "profiles") {
-        const parsed = parseTabzProfileExport(content)
-
-        // Spawn mode: spawn terminals directly instead of saving as bookmarks
-        if (importMode === "spawn") {
-          const profiles = prepareProfilesForSpawn(parsed)
-          let spawned = 0
-          let failed = 0
-
-          for (const profile of profiles) {
-            try {
-              const result = await spawnWithOptions({
-                name: profile.name,
-                command: profile.command,
-                workingDir: profile.workingDir,
-                profile: profile.profile,
-                color: profile.color,
-                autoExecute: true,
-              })
-              if (result.success) {
-                spawned++
-              } else {
-                failed++
-                console.error(`Failed to spawn ${profile.name}:`, result.error)
-              }
-              // Small delay between spawns to avoid overwhelming the backend
-              await new Promise(resolve => setTimeout(resolve, 300))
-            } catch (err) {
-              failed++
-              console.error(`Error spawning ${profile.name}:`, err)
-            }
-          }
-
-          if (failed > 0) {
-            toast.warning(`Spawned ${spawned} terminals, ${failed} failed`)
-          } else {
-            toast.success(`Spawned ${spawned} terminals`)
-          }
-
-          setImportDialogOpen(false)
-          resetImportState()
-          return
-        }
-
-        // Merge/Replace mode: save as bookmarks
-        const newData = importTabzProfiles(parsed, data, importMode as "merge" | "replace")
-        toast.success(`Imported ${parsed.profiles.length} profiles as terminal commands`)
-        saveMutation.mutate(newData)
-      } else {
-        const parsed = parseTabzBookmarkExport(content)
-        const newData = importTabzBookmarks(parsed, data, importMode as "merge" | "replace")
-        const addedCount = newData.bookmarks.length - (importMode === "merge" ? data.bookmarks.length : 0)
-        toast.success(`Imported bookmarks (${importMode === "merge" ? `added ${addedCount} new` : "replaced all"})`)
-        saveMutation.mutate(newData)
+      if (!parsed.bookmarks || !Array.isArray(parsed.bookmarks)) {
+        throw new Error("Invalid bookmarks file: missing bookmarks array")
       }
 
+      let newData: BookmarksData
+      if (importMode === "replace") {
+        newData = {
+          bookmarks: parsed.bookmarks,
+          folders: parsed.folders || [],
+        }
+        toast.success(`Replaced with ${parsed.bookmarks.length} bookmarks`)
+      } else {
+        // Merge mode: add new items, skip duplicates by ID
+        const existingIds = new Set(data.bookmarks.map((b: BookmarkItem) => b.id))
+        const existingFolderIds = new Set(data.folders.map((f: FolderItem) => f.id))
+        const newBookmarks = parsed.bookmarks.filter((b: BookmarkItem) => !existingIds.has(b.id))
+        const newFolders = (parsed.folders || []).filter((f: FolderItem) => !existingFolderIds.has(f.id))
+        newData = {
+          bookmarks: [...data.bookmarks, ...newBookmarks],
+          folders: [...data.folders, ...newFolders],
+        }
+        toast.success(`Added ${newBookmarks.length} new bookmarks`)
+      }
+
+      saveMutation.mutate(newData)
       setImportDialogOpen(false)
       resetImportState()
     } catch (err) {
@@ -736,8 +612,7 @@ export default function BookmarksSection({
     }
   }
 
-  const openImportDialog = (type: "bookmarks" | "profiles") => {
-    setImportType(type)
+  const openImportDialog = () => {
     resetImportState()
     setImportDialogOpen(true)
   }
@@ -753,12 +628,6 @@ export default function BookmarksSection({
     setFormType(bookmark.type || "link")
     setFormCommand(bookmark.command || "")
     setFormWorkingDir(bookmark.workingDir || "")
-    // TabzChrome-specific fields
-    setFormProfile(bookmark.profile || "")
-    setFormAutoExecute(bookmark.autoExecute !== false) // default true
-    setFormSendToChat(bookmark.sendToChat || false)
-    setFormColor(bookmark.color || "")
-    setFormContextActions(bookmark.contextActions || [])
   }
 
   const openEditFolder = (folder: FolderItem) => {
@@ -878,18 +747,10 @@ export default function BookmarksSection({
                 Export Bookmarks
                 <span className="ml-auto text-xs text-muted-foreground">.json</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportProfiles}>
-                <Terminal className="h-4 w-4 mr-2" />
-                Export as TabzChrome Profiles
-              </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => openImportDialog("bookmarks")}>
+              <DropdownMenuItem onClick={() => openImportDialog()}>
                 <Upload className="h-4 w-4 mr-2" />
                 Import Bookmarks
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => openImportDialog("profiles")}>
-                <FileJson className="h-4 w-4 mr-2" />
-                Import TabzChrome Profiles
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1043,51 +904,23 @@ export default function BookmarksSection({
                   {bookmark.type === "terminal" ? (
                     <button
                       data-terminal-command={bookmark.command}
-                      data-tabz-action={bookmark.sendToChat ? "send-chat" : bookmark.autoExecute === false ? "paste-terminal" : "spawn-terminal"}
-                      data-tabz-command={bookmark.command}
-                      data-tabz-project={bookmark.workingDir}
-                      data-tabz-profile={bookmark.profile}
-                      data-tabz-item={`bookmark-${bookmark.id}`}
                       className="group flex flex-col items-center p-3 rounded-lg hover:bg-primary/10 transition-colors relative"
                       onClick={(e) => {
                         e.stopPropagation()
-                        if (bookmark.sendToChat) {
-                          sendToChat(bookmark.command || "")
-                          toast.success("Sent to Claude session")
-                        } else {
-                          handleSpawnBookmark(bookmark)
-                        }
+                        handleSpawnBookmark(bookmark)
                       }}
                     >
-                      {/* Color indicator bar */}
-                      {bookmark.color && (
-                        <div
-                          className="absolute top-1 left-1/2 -translate-x-1/2 w-6 h-1 rounded-full"
-                          style={{ backgroundColor: bookmark.color }}
-                        />
-                      )}
                       <div className="h-12 w-12 flex items-center justify-center mb-1 rounded-lg bg-emerald-500/20 border border-emerald-500/30 relative">
                         {bookmark.icon ? (
                           <span className="text-2xl">{bookmark.icon}</span>
-                        ) : bookmark.sendToChat ? (
-                          <MessageSquare className="h-6 w-6 text-emerald-400" />
-                        ) : bookmark.autoExecute === false ? (
-                          <ClipboardPaste className="h-6 w-6 text-emerald-400" />
                         ) : (
                           <Terminal className="h-6 w-6 text-emerald-400" />
                         )}
                       </div>
                       <span className="text-xs text-center line-clamp-2">{bookmark.name}</span>
-                      {/* Profile badge or working dir */}
-                      {bookmark.profile ? (
-                        <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 mt-0.5 font-mono">
-                          {bookmark.profile}
-                        </Badge>
-                      ) : (
-                        <span className="text-[10px] text-muted-foreground truncate max-w-full mt-0.5 font-mono">
-                          {bookmark.workingDir || <span className="italic">{defaultWorkDir}</span>}
-                        </span>
-                      )}
+                      <span className="text-[10px] text-muted-foreground truncate max-w-full mt-0.5 font-mono">
+                        {bookmark.workingDir || <span className="italic">{defaultWorkDir}</span>}
+                      </span>
                     </button>
                   ) : (
                     <a
@@ -1124,8 +957,6 @@ export default function BookmarksSection({
                               const result = await pasteToTerminal(bookmark.command!, {
                                 workingDir: bookmark.workingDir,
                                 name: bookmark.name,
-                                profile: bookmark.profile,
-                                color: bookmark.color,
                               })
                               if (result.success) {
                                 toast.success(`Command pasted to terminal`)
@@ -1160,22 +991,6 @@ export default function BookmarksSection({
                         <Copy className="h-4 w-4 mr-2" />
                         Copy Command
                       </ContextMenuItem>
-                      {/* Custom context actions from bookmark */}
-                      {bookmark.contextActions && bookmark.contextActions.length > 0 && (
-                        <>
-                          <ContextMenuSeparator />
-                          {bookmark.contextActions.map((action, idx) => (
-                            <ContextMenuItem
-                              key={idx}
-                              onClick={() => handleLaunchTerminal(action.command, { workingDir: bookmark.workingDir, name: action.label })}
-                              disabled={!terminalAvailable}
-                            >
-                              <Terminal className="h-4 w-4 mr-2" />
-                              {action.label}
-                            </ContextMenuItem>
-                          ))}
-                        </>
-                      )}
                     </>
                   ) : (
                     <>
@@ -1267,54 +1082,26 @@ export default function BookmarksSection({
               >
                 {bookmark.type === "terminal" ? (
                   <button
-                    data-tabz-action={bookmark.sendToChat ? "send-chat" : bookmark.autoExecute === false ? "paste-terminal" : "spawn-terminal"}
-                    data-tabz-command={bookmark.command}
-                    data-tabz-project={bookmark.workingDir}
-                    data-tabz-profile={bookmark.profile}
-                    data-tabz-item={`bookmark-${bookmark.id}`}
                     className="flex items-center gap-3 flex-1 min-w-0 overflow-hidden text-left"
                     onClick={(e) => {
                       e.stopPropagation()
-                      if (bookmark.sendToChat) {
-                        sendToChat(bookmark.command || "")
-                        toast.success("Sent to Claude session")
-                      } else {
-                        handleSpawnBookmark(bookmark)
-                      }
+                      handleSpawnBookmark(bookmark)
                     }}
                   >
                     <div
                       className="h-8 w-8 flex items-center justify-center flex-shrink-0 rounded-md bg-emerald-500/20 border border-emerald-500/30"
-                      style={bookmark.color ? { borderColor: bookmark.color } : undefined}
                     >
                       {bookmark.icon ? (
                         <span className="text-lg">{bookmark.icon}</span>
-                      ) : bookmark.sendToChat ? (
-                        <MessageSquare className="h-5 w-5 text-emerald-400" />
-                      ) : bookmark.autoExecute === false ? (
-                        <ClipboardPaste className="h-5 w-5 text-emerald-400" />
                       ) : (
                         <Terminal className="h-5 w-5 text-emerald-400" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium truncate">{bookmark.name}</p>
-                        {bookmark.profile && (
-                          <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 font-mono shrink-0">
-                            {bookmark.profile}
-                          </Badge>
-                        )}
-                      </div>
+                      <p className="font-medium truncate">{bookmark.name}</p>
                       <p className="text-xs text-muted-foreground truncate font-mono">{bookmark.command || <span className="italic">no command</span>}</p>
                     </div>
-                    {bookmark.sendToChat ? (
-                      <MessageSquare className="h-4 w-4 text-emerald-400 flex-shrink-0" />
-                    ) : bookmark.autoExecute === false ? (
-                      <ClipboardPaste className="h-4 w-4 text-emerald-400 flex-shrink-0" />
-                    ) : (
-                      <Play className="h-4 w-4 text-emerald-400 flex-shrink-0" />
-                    )}
+                    <Play className="h-4 w-4 text-emerald-400 flex-shrink-0" />
                   </button>
                 ) : (
                   <a
@@ -1364,8 +1151,6 @@ export default function BookmarksSection({
                                 const result = await pasteToTerminal(bookmark.command!, {
                                   workingDir: bookmark.workingDir,
                                   name: bookmark.name,
-                                  profile: bookmark.profile,
-                                  color: bookmark.color,
                                 })
                                 if (result.success) {
                                   toast.success(`Command pasted to terminal`)
@@ -1400,22 +1185,6 @@ export default function BookmarksSection({
                           <Copy className="h-4 w-4 mr-2" />
                           Copy Command
                         </DropdownMenuItem>
-                        {/* Custom context actions from bookmark */}
-                        {bookmark.contextActions && bookmark.contextActions.length > 0 && (
-                          <>
-                            <DropdownMenuSeparator />
-                            {bookmark.contextActions.map((action, idx) => (
-                              <DropdownMenuItem
-                                key={idx}
-                                onClick={() => handleLaunchTerminal(action.command, { workingDir: bookmark.workingDir, name: action.label })}
-                                disabled={!terminalAvailable}
-                              >
-                                <Terminal className="h-4 w-4 mr-2" />
-                                {action.label}
-                              </DropdownMenuItem>
-                            ))}
-                          </>
-                        )}
                       </>
                     ) : (
                       <>
@@ -1473,8 +1242,6 @@ export default function BookmarksSection({
                               const result = await pasteToTerminal(bookmark.command!, {
                                 workingDir: bookmark.workingDir,
                                 name: bookmark.name,
-                                profile: bookmark.profile,
-                                color: bookmark.color,
                               })
                               if (result.success) {
                                 toast.success(`Command pasted to terminal`)
@@ -1577,7 +1344,7 @@ export default function BookmarksSection({
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                   disabled={!terminalAvailable}
-                  title={!terminalAvailable ? "TabzChrome extension required" : undefined}
+                  title={!terminalAvailable ? "Kitty terminal required" : undefined}
                 >
                   <Terminal className="h-4 w-4" />
                   Terminal
@@ -1628,102 +1395,6 @@ export default function BookmarksSection({
                   <p className="text-xs text-muted-foreground mt-1">
                     Leave blank to use page default: <code className="text-primary">{defaultWorkDir}</code>
                   </p>
-                </div>
-                {/* TabzChrome-specific options */}
-                <div className="border-t pt-4 mt-2">
-                  <p className="text-xs text-muted-foreground mb-3">TabzChrome Options</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium mb-1.5 block">Profile (optional)</label>
-                      <Input
-                        value={formProfile}
-                        onChange={(e) => setFormProfile(e.target.value)}
-                        placeholder="Default"
-                        className="font-mono text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium mb-1.5 block">Tab Color (optional)</label>
-                      <Input
-                        value={formColor}
-                        onChange={(e) => setFormColor(e.target.value)}
-                        placeholder="#10b981"
-                        className="font-mono text-sm"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-3 mt-4">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="autoExecute"
-                        checked={formAutoExecute}
-                        onCheckedChange={(checked) => setFormAutoExecute(checked === true)}
-                      />
-                      <Label htmlFor="autoExecute" className="text-sm cursor-pointer">
-                        Auto-execute command (run immediately)
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="sendToChat"
-                        checked={formSendToChat}
-                        onCheckedChange={(checked) => setFormSendToChat(checked === true)}
-                      />
-                      <Label htmlFor="sendToChat" className="text-sm cursor-pointer">
-                        Send to active Claude session
-                      </Label>
-                    </div>
-                  </div>
-                  {/* Context Actions */}
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium">Context Actions (optional)</label>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setFormContextActions([...formContextActions, { label: "", command: "" }])}
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        Add
-                      </Button>
-                    </div>
-                    {formContextActions.map((action, index) => (
-                      <div key={index} className="flex gap-2 mb-2">
-                        <Input
-                          value={action.label}
-                          onChange={(e) => {
-                            const updated = [...formContextActions]
-                            updated[index] = { ...updated[index], label: e.target.value }
-                            setFormContextActions(updated)
-                          }}
-                          placeholder="Label"
-                          className="text-sm flex-1"
-                        />
-                        <Input
-                          value={action.command}
-                          onChange={(e) => {
-                            const updated = [...formContextActions]
-                            updated[index] = { ...updated[index], command: e.target.value }
-                            setFormContextActions(updated)
-                          }}
-                          placeholder="Command"
-                          className="font-mono text-sm flex-1"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 shrink-0"
-                          onClick={() => {
-                            setFormContextActions(formContextActions.filter((_, i) => i !== index))
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               </>
             )}
@@ -1864,7 +1535,7 @@ export default function BookmarksSection({
                           : "text-muted-foreground hover:text-foreground"
                       }`}
                       disabled={!terminalAvailable}
-                      title={!terminalAvailable ? "TabzChrome extension required" : undefined}
+                      title={!terminalAvailable ? "Kitty terminal required" : undefined}
                     >
                       <Terminal className="h-4 w-4" />
                       Terminal
@@ -1900,102 +1571,6 @@ export default function BookmarksSection({
                       <p className="text-xs text-muted-foreground mt-1">
                         Leave blank to use page default: <code className="text-primary">{defaultWorkDir}</code>
                       </p>
-                    </div>
-                    {/* TabzChrome-specific options */}
-                    <div className="border-t pt-4 mt-2">
-                      <p className="text-xs text-muted-foreground mb-3">TabzChrome Options</p>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium mb-1.5 block">Profile (optional)</label>
-                          <Input
-                            value={formProfile}
-                            onChange={(e) => setFormProfile(e.target.value)}
-                            placeholder="Default"
-                            className="font-mono text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium mb-1.5 block">Tab Color (optional)</label>
-                          <Input
-                            value={formColor}
-                            onChange={(e) => setFormColor(e.target.value)}
-                            placeholder="#10b981"
-                            className="font-mono text-sm"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-3 mt-4">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id="editAutoExecute"
-                            checked={formAutoExecute}
-                            onCheckedChange={(checked) => setFormAutoExecute(checked === true)}
-                          />
-                          <Label htmlFor="editAutoExecute" className="text-sm cursor-pointer">
-                            Auto-execute command (run immediately)
-                          </Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id="editSendToChat"
-                            checked={formSendToChat}
-                            onCheckedChange={(checked) => setFormSendToChat(checked === true)}
-                          />
-                          <Label htmlFor="editSendToChat" className="text-sm cursor-pointer">
-                            Send to active Claude session
-                          </Label>
-                        </div>
-                      </div>
-                      {/* Context Actions */}
-                      <div className="mt-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="text-sm font-medium">Context Actions (optional)</label>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setFormContextActions([...formContextActions, { label: "", command: "" }])}
-                          >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Add
-                          </Button>
-                        </div>
-                        {formContextActions.map((action, index) => (
-                          <div key={index} className="flex gap-2 mb-2">
-                            <Input
-                              value={action.label}
-                              onChange={(e) => {
-                                const updated = [...formContextActions]
-                                updated[index] = { ...updated[index], label: e.target.value }
-                                setFormContextActions(updated)
-                              }}
-                              placeholder="Label"
-                              className="text-sm flex-1"
-                            />
-                            <Input
-                              value={action.command}
-                              onChange={(e) => {
-                                const updated = [...formContextActions]
-                                updated[index] = { ...updated[index], command: e.target.value }
-                                setFormContextActions(updated)
-                              }}
-                              placeholder="Command"
-                              className="font-mono text-sm flex-1"
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-9 w-9 shrink-0"
-                              onClick={() => {
-                                setFormContextActions(formContextActions.filter((_, i) => i !== index))
-                              }}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
                     </div>
                   </>
                 )}
@@ -2095,13 +1670,9 @@ export default function BookmarksSection({
       <Dialog open={importDialogOpen} onOpenChange={(open) => { if (!open) { setImportDialogOpen(false); resetImportState(); } }}>
         <DialogContent className="glass">
           <DialogHeader>
-            <DialogTitle>
-              Import {importType === "profiles" ? "TabzChrome Profiles" : "Bookmarks"}
-            </DialogTitle>
+            <DialogTitle>Import Bookmarks</DialogTitle>
             <DialogDescription>
-              {importType === "profiles"
-                ? "Import TabzChrome profile export as terminal commands"
-                : "Import bookmarks from a TabzChrome JSON export"}
+              Import bookmarks from a JSON export
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -2118,9 +1689,7 @@ export default function BookmarksSection({
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {importType === "profiles"
-                  ? "Expected: tabz-profiles-*.json"
-                  : "Expected: tabz-bookmarks-*.json or Chrome bookmark export"}
+                Expected: bookmarks-*.json
               </p>
             </div>
 
@@ -2129,12 +1698,6 @@ export default function BookmarksSection({
               <div className="rounded-lg border bg-muted/30 p-4">
                 <p className="text-sm font-medium mb-2">File Preview</p>
                 <div className="flex gap-4 text-sm">
-                  {importPreview.profiles !== undefined && (
-                    <div className="flex items-center gap-2">
-                      <Terminal className="h-4 w-4 text-emerald-400" />
-                      <span>{importPreview.profiles} profiles</span>
-                    </div>
-                  )}
                   {importPreview.bookmarks !== undefined && (
                     <div className="flex items-center gap-2">
                       <Bookmark className="h-4 w-4 text-blue-400" />
@@ -2155,23 +1718,6 @@ export default function BookmarksSection({
             <div>
               <label className="text-sm font-medium mb-2 block">Import Mode</label>
               <div className="flex gap-2 p-1 rounded-lg bg-muted/50">
-                {/* Spawn option - only for profiles */}
-                {importType === "profiles" && (
-                  <button
-                    type="button"
-                    onClick={() => setImportMode("spawn")}
-                    disabled={!terminalAvailable}
-                    title={!terminalAvailable ? "TabzChrome required to spawn terminals" : undefined}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all ${
-                      importMode === "spawn"
-                        ? "bg-emerald-500/20 shadow-sm text-emerald-400 border border-emerald-500/30"
-                        : "text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                    }`}
-                  >
-                    <Play className="h-4 w-4" />
-                    Spawn
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={() => setImportMode("merge")}
@@ -2198,13 +1744,9 @@ export default function BookmarksSection({
                 </button>
               </div>
               <p className="text-xs text-muted-foreground mt-1.5">
-                {importMode === "spawn"
-                  ? "Spawn terminals directly with full theme/metadata"
-                  : importMode === "merge"
-                    ? "Add new items, skip duplicates (by ID)"
-                    : importType === "profiles"
-                      ? "Replace all terminal bookmarks with imported profiles"
-                      : "Replace all bookmarks with imported data"}
+                {importMode === "merge"
+                  ? "Add new items, skip duplicates (by ID)"
+                  : "Replace all bookmarks with imported data"}
               </p>
             </div>
           </div>
@@ -2214,13 +1756,9 @@ export default function BookmarksSection({
             </Button>
             <Button
               onClick={handleImport}
-              disabled={!importFile || isImporting || saveMutation.isPending || (importMode === "spawn" && !terminalAvailable)}
+              disabled={!importFile || isImporting || saveMutation.isPending}
             >
-              {isImporting
-                ? (importMode === "spawn" ? "Spawning..." : "Importing...")
-                : importMode === "spawn"
-                  ? "Spawn Terminals"
-                  : `Import ${importType === "profiles" ? "Profiles" : "Bookmarks"}`}
+              {isImporting ? "Importing..." : "Import Bookmarks"}
             </Button>
           </DialogFooter>
         </DialogContent>

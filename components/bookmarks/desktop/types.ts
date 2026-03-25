@@ -4,11 +4,6 @@ import type { Node } from "@xyflow/react";
 // Core bookmark data types (mirrored from bookmarks.tsx to avoid coupling)
 // ---------------------------------------------------------------------------
 
-export interface TerminalContextAction {
-  label: string;
-  command: string;
-}
-
 export interface BookmarkItem {
   id: string;
   name: string;
@@ -20,11 +15,6 @@ export interface BookmarkItem {
   type?: "link" | "terminal";
   command?: string;
   workingDir?: string;
-  profile?: string;
-  autoExecute?: boolean;
-  sendToChat?: boolean;
-  color?: string;
-  contextActions?: TerminalContextAction[];
 }
 
 export interface FolderItem {
@@ -45,7 +35,7 @@ export interface BookmarksData {
 
 export interface TerminalActions {
   run: (command: string, options?: { workingDir?: string; name?: string }) => void;
-  paste: (command: string, options?: { workingDir?: string; name?: string; profile?: string; color?: string }) => void;
+  paste: (command: string, options?: { workingDir?: string; name?: string }) => void;
   sendToChat: (command: string) => void;
   spawn: (bookmark: BookmarkItem) => void;
   available: boolean;

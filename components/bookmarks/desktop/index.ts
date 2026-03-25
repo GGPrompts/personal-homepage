@@ -8,7 +8,6 @@ export type {
   FolderNode as FolderNodeType,
   DesktopNode,
   DesktopLayout,
-  TerminalContextAction,
 } from "./types";
 
 export { BookmarkNode } from "./BookmarkNode";

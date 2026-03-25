@@ -22,7 +22,6 @@ import {
   MessageSquare,
   Pencil,
   Play,
-  Terminal,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -317,8 +316,6 @@ function DesktopCanvasInner({
                     terminalActions?.paste(ctxBookmark.command!, {
                       workingDir: ctxBookmark.workingDir,
                       name: ctxBookmark.name,
-                      profile: ctxBookmark.profile,
-                      color: ctxBookmark.color,
                     });
                     closeMenu();
                   }}
@@ -345,26 +342,6 @@ function DesktopCanvasInner({
                 closeMenu();
               }}
             />
-            {ctxBookmark.contextActions && ctxBookmark.contextActions.length > 0 && (
-              <>
-                <div className="h-px bg-border/40 my-1" />
-                {ctxBookmark.contextActions.map((action, idx) => (
-                  <CtxButton
-                    key={idx}
-                    icon={Terminal}
-                    label={action.label}
-                    disabled={!terminalActions?.available}
-                    onClick={() => {
-                      terminalActions?.run(action.command, {
-                        workingDir: ctxBookmark.workingDir,
-                        name: action.label,
-                      });
-                      closeMenu();
-                    }}
-                  />
-                ))}
-              </>
-            )}
             <div className="h-px bg-border/40 my-1" />
             <CtxButton icon={Pencil} label="Edit" onClick={() => { onEditBookmark(ctxBookmark); closeMenu(); }} />
             <CtxButton icon={Trash2} label="Delete" destructive onClick={() => { onDeleteBookmark(ctxBookmark.id); closeMenu(); }} />

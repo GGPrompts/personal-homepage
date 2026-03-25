@@ -257,8 +257,6 @@ function FolderNodeComponent({
                         terminalActions?.paste(ctxMenu.bookmark.command!, {
                           workingDir: ctxMenu.bookmark.workingDir,
                           name: ctxMenu.bookmark.name,
-                          profile: ctxMenu.bookmark.profile,
-                          color: ctxMenu.bookmark.color,
                         });
                         closeCtxMenu();
                       }}
@@ -285,28 +283,6 @@ function FolderNodeComponent({
                     closeCtxMenu();
                   }}
                 />
-                {/* Custom context actions */}
-                {ctxMenu.bookmark.contextActions &&
-                  ctxMenu.bookmark.contextActions.length > 0 && (
-                    <>
-                      <div className="h-px bg-border/40 my-1" />
-                      {ctxMenu.bookmark.contextActions.map((action, idx) => (
-                        <CtxButton
-                          key={idx}
-                          icon={Terminal}
-                          label={action.label}
-                          disabled={!terminalActions?.available}
-                          onClick={() => {
-                            terminalActions?.run(action.command, {
-                              workingDir: ctxMenu.bookmark.workingDir,
-                              name: action.label,
-                            });
-                            closeCtxMenu();
-                          }}
-                        />
-                      ))}
-                    </>
-                  )}
               </>
             ) : (
               /* Web link bookmark */

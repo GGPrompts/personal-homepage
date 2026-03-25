@@ -2,7 +2,7 @@
 
 import React, { memo, useCallback, useState } from "react";
 import type { NodeProps, Node } from "@xyflow/react";
-import { Terminal, MessageSquare, ClipboardPaste, Globe } from "lucide-react";
+import { Terminal, Globe } from "lucide-react";
 import type { BookmarkNodeData } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -47,12 +47,6 @@ function FaviconWithFallback({
 // ---------------------------------------------------------------------------
 
 function TerminalIcon({ bookmark }: { bookmark: BookmarkNodeData["bookmark"] }) {
-  if (bookmark.sendToChat) {
-    return <MessageSquare className="h-6 w-6 text-emerald-400" />;
-  }
-  if (bookmark.autoExecute === false) {
-    return <ClipboardPaste className="h-6 w-6 text-emerald-400" />;
-  }
   return <Terminal className="h-6 w-6 text-emerald-400" />;
 }
 
