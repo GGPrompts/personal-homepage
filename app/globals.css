@@ -53,6 +53,13 @@
     /* Body gradient colors */
     --gradient-1: 16 185 129;           /* Emerald */
     --gradient-2: 6 182 212;            /* Cyan */
+
+    /* Diff viewer colors */
+    --diff-added-bg: rgba(34, 197, 94, 0.15);
+    --diff-deleted-bg: rgba(239, 68, 68, 0.15);
+    --diff-added-gutter: rgba(34, 197, 94, 0.3);
+    --diff-deleted-gutter: rgba(239, 68, 68, 0.3);
+    --diff-hunk-bg: rgba(59, 130, 246, 0.1);
   }
 
   /* ===== AMBER THEME ===== */
@@ -188,6 +195,13 @@
     /* Body gradient colors */
     --gradient-1: 250 251 252;          /* Off-white */
     --gradient-2: 243 244 246;          /* Light gray */
+
+    /* Diff viewer colors (lighter for light theme) */
+    --diff-added-bg: rgba(34, 197, 94, 0.12);
+    --diff-deleted-bg: rgba(239, 68, 68, 0.12);
+    --diff-added-gutter: rgba(34, 197, 94, 0.25);
+    --diff-deleted-gutter: rgba(239, 68, 68, 0.25);
+    --diff-hunk-bg: rgba(59, 130, 246, 0.08);
   }
 
   /* ===== OCEAN THEME ===== */
