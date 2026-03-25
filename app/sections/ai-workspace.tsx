@@ -23,6 +23,7 @@ interface SessionInfo {
   size: number
   mtime: number
   isSubagent: boolean
+  parentSessionId: string | null
   firstMessage: string | null
   contextPercent?: number | null
 }
@@ -66,6 +67,7 @@ export default function AIWorkspaceSection({
   const [showSidebar, setShowSidebar] = React.useState(true)
   const [spawningSession, setSpawningSession] = React.useState(false)
   const [collapsedGroups, setCollapsedGroups] = React.useState<Record<string, boolean>>({})
+  const [expandedSubagents, setExpandedSubagents] = React.useState<Set<string>>(new Set())
   const [expandedGroups, setExpandedGroups] = React.useState<Record<string, boolean>>({})
   const [viewMode, setViewMode] = React.useState<'projects' | 'recent'>(() => {
     if (typeof window !== 'undefined') {
@@ -181,14 +183,32 @@ export default function AIWorkspaceSection({
     localStorage.setItem('ai-workspace-view-mode', viewMode)
   }, [viewMode])
 
+  // Map from parent sessionId to its subagent sessions
+  const subagentMap = React.useMemo(() => {
+    const map: Record<string, SessionInfo[]> = {}
+    for (const session of sessions) {
+      if (session.isSubagent && session.parentSessionId) {
+        if (!map[session.parentSessionId]) map[session.parentSessionId] = []
+        map[session.parentSessionId].push(session)
+      }
+    }
+    // Sort subagents by mtime desc within each parent
+    for (const key of Object.keys(map)) {
+      map[key].sort((a, b) => b.mtime - a.mtime)
+    }
+    return map
+  }, [sessions])
+
   const grouped = React.useMemo<GroupedSessions>(() => {
     const groups: GroupedSessions = {}
     for (const session of sessions) {
+      // Skip subagents that have a known parent — they'll be nested
+      if (session.isSubagent && session.parentSessionId) continue
       const key = session.project || 'unknown'
       if (!groups[key]) groups[key] = []
       groups[key].push(session)
     }
-    // Sort each group: main sessions first (by mtime desc), then subagents (by mtime desc)
+    // Sort each group: main sessions first (by mtime desc), then orphan subagents (by mtime desc)
     for (const key of Object.keys(groups)) {
       const main = groups[key].filter(s => !s.isSubagent).sort((a, b) => b.mtime - a.mtime)
       const sub = groups[key].filter(s => s.isSubagent).sort((a, b) => b.mtime - a.mtime)
@@ -197,10 +217,18 @@ export default function AIWorkspaceSection({
     return groups
   }, [sessions])
 
-  const recentSessions = React.useMemo(
-    () => [...sessions].sort((a, b) => b.mtime - a.mtime),
-    [sessions]
-  )
+  const recentSessions = React.useMemo(() => {
+    // Only include top-level sessions (main + orphan subagents without a parent)
+    const topLevel = sessions.filter(s => !(s.isSubagent && s.parentSessionId))
+    // Sort by effective mtime: max(own mtime, max subagent mtime)
+    return topLevel.sort((a, b) => {
+      const aSubMax = (subagentMap[a.sessionId] || []).reduce((m, s) => Math.max(m, s.mtime), 0)
+      const bSubMax = (subagentMap[b.sessionId] || []).reduce((m, s) => Math.max(m, s.mtime), 0)
+      const aEffective = Math.max(a.mtime, aSubMax)
+      const bEffective = Math.max(b.mtime, bSubMax)
+      return bEffective - aEffective
+    })
+  }, [sessions, subagentMap])
 
   const selectedSession = React.useMemo(
     () => sessions.find(s => s.path === selectedPath) || null,
@@ -247,6 +275,18 @@ export default function AIWorkspaceSection({
     // Default: groups with >5 sessions start collapsed
     return sessionCount > 5
   }, [collapsedGroups, selectedProject])
+
+  const toggleSubagents = React.useCallback((parentId: string) => {
+    setExpandedSubagents(prev => {
+      const next = new Set(prev)
+      if (next.has(parentId)) {
+        next.delete(parentId)
+      } else {
+        next.add(parentId)
+      }
+      return next
+    })
+  }, [])
 
   const toggleShowAll = React.useCallback((project: string) => {
     setExpandedGroups(prev => ({
@@ -406,73 +446,120 @@ export default function AIWorkspaceSection({
                       {recentSessions.map((session) => {
                         const isSelected = session.path === selectedPath
                         const title = session.firstMessage || 'Untitled session'
+                        const childSubs = subagentMap[session.sessionId] || []
+                        const hasSubagents = childSubs.length > 0
+                        const isExpanded = expandedSubagents.has(session.sessionId)
                         return (
-                          <button
-                            key={session.path}
-                            onClick={() => setSelectedPath(session.path)}
-                            className={`w-full text-left pr-2 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 group min-w-0 overflow-hidden ${
-                              session.isSubagent ? 'pl-7' : 'px-3'
-                            } ${
-                              isSelected
-                                ? 'bg-primary/10 border border-primary/20 text-primary'
-                                : 'hover:bg-muted/30 text-muted-foreground'
-                            }`}
-                          >
-                            {session.isSubagent && (
-                              <Bot className="h-3 w-3 shrink-0 text-blue-400/70" />
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <span className="text-xs truncate leading-snug flex-1 min-w-0" title={session.firstMessage || session.sessionId}>
-                                  {title}
-                                </span>
-                                <Badge variant="secondary" className="text-[9px] h-4 px-1 shrink-0">
-                                  {session.project || 'unknown'}
-                                </Badge>
+                          <React.Fragment key={session.path}>
+                            <button
+                              onClick={() => setSelectedPath(session.path)}
+                              className={`w-full text-left pr-2 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 group min-w-0 overflow-hidden ${
+                                session.isSubagent ? 'pl-7' : 'px-3'
+                              } ${
+                                isSelected
+                                  ? 'bg-primary/10 border border-primary/20 text-primary'
+                                  : 'hover:bg-muted/30 text-muted-foreground'
+                              }`}
+                            >
+                              {session.isSubagent && (
+                                <Bot className="h-3 w-3 shrink-0 text-blue-400/70" />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="text-xs truncate leading-snug flex-1 min-w-0" title={session.firstMessage || session.sessionId}>
+                                    {title}
+                                  </span>
+                                  <Badge variant="secondary" className="text-[9px] h-4 px-1 shrink-0">
+                                    {session.project || 'unknown'}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-nowrap whitespace-nowrap text-[10px] text-muted-foreground/60 leading-none">
+                                  <Clock className="h-2.5 w-2.5 shrink-0" />
+                                  <span>{formatTimeAgo(session.mtime)}</span>
+                                  <span className="opacity-40">·</span>
+                                  <HardDrive className="h-2.5 w-2.5 shrink-0" />
+                                  <span>{formatBytes(session.size)}</span>
+                                  {!session.isSubagent && session.contextPercent != null && (
+                                    <>
+                                      <span className="opacity-40">·</span>
+                                      <span className={`font-mono ${
+                                        session.contextPercent >= 80
+                                          ? 'text-red-400'
+                                          : session.contextPercent >= 50
+                                            ? 'text-yellow-400'
+                                            : 'text-emerald-400'
+                                      }`}>
+                                        {session.contextPercent}%
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
                               </div>
-                              <div className="flex items-center gap-1.5 mt-0.5 flex-nowrap whitespace-nowrap text-[10px] text-muted-foreground/60 leading-none">
-                                <Clock className="h-2.5 w-2.5 shrink-0" />
-                                <span>{formatTimeAgo(session.mtime)}</span>
-                                <span className="opacity-40">·</span>
-                                <HardDrive className="h-2.5 w-2.5 shrink-0" />
-                                <span>{formatBytes(session.size)}</span>
-                                {!session.isSubagent && session.contextPercent != null && (
-                                  <>
-                                    <span className="opacity-40">·</span>
-                                    <span className={`font-mono ${
-                                      session.contextPercent >= 80
-                                        ? 'text-red-400'
-                                        : session.contextPercent >= 50
-                                          ? 'text-yellow-400'
-                                          : 'text-emerald-400'
-                                    }`}>
-                                      {session.contextPercent}%
-                                    </span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            {!session.isSubagent && (
-                              <div
-                                role="button"
-                                tabIndex={0}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleResumeInTerminal(session)
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' || e.key === ' ') {
+                              {!session.isSubagent && (
+                                <div
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={(e) => {
                                     e.stopPropagation()
                                     handleResumeInTerminal(session)
-                                  }
-                                }}
-                                title="Resume in terminal"
-                                className="shrink-0 p-0.5 rounded hover:bg-primary/20 transition-opacity opacity-0 group-hover:opacity-70 hover:!opacity-100 cursor-pointer"
-                              >
-                                <Terminal className="h-3 w-3" />
-                              </div>
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.stopPropagation()
+                                      handleResumeInTerminal(session)
+                                    }
+                                  }}
+                                  title="Resume in terminal"
+                                  className="shrink-0 p-0.5 rounded hover:bg-primary/20 transition-opacity opacity-0 group-hover:opacity-70 hover:!opacity-100 cursor-pointer"
+                                >
+                                  <Terminal className="h-3 w-3" />
+                                </div>
+                              )}
+                            </button>
+                            {hasSubagents && (
+                              <>
+                                <button
+                                  onClick={() => toggleSubagents(session.sessionId)}
+                                  className="w-full flex items-center gap-1.5 pl-5 pr-2 py-1 text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                                >
+                                  <ChevronRight className={`h-2.5 w-2.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                  <Bot className="h-2.5 w-2.5 text-blue-400/50" />
+                                  <span>{childSubs.length} subagent{childSubs.length !== 1 ? 's' : ''}</span>
+                                </button>
+                                {isExpanded && childSubs.map((sub) => {
+                                  const subSelected = sub.path === selectedPath
+                                  const subTitle = sub.firstMessage || 'Untitled session'
+                                  return (
+                                    <button
+                                      key={sub.path}
+                                      onClick={() => setSelectedPath(sub.path)}
+                                      className={`w-full text-left pr-2 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 group min-w-0 overflow-hidden pl-7 ${
+                                        subSelected
+                                          ? 'bg-primary/10 border border-primary/20 text-primary'
+                                          : 'hover:bg-muted/30 text-muted-foreground'
+                                      }`}
+                                    >
+                                      <Bot className="h-3 w-3 shrink-0 text-blue-400/70" />
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                          <span className="text-xs truncate leading-snug flex-1 min-w-0" title={sub.firstMessage || sub.sessionId}>
+                                            {subTitle}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 mt-0.5 flex-nowrap whitespace-nowrap text-[10px] text-muted-foreground/60 leading-none">
+                                          <Clock className="h-2.5 w-2.5 shrink-0" />
+                                          <span>{formatTimeAgo(sub.mtime)}</span>
+                                          <span className="opacity-40">·</span>
+                                          <HardDrive className="h-2.5 w-2.5 shrink-0" />
+                                          <span>{formatBytes(sub.size)}</span>
+                                        </div>
+                                      </div>
+                                    </button>
+                                  )
+                                })}
+                              </>
                             )}
-                          </button>
+                          </React.Fragment>
                         )
                       })}
                     </div>
@@ -488,7 +575,8 @@ export default function AIWorkspaceSection({
                 ) : (
                   Object.entries(grouped).map(([project, projectSessions]) => {
                     const mainCount = projectSessions.filter(s => !s.isSubagent).length
-                    const subCount = projectSessions.length - mainCount
+                    // Count all subagents in this project (including nested ones)
+                    const totalSubCount = sessions.filter(s => s.isSubagent && (s.project || 'unknown') === project).length
                     const collapsed = isGroupCollapsed(project, projectSessions.length)
                     const showAll = expandedGroups[project] || false
                     const SESSION_LIMIT = 5
@@ -502,8 +590,6 @@ export default function AIWorkspaceSection({
                       <div key={project}>
                         <button
                           onClick={() => {
-                            // If currently collapsed, expand it; if expanded, collapse it
-                            // But for groups with selected session, toggling sets explicit state
                             setCollapsedGroups(prev => ({
                               ...prev,
                               [project]: !collapsed,
@@ -519,7 +605,7 @@ export default function AIWorkspaceSection({
                             {project}
                           </span>
                           <Badge variant="secondary" className="ml-auto text-[10px] h-4 px-1">
-                            {mainCount}{subCount > 0 && <span className="text-blue-400/70">+{subCount}</span>}
+                            {mainCount}{totalSubCount > 0 && <span className="text-blue-400/70">+{totalSubCount}</span>}
                           </Badge>
                         </button>
                         {!collapsed && (
@@ -527,68 +613,113 @@ export default function AIWorkspaceSection({
                             {visibleSessions.map((session) => {
                               const isSelected = session.path === selectedPath
                               const title = session.firstMessage || 'Untitled session'
+                              const childSubs = subagentMap[session.sessionId] || []
+                              const hasSubagents = !session.isSubagent && childSubs.length > 0
+                              const isSubExpanded = expandedSubagents.has(session.sessionId)
                               return (
-                                <button
-                                  key={session.path}
-                                  onClick={() => setSelectedPath(session.path)}
-                                  className={`w-full text-left pr-2 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 group min-w-0 overflow-hidden ${
-                                    session.isSubagent ? 'pl-7' : 'px-3'
-                                  } ${
-                                    isSelected
-                                      ? 'bg-primary/10 border border-primary/20 text-primary'
-                                      : 'hover:bg-muted/30 text-muted-foreground'
-                                  }`}
-                                >
-                                  {session.isSubagent && (
-                                    <Bot className="h-3 w-3 shrink-0 text-blue-400/70" />
-                                  )}
-                                  <div className="flex-1 min-w-0">
-                                    <div className="text-xs truncate leading-snug" title={session.firstMessage || session.sessionId}>
-                                      {title}
+                                <React.Fragment key={session.path}>
+                                  <button
+                                    onClick={() => setSelectedPath(session.path)}
+                                    className={`w-full text-left pr-2 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 group min-w-0 overflow-hidden ${
+                                      session.isSubagent ? 'pl-7' : 'px-3'
+                                    } ${
+                                      isSelected
+                                        ? 'bg-primary/10 border border-primary/20 text-primary'
+                                        : 'hover:bg-muted/30 text-muted-foreground'
+                                    }`}
+                                  >
+                                    {session.isSubagent && (
+                                      <Bot className="h-3 w-3 shrink-0 text-blue-400/70" />
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-xs truncate leading-snug" title={session.firstMessage || session.sessionId}>
+                                        {title}
+                                      </div>
+                                      <div className="flex items-center gap-1.5 mt-0.5 flex-nowrap whitespace-nowrap text-[10px] text-muted-foreground/60 leading-none">
+                                        <Clock className="h-2.5 w-2.5 shrink-0" />
+                                        <span>{formatTimeAgo(session.mtime)}</span>
+                                        <span className="opacity-40">·</span>
+                                        <HardDrive className="h-2.5 w-2.5 shrink-0" />
+                                        <span>{formatBytes(session.size)}</span>
+                                        {!session.isSubagent && session.contextPercent != null && (
+                                          <>
+                                            <span className="opacity-40">·</span>
+                                            <span className={`font-mono ${
+                                              session.contextPercent >= 80
+                                                ? 'text-red-400'
+                                                : session.contextPercent >= 50
+                                                  ? 'text-yellow-400'
+                                                  : 'text-emerald-400'
+                                            }`}>
+                                              {session.contextPercent}%
+                                            </span>
+                                          </>
+                                        )}
+                                      </div>
                                     </div>
-                                    <div className="flex items-center gap-1.5 mt-0.5 flex-nowrap whitespace-nowrap text-[10px] text-muted-foreground/60 leading-none">
-                                      <Clock className="h-2.5 w-2.5 shrink-0" />
-                                      <span>{formatTimeAgo(session.mtime)}</span>
-                                      <span className="opacity-40">·</span>
-                                      <HardDrive className="h-2.5 w-2.5 shrink-0" />
-                                      <span>{formatBytes(session.size)}</span>
-                                      {!session.isSubagent && session.contextPercent != null && (
-                                        <>
-                                          <span className="opacity-40">·</span>
-                                          <span className={`font-mono ${
-                                            session.contextPercent >= 80
-                                              ? 'text-red-400'
-                                              : session.contextPercent >= 50
-                                                ? 'text-yellow-400'
-                                                : 'text-emerald-400'
-                                          }`}>
-                                            {session.contextPercent}%
-                                          </span>
-                                        </>
-                                      )}
-                                    </div>
-                                  </div>
-                                  {!session.isSubagent && (
-                                    <div
-                                      role="button"
-                                      tabIndex={0}
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleResumeInTerminal(session)
-                                      }}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
+                                    {!session.isSubagent && (
+                                      <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={(e) => {
                                           e.stopPropagation()
                                           handleResumeInTerminal(session)
-                                        }
-                                      }}
-                                      title="Resume in terminal"
-                                      className="shrink-0 p-0.5 rounded hover:bg-primary/20 transition-opacity opacity-0 group-hover:opacity-70 hover:!opacity-100 cursor-pointer"
-                                    >
-                                      <Terminal className="h-3 w-3" />
-                                    </div>
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter' || e.key === ' ') {
+                                            e.stopPropagation()
+                                            handleResumeInTerminal(session)
+                                          }
+                                        }}
+                                        title="Resume in terminal"
+                                        className="shrink-0 p-0.5 rounded hover:bg-primary/20 transition-opacity opacity-0 group-hover:opacity-70 hover:!opacity-100 cursor-pointer"
+                                      >
+                                        <Terminal className="h-3 w-3" />
+                                      </div>
+                                    )}
+                                  </button>
+                                  {hasSubagents && (
+                                    <>
+                                      <button
+                                        onClick={() => toggleSubagents(session.sessionId)}
+                                        className="w-full flex items-center gap-1.5 pl-5 pr-2 py-1 text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                                      >
+                                        <ChevronRight className={`h-2.5 w-2.5 transition-transform ${isSubExpanded ? 'rotate-90' : ''}`} />
+                                        <Bot className="h-2.5 w-2.5 text-blue-400/50" />
+                                        <span>{childSubs.length} subagent{childSubs.length !== 1 ? 's' : ''}</span>
+                                      </button>
+                                      {isSubExpanded && childSubs.map((sub) => {
+                                        const subSelected = sub.path === selectedPath
+                                        const subTitle = sub.firstMessage || 'Untitled session'
+                                        return (
+                                          <button
+                                            key={sub.path}
+                                            onClick={() => setSelectedPath(sub.path)}
+                                            className={`w-full text-left pr-2 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 group min-w-0 overflow-hidden pl-7 ${
+                                              subSelected
+                                                ? 'bg-primary/10 border border-primary/20 text-primary'
+                                                : 'hover:bg-muted/30 text-muted-foreground'
+                                            }`}
+                                          >
+                                            <Bot className="h-3 w-3 shrink-0 text-blue-400/70" />
+                                            <div className="flex-1 min-w-0">
+                                              <div className="text-xs truncate leading-snug" title={sub.firstMessage || sub.sessionId}>
+                                                {subTitle}
+                                              </div>
+                                              <div className="flex items-center gap-1.5 mt-0.5 flex-nowrap whitespace-nowrap text-[10px] text-muted-foreground/60 leading-none">
+                                                <Clock className="h-2.5 w-2.5 shrink-0" />
+                                                <span>{formatTimeAgo(sub.mtime)}</span>
+                                                <span className="opacity-40">·</span>
+                                                <HardDrive className="h-2.5 w-2.5 shrink-0" />
+                                                <span>{formatBytes(sub.size)}</span>
+                                              </div>
+                                            </div>
+                                          </button>
+                                        )
+                                      })}
+                                    </>
                                   )}
-                                </button>
+                                </React.Fragment>
                               )
                             })}
                             {hasMore && !showAll && (

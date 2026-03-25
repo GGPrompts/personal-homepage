@@ -18,6 +18,7 @@ interface SessionInfo {
   size: number
   mtime: number
   isSubagent: boolean
+  parentSessionId: string | null
   firstMessage: string | null
 }
 
@@ -39,6 +40,15 @@ function walkJsonl(dir: string, results: SessionInfo[], projectSlug: string): vo
             || projectSlug
 
           const isSubagent = fullPath.includes('/subagents/')
+
+          let parentSessionId: string | null = null
+          if (isSubagent) {
+            const parts = fullPath.split('/')
+            const subagentsIdx = parts.lastIndexOf('subagents')
+            if (subagentsIdx > 0) {
+              parentSessionId = parts[subagentsIdx - 1]
+            }
+          }
 
           let firstMessage: string | null = null
           try {
@@ -70,6 +80,7 @@ function walkJsonl(dir: string, results: SessionInfo[], projectSlug: string): vo
             size: stat.size,
             mtime: Math.floor(stat.mtimeMs),
             isSubagent,
+            parentSessionId,
             firstMessage,
           })
         } catch {
