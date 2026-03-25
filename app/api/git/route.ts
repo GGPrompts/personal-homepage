@@ -256,9 +256,8 @@ export async function POST(request: NextRequest) {
     if (!gitRootPost) {
       return NextResponse.json({ error: "Not a git repository" }, { status: 400 })
     }
-    path = gitRootPost
 
-    const execOpts = { cwd: path, encoding: "utf-8" as const, timeout: 60000 }
+    const execOpts = { cwd: gitRootPost, encoding: "utf-8" as const, timeout: 60000 }
     let output = ""
 
     switch (action) {
