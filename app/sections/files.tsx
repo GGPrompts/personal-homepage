@@ -54,6 +54,8 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
     setFontSize,
     setFontFamily,
     setMaxDepth,
+    setTreeFontSize,
+    setTreeFontFamily,
   } = useFilesContext()
   const [showSettingsDropdown, setShowSettingsDropdown] = useState(false)
   const settingsRef = useRef<HTMLDivElement>(null)
@@ -365,8 +367,11 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
                   </button>
 
                   {showSettingsDropdown && (
-                    <div className="absolute top-full right-0 mt-1 w-64 bg-popover/95 backdrop-blur-sm border border-border rounded-lg shadow-xl z-50 p-4 space-y-4">
-                      {/* Font Size */}
+                    <div className="absolute top-full right-0 mt-1 w-64 bg-popover/95 backdrop-blur-sm border border-border rounded-lg shadow-xl z-50 p-4 space-y-3">
+                      {/* Viewer section header */}
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">Viewer</p>
+
+                      {/* Viewer Font Size */}
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <label className="text-sm font-medium">Font Size</label>
@@ -383,7 +388,7 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
                         />
                       </div>
 
-                      {/* Font Family */}
+                      {/* Viewer Font Family */}
                       <div>
                         <label className="text-sm font-medium block mb-2">Font</label>
                         <select
@@ -399,24 +404,63 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
                         </select>
                       </div>
 
-                      {/* File Tree Depth */}
+                      {/* Sidebar section header */}
                       <div className="pt-3 border-t border-border">
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="text-sm font-medium">Tree Depth</label>
-                          <span className="text-sm text-muted-foreground">{viewerSettings.maxDepth} levels</span>
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-3">Sidebar</p>
+
+                        {/* Tree Font Size */}
+                        <div className="mb-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="text-sm font-medium">Font Size</label>
+                            <span className="text-sm text-muted-foreground">{viewerSettings.treeFontSize}px</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="11"
+                            max="18"
+                            step="1"
+                            value={viewerSettings.treeFontSize}
+                            onChange={(e) => setTreeFontSize(parseInt(e.target.value))}
+                            className="w-full accent-primary"
+                          />
                         </div>
-                        <input
-                          type="range"
-                          min="1"
-                          max="10"
-                          step="1"
-                          value={viewerSettings.maxDepth}
-                          onChange={(e) => setMaxDepth(parseInt(e.target.value))}
-                          className="w-full accent-primary"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Lower values load faster
-                        </p>
+
+                        {/* Tree Font Family */}
+                        <div className="mb-3">
+                          <label className="text-sm font-medium block mb-2">Font</label>
+                          <select
+                            value={viewerSettings.treeFontFamily}
+                            onChange={(e) => setTreeFontFamily(e.target.value)}
+                            className="w-full px-3 py-1.5 bg-background text-foreground border border-border rounded-lg text-sm [&>option]:bg-background [&>option]:text-foreground"
+                            style={{ fontFamily: viewerSettings.treeFontFamily === 'system' ? 'system-ui, sans-serif' : viewerSettings.treeFontFamily }}
+                          >
+                            <option value="system">System</option>
+                            <option value="JetBrains Mono">JetBrains Mono</option>
+                            <option value="Fira Code">Fira Code</option>
+                            <option value="Cascadia Code">Cascadia Code</option>
+                            <option value="monospace">Monospace</option>
+                          </select>
+                        </div>
+
+                        {/* File Tree Depth */}
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="text-sm font-medium">Tree Depth</label>
+                            <span className="text-sm text-muted-foreground">{viewerSettings.maxDepth} levels</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="1"
+                            max="10"
+                            step="1"
+                            value={viewerSettings.maxDepth}
+                            onChange={(e) => setMaxDepth(parseInt(e.target.value))}
+                            className="w-full accent-primary"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Lower values load faster
+                          </p>
+                        </div>
                       </div>
                     </div>
                   )}
