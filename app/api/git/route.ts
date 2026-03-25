@@ -11,9 +11,16 @@ export const dynamic = "force-dynamic"
 
 const PROJECTS_DIR = join(homedir(), "projects")
 
+// Expand ~ to home directory
+function expandHome(p: string): string {
+  if (p.startsWith("~/")) return join(homedir(), p.slice(2))
+  if (p === "~") return homedir()
+  return p
+}
+
 // Validate path is within allowed directories
 function validatePath(path: string): boolean {
-  const resolved = join(path)
+  const resolved = join(expandHome(path))
   return resolved.startsWith(PROJECTS_DIR) || resolved.startsWith(homedir())
 }
 
@@ -200,11 +207,13 @@ async function getDetailedGitStatus(projectPath: string): Promise<GitStatus> {
 
 // GET - Get git status
 export async function GET(request: NextRequest) {
-  const path = request.nextUrl.searchParams.get("path")
+  const rawPath = request.nextUrl.searchParams.get("path")
 
-  if (!path) {
+  if (!rawPath) {
     return NextResponse.json({ error: "Path is required" }, { status: 400 })
   }
+
+  const path = expandHome(rawPath)
 
   if (!validatePath(path)) {
     return NextResponse.json({ error: "Invalid path" }, { status: 403 })
@@ -233,16 +242,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { path, action, files, message } = body as {
+    const { path: rawPostPath, action, files, message } = body as {
       path: string
       action: "fetch" | "pull" | "push" | "sync" | "stage" | "unstage" | "commit" | "discard"
       files?: string[]
       message?: string
     }
 
-    if (!path || !action) {
+    if (!rawPostPath || !action) {
       return NextResponse.json({ error: "Path and action are required" }, { status: 400 })
     }
+
+    const path = expandHome(rawPostPath)
 
     if (!validatePath(path)) {
       return NextResponse.json({ error: "Invalid path" }, { status: 403 })

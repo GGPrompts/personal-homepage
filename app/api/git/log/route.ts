@@ -9,9 +9,16 @@ export const dynamic = "force-dynamic"
 
 const PROJECTS_DIR = join(homedir(), "projects")
 
-// Validate path is within allowed directories (same as /api/git/route.ts)
+// Expand ~ to home directory
+function expandHome(p: string): string {
+  if (p.startsWith("~/")) return join(homedir(), p.slice(2))
+  if (p === "~") return homedir()
+  return p
+}
+
+// Validate path is within allowed directories
 function validatePath(path: string): boolean {
-  const resolved = join(path)
+  const resolved = join(expandHome(path))
   return resolved.startsWith(PROJECTS_DIR) || resolved.startsWith(homedir())
 }
 
@@ -110,15 +117,17 @@ function parseLogLine(line: string): Commit | null {
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
-  let path = params.get("path")
+  const rawPath = params.get("path")
   const limit = Math.min(Math.max(parseInt(params.get("limit") || "50", 10) || 50, 1), 500)
   const skip = Math.max(parseInt(params.get("skip") || "0", 10) || 0, 0)
   const branch = params.get("branch")
   const file = params.get("file")
 
-  if (!path) {
+  if (!rawPath) {
     return NextResponse.json({ error: "Path is required" }, { status: 400 })
   }
+
+  let path = expandHome(rawPath)
 
   if (!validatePath(path)) {
     return NextResponse.json({ error: "Invalid path" }, { status: 403 })

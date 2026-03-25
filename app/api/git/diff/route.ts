@@ -8,9 +8,16 @@ export const dynamic = "force-dynamic"
 
 const PROJECTS_DIR = join(homedir(), "projects")
 
+// Expand ~ to home directory
+function expandHome(p: string): string {
+  if (p.startsWith("~/")) return join(homedir(), p.slice(2))
+  if (p === "~") return homedir()
+  return p
+}
+
 // Validate path is within allowed directories
 function validatePath(path: string): boolean {
-  const resolved = join(path)
+  const resolved = join(expandHome(path))
   return resolved.startsWith(PROJECTS_DIR) || resolved.startsWith(homedir())
 }
 
@@ -142,16 +149,18 @@ function parseNumstat(
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
-  let path = params.get("path")
+  const rawPath = params.get("path")
   const file = params.get("file")
   const commit = params.get("commit")
   const from = params.get("from")
   const to = params.get("to")
   const staged = params.get("staged")
 
-  if (!path) {
+  if (!rawPath) {
     return NextResponse.json({ error: "Path is required" }, { status: 400 })
   }
+
+  let path = expandHome(rawPath)
 
   if (!validatePath(path)) {
     return NextResponse.json({ error: "Invalid path" }, { status: 403 })
