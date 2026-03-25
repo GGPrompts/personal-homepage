@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
     const cmd = [
       "git log",
       branchArg,
-      `--format=%H|%P|%an|%ae|%aI|%s|%D`,
+      `--format='%H|%P|%an|%ae|%aI|%s|%D'`,
       `--max-count=${fetchLimit}`,
       skipArg,
       fileArg,
@@ -205,7 +205,7 @@ export async function GET(request: NextRequest) {
     // Get branch list with current branch marker
     let branches: { name: string; current: boolean }[] = []
     try {
-      const branchOutput = execSync("git branch --format=%(refname:short)|%(HEAD)", {
+      const branchOutput = execSync("git branch --format='%(refname:short)|%(HEAD)'", {
         cwd: path,
         encoding: "utf-8",
         timeout: 5000,
