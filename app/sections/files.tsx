@@ -5,6 +5,7 @@ import {
   Plug,
   HardDrive,
   Github,
+  GitBranch,
   PanelRightClose,
   PanelRightOpen,
   FileText,
@@ -21,6 +22,8 @@ import { PluginList } from '@/app/components/files/PluginList'
 import { FilteredFileList } from '@/app/components/files/FilteredFileList'
 import { GitHubFileTree } from '@/app/components/files/GitHubFileTree'
 import { GitHubFileViewer } from '@/app/components/files/GitHubFileViewer'
+import { GitTab } from '@/components/git/GitTab'
+import { GitGraph } from '@/components/git/GitGraph'
 import { useWorkingDirectory } from '@/hooks/useWorkingDirectory'
 import { useAuth } from '@/components/AuthProvider'
 import { cn } from '@/lib/utils'
@@ -33,7 +36,7 @@ interface FilesSectionProps {
   onInitialPathConsumed?: () => void
 }
 
-type FileSource = 'local' | 'github'
+type FileSource = 'local' | 'github' | 'git'
 
 function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onInitialPathConsumed }: FilesSectionProps) {
   const { workingDir } = useWorkingDirectory()
@@ -94,6 +97,27 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
     sha: string
     name: string
   } | null>(null)
+
+  // Git tab state
+  const [gitViewMode, setGitViewMode] = useState<'file' | 'graph'>('file')
+  const [selectedGitCommit, setSelectedGitCommit] = useState<string | null>(null)
+
+  // Handle Git file selection (from changed files list)
+  const handleGitFileSelect = useCallback((filePath: string) => {
+    openFile(filePath)
+    setGitViewMode('file')
+  }, [openFile])
+
+  // Handle Git commit selection (from commit log)
+  const handleGitCommitSelect = useCallback((sha: string) => {
+    setSelectedGitCommit(sha)
+    setGitViewMode('graph')
+  }, [])
+
+  // Handle show graph view
+  const handleShowGraph = useCallback(() => {
+    setGitViewMode('graph')
+  }, [])
 
   // Load token on mount
   React.useEffect(() => {
@@ -181,6 +205,14 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
                   <Github className="h-3 w-3" />
                   GitHub
                 </TabsTrigger>
+                <TabsTrigger
+                  value="git"
+                  className="flex-1 h-7 text-xs gap-1 data-[state=active]:bg-primary/20"
+                  data-tabz-action="source-git"
+                >
+                  <GitBranch className="h-3 w-3" />
+                  Git
+                </TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
@@ -228,6 +260,20 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
                   onRefresh={handleRefreshFiltered}
                 />
               )
+            ) : fileSource === 'git' ? (
+              workingDir ? (
+                <GitTab
+                  workingDir={workingDir}
+                  onFileSelect={handleGitFileSelect}
+                  onCommitSelect={handleGitCommitSelect}
+                  onShowGraph={handleShowGraph}
+                  className="h-full"
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground text-xs px-4 text-center">
+                  Set a working directory to view git status
+                </div>
+              )
             ) : (
               <GitHubFileTree
                 className="h-full"
@@ -244,11 +290,11 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
           {/* Header with settings and plugins toggle */}
           <div className="px-4 py-2 border-b border-border/50 bg-background/30 flex-shrink-0 flex items-center justify-between">
             <span className="text-sm font-medium text-muted-foreground">
-              {fileSource === 'local' ? 'File Viewer' : 'GitHub Viewer'}
+              {fileSource === 'local' ? 'File Viewer' : fileSource === 'git' ? 'Git Viewer' : 'GitHub Viewer'}
             </span>
             <div className="flex items-center gap-2">
               {/* Settings Dropdown */}
-              {fileSource === 'local' && (
+              {(fileSource === 'local' || fileSource === 'git') && (
                 <div className="relative" ref={settingsRef}>
                   <button
                     onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
@@ -347,6 +393,17 @@ function FilesSectionContent({ activeSubItem, onSubItemHandled, initialPath, onI
           <div className="flex-1 overflow-hidden p-2">
             {fileSource === 'local' ? (
               <FileViewer />
+            ) : fileSource === 'git' ? (
+              gitViewMode === 'graph' && workingDir ? (
+                <GitGraph
+                  repoPath={workingDir}
+                  onSelectCommit={handleGitCommitSelect}
+                  selectedSha={selectedGitCommit ?? undefined}
+                  className="h-full rounded-lg"
+                />
+              ) : (
+                <FileViewer />
+              )
             ) : token && repo ? (
               <GitHubFileViewer
                 token={token}
