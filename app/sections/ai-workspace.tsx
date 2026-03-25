@@ -13,6 +13,8 @@ import {
 import { ConversationViewer } from "@/components/ai/ConversationViewer"
 import { useSessionStream } from "@/hooks/useSessionStream"
 import { useWorkingDirSafe, expandTilde } from "@/hooks/useWorkingDirectory"
+import { useAuth } from "@/components/AuthProvider"
+import { useTerminalExtension } from "@/hooks/useTerminalExtension"
 
 interface SessionInfo {
   path: string
@@ -61,6 +63,10 @@ export default function AIWorkspaceSection({
   defaultWorkingDir?: string | null
   onNavigateToSection?: (section: string, path?: string) => void
 }) {
+  const { user } = useAuth()
+  const userAvatarUrl = user?.user_metadata?.avatar_url || null
+  const { backendType } = useTerminalExtension()
+
   const [sessions, setSessions] = React.useState<SessionInfo[]>([])
   const [selectedPath, setSelectedPath] = React.useState<string | null>(null)
   const [isLoadingSessions, setIsLoadingSessions] = React.useState(true)
@@ -87,7 +93,7 @@ export default function AIWorkspaceSection({
   const [isSending, setIsSending] = React.useState(false)
   const sendStatusTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const { messages, isStreaming, isConnected, isWaiting, error } = useSessionStream({
+  const { messages, isStreaming, isConnected, isWaiting, error, isTruncated, loadFullHistory, isLoadingFull } = useSessionStream({
     path: selectedPath,
     enabled: !!selectedPath,
   })
@@ -301,7 +307,7 @@ export default function AIWorkspaceSection({
       const res = await fetch('/api/ai/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ backend: backendType }),
       })
       if (res.ok) {
         const data = await res.json()
@@ -341,24 +347,28 @@ export default function AIWorkspaceSection({
     setIsSending(true)
     if (sendStatusTimerRef.current) clearTimeout(sendStatusTimerRef.current)
 
+    let failed = false
     try {
       const res = await fetch('/api/ai/sessions', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: selectedSessionId, prompt: promptInput.trim() }),
+        body: JSON.stringify({ sessionId: selectedSessionId, prompt: promptInput.trim(), backend: backendType, projectPath: selectedSession?.projectPath }),
       })
       const data = await res.json()
       if (res.ok && data.ok) {
         setSendStatus({ type: 'success', message: 'Sent' })
         setPromptInput("")
       } else {
-        setSendStatus({ type: 'error', message: data.error || 'Failed to send' })
+        failed = true
+        const shortError = (data.error || 'Failed to send').slice(0, 80)
+        setSendStatus({ type: 'error', message: shortError })
       }
     } catch {
+      failed = true
       setSendStatus({ type: 'error', message: 'Network error' })
     } finally {
       setIsSending(false)
-      sendStatusTimerRef.current = setTimeout(() => setSendStatus(null), 3000)
+      sendStatusTimerRef.current = setTimeout(() => setSendStatus(null), failed ? 6000 : 3000)
     }
   }
 
@@ -892,7 +902,7 @@ export default function AIWorkspaceSection({
                 </Button>
               </div>
             ) : (
-              <ConversationViewer messages={messages} isStreaming={isStreaming} />
+              <ConversationViewer messages={messages} isStreaming={isStreaming} isTruncated={isTruncated} onLoadFullHistory={loadFullHistory} isLoadingFull={isLoadingFull} userAvatarUrl={userAvatarUrl} />
             )}
           </div>
 
@@ -910,7 +920,7 @@ export default function AIWorkspaceSection({
                   type="text"
                   value={promptInput}
                   onChange={(e) => setPromptInput(e.target.value)}
-                  placeholder="Send a prompt to this session via thc..."
+                  placeholder={`Send a prompt to this session via ${backendType === 'native' ? 'Kitty' : 'TabzChrome'}...`}
                   className="flex-1 bg-muted/20 border border-border/40 rounded-lg px-3 py-2 text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
                   disabled={isSending}
                 />
@@ -939,6 +949,9 @@ export default function AIWorkspaceSection({
                   )}
                 </AnimatePresence>
               </form>
+              {sendStatus?.type === 'error' && (
+                <p className="text-xs text-red-400 mt-1 px-1">{sendStatus.message}</p>
+              )}
             </div>
           )}
         </div>

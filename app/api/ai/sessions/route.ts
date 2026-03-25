@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { readdirSync, statSync, openSync, readSync, closeSync } from 'fs'
+import { readdirSync, statSync, openSync, readSync, closeSync, existsSync } from 'fs'
 import { join } from 'path'
 import { execSync, execFileSync, spawn } from 'child_process'
 import { randomUUID } from 'crypto'
@@ -8,6 +8,43 @@ import { extractFirstUserMessage } from '@/lib/ai/jsonl-parser'
 const CLAUDE_PROJECTS_DIR = join(process.env.HOME || '', '.claude', 'projects')
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const SAFE_PATH_RE = /^\/[\w.\-/]+$/
+
+/**
+ * Resolve a Claude project slug back to a real filesystem path.
+ * Slugs encode '/' as '-', so naive replace is lossy when dir names contain dashes.
+ * We try the naive decode first, then progressively merge segments with dashes
+ * and check which path actually exists on disk.
+ */
+function resolveProjectPath(slug: string): string {
+  // Naive decode: -home-builder-projects-foo → /home/builder/projects/foo
+  const naive = '/' + slug.slice(1).replace(/-/g, '/')
+  if (existsSync(naive)) return naive
+
+  // Try merging segments with dashes to find actual directory names
+  // e.g. segments [home, builder, projects, personal, homepage] →
+  //   try /home/builder/projects/personal-homepage
+  const segments = slug.slice(1).split('-')
+  return tryMergeSegments(segments, '') || naive
+}
+
+function tryMergeSegments(segments: string[], prefix: string): string | null {
+  if (segments.length === 0) return prefix || null
+
+  // Try progressively longer merged segments
+  for (let len = 1; len <= segments.length; len++) {
+    const part = segments.slice(0, len).join('-')
+    const candidate = prefix + '/' + part
+    const remaining = segments.slice(len)
+
+    if (remaining.length === 0) {
+      if (existsSync(candidate)) return candidate
+    } else if (existsSync(candidate)) {
+      const result = tryMergeSegments(remaining, candidate)
+      if (result) return result
+    }
+  }
+  return null
+}
 
 interface SessionInfo {
   path: string
@@ -69,7 +106,8 @@ function walkJsonl(dir: string, results: SessionInfo[], projectSlug: string): vo
 
           // Decode projectSlug back to filesystem path
           // Slug is the absolute path with '/' replaced by '-', e.g. -home-builder-projects-foo
-          const projectPath = '/' + projectSlug.slice(1).replace(/-/g, '/')
+          // Simple replace is lossy (dashes in dir names become slashes), so verify against fs
+          const projectPath = resolveProjectPath(projectSlug)
 
           results.push({
             path: fullPath,
@@ -116,6 +154,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const projectPath = body.projectPath as string | undefined
+    const backend = (body.backend as string) || 'native'
 
     const cwd = projectPath || process.env.HOME || '/home'
 
@@ -127,37 +166,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Try thc first (Thermal Conductor daemon)
-    let hasThc = false
-    try {
-      execSync('which thc', { stdio: 'ignore' })
-      hasThc = true
-    } catch {
-      // thc not installed
-    }
-
-    if (hasThc) {
-      try {
-        const output = execFileSync('thc', ['spawn', '-p', cwd], {
-          encoding: 'utf-8',
-          timeout: 5000,
-        }).trim()
-
-        // thc handles session creation — JSONL discovery will pick up the new session
-        return NextResponse.json({
-          sessionId: null,
-          jsonlPath: null,
-          projectPath: cwd,
-          spawner: 'thc',
-          thcOutput: output,
-        })
-      } catch (thcErr) {
-        // thc failed (daemon not running, etc.) — fall through to Kitty
-        console.warn('thc spawn failed, falling back to Kitty:', thcErr instanceof Error ? thcErr.message : thcErr)
-      }
-    }
-
-    // Fallback: spawn Claude in a detached Kitty terminal
+    // Spawn Claude in a detached Kitty terminal
     try {
       execSync('which claude', { stdio: 'ignore' })
     } catch {
@@ -194,10 +203,29 @@ export async function POST(request: NextRequest) {
   }
 }
 
+/**
+ * Send text to a kitty window, then press Enter after a short delay.
+ * Claude CLI needs time to process pasted input before the newline submits it.
+ */
+async function kittySendText(windowId: number, text: string): Promise<void> {
+  // Send the prompt text (without newline)
+  execFileSync(
+    'kitty', ['@', 'send-text', '--match', `id:${windowId}`, text],
+    { encoding: 'utf-8', timeout: 10000 }
+  )
+  // Wait for Claude CLI to process the input
+  await new Promise(resolve => setTimeout(resolve, 400))
+  // Send Enter to submit
+  execFileSync(
+    'kitty', ['@', 'send-key', '--match', `id:${windowId}`, 'Return'],
+    { encoding: 'utf-8', timeout: 10000 }
+  )
+}
+
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { sessionId, prompt } = body as { sessionId?: string; prompt?: string }
+    const { sessionId, prompt, backend } = body as { sessionId?: string; prompt?: string; backend?: string }
 
     if (!sessionId || !prompt) {
       return NextResponse.json(
@@ -213,57 +241,66 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const sessionPrefix = sessionId.slice(0, 8)
+    const projectPath = (body as { projectPath?: string }).projectPath
 
-    // Try kitty @ send-text first (primary — works with any Kitty-spawned session)
-    let hasKitty = false
+    // Use kitty @ ls to find the right window
     try {
-      execSync('which kitty', { stdio: 'ignore' })
-      hasKitty = true
-    } catch {
-      // kitty not available
-    }
+      const lsOutput = execFileSync('kitty', ['@', 'ls'], { encoding: 'utf-8', timeout: 5000 })
+      const osWindows = JSON.parse(lsOutput) as Array<{
+        tabs: Array<{
+          windows: Array<{
+            id: number
+            title: string
+            cwd: string
+            foreground_processes: Array<{ cmdline: string[] }>
+          }>
+        }>
+      }>
 
-    if (hasKitty) {
-      try {
-        execFileSync(
-          'kitty', ['@', 'send-text', '--match', `title:^claude-${sessionPrefix}`, prompt + '\n'],
-          { encoding: 'utf-8', timeout: 10000 }
-        )
-        return NextResponse.json({ ok: true, method: 'kitty' })
-      } catch {
-        // kitty send-text failed — window not found or remote control disabled
+      const sessionPrefix = sessionId.slice(0, 8)
+      let cwdMatch: number | null = null
+
+      for (const osWin of osWindows) {
+        for (const tab of osWin.tabs) {
+          for (const win of tab.windows) {
+            // Strategy 1: title match (homepage-spawned sessions)
+            if (win.title.startsWith(`claude-${sessionPrefix}`)) {
+              await kittySendText(win.id, prompt)
+              return NextResponse.json({ ok: true, method: 'kitty-title', windowId: win.id })
+            }
+
+            // Strategy 2: track cwd + claude process match for fallback
+            if (projectPath && !cwdMatch) {
+              const resolvedProject = projectPath.startsWith('~')
+                ? projectPath.replace('~', process.env.HOME || '')
+                : projectPath
+              const isClaudeRunning = win.foreground_processes.some(p =>
+                p.cmdline.some(arg => arg === 'claude' || arg.endsWith('/claude'))
+              )
+              if (isClaudeRunning && win.cwd === resolvedProject) {
+                cwdMatch = win.id
+              }
+            }
+          }
+        }
       }
-    }
 
-    // Fall back to thc send (if thc daemon is running)
-    let hasThc = false
-    try {
-      execSync('which thc', { stdio: 'ignore' })
-      hasThc = true
-    } catch {
-      // thc not installed
-    }
-
-    if (hasThc) {
-      try {
-        const output = execFileSync('thc', ['send', sessionId, prompt], {
-          encoding: 'utf-8',
-          timeout: 10000,
-        }).trim()
-        return NextResponse.json({ ok: true, method: 'thc', output })
-      } catch {
-        // thc send failed
+      // Use cwd match if no title match found
+      if (cwdMatch) {
+        await kittySendText(cwdMatch, prompt)
+        return NextResponse.json({ ok: true, method: 'kitty-cwd', windowId: cwdMatch })
       }
+    } catch (err) {
+      // kitty @ ls or send-text failed
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      return NextResponse.json(
+        { error: `Kitty remote control failed: ${msg}` },
+        { status: 500 }
+      )
     }
 
-    // Both methods failed
-    const methods = [
-      hasKitty ? 'kitty (window not found — ensure session is running in a Kitty window with matching title, and allow_remote_control is enabled in kitty.conf)' : 'kitty (not installed)',
-      hasThc ? 'thc (send failed — is the daemon running?)' : 'thc (not installed)',
-    ]
     return NextResponse.json(
-      { error: `Failed to send input. Tried: ${methods.join('; ')}` },
+      { error: 'No Kitty window found running Claude for this project — is the session still active?' },
       { status: 500 }
     )
   } catch (error) {

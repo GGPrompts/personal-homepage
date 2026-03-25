@@ -3,7 +3,7 @@
 import * as React from "react"
 import { motion } from "framer-motion"
 import {
-  User, Bot, ChevronRight, Copy, Brain, Wrench, CheckCircle, AlertCircle,
+  User, Bot, ChevronRight, Copy, Brain, Wrench, CheckCircle, AlertCircle, History, Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { ParsedMessage, ParsedBlock } from "@/lib/ai/jsonl-parser"
@@ -11,6 +11,14 @@ import type { ParsedMessage, ParsedBlock } from "@/lib/ai/jsonl-parser"
 interface ConversationViewerProps {
   messages: ParsedMessage[]
   isStreaming: boolean
+  /** Whether the conversation was truncated on load */
+  isTruncated?: boolean
+  /** Callback to load full history */
+  onLoadFullHistory?: () => void
+  /** Whether full history is loading */
+  isLoadingFull?: boolean
+  /** User avatar URL (e.g. GitHub avatar) */
+  userAvatarUrl?: string | null
 }
 
 function CodeBlock({ code, language }: { code: string; language: string }) {
@@ -33,6 +41,51 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
   )
 }
 
+function renderTextSegment(text: string, keyPrefix: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = []
+  const lines = text.split('\n')
+  let paragraphLines: string[] = []
+
+  const flushParagraph = (idx: number) => {
+    if (paragraphLines.length === 0) return
+    const content = paragraphLines.join('\n')
+    if (content.trim()) {
+      parts.push(
+        <p key={`${keyPrefix}-p-${idx}`} className="whitespace-pre-wrap break-words">
+          {renderInlineElements(content)}
+        </p>
+      )
+    }
+    paragraphLines = []
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const headingMatch = line.match(/^(#{1,4})\s+(.+)$/)
+    if (headingMatch) {
+      flushParagraph(i)
+      const level = headingMatch[1].length
+      const content = headingMatch[2]
+      const sizes: Record<number, string> = {
+        1: 'text-xl font-bold',
+        2: 'text-lg font-semibold',
+        3: 'text-base font-semibold',
+        4: 'text-sm font-semibold',
+      }
+      parts.push(
+        <div key={`${keyPrefix}-h-${i}`} className={`${sizes[level] || sizes[4]} mt-3 mb-1`}>
+          {renderInlineElements(content)}
+        </div>
+      )
+    } else {
+      paragraphLines.push(line)
+    }
+  }
+
+  flushParagraph(lines.length)
+  return parts
+}
+
 function renderMarkdownText(text: string, keyPrefix: string): React.ReactNode[] {
   const parts: React.ReactNode[] = []
   const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g
@@ -42,11 +95,7 @@ function renderMarkdownText(text: string, keyPrefix: string): React.ReactNode[] 
   while ((match = codeBlockRegex.exec(text)) !== null) {
     if (match.index > lastIndex) {
       const before = text.slice(lastIndex, match.index)
-      parts.push(
-        <p key={`${keyPrefix}-t-${lastIndex}`} className="whitespace-pre-wrap break-words">
-          {renderInlineElements(before)}
-        </p>
-      )
+      parts.push(...renderTextSegment(before, `${keyPrefix}-t-${lastIndex}`))
     }
     parts.push(
       <CodeBlock
@@ -60,11 +109,7 @@ function renderMarkdownText(text: string, keyPrefix: string): React.ReactNode[] 
 
   if (lastIndex < text.length) {
     const remaining = text.slice(lastIndex)
-    parts.push(
-      <p key={`${keyPrefix}-t-${lastIndex}`} className="whitespace-pre-wrap break-words">
-        {renderInlineElements(remaining)}
-      </p>
-    )
+    parts.push(...renderTextSegment(remaining, `${keyPrefix}-t-${lastIndex}`))
   }
 
   return parts
@@ -261,7 +306,7 @@ function BlockRenderer({ block, keyPrefix }: { block: ParsedBlock; keyPrefix: st
   }
 }
 
-function MessageView({ message }: { message: ParsedMessage }) {
+function MessageView({ message, userAvatarUrl }: { message: ParsedMessage; userAvatarUrl?: string | null }) {
   if (message.role === 'summary') {
     return (
       <div className="flex items-center gap-3 py-3">
@@ -278,11 +323,15 @@ function MessageView({ message }: { message: ParsedMessage }) {
 
   return (
     <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-      <div className={`shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${
+      <div className={`shrink-0 h-8 w-8 rounded-full flex items-center justify-center overflow-hidden ${
         isUser ? 'bg-primary/10 border border-primary/20' : 'bg-orange-500/10 border border-orange-500/20'
       }`}>
         {isUser ? (
-          <User className="h-4 w-4 text-primary" />
+          userAvatarUrl ? (
+            <img src={userAvatarUrl} alt="" className="h-8 w-8 rounded-full" />
+          ) : (
+            <User className="h-4 w-4 text-primary" />
+          )
         ) : (
           <Bot className="h-4 w-4 text-orange-400" />
         )}
@@ -380,7 +429,7 @@ function ToolGroupView({ messages }: { messages: ParsedMessage[] }) {
   )
 }
 
-export function ConversationViewer({ messages, isStreaming }: ConversationViewerProps) {
+export function ConversationViewer({ messages, isStreaming, isTruncated, onLoadFullHistory, isLoadingFull, userAvatarUrl }: ConversationViewerProps) {
   const scrollRef = React.useRef<HTMLDivElement>(null)
   const bottomRef = React.useRef<HTMLDivElement>(null)
   const isFollowingRef = React.useRef(true)
@@ -411,9 +460,27 @@ export function ConversationViewer({ messages, isStreaming }: ConversationViewer
   return (
     <div ref={scrollRef} className="h-full overflow-y-auto">
       <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-4xl mx-auto w-full">
+        {isTruncated && onLoadFullHistory && (
+          <div className="flex justify-center py-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="glass text-xs gap-2"
+              onClick={onLoadFullHistory}
+              disabled={isLoadingFull}
+            >
+              {isLoadingFull ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <History className="h-3 w-3" />
+              )}
+              {isLoadingFull ? 'Loading full history...' : 'Load earlier messages'}
+            </Button>
+          </div>
+        )}
         {groupConsecutiveToolMessages(messages).map((item, idx) =>
           item.type === 'single' ? (
-            <MessageView key={item.message.id} message={item.message} />
+            <MessageView key={item.message.id} message={item.message} userAvatarUrl={userAvatarUrl} />
           ) : (
             <ToolGroupView key={`group-${idx}`} messages={item.messages} />
           )

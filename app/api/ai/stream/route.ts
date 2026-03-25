@@ -4,9 +4,11 @@ import { parseJsonlEntries } from '@/lib/ai/jsonl-parser'
 
 const POLL_INTERVAL = 500
 const INITIAL_READ_SIZE = 200 * 1024
+const FULL_READ_SIZE = 50 * 1024 * 1024 // 50MB safety cap
 
 export async function GET(request: NextRequest) {
   const path = request.nextUrl.searchParams.get('path')
+  const full = request.nextUrl.searchParams.get('full') === 'true'
 
   if (!path) {
     return new Response('Missing path parameter', { status: 400 })
@@ -15,6 +17,8 @@ export async function GET(request: NextRequest) {
   if (!path.includes('.claude/') || !path.endsWith('.jsonl')) {
     return new Response('Invalid path', { status: 400 })
   }
+
+  const maxInitialRead = full ? FULL_READ_SIZE : INITIAL_READ_SIZE
 
   const encoder = new TextEncoder()
 
@@ -67,8 +71,9 @@ export async function GET(request: NextRequest) {
           if (!fileFound) {
             fileFound = true
             let readFrom = 0
-            if (fileSize > INITIAL_READ_SIZE) {
-              readFrom = fileSize - INITIAL_READ_SIZE
+            const truncated = fileSize > maxInitialRead
+            if (truncated) {
+              readFrom = fileSize - maxInitialRead
             }
 
             const bufSize = fileSize - readFrom
@@ -85,7 +90,7 @@ export async function GET(request: NextRequest) {
             }
 
             const entries = parseJsonlEntries(text)
-            sendEvent('initial', { entries })
+            sendEvent('initial', { entries, truncated, totalSize: fileSize })
             offset = fileSize
             return
           }

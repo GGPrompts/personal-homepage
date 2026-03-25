@@ -16,6 +16,12 @@ interface UseSessionStreamReturn {
   isWaiting: boolean
   error: string | null
   reconnect: () => void
+  /** Whether the initial load was truncated (file too large) */
+  isTruncated: boolean
+  /** Load the full conversation history (re-reads entire file) */
+  loadFullHistory: () => void
+  /** Whether full history is currently loading */
+  isLoadingFull: boolean
 }
 
 export function useSessionStream({ path, enabled = true }: UseSessionStreamOptions): UseSessionStreamReturn {
@@ -26,6 +32,9 @@ export function useSessionStream({ path, enabled = true }: UseSessionStreamOptio
   const [isWaiting, setIsWaiting] = useState(false)
   const [messages, setMessages] = useState<ParsedMessage[]>([])
   const [reconnectKey, setReconnectKey] = useState(0)
+  const [isTruncated, setIsTruncated] = useState(false)
+  const [isLoadingFull, setIsLoadingFull] = useState(false)
+  const [loadFull, setLoadFull] = useState(false)
 
   const lastUpdateRef = useRef<number>(0)
   const eventSourceRef = useRef<EventSource | null>(null)
@@ -69,7 +78,8 @@ export function useSessionStream({ path, enabled = true }: UseSessionStreamOptio
     setIsConnected(false)
     setIsStreaming(false)
 
-    const es = new EventSource(`/api/ai/stream?path=${encodeURIComponent(path)}`)
+    const streamUrl = `/api/ai/stream?path=${encodeURIComponent(path)}${loadFull ? '&full=true' : ''}`
+    const es = new EventSource(streamUrl)
     eventSourceRef.current = es
 
     es.addEventListener('waiting', () => {
@@ -87,6 +97,8 @@ export function useSessionStream({ path, enabled = true }: UseSessionStreamOptio
         setIsConnected(true)
         setIsWaiting(false)
         setError(null)
+        setIsTruncated(!!data.truncated)
+        setIsLoadingFull(false)
       } catch {
         setError('Failed to parse initial data')
       }
@@ -152,12 +164,18 @@ export function useSessionStream({ path, enabled = true }: UseSessionStreamOptio
         streamingTimerRef.current = null
       }
     }
-  }, [path, enabled, reconnectKey, flushBatch])
+  }, [path, enabled, reconnectKey, loadFull, flushBatch])
 
   const reconnect = useCallback(() => {
     setReconnectKey(k => k + 1)
     setError(null)
   }, [])
 
-  return { messages, isStreaming, isConnected, isWaiting, error, reconnect }
+  const loadFullHistory = useCallback(() => {
+    setIsLoadingFull(true)
+    setLoadFull(true)
+    setReconnectKey(k => k + 1)
+  }, [])
+
+  return { messages, isStreaming, isConnected, isWaiting, error, reconnect, isTruncated, loadFullHistory, isLoadingFull }
 }
