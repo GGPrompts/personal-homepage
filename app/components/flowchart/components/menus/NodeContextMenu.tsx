@@ -175,7 +175,7 @@ export function NodeContextMenu({
             className={`context-menu-item ${!tabzConnected ? 'disabled' : ''}`}
             onClick={() => { onOpenInTFE('spawn'); onClose(); }}
             disabled={!tabzConnected}
-            title={!tabzConnected ? 'TabzChrome not connected' : `Open ${editablePathLabel} in new TFE tab`}
+            title={!tabzConnected ? 'Terminal not available' : `Open ${editablePathLabel} in new TFE tab`}
           >
             <span className="context-menu-icon">&#x1F4C2;</span>
             Open in New TFE Tab
@@ -184,7 +184,7 @@ export function NodeContextMenu({
             className={`context-menu-item ${!tabzConnected ? 'disabled' : ''}`}
             onClick={() => { onOpenInTFE('queue'); onClose(); }}
             disabled={!tabzConnected}
-            title={!tabzConnected ? 'TabzChrome not connected' : `Open ${editablePathLabel} in current terminal`}
+            title={!tabzConnected ? 'Terminal not available' : `Open ${editablePathLabel} in current terminal`}
           >
             <span className="context-menu-icon">&#x1F4BB;</span>
             Open in Current Terminal

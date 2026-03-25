@@ -1824,7 +1824,7 @@ kbd {
   color: #58a6ff !important;
 }
 
-/* TabzChrome Connection Status Indicator */
+/* Terminal Connection Status Indicator */
 .tabz-status {
   position: fixed;
   bottom: 60px;

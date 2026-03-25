@@ -1,5 +1,5 @@
 /**
- * Parser for .prompty files (TFE/TabzChrome format)
+ * Parser for .prompty files (TFE format)
  *
  * Format:
  * ---

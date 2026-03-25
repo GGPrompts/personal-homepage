@@ -269,7 +269,7 @@ function FolderNodeComponent({
                       disabled={!terminalActions?.available}
                       onClick={() => {
                         terminalActions?.sendToChat(ctxMenu.bookmark.command!);
-                        toast.success("Sent to TabzChrome chat");
+                        toast.success("Sent to Claude session");
                         closeCtxMenu();
                       }}
                     />

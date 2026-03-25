@@ -329,7 +329,7 @@ function DesktopCanvasInner({
                   disabled={!terminalActions?.available}
                   onClick={() => {
                     terminalActions?.sendToChat(ctxBookmark.command!);
-                    toast.success("Sent to TabzChrome chat");
+                    toast.success("Sent to Claude session");
                     closeMenu();
                   }}
                 />

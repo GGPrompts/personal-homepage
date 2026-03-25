@@ -545,58 +545,53 @@ export function useTerminalExtension() {
     [spawnWithOptions]
   )
 
-  // Send command to TabzChrome chat input via WebSocket (requires auth token)
+  // Send text to an active Claude session via kitty @ send-text
   const sendToChat = useCallback(
     async (command: string): Promise<boolean> => {
       if (typeof window === "undefined") return false
 
       try {
-        // Fetch auth token from backend
-        const tokenResponse = await fetch(`${TABZ_API_BASE}/api/auth/token`, {
-          signal: AbortSignal.timeout(2000),
+        // Find active Claude sessions running in Kitty terminals
+        const activeResponse = await fetch("/api/ai/sessions/active", {
+          signal: AbortSignal.timeout(5000),
         })
-        if (!tokenResponse.ok) {
-          console.error("[useTerminalExtension] Failed to fetch auth token")
-          return false
-        }
-        const { token: wsToken } = await tokenResponse.json()
-        if (!wsToken) {
-          console.error("[useTerminalExtension] No token returned from backend")
+        if (!activeResponse.ok) {
+          console.error("[useTerminalExtension] Failed to fetch active sessions")
           return false
         }
 
-        // Sanitize token to remove non-ASCII characters
-        const cleanToken = wsToken.replace(/[^\x00-\xFF]/g, '')
-        const wsUrl = `ws://localhost:8129?token=${cleanToken}`
+        const { active } = await activeResponse.json() as {
+          active: Array<{ windowId: number; title: string; cwd: string; socket: string; sessionId: string | null }>
+        }
 
-        // Connect via WebSocket and send command
-        return new Promise((resolve) => {
-          try {
-            const ws = new WebSocket(wsUrl)
-            const timeout = setTimeout(() => {
-              ws.close()
-              console.error("[useTerminalExtension] WebSocket connection timeout")
-              resolve(false)
-            }, 3000)
+        if (!active || active.length === 0) {
+          console.error("[useTerminalExtension] No active Claude sessions found")
+          return false
+        }
 
-            ws.onopen = () => {
-              ws.send(JSON.stringify({ type: "QUEUE_COMMAND", command }))
-              clearTimeout(timeout)
-              ws.close()
-              console.log("[useTerminalExtension] Sent command to chat via WebSocket:", command)
-              resolve(true)
-            }
+        // Pick the first (most recently detected) active session
+        const session = active[0]
 
-            ws.onerror = (err) => {
-              clearTimeout(timeout)
-              console.error("[useTerminalExtension] WebSocket error:", err)
-              resolve(false)
-            }
-          } catch (err) {
-            console.error("[useTerminalExtension] WebSocket exception:", err)
-            resolve(false)
-          }
+        // Send the text to the session via the AI sessions PUT endpoint
+        const sendResponse = await fetch("/api/ai/sessions", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: session.sessionId,
+            prompt: command,
+            projectPath: session.cwd,
+          }),
+          signal: AbortSignal.timeout(5000),
         })
+
+        if (!sendResponse.ok) {
+          const err = await sendResponse.json().catch(() => ({}))
+          console.error("[useTerminalExtension] Failed to send to Claude session:", err)
+          return false
+        }
+
+        console.log("[useTerminalExtension] Sent text to Claude session:", command)
+        return true
       } catch (err) {
         console.error("[useTerminalExtension] sendToChat error:", err)
         return false

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { spawnKittyTerminal, validateWorkDir } from "@/lib/terminal-native"
+import { spawnKittyTerminal, validateWorkDir, kittyRemote } from "@/lib/terminal-native"
 
 export const dynamic = "force-dynamic"
 
@@ -27,6 +27,35 @@ export async function POST(request: NextRequest) {
     }
 
     spawnKittyTerminal({ command, workingDir, name })
+
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    return NextResponse.json({ success: false, error: message }, { status: 500 })
+  }
+}
+
+/**
+ * PUT /api/terminal - Send text to the active (most recent) kitty window.
+ * Body: { text: string }
+ *
+ * Uses `kitty @ send-text` which targets the active window by default.
+ * Appends a newline to execute the command.
+ */
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { text } = body as { text?: string }
+
+    if (!text) {
+      return NextResponse.json(
+        { success: false, error: "text is required" },
+        { status: 400 }
+      )
+    }
+
+    // send-text without --match sends to the most recently focused window
+    kittyRemote(["send-text", text + "\n"])
 
     return NextResponse.json({ success: true })
   } catch (err) {

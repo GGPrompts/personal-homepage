@@ -279,14 +279,14 @@ export async function PUT(request: NextRequest) {
     const body = await request.json()
     const { sessionId, prompt, backend } = body as { sessionId?: string; prompt?: string; backend?: string }
 
-    if (!sessionId || !prompt) {
+    if (!prompt) {
       return NextResponse.json(
-        { error: 'sessionId and prompt are required' },
+        { error: 'prompt is required' },
         { status: 400 }
       )
     }
 
-    if (!UUID_RE.test(sessionId)) {
+    if (sessionId && !UUID_RE.test(sessionId) && !/^[a-f0-9]{8}$/i.test(sessionId)) {
       return NextResponse.json(
         { error: 'Invalid sessionId format' },
         { status: 400 }
@@ -299,12 +299,12 @@ export async function PUT(request: NextRequest) {
     try {
       const windows = kittyListAllWindows()
 
-      const sessionPrefix = sessionId.slice(0, 8)
+      const sessionPrefix = sessionId ? sessionId.slice(0, 8) : null
       let cwdMatch: (typeof windows)[number] | null = null
 
       for (const win of windows) {
         // Strategy 1: title match (homepage-spawned sessions)
-        if (win.title.startsWith(`claude-${sessionPrefix}`)) {
+        if (sessionPrefix && win.title.startsWith(`claude-${sessionPrefix}`)) {
           await kittySendText(win.id, prompt, win.socket)
           return NextResponse.json({ ok: true, method: 'kitty-title', windowId: win.id })
         }

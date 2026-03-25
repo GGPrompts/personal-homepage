@@ -457,7 +457,7 @@ export function ChatMessage({
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      {tabzConnected ? 'Send to TabzChrome chat' : 'TabzChrome not connected'}
+                      {tabzConnected ? 'Send to Claude session' : 'No active Claude session'}
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>

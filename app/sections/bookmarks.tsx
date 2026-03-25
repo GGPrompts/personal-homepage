@@ -1053,7 +1053,7 @@ export default function BookmarksSection({
                         e.stopPropagation()
                         if (bookmark.sendToChat) {
                           sendToChat(bookmark.command || "")
-                          toast.success("Sent to TabzChrome chat")
+                          toast.success("Sent to Claude session")
                         } else {
                           handleSpawnBookmark(bookmark)
                         }
@@ -1141,7 +1141,7 @@ export default function BookmarksSection({
                           <ContextMenuItem
                             onClick={() => {
                               sendToChat(bookmark.command!)
-                              toast.success("Sent to TabzChrome chat")
+                              toast.success("Sent to Claude session")
                             }}
                             disabled={!terminalAvailable}
                           >
@@ -1277,7 +1277,7 @@ export default function BookmarksSection({
                       e.stopPropagation()
                       if (bookmark.sendToChat) {
                         sendToChat(bookmark.command || "")
-                        toast.success("Sent to TabzChrome chat")
+                        toast.success("Sent to Claude session")
                       } else {
                         handleSpawnBookmark(bookmark)
                       }
@@ -1381,7 +1381,7 @@ export default function BookmarksSection({
                             <DropdownMenuItem
                               onClick={() => {
                                 sendToChat(bookmark.command!)
-                                toast.success("Sent to TabzChrome chat")
+                                toast.success("Sent to Claude session")
                               }}
                               disabled={!terminalAvailable}
                             >
@@ -1490,7 +1490,7 @@ export default function BookmarksSection({
                           <ContextMenuItem
                             onClick={() => {
                               sendToChat(bookmark.command!)
-                              toast.success("Sent to TabzChrome chat")
+                              toast.success("Sent to Claude session")
                             }}
                             disabled={!terminalAvailable}
                           >
@@ -1670,7 +1670,7 @@ export default function BookmarksSection({
                         onCheckedChange={(checked) => setFormSendToChat(checked === true)}
                       />
                       <Label htmlFor="sendToChat" className="text-sm cursor-pointer">
-                        Send to TabzChrome chat input
+                        Send to active Claude session
                       </Label>
                     </div>
                   </div>
@@ -1942,7 +1942,7 @@ export default function BookmarksSection({
                             onCheckedChange={(checked) => setFormSendToChat(checked === true)}
                           />
                           <Label htmlFor="editSendToChat" className="text-sm cursor-pointer">
-                            Send to TabzChrome chat input
+                            Send to active Claude session
                           </Label>
                         </div>
                       </div>

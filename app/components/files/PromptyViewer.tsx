@@ -128,10 +128,10 @@ function LineWithFields({
 // ============================================================================
 
 interface TerminalInfo {
-  id: string
+  id: number
   name: string
-  sessionName?: string
-  isClaudeSession?: boolean
+  sessionId: string | null
+  cwd: string
 }
 
 interface TerminalDropdownProps {
@@ -144,23 +144,25 @@ function TerminalDropdown({ processedContent, terminals, onFetchTerminals }: Ter
   const [showDropdown, setShowDropdown] = useState(false)
   const [sendStatus, setSendStatus] = useState<'idle' | 'sending' | 'sent'>('idle')
 
-  const sendToTerminal = async (terminal: TerminalInfo, sendEnter: boolean = false) => {
+  const sendToTerminal = async (terminal: TerminalInfo) => {
+    if (!terminal.sessionId) {
+      toast.error('No session ID for this terminal')
+      return
+    }
     setSendStatus('sending')
     try {
-      // Try to send via local API
-      const response = await fetch('/api/tabz/terminal-input', {
-        method: 'POST',
+      const response = await fetch('/api/ai/sessions', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          terminalId: terminal.id,
-          sessionName: terminal.sessionName,
-          text: processedContent,
-          sendEnter,
+          sessionId: terminal.sessionId,
+          prompt: processedContent,
         }),
       })
 
       if (!response.ok) {
-        throw new Error('Failed to send to terminal')
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to send to terminal')
       }
 
       setSendStatus('sent')
@@ -169,7 +171,7 @@ function TerminalDropdown({ processedContent, terminals, onFetchTerminals }: Ter
       setTimeout(() => setSendStatus('idle'), 2000)
     } catch (err) {
       console.error('Failed to send to terminal:', err)
-      toast.error('Failed to send to terminal')
+      toast.error(err instanceof Error ? err.message : 'Failed to send to terminal')
       setSendStatus('idle')
     }
   }
@@ -201,22 +203,14 @@ function TerminalDropdown({ processedContent, terminals, onFetchTerminals }: Ter
               {terminals.map(t => (
                 <div key={t.id} className="px-2">
                   <button
-                    onClick={() => sendToTerminal(t, false)}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-muted rounded text-left"
+                    onClick={() => sendToTerminal(t)}
+                    disabled={!t.sessionId}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-muted rounded text-left disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Terminal className={`h-4 w-4 ${t.isClaudeSession ? 'text-orange-400' : ''}`} />
+                    <Terminal className="h-4 w-4 text-orange-400" />
                     <span className="truncate flex-1">{t.name}</span>
-                    {t.isClaudeSession && <span className="text-xs text-orange-400">AI</span>}
+                    <span className="text-xs text-orange-400">AI</span>
                   </button>
-                  {t.isClaudeSession && (
-                    <button
-                      onClick={() => sendToTerminal(t, true)}
-                      className="w-full flex items-center gap-2 px-2 py-1 text-xs hover:bg-muted rounded text-left text-muted-foreground ml-6"
-                      title="Send and press Enter to submit"
-                    >
-                      <Send className="h-3 w-3" /> Send + Enter (submit)
-                    </button>
-                  )}
                 </div>
               ))}
             </>
@@ -301,18 +295,18 @@ export function PromptyViewer({ content, fileName, fontSize = 14 }: PromptyViewe
 
   const fetchTerminals = useCallback(async () => {
     try {
-      const response = await fetch('/api/tabz/agents')
+      const response = await fetch('/api/ai/sessions/active')
       if (!response.ok) return
       const data = await response.json()
-      const terminalList: TerminalInfo[] = (data.data || []).map((t: { id: string; name?: string; sessionName?: string }) => ({
-        id: t.id,
-        name: t.name || t.id,
-        sessionName: t.sessionName,
-        isClaudeSession: t.name?.toLowerCase().includes('claude') || t.id?.includes('claude')
+      const terminalList: TerminalInfo[] = (data.active || []).map((t: { windowId: number; title: string; cwd: string; sessionId: string | null }) => ({
+        id: t.windowId,
+        name: t.title || `Window ${t.windowId}`,
+        sessionId: t.sessionId,
+        cwd: t.cwd,
       }))
       setTerminals(terminalList)
     } catch (err) {
-      console.error('Failed to fetch terminals:', err)
+      console.error('Failed to fetch active sessions:', err)
     }
   }, [])
 
