@@ -531,8 +531,30 @@ export function useTerminalExtension() {
   )
 
   // Paste command to terminal without executing (autoExecute: false)
+  // Native backend: sends text to the focused kitty window via send-text (no Enter)
+  // TabzChrome backend: spawns terminal with autoExecute: false
   const pasteToTerminal = useCallback(
     async (command: string, options?: { workingDir?: string; name?: string; profile?: string; color?: string }): Promise<SpawnResult> => {
+      // Native backend: use kitty @ send-text without newline
+      if (backendType === "native") {
+        try {
+          const response = await fetch("/api/terminal", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: command, execute: false }),
+          })
+          const data = await response.json()
+          if (data.success) {
+            return { success: true }
+          }
+          return { success: false, error: data.error || "Failed to paste to terminal" }
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : "Unknown error"
+          return { success: false, error: errorMessage }
+        }
+      }
+
+      // TabzChrome backend: spawn with autoExecute: false
       return spawnWithOptions({
         command,
         name: options?.name,
@@ -542,7 +564,7 @@ export function useTerminalExtension() {
         autoExecute: false,
       })
     },
-    [spawnWithOptions]
+    [spawnWithOptions, backendType]
   )
 
   // Send text to an active Claude session via kitty @ send-text

@@ -314,28 +314,19 @@ export function FileTreeContextMenu({
       }
 
       // Now call TTS API
-      const ttsResponse = await fetch('/api/tabz/speak', {
+      const ttsResponse = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, priority: 'low' }),
+        body: JSON.stringify({ text: text.slice(0, 5000) }),
       })
 
-      const ttsData = await ttsResponse.json()
-
       if (!ttsResponse.ok) {
-        if (ttsResponse.status === 503) {
-          toast.error(ttsData.hint || ttsData.error || 'TTS not available')
-        } else {
-          toast.error(ttsData.error || 'Failed to read aloud')
-        }
+        const ttsData = await ttsResponse.json().catch(() => ({}))
+        toast.error(ttsData.error || 'TTS failed')
         return
       }
 
-      if (ttsData.success) {
-        toast.success(`Reading ${name} aloud...`)
-      } else {
-        toast.error(ttsData.error || 'Failed to read aloud')
-      }
+      toast.success(`Reading ${name} aloud...`)
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error'
       toast.error(`Failed to read aloud: ${errorMessage}`)

@@ -37,15 +37,16 @@ export async function POST(request: NextRequest) {
 
 /**
  * PUT /api/terminal - Send text to the active (most recent) kitty window.
- * Body: { text: string }
+ * Body: { text: string, execute?: boolean }
  *
  * Uses `kitty @ send-text` which targets the active window by default.
- * Appends a newline to execute the command.
+ * When execute is true (default), appends a newline to run the command.
+ * When execute is false, sends text only (paste without pressing Enter).
  */
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { text } = body as { text?: string }
+    const { text, execute = true } = body as { text?: string; execute?: boolean }
 
     if (!text) {
       return NextResponse.json(
@@ -55,7 +56,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // send-text without --match sends to the most recently focused window
-    kittyRemote(["send-text", text + "\n"])
+    kittyRemote(["send-text", execute ? text + "\n" : text])
 
     return NextResponse.json({ success: true })
   } catch (err) {
