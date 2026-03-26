@@ -1598,6 +1598,7 @@ export function FlowEditor({ tabzConnected, tabzQueue, tabzSpawn }: FlowEditorPr
           if (defaultFile?.content) {
             applyWorkflow(defaultFile.content);
             setIsLoadingDefault(false);
+            setTimeout(() => fitView({ padding: 0.1, duration: 300 }), 100);
             return;
           }
         }
@@ -1613,6 +1614,7 @@ export function FlowEditor({ tabzConnected, tabzQueue, tabzSpawn }: FlowEditorPr
           const defaultWorkflow = workflows.find(w => w.id === cleanId);
           if (defaultWorkflow) {
             applyWorkflow(defaultWorkflow);
+            setTimeout(() => fitView({ padding: 0.1, duration: 300 }), 100);
           }
         } catch (e) {
           console.error('Failed to load default workflow from localStorage:', e);
@@ -2004,6 +2006,8 @@ export function FlowEditor({ tabzConnected, tabzQueue, tabzSpawn }: FlowEditorPr
           </Controls>
           <MiniMap
             nodeColor={(node) => {
+              // Hide invisible nodes (opacity: 0) from minimap
+              if (node.style?.opacity === 0) return 'transparent';
               const data = node.data as unknown as CustomNodeData | undefined;
               const nodeType = data?.nodeType;
               if (nodeType && nodeColors[nodeType]) {
