@@ -52,7 +52,12 @@ function getScanDirectory(workingDir?: string): string {
   if (!workingDir || workingDir === "~") {
     return DEFAULT_PROJECTS_DIR
   }
-  return resolve(expandTilde(workingDir))
+  const resolved = resolve(expandTilde(workingDir))
+  const allowedBase = join(homedir(), "projects")
+  if (!resolved.startsWith(allowedBase + "/") && resolved !== allowedBase) {
+    return DEFAULT_PROJECTS_DIR
+  }
+  return resolved
 }
 
 /** Get 7-day commit count for a project. Returns 0 on any error. */
@@ -213,7 +218,7 @@ export async function GET(request: NextRequest) {
 
   if (!existsSync(scanDir)) {
     return NextResponse.json(
-      { error: `Directory not found: ${scanDir}`, nodes: [], edges: [] },
+      { error: "Directory not found", nodes: [], edges: [] },
       { status: 404 }
     )
   }

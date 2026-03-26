@@ -93,6 +93,36 @@ function shortenPath(path: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Error Boundary for WebGL
+// ---------------------------------------------------------------------------
+
+class GraphErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+          <AlertCircle className="h-8 w-8 mb-2" />
+          <p className="text-sm">Failed to initialize 3D graph. WebGL may not be available.</p>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Detail Panel
 // ---------------------------------------------------------------------------
 
@@ -232,7 +262,7 @@ export default function ArchitectureVisualizerSection({
     updateSize()
     window.addEventListener("resize", updateSize)
     return () => window.removeEventListener("resize", updateSize)
-  }, [isFullscreen])
+  }, [isFullscreen, isLoading, graphData])
 
   // Fetch graph data
   const fetchGraph = React.useCallback(async (silent = false) => {
@@ -422,46 +452,48 @@ export default function ArchitectureVisualizerSection({
       )}
 
       {/* Graph */}
-      {!isLoading && !error && graphData && (
+      {!isLoading && !error && graphData && graphData.nodes.length > 0 && (
         <div
           ref={containerRef}
           className="relative rounded-lg border border-border/20 bg-black/40 overflow-hidden"
           data-tabz-region="graph"
         >
-          <ForceGraph3D
-            graphData={forceGraphData}
-            width={dimensions.width}
-            height={dimensions.height}
-            backgroundColor="rgba(0,0,0,0)"
-            showNavInfo={false}
-            nodeId="id"
-            nodeLabel="name"
-            nodeVal={(node: Record<string, unknown>) => (node as unknown as GraphNode & { __size: number }).__size}
-            nodeColor={(node: Record<string, unknown>) => {
-              const n = node as unknown as GraphNode & { __color: string }
-              if (hoveredNode && !connectedNodeIds.has(n.id)) {
-                return "#1e293b" // dim non-connected nodes on hover
-              }
-              return n.__color
-            }}
-            nodeOpacity={0.9}
-            linkSource="source"
-            linkTarget="target"
-            linkColor={() => "rgba(100, 116, 139, 0.3)"}
-            linkWidth={1}
-            linkDirectionalArrowLength={3.5}
-            linkDirectionalArrowRelPos={1}
-            linkDirectionalArrowColor={() => "rgba(100, 116, 139, 0.5)"}
-            onNodeClick={(node: Record<string, unknown>) => {
-              setSelectedNode(node as unknown as GraphNode)
-            }}
-            onNodeHover={(node: Record<string, unknown> | null) => {
-              setHoveredNode(node as unknown as GraphNode | null)
-            }}
-            onBackgroundClick={() => setSelectedNode(null)}
-            enableNodeDrag={true}
-            enableNavigationControls={true}
-          />
+          <GraphErrorBoundary>
+            <ForceGraph3D
+              graphData={forceGraphData}
+              width={dimensions.width}
+              height={dimensions.height}
+              backgroundColor="rgba(0,0,0,0)"
+              showNavInfo={false}
+              nodeId="id"
+              nodeLabel="name"
+              nodeVal={(node: Record<string, unknown>) => (node as unknown as GraphNode & { __size: number }).__size}
+              nodeColor={(node: Record<string, unknown>) => {
+                const n = node as unknown as GraphNode & { __color: string }
+                if (hoveredNode && !connectedNodeIds.has(n.id)) {
+                  return "#1e293b" // dim non-connected nodes on hover
+                }
+                return n.__color
+              }}
+              nodeOpacity={0.9}
+              linkSource="source"
+              linkTarget="target"
+              linkColor={() => "rgba(100, 116, 139, 0.3)"}
+              linkWidth={1}
+              linkDirectionalArrowLength={3.5}
+              linkDirectionalArrowRelPos={1}
+              linkDirectionalArrowColor={() => "rgba(100, 116, 139, 0.5)"}
+              onNodeClick={(node: Record<string, unknown>) => {
+                setSelectedNode(node as unknown as GraphNode)
+              }}
+              onNodeHover={(node: Record<string, unknown> | null) => {
+                setHoveredNode(node as unknown as GraphNode | null)
+              }}
+              onBackgroundClick={() => setSelectedNode(null)}
+              enableNodeDrag={true}
+              enableNavigationControls={true}
+            />
+          </GraphErrorBoundary>
 
           {/* Legend */}
           <div className="absolute bottom-3 left-3 flex items-center gap-3 text-xs text-muted-foreground bg-background/70 backdrop-blur-sm rounded-md px-3 py-1.5 border border-border/20">
