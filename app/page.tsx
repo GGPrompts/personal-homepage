@@ -42,6 +42,7 @@ import {
   Activity,
   BookOpen,
   Radar,
+  Network,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -106,6 +107,7 @@ import GovHoundSection from "./sections/govhound"
 import UptimeSection from "./sections/uptime"
 import PromptLibrarySection from "./sections/prompt-library"
 import AgentSwarmSection from "./sections/agent-swarm"
+import ArchitectureVisualizerSection from "./sections/architecture-visualizer"
 import { MusicPlayerSection } from "./sections/music-player"
 import dynamic from "next/dynamic"
 import { useLoginTrigger } from "@/hooks/useLoginTrigger"
@@ -167,6 +169,7 @@ const navigationItems: NavigationItem[] = [
   { id: "govhound", label: "GovHound", icon: Shield, description: "Federal IT contracts" },
   { id: "uptime", label: "Uptime", icon: Activity, description: "Service status monitoring" },
   { id: "agent-swarm", label: "Agent Swarm", icon: Radar, description: "AI agent session monitor" },
+  { id: "architecture", label: "Architecture", icon: Network, description: "Project ecosystem visualizer" },
   { id: "profile", label: "Profile", icon: User, description: "Account & sync" },
   { id: "settings", label: "Settings", icon: Settings, description: "Theme & preferences" },
 ]
@@ -793,6 +796,7 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
             uptime: { icon: Activity, label: "Uptime", description: "Service status monitoring" },
             "prompt-library": { icon: BookOpen, label: "Prompt Library", description: "Browse and manage reusable prompts" },
             "agent-swarm": { icon: Radar, label: "Agent Swarm", description: "AI agent session monitor" },
+            "architecture": { icon: Network, label: "Architecture", description: "Project ecosystem visualizer" },
           }
 
           const config = tileConfig[sectionId]
@@ -1024,6 +1028,11 @@ export default function PersonalHomepage() {
           return <LocalOnlyOverlay sectionName="Agent Swarm" description="This feature monitors local tmux/Claude agent sessions and requires localhost access." />
         }
         return <AgentSwarmSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "architecture":
+        if (!isLocal) {
+          return <LocalOnlyOverlay sectionName="Architecture Visualizer" description="This feature scans local project directories and requires localhost access." />
+        }
+        return <ArchitectureVisualizerSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "profile":
         return <ProfileSection />
       case "settings":

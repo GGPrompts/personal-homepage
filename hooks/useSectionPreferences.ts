@@ -26,7 +26,7 @@ import {
 } from "lucide-react"
 
 // Section IDs that can be toggled (excluding home and settings which are always visible)
-export type ToggleableSection = "weather" | "feed" | "api-playground" | "bookmarks" | "search" | "stocks" | "crypto" | "spacex" | "github-activity" | "disasters" | "tasks" | "projects" | "jobs" | "profile" | "ai-workspace" | "market-pulse" | "kanban" | "photo-gallery" | "music-player" | "video-player" | "files" | "analytics" | "flowchart" | "email" | "calendar" | "govhound" | "uptime" | "prompt-library" | "agent-swarm"
+export type ToggleableSection = "weather" | "feed" | "api-playground" | "bookmarks" | "search" | "stocks" | "crypto" | "spacex" | "github-activity" | "disasters" | "tasks" | "projects" | "jobs" | "profile" | "ai-workspace" | "market-pulse" | "kanban" | "photo-gallery" | "music-player" | "video-player" | "files" | "analytics" | "flowchart" | "email" | "calendar" | "govhound" | "uptime" | "prompt-library" | "agent-swarm" | "architecture"
 
 // All sections including non-toggleable ones
 export type Section = "home" | ToggleableSection | "settings"
@@ -152,6 +152,7 @@ export const DEFAULT_CATEGORY_ASSIGNMENTS: Record<ToggleableSection, CategoryId>
   govhound: "productivity",
   uptime: "development",
   "agent-swarm": "development",
+  architecture: "development",
 }
 
 // Default collapsed state (all expanded)
@@ -195,6 +196,7 @@ export const DEFAULT_SECTION_ORDER: ToggleableSection[] = [
   "govhound",
   "uptime",
   "agent-swarm",
+  "architecture",
 ]
 
 // Default visibility (all visible except media players which are opt-in)
@@ -228,6 +230,7 @@ export const DEFAULT_VISIBILITY: Record<ToggleableSection, boolean> = {
   uptime: true,
   "prompt-library": true,
   "agent-swarm": true,
+  architecture: true,
 }
 
 const STORAGE_KEY = "section-preferences"
@@ -278,6 +281,7 @@ export const DEFAULT_SECTION_AGENTS: Record<ToggleableSection, string | null> = 
   uptime: null,
   "prompt-library": null,
   "agent-swarm": null,
+  architecture: null,
 }
 
 function loadPreferences(): SectionPreferences {
