@@ -41,6 +41,7 @@ import {
   Shield,
   Activity,
   BookOpen,
+  Radar,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -104,6 +105,7 @@ import SettingsSection from "./sections/settings"
 import GovHoundSection from "./sections/govhound"
 import UptimeSection from "./sections/uptime"
 import PromptLibrarySection from "./sections/prompt-library"
+import AgentSwarmSection from "./sections/agent-swarm"
 import { MusicPlayerSection } from "./sections/music-player"
 import dynamic from "next/dynamic"
 import { useLoginTrigger } from "@/hooks/useLoginTrigger"
@@ -164,6 +166,7 @@ const navigationItems: NavigationItem[] = [
   { id: "video-player", label: "Video Player", icon: Video, description: "Media playback" },
   { id: "govhound", label: "GovHound", icon: Shield, description: "Federal IT contracts" },
   { id: "uptime", label: "Uptime", icon: Activity, description: "Service status monitoring" },
+  { id: "agent-swarm", label: "Agent Swarm", icon: Radar, description: "AI agent session monitor" },
   { id: "profile", label: "Profile", icon: User, description: "Account & sync" },
   { id: "settings", label: "Settings", icon: Settings, description: "Theme & preferences" },
 ]
@@ -789,6 +792,7 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
             govhound: { icon: Shield, label: "GovHound", description: "Federal IT contracts" },
             uptime: { icon: Activity, label: "Uptime", description: "Service status monitoring" },
             "prompt-library": { icon: BookOpen, label: "Prompt Library", description: "Browse and manage reusable prompts" },
+            "agent-swarm": { icon: Radar, label: "Agent Swarm", description: "AI agent session monitor" },
           }
 
           const config = tileConfig[sectionId]
@@ -1015,6 +1019,11 @@ export default function PersonalHomepage() {
         return <UptimeSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "prompt-library":
         return <PromptLibrarySection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "agent-swarm":
+        if (!isLocal) {
+          return <LocalOnlyOverlay sectionName="Agent Swarm" description="This feature monitors local tmux/Claude agent sessions and requires localhost access." />
+        }
+        return <AgentSwarmSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "profile":
         return <ProfileSection />
       case "settings":

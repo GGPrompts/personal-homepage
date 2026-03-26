@@ -75,7 +75,7 @@ import {
 import { useAgents } from "@/hooks/useAgents"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { isEmoji, isAvatarUrl } from "@/lib/ai/utils"
-import { Bot } from "lucide-react"
+import { Bot, Radar } from "lucide-react"
 
 // Section metadata for display
 const sectionMeta: Record<ToggleableSection, { label: string; icon: React.ElementType; description: string }> = {
@@ -107,6 +107,7 @@ const sectionMeta: Record<ToggleableSection, { label: string; icon: React.Elemen
   govhound: { label: "GovHound", icon: Shield, description: "Federal IT contracts" },
   uptime: { label: "Uptime", icon: Activity, description: "Service status monitoring" },
   "prompt-library": { label: "Prompt Library", icon: BookOpen, description: "Browse and manage reusable prompts" },
+  "agent-swarm": { label: "Agent Swarm", icon: Radar, description: "AI agent session monitor" },
 }
 
 // Agent card type for display
