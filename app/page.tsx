@@ -108,6 +108,7 @@ import UptimeSection from "./sections/uptime"
 import PromptLibrarySection from "./sections/prompt-library"
 import AgentSwarmSection from "./sections/agent-swarm"
 import ArchitectureVisualizerSection from "./sections/architecture-visualizer"
+import ReadingQueueSection from "./sections/reading-queue"
 import { MusicPlayerSection } from "./sections/music-player"
 import dynamic from "next/dynamic"
 import { useLoginTrigger } from "@/hooks/useLoginTrigger"
@@ -171,6 +172,7 @@ const navigationItems: NavigationItem[] = [
   { id: "uptime", label: "Uptime", icon: Activity, description: "Service status monitoring" },
   { id: "agent-swarm", label: "Agent Swarm", icon: Radar, description: "AI agent session monitor" },
   { id: "architecture", label: "Architecture", icon: Network, description: "Project ecosystem visualizer" },
+  { id: "reading-queue", label: "Reading Queue", icon: BookOpen, description: "Read later queue" },
   { id: "profile", label: "Profile", icon: User, description: "Account & sync" },
   { id: "settings", label: "Settings", icon: Settings, description: "Theme & preferences" },
 ]
@@ -798,6 +800,7 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
             "prompt-library": { icon: BookOpen, label: "Prompt Library", description: "Browse and manage reusable prompts" },
             "agent-swarm": { icon: Radar, label: "Agent Swarm", description: "AI agent session monitor" },
             "architecture": { icon: Network, label: "Architecture", description: "Project ecosystem visualizer" },
+            "reading-queue": { icon: BookOpen, label: "Reading Queue", description: "Read later queue" },
           }
 
           const config = tileConfig[sectionId]
@@ -1034,6 +1037,8 @@ export default function PersonalHomepage() {
           return <LocalOnlyOverlay sectionName="Architecture Visualizer" description="This feature scans local project directories and requires localhost access." />
         }
         return <ArchitectureVisualizerSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+      case "reading-queue":
+        return <ReadingQueueSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "profile":
         return <ProfileSection />
       case "settings":

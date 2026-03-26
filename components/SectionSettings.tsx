@@ -109,6 +109,7 @@ const sectionMeta: Record<ToggleableSection, { label: string; icon: React.Elemen
   "prompt-library": { label: "Prompt Library", icon: BookOpen, description: "Browse and manage reusable prompts" },
   "agent-swarm": { label: "Agent Swarm", icon: Radar, description: "AI agent session monitor" },
   architecture: { label: "Architecture", icon: Network, description: "Project ecosystem visualizer" },
+  "reading-queue": { label: "Reading Queue", icon: BookOpen, description: "Read later queue" },
 }
 
 // Agent card type for display

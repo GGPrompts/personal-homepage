@@ -25,6 +25,7 @@ import {
   Globe,
   Bookmark,
   ExternalLink,
+  BookOpen,
 } from "lucide-react"
 
 // ============================================================================
@@ -37,6 +38,14 @@ interface QuickNote {
   text: string
   createdAt: string
   updatedAt?: string
+}
+
+interface ReadingQueueItem {
+  id: string
+  title: string
+  url: string
+  status: "queued" | "reading" | "done"
+  addedAt: string
 }
 
 interface NavigationItem {
@@ -61,6 +70,7 @@ export function CommandPalette({ navigationItems, setActiveSection }: CommandPal
   const [open, setOpen] = useState(false)
   const [notes, setNotes] = useState<QuickNote[]>([])
   const [notesLoaded, setNotesLoaded] = useState(false)
+  const [readingQueueItems, setReadingQueueItems] = useState<ReadingQueueItem[]>([])
 
   // Bookmark search via TabzChrome
   const {
@@ -97,11 +107,34 @@ export function CommandPalette({ navigationItems, setActiveSection }: CommandPal
     }
   }, [open, notesLoaded])
 
+  // Load reading queue items when palette opens
+  useEffect(() => {
+    if (open) {
+      try {
+        const saved = localStorage.getItem("reading-queue-items")
+        if (saved) {
+          const all: ReadingQueueItem[] = JSON.parse(saved)
+          // Get 3 most recent queued items
+          const queued = all
+            .filter((i) => i.status === "queued")
+            .sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime())
+            .slice(0, 3)
+          setReadingQueueItems(queued)
+        } else {
+          setReadingQueueItems([])
+        }
+      } catch {
+        setReadingQueueItems([])
+      }
+    }
+  }, [open])
+
   // Reset state when closing
   useEffect(() => {
     if (!open) {
       setNotesLoaded(false)
       setNotes([])
+      setReadingQueueItems([])
       clearBookmarkSearch()
     }
   }, [open, clearBookmarkSearch])
@@ -129,6 +162,16 @@ export function CommandPalette({ navigationItems, setActiveSection }: CommandPal
     setActiveSection("tasks")
     setOpen(false)
   }, [setActiveSection])
+
+  // Handle reading queue item selection: open URL and navigate to section
+  const handleSelectReadingItem = useCallback(
+    (item: ReadingQueueItem) => {
+      window.open(item.url, "_blank")
+      setActiveSection("reading-queue")
+      setOpen(false)
+    },
+    [setActiveSection]
+  )
 
   // Handle search value changes for bookmark search
   const handleSearchChange = useCallback(
@@ -205,6 +248,30 @@ export function CommandPalette({ navigationItems, setActiveSection }: CommandPal
                         : note.text}
                     </span>
                     <CommandShortcut>{note.project}</CommandShortcut>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </>
+          )}
+
+          {/* Reading Queue Group */}
+          {readingQueueItems.length > 0 && (
+            <>
+              <CommandSeparator />
+              <CommandGroup heading="Reading Queue">
+                {readingQueueItems.map((item) => (
+                  <CommandItem
+                    key={item.id}
+                    value={`reading queue ${item.title} ${item.url}`}
+                    onSelect={() => handleSelectReadingItem(item)}
+                    data-tabz-action="open-reading-item"
+                    data-tabz-item={`reading-${item.id}`}
+                  >
+                    <BookOpen className="h-4 w-4 text-muted-foreground" />
+                    <span className="truncate max-w-[250px]">{item.title}</span>
+                    <CommandShortcut>
+                      <ExternalLink className="h-3 w-3" />
+                    </CommandShortcut>
                   </CommandItem>
                 ))}
               </CommandGroup>

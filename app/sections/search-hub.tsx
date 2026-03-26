@@ -329,6 +329,10 @@ export default function SearchHubSection({
   const [saveBookmarkOpen, setSaveBookmarkOpen] = React.useState(false)
   const [saveBookmarkUrl, setSaveBookmarkUrl] = React.useState("")
   const [saveBookmarkTitle, setSaveBookmarkTitle] = React.useState("")
+  const [saveToQueueOpen, setSaveToQueueOpen] = React.useState(false)
+  const [queueUrl, setQueueUrl] = React.useState("")
+  const [queueTitle, setQueueTitle] = React.useState("")
+  const [queueSaved, setQueueSaved] = React.useState(false)
   const inputRef = React.useRef<HTMLInputElement>(null)
 
   // Chrome bookmarks hook
@@ -535,6 +539,31 @@ export default function SearchHubSection({
       // Show success feedback
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  // Handle saving to reading queue
+  const handleSaveToQueue = () => {
+    if (!queueUrl.trim() || !queueTitle.trim()) return
+
+    const QUEUE_KEY = "reading-queue-items"
+    try {
+      const existing = JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]")
+      const newItem = {
+        id: `rq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        title: queueTitle.trim(),
+        url: queueUrl.trim(),
+        status: "queued",
+        addedAt: new Date().toISOString(),
+      }
+      localStorage.setItem(QUEUE_KEY, JSON.stringify([newItem, ...existing]))
+      setSaveToQueueOpen(false)
+      setQueueUrl("")
+      setQueueTitle("")
+      setQueueSaved(true)
+      setTimeout(() => setQueueSaved(false), 2000)
+    } catch {
+      // Storage error
     }
   }
 
@@ -809,6 +838,73 @@ export default function SearchHubSection({
                 <span>{activeCategory === "bookmarks" ? "Bookmark saved!" : "Prompt copied to clipboard - paste when page loads"}</span>
               </div>
             )}
+
+            {/* Queue saved feedback */}
+            {queueSaved && (
+              <div className="flex items-center gap-2 mt-3 text-sm text-emerald-400">
+                <Check className="h-4 w-4" />
+                <span>Saved to Reading Queue!</span>
+              </div>
+            )}
+
+            {/* Save to Reading Queue */}
+            <div className="mt-3 pt-3 border-t border-muted/30">
+              <button
+                type="button"
+                onClick={() => setSaveToQueueOpen(!saveToQueueOpen)}
+                className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                data-tabz-action="save-to-queue"
+              >
+                <BookOpen className="h-3.5 w-3.5" />
+                Save to Reading Queue
+              </button>
+              {saveToQueueOpen && (
+                <div className="mt-3 p-3 rounded-lg bg-muted/30 border border-muted/50">
+                  <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                    <BookOpen className="h-4 w-4" />
+                    Save to Reading Queue
+                  </h4>
+                  <div className="space-y-2">
+                    <Input
+                      value={queueUrl}
+                      onChange={(e) => setQueueUrl(e.target.value)}
+                      placeholder="URL (https://...)"
+                      className="text-sm"
+                      data-tabz-input="queue-url"
+                    />
+                    <Input
+                      value={queueTitle}
+                      onChange={(e) => setQueueTitle(e.target.value)}
+                      placeholder="Title"
+                      className="text-sm"
+                      data-tabz-input="queue-title"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleSaveToQueue}
+                        disabled={!queueUrl.trim() || !queueTitle.trim()}
+                      >
+                        Save to Queue
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setSaveToQueueOpen(false)
+                          setQueueUrl("")
+                          setQueueTitle("")
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </form>
 
