@@ -26,7 +26,7 @@ import { Textarea } from "@/components/ui/textarea"
 // TYPES
 // ============================================================================
 
-interface ReadingItem {
+export interface ReadingItem {
   id: string
   title: string
   url: string
@@ -45,7 +45,7 @@ type TabStatus = "queued" | "reading" | "done"
 // STORAGE
 // ============================================================================
 
-const STORAGE_KEY = "reading-queue-items"
+export const STORAGE_KEY = "reading-queue-items"
 
 function loadItems(): ReadingItem[] {
   if (typeof window === "undefined") return []
@@ -61,7 +61,11 @@ function loadItems(): ReadingItem[] {
 }
 
 function saveItems(items: ReadingItem[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
+  } catch (err) {
+    console.error("Failed to save reading queue items to localStorage:", err)
+  }
 }
 
 // ============================================================================
@@ -85,6 +89,15 @@ function formatRelativeTime(dateStr: string): string {
   if (diffHours < 24) return `${diffHours}h ago`
   if (diffDays < 7) return `${diffDays}d ago`
   return date.toLocaleDateString()
+}
+
+function isSafeUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === "http:" || parsed.protocol === "https:"
+  } catch {
+    return false
+  }
 }
 
 function getDomain(url: string): string {
@@ -138,10 +151,13 @@ export default function ReadingQueueSection({ activeSubItem, onSubItemHandled }:
     }
   }, [activeSubItem, onSubItemHandled])
 
-  // Persist items when they change
-  const updateItems = React.useCallback((newItems: ReadingItem[]) => {
-    setItems(newItems)
-    saveItems(newItems)
+  // Persist items when they change (functional updater pattern to avoid stale closures)
+  const updateItemsFn = React.useCallback((updater: (prev: ReadingItem[]) => ReadingItem[]) => {
+    setItems((prev) => {
+      const newItems = updater(prev)
+      saveItems(newItems)
+      return newItems
+    })
   }, [])
 
   // Auto-fetch title when URL is pasted/entered
@@ -173,6 +189,7 @@ export default function ReadingQueueSection({ activeSubItem, onSubItemHandled }:
   // Add new item
   const handleAdd = React.useCallback(() => {
     if (!addUrl.trim() || !addTitle.trim()) return
+    if (!isSafeUrl(addUrl.trim())) return
 
     const newItem: ReadingItem = {
       id: generateId(),
@@ -184,18 +201,18 @@ export default function ReadingQueueSection({ activeSubItem, onSubItemHandled }:
       tags: addTags.trim() ? addTags.split(",").map((t) => t.trim()).filter(Boolean) : undefined,
     }
 
-    updateItems([newItem, ...items])
+    updateItemsFn((prev) => [newItem, ...prev])
     setAddUrl("")
     setAddTitle("")
     setAddEstimate("")
     setAddTags("")
     setShowAddForm(false)
-  }, [addUrl, addTitle, addEstimate, addTags, items, updateItems])
+  }, [addUrl, addTitle, addEstimate, addTags, updateItemsFn])
 
   // Move item to next status
   const moveForward = React.useCallback((id: string) => {
-    updateItems(
-      items.map((item) => {
+    updateItemsFn((prev) =>
+      prev.map((item) => {
         if (item.id !== id) return item
         if (item.status === "queued") {
           return { ...item, status: "reading" as const, startedAt: new Date().toISOString() }
@@ -206,12 +223,12 @@ export default function ReadingQueueSection({ activeSubItem, onSubItemHandled }:
         return item
       })
     )
-  }, [items, updateItems])
+  }, [updateItemsFn])
 
   // Move item back to previous status
   const moveBack = React.useCallback((id: string) => {
-    updateItems(
-      items.map((item) => {
+    updateItemsFn((prev) =>
+      prev.map((item) => {
         if (item.id !== id) return item
         if (item.status === "reading") {
           return { ...item, status: "queued" as const, startedAt: undefined }
@@ -222,23 +239,23 @@ export default function ReadingQueueSection({ activeSubItem, onSubItemHandled }:
         return item
       })
     )
-  }, [items, updateItems])
+  }, [updateItemsFn])
 
   // Delete item
   const deleteItem = React.useCallback((id: string) => {
-    updateItems(items.filter((item) => item.id !== id))
-  }, [items, updateItems])
+    updateItemsFn((prev) => prev.filter((item) => item.id !== id))
+  }, [updateItemsFn])
 
   // Save notes for an item
   const saveNotes = React.useCallback((id: string) => {
-    updateItems(
-      items.map((item) =>
+    updateItemsFn((prev) =>
+      prev.map((item) =>
         item.id === id ? { ...item, notes: editingNotes || undefined } : item
       )
     )
     setEditingNotesId(null)
     setEditingNotes("")
-  }, [items, editingNotes, updateItems])
+  }, [editingNotes, updateItemsFn])
 
   // Computed stats
   const queuedItems = items.filter((i) => i.status === "queued")
@@ -442,7 +459,7 @@ export default function ReadingQueueSection({ activeSubItem, onSubItemHandled }:
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <a
-                      href={item.url}
+                      href={isSafeUrl(item.url) ? item.url : "#"}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-sm font-medium hover:text-primary transition-colors truncate"
@@ -457,7 +474,7 @@ export default function ReadingQueueSection({ activeSubItem, onSubItemHandled }:
                       <LinkIcon className="h-3 w-3" />
                       {getDomain(item.url)}
                     </span>
-                    <span>
+                    <span suppressHydrationWarning>
                       {item.status === "done" && item.completedAt
                         ? `Completed ${formatRelativeTime(item.completedAt)}`
                         : item.status === "reading" && item.startedAt

@@ -562,8 +562,8 @@ export default function SearchHubSection({
       setQueueTitle("")
       setQueueSaved(true)
       setTimeout(() => setQueueSaved(false), 2000)
-    } catch {
-      // Storage error
+    } catch (err) {
+      console.error("Failed to save to reading queue:", err)
     }
   }
 

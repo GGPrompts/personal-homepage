@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import React, { useEffect, useState, useCallback } from "react"
 import {
   CommandDialog,
   CommandInput,
@@ -27,6 +27,7 @@ import {
   ExternalLink,
   BookOpen,
 } from "lucide-react"
+import { type ReadingItem, STORAGE_KEY as READING_QUEUE_KEY } from "@/app/sections/reading-queue"
 
 // ============================================================================
 // TYPES
@@ -38,14 +39,6 @@ interface QuickNote {
   text: string
   createdAt: string
   updatedAt?: string
-}
-
-interface ReadingQueueItem {
-  id: string
-  title: string
-  url: string
-  status: "queued" | "reading" | "done"
-  addedAt: string
 }
 
 interface NavigationItem {
@@ -70,7 +63,7 @@ export function CommandPalette({ navigationItems, setActiveSection }: CommandPal
   const [open, setOpen] = useState(false)
   const [notes, setNotes] = useState<QuickNote[]>([])
   const [notesLoaded, setNotesLoaded] = useState(false)
-  const [readingQueueItems, setReadingQueueItems] = useState<ReadingQueueItem[]>([])
+  const [readingQueueItems, setReadingQueueItems] = useState<ReadingItem[]>([])
 
   // Bookmark search via TabzChrome
   const {
@@ -96,7 +89,10 @@ export function CommandPalette({ navigationItems, setActiveSection }: CommandPal
   useEffect(() => {
     if (open && !notesLoaded) {
       fetch("/api/quicknotes")
-        .then((res) => res.json())
+        .then((res) => {
+          if (!res.ok) throw new Error(`quicknotes fetch failed: ${res.status}`)
+          return res.json()
+        })
         .then((data) => {
           setNotes(data.notes || [])
           setNotesLoaded(true)
@@ -111,9 +107,9 @@ export function CommandPalette({ navigationItems, setActiveSection }: CommandPal
   useEffect(() => {
     if (open) {
       try {
-        const saved = localStorage.getItem("reading-queue-items")
+        const saved = localStorage.getItem(READING_QUEUE_KEY)
         if (saved) {
-          const all: ReadingQueueItem[] = JSON.parse(saved)
+          const all: ReadingItem[] = JSON.parse(saved)
           // Get 3 most recent queued items
           const queued = all
             .filter((i) => i.status === "queued")
@@ -165,8 +161,16 @@ export function CommandPalette({ navigationItems, setActiveSection }: CommandPal
 
   // Handle reading queue item selection: open URL and navigate to section
   const handleSelectReadingItem = useCallback(
-    (item: ReadingQueueItem) => {
-      window.open(item.url, "_blank")
+    (item: ReadingItem) => {
+      // Only open URLs with safe protocols to prevent javascript: XSS
+      try {
+        const parsed = new URL(item.url)
+        if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+          window.open(item.url, "_blank")
+        }
+      } catch {
+        // Invalid URL, skip opening
+      }
       setActiveSection("reading-queue")
       setOpen(false)
     },
