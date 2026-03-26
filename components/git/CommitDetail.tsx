@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
+import React, { memo, useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   ArrowLeft,
@@ -91,7 +91,7 @@ function timeAgo(dateString: string): string {
   return `${diffYears}y ago`
 }
 
-export function CommitDetail({
+export const CommitDetail = memo(function CommitDetail({
   commit,
   repoPath,
   onBack,
@@ -258,4 +258,4 @@ export function CommitDetail({
       </div>
     </div>
   )
-}
+})

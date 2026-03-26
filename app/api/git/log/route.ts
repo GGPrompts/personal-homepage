@@ -9,6 +9,29 @@ export const dynamic = "force-dynamic"
 
 const PROJECTS_DIR = join(homedir(), "projects")
 
+// --- In-memory caches with TTL ---
+const CACHE_TTL = 30_000 // 30 seconds
+
+interface CacheEntry<T> {
+  value: T
+  timestamp: number
+}
+
+const commitCountCache = new Map<string, CacheEntry<number>>()
+const branchListCache = new Map<string, CacheEntry<{ name: string; current: boolean }[]>>()
+
+function getCached<T>(cache: Map<string, CacheEntry<T>>, key: string): T | null {
+  const entry = cache.get(key)
+  if (entry && Date.now() - entry.timestamp < CACHE_TTL) {
+    return entry.value
+  }
+  return null
+}
+
+function setCache<T>(cache: Map<string, CacheEntry<T>>, key: string, value: T): void {
+  cache.set(key, { value, timestamp: Date.now() })
+}
+
 // Expand ~ to home directory
 function expandHome(p: string): string {
   if (p.startsWith("~/")) return join(homedir(), p.slice(2))
@@ -187,35 +210,44 @@ export async function GET(request: NextRequest) {
     // Run graph layout
     const layout = computeGraphLayout(commits)
 
-    // Get total commit count (cached per request, fast for most repos)
-    let totalCommits = 0
-    try {
-      const countCmd = branch
-        ? `git rev-list --count "${branch.replace(/"/g, '\\"')}"`
-        : "git rev-list --count --all"
-      totalCommits = parseInt(
-        execSync(countCmd, { cwd: path, encoding: "utf-8", timeout: 5000 }).trim(),
-        10
-      ) || 0
-    } catch {
-      // Fallback: we know at least this many
-      totalCommits = skip + commits.length + (hasMore ? 1 : 0)
+    // Get total commit count (cached with TTL)
+    const countCacheKey = `${path}:${branch || "__all__"}`
+    let totalCommits = getCached(commitCountCache, countCacheKey)
+    if (totalCommits === null) {
+      try {
+        const countCmd = branch
+          ? `git rev-list --count "${branch.replace(/"/g, '\\"')}"`
+          : "git rev-list --count --all"
+        totalCommits = parseInt(
+          execSync(countCmd, { cwd: path, encoding: "utf-8", timeout: 5000 }).trim(),
+          10
+        ) || 0
+        setCache(commitCountCache, countCacheKey, totalCommits)
+      } catch {
+        // Fallback: we know at least this many
+        totalCommits = skip + commits.length + (hasMore ? 1 : 0)
+      }
     }
 
-    // Get branch list with current branch marker
-    let branches: { name: string; current: boolean }[] = []
-    try {
-      const branchOutput = execSync("git branch --format='%(refname:short)|%(HEAD)'", {
-        cwd: path,
-        encoding: "utf-8",
-        timeout: 5000,
-      })
-      branches = branchOutput.trim().split("\n").filter(Boolean).map((line) => {
-        const [name, head] = line.split("|")
-        return { name: name.trim(), current: head?.trim() === "*" }
-      })
-    } catch {
-      // Non-critical, return empty
+    // Get branch list with current branch marker (cached with TTL)
+    const branchCacheKey = path
+    let branches = getCached(branchListCache, branchCacheKey)
+    if (branches === null) {
+      branches = []
+      try {
+        const branchOutput = execSync("git branch --format='%(refname:short)|%(HEAD)'", {
+          cwd: path,
+          encoding: "utf-8",
+          timeout: 5000,
+        })
+        branches = branchOutput.trim().split("\n").filter(Boolean).map((line) => {
+          const [name, head] = line.split("|")
+          return { name: name.trim(), current: head?.trim() === "*" }
+        })
+        setCache(branchListCache, branchCacheKey, branches)
+      } catch {
+        // Non-critical, return empty
+      }
     }
 
     // Map layout nodes to response format

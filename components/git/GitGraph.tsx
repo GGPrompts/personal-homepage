@@ -216,7 +216,8 @@ export function GitGraph({
               key={node.sha}
               node={node}
               isSelected={selectedSha === node.sha}
-              onClick={() => onSelectCommit(node.sha)}
+              sha={node.sha}
+              onSelectCommit={onSelectCommit}
             />
           ))}
         </div>

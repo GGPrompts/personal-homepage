@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useMemo, memo } from 'react'
 import {
   FileText,
   Plus,
@@ -110,19 +110,19 @@ function CollapsibleSection({
   )
 }
 
-function FileRow({
+const FileRow = memo(function FileRow({
   file,
   isSelected,
-  onClick,
+  onFileSelect,
   onToggleStage,
   onDiscard,
   isLoading,
 }: {
   file: GitFile
   isSelected: boolean
-  onClick: () => void
-  onToggleStage: () => void
-  onDiscard?: () => void
+  onFileSelect: (path: string) => void
+  onToggleStage: (file: GitFile) => void
+  onDiscard?: (file: GitFile) => void
   isLoading: boolean
 }) {
   const fileName = file.path.split('/').pop() || file.path
@@ -144,7 +144,7 @@ function FileRow({
       <button
         onClick={(e) => {
           e.stopPropagation()
-          onToggleStage()
+          onToggleStage(file)
         }}
         disabled={isLoading}
         className="flex-shrink-0 p-0.5 rounded hover:bg-muted transition-colors disabled:opacity-50"
@@ -161,7 +161,7 @@ function FileRow({
 
       {/* File info (clickable for diff view) */}
       <button
-        onClick={onClick}
+        onClick={() => onFileSelect(file.path)}
         className="flex items-center gap-1.5 flex-1 min-w-0 text-left"
       >
         {statusIcons[file.status]}
@@ -187,7 +187,7 @@ function FileRow({
         <button
           onClick={(e) => {
             e.stopPropagation()
-            onDiscard()
+            onDiscard(file)
           }}
           disabled={isLoading}
           className="flex-shrink-0 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-red-500/20 hover:text-red-500 transition-all disabled:opacity-50"
@@ -198,7 +198,7 @@ function FileRow({
       )}
     </div>
   )
-}
+})
 
 export function ChangedFilesList({
   files,
@@ -211,9 +211,9 @@ export function ChangedFilesList({
   const [loadingFiles, setLoadingFiles] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState<string | null>(null)
 
-  const stagedFiles = files.filter((f) => f.staged)
-  const changedFiles = files.filter((f) => !f.staged && f.status !== 'untracked')
-  const untrackedFiles = files.filter((f) => f.status === 'untracked')
+  const stagedFiles = useMemo(() => files.filter((f) => f.staged), [files])
+  const changedFiles = useMemo(() => files.filter((f) => !f.staged && f.status !== 'untracked'), [files])
+  const untrackedFiles = useMemo(() => files.filter((f) => f.status === 'untracked'), [files])
 
   const gitAction = useCallback(
     async (action: string, actionFiles?: string[]) => {
@@ -285,6 +285,11 @@ export function ChangedFilesList({
     }
   }, [gitAction, onRefresh])
 
+  const handleFileSelect = useCallback(
+    (path: string) => onFileSelect(path),
+    [onFileSelect]
+  )
+
   const handleUnstageAll = useCallback(async () => {
     setBulkLoading('unstage-all')
     try {
@@ -334,9 +339,9 @@ export function ChangedFilesList({
               key={`staged-${file.path}`}
               file={file}
               isSelected={selectedFile === file.path}
-              onClick={() => onFileSelect(file.path)}
-              onToggleStage={() => handleToggleStage(file)}
-              onDiscard={() => handleDiscard(file)}
+              onFileSelect={handleFileSelect}
+              onToggleStage={handleToggleStage}
+              onDiscard={handleDiscard}
               isLoading={loadingFiles.has(key)}
             />
           )
@@ -369,9 +374,9 @@ export function ChangedFilesList({
               key={`changed-${file.path}`}
               file={file}
               isSelected={selectedFile === file.path}
-              onClick={() => onFileSelect(file.path)}
-              onToggleStage={() => handleToggleStage(file)}
-              onDiscard={() => handleDiscard(file)}
+              onFileSelect={handleFileSelect}
+              onToggleStage={handleToggleStage}
+              onDiscard={handleDiscard}
               isLoading={loadingFiles.has(key)}
             />
           )
@@ -404,8 +409,8 @@ export function ChangedFilesList({
               key={`untracked-${file.path}`}
               file={file}
               isSelected={selectedFile === file.path}
-              onClick={() => onFileSelect(file.path)}
-              onToggleStage={() => handleToggleStage(file)}
+              onFileSelect={handleFileSelect}
+              onToggleStage={handleToggleStage}
               isLoading={loadingFiles.has(key)}
             />
           )

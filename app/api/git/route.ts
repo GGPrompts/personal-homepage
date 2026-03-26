@@ -127,36 +127,51 @@ function parseGitStatus(output: string, branch: string): GitFile[] {
 }
 
 async function getDetailedGitStatus(projectPath: string): Promise<GitStatus> {
-  // Get current branch
-  const branch = execSync("git rev-parse --abbrev-ref HEAD", {
-    cwd: projectPath,
-    encoding: "utf-8",
-    timeout: 5000,
-  }).trim()
-
-  // Get upstream branch
-  let upstream: string | null = null
-  try {
-    upstream = execSync(`git rev-parse --abbrev-ref ${branch}@{upstream}`, {
+  // Run branch, status, and stash in parallel (they're independent reads)
+  const [branchResult, statusResult, stashResult] = await Promise.all([
+    execAsync("git rev-parse --abbrev-ref HEAD", {
       cwd: projectPath,
       encoding: "utf-8",
       timeout: 5000,
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim()
+    }),
+    execAsync("git status --porcelain=v2", {
+      cwd: projectPath,
+      encoding: "utf-8",
+      timeout: 10000,
+    }),
+    execAsync("git stash list", {
+      cwd: projectPath,
+      encoding: "utf-8",
+      timeout: 5000,
+    }).catch(() => ({ stdout: "", stderr: "" })),
+  ])
+
+  const branch = branchResult.stdout.trim()
+  const files = parseGitStatus(statusResult.stdout, branch)
+  const stashOutput = stashResult.stdout.trim()
+  const stashCount = stashOutput ? stashOutput.split("\n").length : 0
+
+  // Get upstream and ahead/behind (depends on branch name)
+  let upstream: string | null = null
+  let ahead = 0
+  let behind = 0
+  try {
+    upstream = (await execAsync(`git rev-parse --abbrev-ref ${branch}@{upstream}`, {
+      cwd: projectPath,
+      encoding: "utf-8",
+      timeout: 5000,
+    })).stdout.trim()
   } catch {
     // No upstream
   }
 
-  // Get ahead/behind counts
-  let ahead = 0
-  let behind = 0
   if (upstream) {
     try {
-      const countOutput = execSync(`git rev-list --left-right --count ${branch}...${upstream}`, {
+      const countOutput = (await execAsync(`git rev-list --left-right --count ${branch}...${upstream}`, {
         cwd: projectPath,
         encoding: "utf-8",
         timeout: 5000,
-      }).trim()
+      })).stdout.trim()
       const [a, b] = countOutput.split(/\s+/).map(Number)
       ahead = a || 0
       behind = b || 0
@@ -165,33 +180,11 @@ async function getDetailedGitStatus(projectPath: string): Promise<GitStatus> {
     }
   }
 
-  // Get detailed status
-  const statusOutput = execSync("git status --porcelain=v2", {
-    cwd: projectPath,
-    encoding: "utf-8",
-    timeout: 10000,
-  })
-
-  const files = parseGitStatus(statusOutput, branch)
-
   // Determine overall status
   let status: GitStatus["status"] = "clean"
   if (files.length > 0) {
     const hasModified = files.some((f) => f.status !== "untracked")
     status = hasModified ? "dirty" : "untracked"
-  }
-
-  // Get stash count
-  let stashCount = 0
-  try {
-    const stashOutput = execSync("git stash list", {
-      cwd: projectPath,
-      encoding: "utf-8",
-      timeout: 5000,
-    }).trim()
-    stashCount = stashOutput ? stashOutput.split("\n").length : 0
-  } catch {
-    // Ignore stash errors
   }
 
   return {
@@ -202,6 +195,46 @@ async function getDetailedGitStatus(projectPath: string): Promise<GitStatus> {
     status,
     files,
     stashCount,
+  }
+}
+
+/**
+ * Lightweight status after local-only mutations (stage/unstage/discard).
+ * Skips upstream/ahead/behind and stash since those don't change.
+ */
+async function getLightGitStatus(projectPath: string, knownBranch?: string): Promise<GitStatus> {
+  const [branchResult, statusResult] = await Promise.all([
+    knownBranch
+      ? Promise.resolve({ stdout: knownBranch, stderr: "" })
+      : execAsync("git rev-parse --abbrev-ref HEAD", {
+          cwd: projectPath,
+          encoding: "utf-8",
+          timeout: 5000,
+        }),
+    execAsync("git status --porcelain=v2", {
+      cwd: projectPath,
+      encoding: "utf-8",
+      timeout: 10000,
+    }),
+  ])
+
+  const branch = branchResult.stdout.trim()
+  const files = parseGitStatus(statusResult.stdout, branch)
+
+  let status: GitStatus["status"] = "clean"
+  if (files.length > 0) {
+    const hasModified = files.some((f) => f.status !== "untracked")
+    status = hasModified ? "dirty" : "untracked"
+  }
+
+  return {
+    branch,
+    upstream: null,
+    ahead: 0,
+    behind: 0,
+    status,
+    files,
+    stashCount: 0,
   }
 }
 
@@ -380,7 +413,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Get updated status after action
-    const status = await getDetailedGitStatus(path)
+    // For local-only mutations (stage/unstage/discard), use lightweight status
+    // that skips upstream/ahead/behind and stash queries
+    const useLight = action === "stage" || action === "unstage" || action === "discard"
+    const status = useLight
+      ? await getLightGitStatus(gitRootPost)
+      : await getDetailedGitStatus(gitRootPost)
 
     return NextResponse.json({ success: true, output, status })
   } catch (error) {

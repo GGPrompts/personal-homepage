@@ -1,12 +1,14 @@
 'use client'
 
+import React, { memo, useCallback } from 'react'
 import { Badge } from '@/components/ui/badge'
 import type { GraphNode, Ref } from '@/lib/git/graph-layout'
 
 interface GitGraphRowProps {
   node: GraphNode
   isSelected: boolean
-  onClick: () => void
+  sha: string
+  onSelectCommit: (sha: string) => void
 }
 
 function timeAgo(dateString: string): string {
@@ -55,16 +57,20 @@ function classifyRefs(refs: Ref[]): {
   return { branches, tags, isHead }
 }
 
-export function GitGraphRow({ node, isSelected, onClick }: GitGraphRowProps) {
+export const GitGraphRow = memo(function GitGraphRow({ node, isSelected, sha, onSelectCommit }: GitGraphRowProps) {
   const { branches, tags, isHead } = classifyRefs(node.refs ?? [])
   const relativeTime = timeAgo(node.date)
+
+  const handleClick = useCallback(() => {
+    onSelectCommit(sha)
+  }, [sha, onSelectCommit])
 
   return (
     <div
       className={`flex items-center gap-2 px-3 cursor-pointer transition-colors h-[40px] ${
         isSelected ? 'bg-primary/10' : 'hover:bg-muted/50'
       }`}
-      onClick={onClick}
+      onClick={handleClick}
     >
       {/* Short SHA */}
       <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0 h-5 shrink-0">
@@ -115,4 +121,4 @@ export function GitGraphRow({ node, isSelected, onClick }: GitGraphRowProps) {
       </span>
     </div>
   )
-}
+})

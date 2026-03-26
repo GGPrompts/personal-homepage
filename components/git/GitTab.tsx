@@ -225,6 +225,22 @@ export function GitTab({
     refetchLog()
   }, [refetchStatus, refetchLog])
 
+  const toggleCommitsOpen = useCallback(() => {
+    setCommitsOpen(prev => !prev)
+  }, [])
+
+  const setViewModeList = useCallback(() => setCommitViewMode('list'), [])
+  const setViewModeGraph = useCallback(() => setCommitViewMode('graph'), [])
+
+  // Memoize the commit list items so timeAgo isn't recalculated on every render
+  const commitListItems = useMemo(() => {
+    if (!logData?.commits) return null
+    return logData.commits.map((commit) => ({
+      ...commit,
+      relativeTime: timeAgo(commit.date),
+    }))
+  }, [logData?.commits])
+
   // Loading state
   if (statusLoading && !gitStatus) {
     return (
@@ -377,7 +393,7 @@ export function GitTab({
         <div className="px-2 py-2">
           <div className="flex items-center gap-1.5 w-full px-1 mb-1">
             <button
-              onClick={() => setCommitsOpen(!commitsOpen)}
+              onClick={toggleCommitsOpen}
               className="flex items-center gap-1.5 flex-1 min-w-0"
             >
               {commitsOpen ? (
@@ -393,7 +409,7 @@ export function GitTab({
             {/* View mode toggle */}
             <div className="flex items-center rounded border border-border/50 overflow-hidden flex-shrink-0">
               <button
-                onClick={() => setCommitViewMode('list')}
+                onClick={setViewModeList}
                 className={cn(
                   'p-0.5 transition-colors',
                   commitViewMode === 'list'
@@ -405,7 +421,7 @@ export function GitTab({
                 <List className="h-3 w-3" />
               </button>
               <button
-                onClick={() => setCommitViewMode('graph')}
+                onClick={setViewModeGraph}
                 className={cn(
                   'p-0.5 transition-colors',
                   commitViewMode === 'graph'
@@ -440,7 +456,7 @@ export function GitTab({
                 </p>
               )}
 
-              {logData?.commits.map((commit) => (
+              {commitListItems?.map((commit) => (
                 <button
                   key={commit.sha}
                   onClick={() => handleCommitClick(commit)}
@@ -461,7 +477,7 @@ export function GitTab({
                         {commit.shortSha}
                       </Badge>
                       <span className="text-[0.75em] text-muted-foreground flex-shrink-0">
-                        {timeAgo(commit.date)}
+                        {commit.relativeTime}
                       </span>
                     </div>
                     <p className="text-[0.85em] truncate mt-0.5 text-foreground">
@@ -471,7 +487,7 @@ export function GitTab({
                 </button>
               ))}
 
-              {logData && logData.commits.length > 0 && (
+              {commitListItems && commitListItems.length > 0 && (
                 <button
                   onClick={onShowGraph}
                   className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded text-[0.85em] text-muted-foreground hover:text-primary hover:bg-muted/50 transition-colors"
