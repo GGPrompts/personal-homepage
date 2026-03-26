@@ -1,9 +1,10 @@
 'use client'
 
-import React, { useMemo, useRef, useCallback } from 'react'
+import React, { useMemo, useRef } from 'react'
 import { Columns2, AlignJustify, Plus, Minus } from 'lucide-react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -195,7 +196,28 @@ function buildSplitPairs(hunk: DiffHunk): SplitPair[] {
 }
 
 // ---------------------------------------------------------------------------
-// Unified mode renderer
+// Unified mode: flat item types for virtualization
+// ---------------------------------------------------------------------------
+
+type UnifiedFlatItem =
+  | { type: 'hunk-header'; hunk: DiffHunk }
+  | { type: 'line'; line: DiffLine }
+
+function buildUnifiedFlatItems(files: DiffFile[]): UnifiedFlatItem[] {
+  const items: UnifiedFlatItem[] = []
+  for (const file of files) {
+    for (const hunk of file.hunks) {
+      items.push({ type: 'hunk-header', hunk })
+      for (const line of hunk.lines) {
+        items.push({ type: 'line', line })
+      }
+    }
+  }
+  return items
+}
+
+// ---------------------------------------------------------------------------
+// Unified mode renderer (virtualized)
 // ---------------------------------------------------------------------------
 
 function UnifiedView({
@@ -207,110 +229,174 @@ function UnifiedView({
   language: string
   lineNumberWidth: number
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  const flatItems = useMemo(() => buildUnifiedFlatItems(files), [files])
+
+  const virtualizer = useVirtualizer({
+    count: flatItems.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: (index) => flatItems[index].type === 'hunk-header' ? 28 : 24,
+    overscan: 20,
+  })
+
   return (
-    <div className="diff-unified overflow-auto h-full font-mono text-sm leading-6">
-      {files.map((file, fileIndex) => (
-        <div key={fileIndex}>
-          {file.hunks.map((hunk, hunkIndex) => (
-            <div key={hunkIndex}>
-              {/* Hunk header */}
+    <div ref={scrollRef} className="diff-unified overflow-auto h-full font-mono text-sm leading-6">
+      <div
+        style={{
+          height: virtualizer.getTotalSize(),
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {virtualizer.getVirtualItems().map((virtualItem) => {
+          const item = flatItems[virtualItem.index]
+
+          if (item.type === 'hunk-header') {
+            const { hunk } = item
+            return (
               <div
-                className="px-3 py-1 text-xs select-none sticky top-0 z-10"
-                style={{ background: 'var(--diff-hunk-bg)' }}
+                key={virtualItem.key}
+                data-index={virtualItem.index}
+                ref={virtualizer.measureElement}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${virtualItem.start}px)`,
+                }}
               >
-                <span className="opacity-70">
-                  @@ -{hunk.oldStart},{hunk.oldCount} +{hunk.newStart},{hunk.newCount} @@
-                </span>
-                {hunk.header && (
-                  <span className="ml-2 text-[hsl(var(--primary))]">{hunk.header}</span>
-                )}
+                <div
+                  className="px-3 py-1 text-xs select-none"
+                  style={{ background: 'var(--diff-hunk-bg)' }}
+                >
+                  <span className="opacity-70">
+                    @@ -{hunk.oldStart},{hunk.oldCount} +{hunk.newStart},{hunk.newCount} @@
+                  </span>
+                  {hunk.header && (
+                    <span className="ml-2 text-[hsl(var(--primary))]">{hunk.header}</span>
+                  )}
+                </div>
               </div>
+            )
+          }
 
-              {/* Lines */}
-              {hunk.lines.map((line, lineIndex) => {
-                const bgVar =
-                  line.type === 'addition'
-                    ? 'var(--diff-added-bg)'
-                    : line.type === 'deletion'
-                      ? 'var(--diff-deleted-bg)'
-                      : 'transparent'
-                const borderColor =
-                  line.type === 'addition'
-                    ? 'rgb(34, 197, 94)'
-                    : line.type === 'deletion'
-                      ? 'rgb(239, 68, 68)'
-                      : 'transparent'
-                const prefix =
-                  line.type === 'addition' ? '+' : line.type === 'deletion' ? '-' : ' '
+          const { line } = item
+          const bgVar =
+            line.type === 'addition'
+              ? 'var(--diff-added-bg)'
+              : line.type === 'deletion'
+                ? 'var(--diff-deleted-bg)'
+                : 'transparent'
+          const borderColor =
+            line.type === 'addition'
+              ? 'rgb(34, 197, 94)'
+              : line.type === 'deletion'
+                ? 'rgb(239, 68, 68)'
+                : 'transparent'
+          const prefix =
+            line.type === 'addition' ? '+' : line.type === 'deletion' ? '-' : ' '
 
-                return (
-                  <div
-                    key={lineIndex}
-                    className="flex"
-                    style={{
-                      background: bgVar,
-                      borderLeft: `3px solid ${borderColor}`,
-                    }}
-                  >
-                    {/* Old line number */}
-                    <span
-                      className="select-none text-right px-2 shrink-0"
-                      style={{
-                        minWidth: `${lineNumberWidth + 1}ch`,
-                        color: 'hsl(var(--muted-foreground))',
-                        opacity: 0.5,
-                        borderRight: '1px solid hsl(var(--border) / 0.3)',
-                      }}
-                    >
-                      {formatLineNumber(line.oldLineNumber, lineNumberWidth)}
-                    </span>
+          return (
+            <div
+              key={virtualItem.key}
+              data-index={virtualItem.index}
+              ref={virtualizer.measureElement}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualItem.start}px)`,
+              }}
+            >
+              <div
+                className="flex"
+                style={{
+                  background: bgVar,
+                  borderLeft: `3px solid ${borderColor}`,
+                }}
+              >
+                {/* Old line number */}
+                <span
+                  className="select-none text-right px-2 shrink-0"
+                  style={{
+                    minWidth: `${lineNumberWidth + 1}ch`,
+                    color: 'hsl(var(--muted-foreground))',
+                    opacity: 0.5,
+                    borderRight: '1px solid hsl(var(--border) / 0.3)',
+                  }}
+                >
+                  {formatLineNumber(line.oldLineNumber, lineNumberWidth)}
+                </span>
 
-                    {/* New line number */}
-                    <span
-                      className="select-none text-right px-2 shrink-0"
-                      style={{
-                        minWidth: `${lineNumberWidth + 1}ch`,
-                        color: 'hsl(var(--muted-foreground))',
-                        opacity: 0.5,
-                        borderRight: '1px solid hsl(var(--border) / 0.3)',
-                      }}
-                    >
-                      {formatLineNumber(line.newLineNumber, lineNumberWidth)}
-                    </span>
+                {/* New line number */}
+                <span
+                  className="select-none text-right px-2 shrink-0"
+                  style={{
+                    minWidth: `${lineNumberWidth + 1}ch`,
+                    color: 'hsl(var(--muted-foreground))',
+                    opacity: 0.5,
+                    borderRight: '1px solid hsl(var(--border) / 0.3)',
+                  }}
+                >
+                  {formatLineNumber(line.newLineNumber, lineNumberWidth)}
+                </span>
 
-                    {/* Prefix (+/-/space) */}
-                    <span
-                      className="select-none px-1 shrink-0"
-                      style={{
-                        color:
-                          line.type === 'addition'
-                            ? 'rgb(34, 197, 94)'
-                            : line.type === 'deletion'
-                              ? 'rgb(239, 68, 68)'
-                              : 'hsl(var(--muted-foreground))',
-                        fontWeight: line.type !== 'context' ? 600 : 400,
-                      }}
-                    >
-                      {prefix}
-                    </span>
+                {/* Prefix (+/-/space) */}
+                <span
+                  className="select-none px-1 shrink-0"
+                  style={{
+                    color:
+                      line.type === 'addition'
+                        ? 'rgb(34, 197, 94)'
+                        : line.type === 'deletion'
+                          ? 'rgb(239, 68, 68)'
+                          : 'hsl(var(--muted-foreground))',
+                    fontWeight: line.type !== 'context' ? 600 : 400,
+                  }}
+                >
+                  {prefix}
+                </span>
 
-                    {/* Content */}
-                    <span className="flex-1 pr-4 whitespace-pre overflow-visible">
-                      <HighlightedLine content={line.content} language={language} />
-                    </span>
-                  </div>
-                )
-              })}
+                {/* Content */}
+                <span className="flex-1 pr-4 whitespace-pre overflow-visible">
+                  <HighlightedLine content={line.content} language={language} />
+                </span>
+              </div>
             </div>
-          ))}
-        </div>
-      ))}
+          )
+        })}
+      </div>
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Split mode renderer
+// Split mode: flat item types for virtualization
+// ---------------------------------------------------------------------------
+
+type SplitFlatItem =
+  | { type: 'hunk-header'; hunk: DiffHunk }
+  | { type: 'pair'; left: SplitLine; right: SplitLine }
+
+function buildSplitFlatItems(files: DiffFile[]): SplitFlatItem[] {
+  const items: SplitFlatItem[] = []
+  for (const file of files) {
+    for (const hunk of file.hunks) {
+      items.push({ type: 'hunk-header', hunk })
+      const pairs = buildSplitPairs(hunk)
+      for (const pair of pairs) {
+        items.push({ type: 'pair', left: pair.left, right: pair.right })
+      }
+    }
+  }
+  return items
+}
+
+// ---------------------------------------------------------------------------
+// Split mode renderer (virtualized, single virtualizer for both panels)
 // ---------------------------------------------------------------------------
 
 function SplitView({
@@ -322,135 +408,160 @@ function SplitView({
   language: string
   lineNumberWidth: number
 }) {
-  const leftRef = useRef<HTMLDivElement>(null)
-  const rightRef = useRef<HTMLDivElement>(null)
-  const isSyncing = useRef(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
-  const handleScroll = useCallback((source: 'left' | 'right') => {
-    if (isSyncing.current) return
-    isSyncing.current = true
+  const flatItems = useMemo(() => buildSplitFlatItems(files), [files])
 
-    const sourceEl = source === 'left' ? leftRef.current : rightRef.current
-    const targetEl = source === 'left' ? rightRef.current : leftRef.current
+  const virtualizer = useVirtualizer({
+    count: flatItems.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: (index) => flatItems[index].type === 'hunk-header' ? 28 : 24,
+    overscan: 20,
+  })
 
-    if (sourceEl && targetEl) {
-      targetEl.scrollTop = sourceEl.scrollTop
-      targetEl.scrollLeft = sourceEl.scrollLeft
-    }
+  const renderSplitSide = (entry: SplitLine, side: 'left' | 'right') => {
+    const bgVar =
+      entry.type === 'addition'
+        ? 'var(--diff-added-bg)'
+        : entry.type === 'deletion'
+          ? 'var(--diff-deleted-bg)'
+          : entry.type === 'empty'
+            ? 'hsl(var(--muted) / 0.15)'
+            : 'transparent'
 
-    requestAnimationFrame(() => {
-      isSyncing.current = false
-    })
-  }, [])
+    const gutterBg =
+      entry.type === 'addition'
+        ? 'var(--diff-added-gutter)'
+        : entry.type === 'deletion'
+          ? 'var(--diff-deleted-gutter)'
+          : 'transparent'
 
-  // Pre-build all split pairs for all hunks
-  const allPairs = useMemo(() => {
-    const result: { fileIndex: number; hunkIndex: number; hunk: DiffHunk; pairs: SplitPair[] }[] = []
-    for (let fi = 0; fi < files.length; fi++) {
-      for (let hi = 0; hi < files[fi].hunks.length; hi++) {
-        const hunk = files[fi].hunks[hi]
-        result.push({
-          fileIndex: fi,
-          hunkIndex: hi,
-          hunk,
-          pairs: buildSplitPairs(hunk),
-        })
-      }
-    }
-    return result
-  }, [files])
+    return (
+      <div className="flex h-full" style={{ background: bgVar }}>
+        {/* Line number gutter */}
+        <span
+          className="select-none text-right px-2 shrink-0"
+          style={{
+            minWidth: `${lineNumberWidth + 1}ch`,
+            color: 'hsl(var(--muted-foreground))',
+            opacity: 0.5,
+            background: gutterBg,
+            borderRight: '1px solid hsl(var(--border) / 0.3)',
+          }}
+        >
+          {entry.type !== 'empty'
+            ? formatLineNumber(entry.lineNumber, lineNumberWidth)
+            : ''}
+        </span>
 
-  const renderSide = (
-    side: 'left' | 'right',
-    ref: React.RefObject<HTMLDivElement | null>,
-  ) => (
-    <div
-      ref={ref}
-      className="overflow-auto h-full font-mono text-sm leading-6"
-      onScroll={() => handleScroll(side)}
-    >
-      {allPairs.map(({ hunkIndex, hunk, pairs }, groupIndex) => (
-        <div key={groupIndex}>
-          {/* Hunk header */}
-          <div
-            className="px-3 py-1 text-xs select-none sticky top-0 z-10"
-            style={{ background: 'var(--diff-hunk-bg)' }}
-          >
-            <span className="opacity-70">
-              {side === 'left'
-                ? `@@ -${hunk.oldStart},${hunk.oldCount} @@`
-                : `@@ +${hunk.newStart},${hunk.newCount} @@`}
-            </span>
-            {hunk.header && (
-              <span className="ml-2 text-[hsl(var(--primary))]">{hunk.header}</span>
-            )}
-          </div>
-
-          {/* Paired lines */}
-          {pairs.map((pair, pairIndex) => {
-            const entry = side === 'left' ? pair.left : pair.right
-            const bgVar =
-              entry.type === 'addition'
-                ? 'var(--diff-added-bg)'
-                : entry.type === 'deletion'
-                  ? 'var(--diff-deleted-bg)'
-                  : entry.type === 'empty'
-                    ? 'hsl(var(--muted) / 0.15)'
-                    : 'transparent'
-
-            const gutterBg =
-              entry.type === 'addition'
-                ? 'var(--diff-added-gutter)'
-                : entry.type === 'deletion'
-                  ? 'var(--diff-deleted-gutter)'
-                  : 'transparent'
-
-            return (
-              <div
-                key={pairIndex}
-                className="flex"
-                style={{ background: bgVar }}
-              >
-                {/* Line number gutter */}
-                <span
-                  className="select-none text-right px-2 shrink-0"
-                  style={{
-                    minWidth: `${lineNumberWidth + 1}ch`,
-                    color: 'hsl(var(--muted-foreground))',
-                    opacity: 0.5,
-                    background: gutterBg,
-                    borderRight: '1px solid hsl(var(--border) / 0.3)',
-                  }}
-                >
-                  {entry.type !== 'empty'
-                    ? formatLineNumber(entry.lineNumber, lineNumberWidth)
-                    : ''}
-                </span>
-
-                {/* Content */}
-                <span className="flex-1 px-2 whitespace-pre overflow-visible">
-                  {entry.type !== 'empty' ? (
-                    <HighlightedLine content={entry.content} language={language} />
-                  ) : (
-                    <span className="opacity-0">{' '}</span>
-                  )}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-      ))}
-    </div>
-  )
+        {/* Content */}
+        <span className="flex-1 px-2 whitespace-pre overflow-hidden">
+          {entry.type !== 'empty' ? (
+            <HighlightedLine content={entry.content} language={language} />
+          ) : (
+            <span className="opacity-0">{' '}</span>
+          )}
+        </span>
+      </div>
+    )
+  }
 
   return (
     <ResizablePanelGroup direction="horizontal" className="h-full">
       <ResizablePanel defaultSize={50} minSize={20}>
-        {renderSide('left', leftRef)}
+        <div
+          ref={scrollRef}
+          className="overflow-auto h-full font-mono text-sm leading-6"
+        >
+          <div
+            style={{
+              height: virtualizer.getTotalSize(),
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {virtualizer.getVirtualItems().map((virtualItem) => {
+              const item = flatItems[virtualItem.index]
+              return (
+                <div
+                  key={virtualItem.key}
+                  data-index={virtualItem.index}
+                  ref={virtualizer.measureElement}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualItem.start}px)`,
+                  }}
+                >
+                  {item.type === 'hunk-header' ? (
+                    <div
+                      className="px-3 py-1 text-xs select-none"
+                      style={{ background: 'var(--diff-hunk-bg)' }}
+                    >
+                      <span className="opacity-70">
+                        @@ -{item.hunk.oldStart},{item.hunk.oldCount} @@
+                      </span>
+                      {item.hunk.header && (
+                        <span className="ml-2 text-[hsl(var(--primary))]">{item.hunk.header}</span>
+                      )}
+                    </div>
+                  ) : (
+                    renderSplitSide(item.left, 'left')
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
       </ResizablePanel>
       <ResizableHandle withHandle />
       <ResizablePanel defaultSize={50} minSize={20}>
-        {renderSide('right', rightRef)}
+        <div
+          className="overflow-hidden h-full font-mono text-sm leading-6"
+        >
+          <div
+            style={{
+              height: virtualizer.getTotalSize(),
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {virtualizer.getVirtualItems().map((virtualItem) => {
+              const item = flatItems[virtualItem.index]
+              return (
+                <div
+                  key={virtualItem.key}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualItem.start}px)`,
+                    height: virtualItem.size,
+                  }}
+                >
+                  {item.type === 'hunk-header' ? (
+                    <div
+                      className="px-3 py-1 text-xs select-none"
+                      style={{ background: 'var(--diff-hunk-bg)' }}
+                    >
+                      <span className="opacity-70">
+                        @@ +{item.hunk.newStart},{item.hunk.newCount} @@
+                      </span>
+                      {item.hunk.header && (
+                        <span className="ml-2 text-[hsl(var(--primary))]">{item.hunk.header}</span>
+                      )}
+                    </div>
+                  ) : (
+                    renderSplitSide(item.right, 'right')
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
       </ResizablePanel>
     </ResizablePanelGroup>
   )

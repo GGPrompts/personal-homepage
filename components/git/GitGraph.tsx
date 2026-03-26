@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { Loader2, AlertCircle, RefreshCw } from 'lucide-react'
 import {
   ROW_HEIGHT,
@@ -148,6 +149,18 @@ export function GitGraph({
   const canvasWidth = (laneCount + 1) * RAIL_WIDTH
   const canvasHeight = nodes.length * ROW_HEIGHT
 
+  // Virtualizer — always call hooks unconditionally
+  const virtualizer = useVirtualizer({
+    count: nodes.length,
+    getScrollElement: () => containerRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 10,
+  })
+
+  const virtualItems = virtualizer.getVirtualItems()
+  const visibleStart = virtualItems.length > 0 ? virtualItems[0].index : 0
+  const visibleEnd = virtualItems.length > 0 ? virtualItems[virtualItems.length - 1].index : 0
+
   // Loading state
   if (loading && nodes.length === 0) {
     return (
@@ -198,28 +211,41 @@ export function GitGraph({
       ref={containerRef}
       className={cn('glass-dark h-full overflow-auto', className)}
     >
-      {/* Graph container */}
-      <div className="relative" style={{ minHeight: canvasHeight }}>
-        {/* SVG lane renderer */}
+      {/* Graph container — total height drives scrollbar */}
+      <div className="relative" style={{ height: virtualizer.getTotalSize() }}>
+        {/* SVG lane renderer — only visible range */}
         <GitGraphCanvas
           nodes={nodes}
           connections={connections}
           width={canvasWidth}
           height={canvasHeight}
           selectedSha={selectedSha}
+          visibleRange={{ start: visibleStart, end: visibleEnd }}
         />
 
-        {/* Commit rows */}
-        <div className="relative" style={{ marginLeft: canvasWidth }}>
-          {nodes.map((node) => (
-            <GitGraphRow
-              key={node.sha}
-              node={node}
-              isSelected={selectedSha === node.sha}
-              sha={node.sha}
-              onSelectCommit={onSelectCommit}
-            />
-          ))}
+        {/* Virtualized commit rows */}
+        <div className="absolute top-0 left-0 w-full">
+          {virtualItems.map((virtualRow) => {
+            const node = nodes[virtualRow.index]
+            return (
+              <div
+                key={node.sha}
+                className="absolute left-0 w-full"
+                style={{
+                  height: ROW_HEIGHT,
+                  transform: `translateY(${virtualRow.start}px)`,
+                  paddingLeft: canvasWidth,
+                }}
+              >
+                <GitGraphRow
+                  node={node}
+                  isSelected={selectedSha === node.sha}
+                  sha={node.sha}
+                  onSelectCommit={onSelectCommit}
+                />
+              </div>
+            )
+          })}
         </div>
       </div>
 

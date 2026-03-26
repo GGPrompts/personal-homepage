@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import {
   getRailColor,
   ROW_HEIGHT,
@@ -9,12 +10,16 @@ import {
   type GraphConnection,
 } from '@/lib/git/graph-layout'
 
+/** Buffer rows above/below visible range to render in SVG */
+const VISIBLE_BUFFER = 5
+
 interface GitGraphCanvasProps {
   nodes: GraphNode[]
   connections: GraphConnection[]
   width: number
   height: number
   selectedSha?: string
+  visibleRange?: { start: number; end: number }
 }
 
 export function GitGraphCanvas({
@@ -23,7 +28,31 @@ export function GitGraphCanvas({
   width,
   height,
   selectedSha,
+  visibleRange,
 }: GitGraphCanvasProps) {
+  // Filter to visible range with buffer
+  const { visibleNodes, visibleConnections } = useMemo(() => {
+    if (!visibleRange) {
+      return { visibleNodes: nodes, visibleConnections: connections }
+    }
+
+    const start = Math.max(0, visibleRange.start - VISIBLE_BUFFER)
+    const end = Math.min(nodes.length - 1, visibleRange.end + VISIBLE_BUFFER)
+
+    const filteredNodes = nodes.filter((n) => n.row >= start && n.row <= end)
+
+    const filteredConnections = connections.filter(
+      (c) =>
+        // Include connection if either endpoint is in range
+        (c.from >= start && c.from <= end) ||
+        (c.to >= start && c.to <= end) ||
+        // Also include connections that span across the visible range
+        (c.from < start && c.to > end)
+    )
+
+    return { visibleNodes: filteredNodes, visibleConnections: filteredConnections }
+  }, [nodes, connections, visibleRange])
+
   return (
     <svg
       width={width}
@@ -32,7 +61,7 @@ export function GitGraphCanvas({
       style={{ pointerEvents: 'none' }}
     >
       {/* Connection paths */}
-      {connections.map((conn, i) => {
+      {visibleConnections.map((conn, i) => {
         const fromX = (conn.fromLane + 0.5) * RAIL_WIDTH
         const fromY = conn.from * ROW_HEIGHT + ROW_HEIGHT / 2
         const toX = (conn.toLane + 0.5) * RAIL_WIDTH
@@ -63,7 +92,7 @@ export function GitGraphCanvas({
 
         return (
           <path
-            key={i}
+            key={`${conn.from}-${conn.to}-${conn.fromLane}-${conn.toLane}`}
             d={d}
             stroke={color}
             strokeWidth={2}
@@ -75,7 +104,7 @@ export function GitGraphCanvas({
       })}
 
       {/* Commit node circles */}
-      {nodes.map((node) => {
+      {visibleNodes.map((node) => {
         const cx = (node.lane + 0.5) * RAIL_WIDTH
         const cy = node.row * ROW_HEIGHT + ROW_HEIGHT / 2
         const color = getRailColor(node.lane)
