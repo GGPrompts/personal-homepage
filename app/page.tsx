@@ -120,6 +120,7 @@ const VideoPlayerSection = dynamic(() => import("./sections/video-player"), {
   loading: () => <div className="p-6 text-muted-foreground">Loading video player...</div>,
 })
 import { StartupJobsModal } from "@/components/StartupJobsModal"
+import { CommandPalette } from "@/components/CommandPalette"
 import { useJobResults } from "@/hooks/useJobResults"
 
 // ============================================================================
@@ -1045,6 +1046,12 @@ export default function PersonalHomepage() {
   return (
     <TooltipProvider>
       <div className="min-h-screen relative z-10">
+        {/* Command Palette (Ctrl+K) */}
+        <CommandPalette
+          navigationItems={navigationItems}
+          setActiveSection={setActiveSection}
+        />
+
         {/* Mobile Header Buttons */}
         <div className="fixed top-4 left-4 right-4 z-50 lg:hidden flex justify-between pointer-events-none">
           {/* Mobile Menu Button */}
