@@ -171,9 +171,13 @@ export function extractMessageContent(entry: ConversationEntry): ParsedMessage |
           case 'text':
             blocks.push({ kind: 'text', text: block.text || '' })
             break
-          case 'thinking':
-            blocks.push({ kind: 'thinking', text: block.thinking || (block as unknown as { text?: string }).text || '' })
+          case 'thinking': {
+            const thinkingText = block.thinking || (block as unknown as { text?: string }).text || ''
+            if (thinkingText.trim()) {
+              blocks.push({ kind: 'thinking', text: thinkingText })
+            }
             break
+          }
           case 'tool_use':
             blocks.push({
               kind: 'tool_use',
