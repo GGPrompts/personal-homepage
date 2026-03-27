@@ -31,6 +31,7 @@ import {
   ArrowRightLeft,
   Replace,
   Monitor,
+  Layers,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -71,6 +72,7 @@ import { useWorkingDirectory, isPathUnderWorkingDir } from "@/hooks/useWorkingDi
 import { Github, User } from "lucide-react"
 import { toast } from "sonner"
 import { DesktopCanvas } from "@/components/bookmarks/desktop"
+import { BlueprintsView } from "@/components/bookmarks/blueprints"
 import {
   downloadJson,
   readJsonFile,
@@ -231,7 +233,7 @@ export default function BookmarksSection({
   const [showAuthModal, setShowAuthModal] = React.useState(false)
 
   // UI state
-  const [viewMode, setViewMode] = React.useState<"grid" | "list" | "desktop">(() => {
+  const [viewMode, setViewMode] = React.useState<"grid" | "list" | "desktop" | "blueprints">(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(STORAGE_KEY)
       if (saved) {
@@ -712,6 +714,7 @@ export default function BookmarksSection({
               size="sm"
               className="rounded-r-none"
               onClick={() => setViewMode("grid")}
+              title="Grid view"
             >
               <Grid className="h-4 w-4" />
             </Button>
@@ -720,16 +723,27 @@ export default function BookmarksSection({
               size="sm"
               className="rounded-none border-x"
               onClick={() => setViewMode("desktop")}
+              title="Desktop view"
             >
               <Monitor className="h-4 w-4" />
             </Button>
             <Button
               variant={viewMode === "list" ? "default" : "ghost"}
               size="sm"
-              className="rounded-l-none"
+              className="rounded-none border-r"
               onClick={() => setViewMode("list")}
+              title="List view"
             >
               <List className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "blueprints" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-l-none"
+              onClick={() => setViewMode("blueprints")}
+              title="Workspace blueprints"
+            >
+              <Layers className="h-4 w-4" />
             </Button>
           </div>
 
@@ -834,6 +848,11 @@ export default function BookmarksSection({
           <div className="flex items-center justify-center h-full text-destructive">
             Failed to load bookmarks
           </div>
+        ) : viewMode === "blueprints" ? (
+          <BlueprintsView
+            bookmarks={data.bookmarks}
+            folders={data.folders}
+          />
         ) : visibleFolders.length === 0 && visibleBookmarks.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
             <Bookmark className="h-12 w-12 mb-4" />

@@ -26,8 +26,11 @@ import {
   Bookmark,
   ExternalLink,
   BookOpen,
+  Layers,
+  Play,
 } from "lucide-react"
 import { type ReadingItem, STORAGE_KEY as READING_QUEUE_KEY } from "@/app/sections/reading-queue"
+import { type WorkspaceBlueprint, loadBlueprints } from "@/components/bookmarks/blueprints"
 
 // ============================================================================
 // TYPES
@@ -64,6 +67,7 @@ export function CommandPalette({ navigationItems, setActiveSection }: CommandPal
   const [notes, setNotes] = useState<QuickNote[]>([])
   const [notesLoaded, setNotesLoaded] = useState(false)
   const [readingQueueItems, setReadingQueueItems] = useState<ReadingItem[]>([])
+  const [blueprintItems, setBlueprintItems] = useState<WorkspaceBlueprint[]>([])
 
   // Bookmark search via TabzChrome
   const {
@@ -125,12 +129,20 @@ export function CommandPalette({ navigationItems, setActiveSection }: CommandPal
     }
   }, [open])
 
+  // Load workspace blueprints when palette opens
+  useEffect(() => {
+    if (open) {
+      setBlueprintItems(loadBlueprints())
+    }
+  }, [open])
+
   // Reset state when closing
   useEffect(() => {
     if (!open) {
       setNotesLoaded(false)
       setNotes([])
       setReadingQueueItems([])
+      setBlueprintItems([])
       clearBookmarkSearch()
     }
   }, [open, clearBookmarkSearch])
@@ -175,6 +187,30 @@ export function CommandPalette({ navigationItems, setActiveSection }: CommandPal
       setOpen(false)
     },
     [setActiveSection]
+  )
+
+  // Handle workspace blueprint launch
+  const handleLaunchBlueprint = useCallback(
+    async (blueprint: WorkspaceBlueprint) => {
+      setOpen(false)
+      try {
+        const res = await fetch("/api/workspace-launch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: blueprint.name,
+            windows: blueprint.windows,
+          }),
+        })
+        const data = await res.json()
+        if (!data.success) {
+          console.error("Blueprint launch failed:", data.error)
+        }
+      } catch (err) {
+        console.error("Blueprint launch error:", err)
+      }
+    },
+    []
   )
 
   // Handle search value changes for bookmark search
@@ -275,6 +311,34 @@ export function CommandPalette({ navigationItems, setActiveSection }: CommandPal
                     <span className="truncate max-w-[250px]">{item.title}</span>
                     <CommandShortcut>
                       <ExternalLink className="h-3 w-3" />
+                    </CommandShortcut>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </>
+          )}
+
+          {/* Workspace Blueprints Group */}
+          {blueprintItems.length > 0 && (
+            <>
+              <CommandSeparator />
+              <CommandGroup heading="Workspace Blueprints">
+                {blueprintItems.map((bp) => (
+                  <CommandItem
+                    key={bp.id}
+                    value={`workspace blueprint ${bp.name} ${bp.windows.map((w) => w.label).join(" ")}`}
+                    onSelect={() => handleLaunchBlueprint(bp)}
+                    data-tabz-action="launch-blueprint"
+                    data-tabz-item={`blueprint-${bp.id}`}
+                  >
+                    {bp.icon ? (
+                      <span className="text-sm mr-1">{bp.icon}</span>
+                    ) : (
+                      <Layers className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <span className="truncate max-w-[250px]">{bp.name}</span>
+                    <CommandShortcut>
+                      <Play className="h-3 w-3" />
                     </CommandShortcut>
                   </CommandItem>
                 ))}
