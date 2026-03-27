@@ -679,6 +679,231 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
   })
   const feedCount = feedData?.items?.length ?? null
 
+  // ---- Tier 1: Zero-cost localStorage reads ----
+
+  // Tasks / Scratchpad - read pending task count from localStorage
+  const [taskCount, setTaskCount] = React.useState<number | null>(null)
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem("quick-tasks")
+      if (saved) {
+        const tasks = JSON.parse(saved)
+        const pending = tasks.filter((t: any) => !t.completed).length
+        setTaskCount(pending)
+      } else {
+        setTaskCount(0)
+      }
+    } catch {
+      // Invalid data
+    }
+  }, [])
+
+  // Reading Queue - read queued count from localStorage
+  const [queueStats, setQueueStats] = React.useState<{ queued: number; reading: number } | null>(null)
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem("reading-queue-items")
+      if (saved) {
+        const items = JSON.parse(saved)
+        const queued = items.filter((i: any) => i.status === "queued").length
+        const reading = items.filter((i: any) => i.status === "reading").length
+        setQueueStats({ queued, reading })
+      } else {
+        setQueueStats({ queued: 0, reading: 0 })
+      }
+    } catch {
+      // Invalid data
+    }
+  }, [])
+
+  // Stocks portfolio - read cash and position count from localStorage
+  const [portfolioStats, setPortfolioStats] = React.useState<{ cash: number; positions: number; watchlist: number } | null>(null)
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem("stocks-portfolio")
+      if (saved) {
+        const portfolio = JSON.parse(saved)
+        setPortfolioStats({
+          cash: portfolio.cash || 0,
+          positions: portfolio.positions?.length || 0,
+          watchlist: portfolio.watchlist?.length || 0,
+        })
+      }
+    } catch {
+      // Invalid data
+    }
+  }, [])
+
+  // ---- Tier 2: Lightweight API calls ----
+
+  // SpaceX - next launch
+  const { data: nextLaunch } = useQuery<{ name: string; date_utc: string; tbd: boolean } | null>({
+    queryKey: ["home-spacex-next"],
+    queryFn: async () => {
+      const res = await fetch("https://api.spacexdata.com/v5/launches/next")
+      if (!res.ok) return null
+      return res.json()
+    },
+    staleTime: 15 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  })
+
+  // Crypto - BTC price from CoinGecko
+  const { data: btcData } = useQuery<{ price: number; change24h: number } | null>({
+    queryKey: ["home-crypto-btc"],
+    queryFn: async () => {
+      const res = await fetch(
+        "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true"
+      )
+      if (!res.ok) return null
+      const data = await res.json()
+      if (!data.bitcoin) return null
+      return {
+        price: data.bitcoin.usd,
+        change24h: data.bitcoin.usd_24h_change,
+      }
+    },
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  })
+
+  // Disasters - recent earthquake count from USGS
+  const { data: quakeData } = useQuery<{ count: number; maxMag: number } | null>({
+    queryKey: ["home-earthquakes"],
+    queryFn: async () => {
+      const res = await fetch("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson")
+      if (!res.ok) return null
+      const data = await res.json()
+      const features = data.features || []
+      const mags = features.map((f: any) => f.properties.mag).filter((m: any) => typeof m === "number")
+      return {
+        count: features.length,
+        maxMag: mags.length > 0 ? Math.max(...mags) : 0,
+      }
+    },
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  })
+
+  // Uptime - service status
+  const { data: uptimeData } = useQuery<{ total: number; up: number; down: number; degraded: number } | null>({
+    queryKey: ["home-uptime"],
+    queryFn: async () => {
+      const res = await fetch("/api/uptime")
+      if (!res.ok) return null
+      const data = await res.json()
+      const results = data.results || []
+      const up = results.filter((r: any) => r.status === "up").length
+      const down = results.filter((r: any) => r.status === "down").length
+      const degraded = results.filter((r: any) => r.status === "degraded").length
+      return { total: results.length, up, down, degraded }
+    },
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  })
+
+  // AI / Agent Swarm - active sessions
+  const { data: activeSessionsData } = useQuery<{ count: number } | null>({
+    queryKey: ["home-ai-sessions"],
+    queryFn: async () => {
+      const res = await fetch("/api/ai/sessions/active")
+      if (!res.ok) return null
+      const data = await res.json()
+      return { count: data.active?.length || 0 }
+    },
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  })
+
+  // Projects - local project count
+  const { data: projectsData } = useQuery<{ count: number } | null>({
+    queryKey: ["home-projects-local"],
+    queryFn: async () => {
+      const res = await fetch("/api/projects/local")
+      if (!res.ok) return null
+      const data = await res.json()
+      return { count: data.count || data.projects?.length || 0 }
+    },
+    staleTime: 15 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  })
+
+  // Analytics - Claude Code stats (today's tokens)
+  const { data: claudeStats } = useQuery<{ totalMessages: number; totalSessions: number; todayTokens: number } | null>({
+    queryKey: ["home-claude-stats"],
+    queryFn: async () => {
+      const res = await fetch("/api/claude-stats")
+      if (!res.ok) return null
+      const data = await res.json()
+      if (!data.success || !data.data) return null
+      const dailyTokens = data.data.dailyTokenUsage || []
+      const todayEntry = dailyTokens.length > 0 ? dailyTokens[dailyTokens.length - 1] : null
+      return {
+        totalMessages: data.data.totalMessages || 0,
+        totalSessions: data.data.totalSessions || 0,
+        todayTokens: todayEntry?.totalTokens || 0,
+      }
+    },
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  })
+
+  // Quick Notes count
+  const { data: notesData } = useQuery<{ count: number } | null>({
+    queryKey: ["home-quicknotes"],
+    queryFn: async () => {
+      const res = await fetch("/api/quicknotes")
+      if (!res.ok) return null
+      const data = await res.json()
+      const notes = data.notes || []
+      return { count: notes.length }
+    },
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  })
+
+  // Helper: format large numbers
+  const formatNumber = (n: number): string => {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+    return n.toString()
+  }
+
+  // Helper: format countdown for SpaceX
+  const formatLaunchCountdown = (dateUtc: string): string => {
+    const diff = new Date(dateUtc).getTime() - Date.now()
+    if (diff <= 0) return "Launching now"
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+    if (days > 0) return `T-${days}d ${hours}h`
+    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+    return `T-${hours}h ${mins}m`
+  }
+
+  // Helper: render a dynamic tile
+  const renderDynamicTile = (
+    sectionId: ToggleableSection,
+    Icon: React.ElementType,
+    label: string,
+    badge: React.ReactNode,
+    description: React.ReactNode,
+  ) => (
+    <button
+      key={sectionId}
+      onClick={() => onNavigate(sectionId)}
+      className="glass rounded-lg p-6 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors duration-200 group"
+      data-tabz-section={sectionId}
+      data-tabz-action="navigate"
+    >
+      <div className="flex items-start justify-between mb-4">
+        <Icon className="h-8 w-8 text-primary" />
+        {badge}
+      </div>
+      <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">{label}</h3>
+      <p className="text-sm text-muted-foreground">{description}</p>
+    </button>
+  )
+
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold font-mono gradient-text-theme terminal-glow mb-2">
@@ -768,39 +993,224 @@ function HomeSection({ onNavigate, userName, isVisible, prefsLoaded, sectionOrde
             )
           }
 
-          // Static tiles configuration
+          // ---- Dynamic tiles ----
+
+          // Tasks / Scratchpad tile
+          if (sectionId === "tasks") {
+            const totalNotes = notesData?.count ?? 0
+            const combined = (taskCount ?? 0) + totalNotes
+            return renderDynamicTile(
+              sectionId,
+              CheckCircle2,
+              "Scratchpad",
+              combined > 0 ? (
+                <span className="text-3xl font-bold text-primary" suppressHydrationWarning>{combined}</span>
+              ) : null,
+              taskCount !== null
+                ? `${taskCount} pending task${taskCount !== 1 ? "s" : ""}${totalNotes > 0 ? `, ${totalNotes} note${totalNotes !== 1 ? "s" : ""}` : ""}`
+                : "Quick notes and todos",
+            )
+          }
+
+          // Reading Queue tile
+          if (sectionId === "reading-queue") {
+            const total = queueStats ? queueStats.queued + queueStats.reading : null
+            return renderDynamicTile(
+              sectionId,
+              BookOpen,
+              "Reading Queue",
+              total !== null && total > 0 ? (
+                <span className="text-3xl font-bold text-primary" suppressHydrationWarning>{total}</span>
+              ) : null,
+              queueStats
+                ? queueStats.queued > 0 || queueStats.reading > 0
+                  ? `${queueStats.queued} queued${queueStats.reading > 0 ? `, ${queueStats.reading} reading` : ""}`
+                  : "Queue is empty"
+                : "Read later queue",
+            )
+          }
+
+          // SpaceX tile
+          if (sectionId === "spacex") {
+            return renderDynamicTile(
+              sectionId,
+              Rocket,
+              "SpaceX Launches",
+              null,
+              nextLaunch ? (
+                <span suppressHydrationWarning>
+                  {nextLaunch.name}{nextLaunch.tbd ? " (TBD)" : ` - ${formatLaunchCountdown(nextLaunch.date_utc)}`}
+                </span>
+              ) : "Track rocket launches",
+            )
+          }
+
+          // Crypto tile
+          if (sectionId === "crypto") {
+            return renderDynamicTile(
+              sectionId,
+              Bitcoin,
+              "Crypto",
+              btcData ? (
+                <span className="text-xl font-bold text-primary">${formatNumber(btcData.price)}</span>
+              ) : null,
+              btcData ? (
+                <span className={`flex items-center gap-1 ${btcData.change24h >= 0 ? "text-green-500" : "text-red-500"}`}>
+                  BTC {btcData.change24h >= 0 ? "+" : ""}{btcData.change24h.toFixed(1)}% (24h)
+                </span>
+              ) : "Live cryptocurrency prices",
+            )
+          }
+
+          // Disasters tile
+          if (sectionId === "disasters") {
+            return renderDynamicTile(
+              sectionId,
+              AlertCircle,
+              "Disasters",
+              quakeData && quakeData.count > 0 ? (
+                <span className="text-3xl font-bold text-primary">{quakeData.count}</span>
+              ) : null,
+              quakeData
+                ? quakeData.count > 0
+                  ? `${quakeData.count} quakes today (M${quakeData.maxMag.toFixed(1)} max)`
+                  : "No significant activity"
+                : "Earthquakes & alerts",
+            )
+          }
+
+          // Uptime tile
+          if (sectionId === "uptime") {
+            const allUp = uptimeData && uptimeData.down === 0 && uptimeData.degraded === 0
+            return renderDynamicTile(
+              sectionId,
+              Activity,
+              "Uptime",
+              uptimeData ? (
+                <span className={`text-xl font-bold ${allUp ? "text-green-500" : "text-amber-500"}`}>
+                  {uptimeData.up}/{uptimeData.total}
+                </span>
+              ) : null,
+              uptimeData
+                ? allUp
+                  ? "All systems operational"
+                  : `${uptimeData.down > 0 ? `${uptimeData.down} down` : ""}${uptimeData.down > 0 && uptimeData.degraded > 0 ? ", " : ""}${uptimeData.degraded > 0 ? `${uptimeData.degraded} degraded` : ""}`
+                : "Service status monitoring",
+            )
+          }
+
+          // AI Workspace tile
+          if (sectionId === "ai-workspace") {
+            return renderDynamicTile(
+              sectionId,
+              MessageSquare,
+              "AI Workspace",
+              activeSessionsData && activeSessionsData.count > 0 ? (
+                <span className="text-3xl font-bold text-primary">{activeSessionsData.count}</span>
+              ) : null,
+              activeSessionsData
+                ? activeSessionsData.count > 0
+                  ? `${activeSessionsData.count} active session${activeSessionsData.count !== 1 ? "s" : ""}`
+                  : "No active sessions"
+                : "Chat with Claude & local models",
+            )
+          }
+
+          // Agent Swarm tile
+          if (sectionId === "agent-swarm") {
+            return renderDynamicTile(
+              sectionId,
+              Radar,
+              "Agent Swarm",
+              activeSessionsData && activeSessionsData.count > 0 ? (
+                <span className="text-3xl font-bold text-primary">{activeSessionsData.count}</span>
+              ) : null,
+              activeSessionsData
+                ? activeSessionsData.count > 0
+                  ? `${activeSessionsData.count} active agent${activeSessionsData.count !== 1 ? "s" : ""} running`
+                  : "No agents running"
+                : "AI agent session monitor",
+            )
+          }
+
+          // Projects tile
+          if (sectionId === "projects") {
+            return renderDynamicTile(
+              sectionId,
+              FolderGit2,
+              "Projects",
+              projectsData && projectsData.count > 0 ? (
+                <span className="text-3xl font-bold text-primary">{projectsData.count}</span>
+              ) : null,
+              projectsData
+                ? `${projectsData.count} local project${projectsData.count !== 1 ? "s" : ""}`
+                : "GitHub & local repos",
+            )
+          }
+
+          // Analytics tile
+          if (sectionId === "analytics") {
+            return renderDynamicTile(
+              sectionId,
+              BarChart3,
+              "Analytics",
+              claudeStats ? (
+                <span className="text-xl font-bold text-primary">{formatNumber(claudeStats.todayTokens)}</span>
+              ) : null,
+              claudeStats
+                ? `${formatNumber(claudeStats.todayTokens)} tokens today, ${formatNumber(claudeStats.totalMessages)} total msgs`
+                : "Claude Code usage stats",
+            )
+          }
+
+          // Stocks tile
+          if (sectionId === "stocks") {
+            return renderDynamicTile(
+              sectionId,
+              TrendingUp,
+              "Paper Trading",
+              portfolioStats ? (
+                <span className="text-xl font-bold text-primary">${formatNumber(portfolioStats.cash)}</span>
+              ) : null,
+              portfolioStats
+                ? `${portfolioStats.positions} position${portfolioStats.positions !== 1 ? "s" : ""}, ${portfolioStats.watchlist} on watchlist`
+                : "Practice stock trading",
+            )
+          }
+
+          // ---- Static tiles (Tier 3) ----
           const tileConfig: Record<ToggleableSection, { icon: React.ElementType; label: string; description: string } | null> = {
-            weather: null, // Handled above
-            feed: null, // Handled above
+            weather: null,
+            feed: null,
+            tasks: null,
+            "reading-queue": null,
+            spacex: null,
+            crypto: null,
+            disasters: null,
+            uptime: null,
+            "ai-workspace": null,
+            "agent-swarm": null,
+            projects: null,
+            analytics: null,
+            stocks: null,
             "market-pulse": { icon: TrendingUp, label: "Market Pulse", description: "Tech salary & job trends" },
-            "api-playground": { icon: Zap, label: "API Playground", description: "Test and debug API requests" },
+            "api-playground": { icon: Zap, label: "API Playground", description: "Test and debug API endpoints" },
             bookmarks: { icon: Bookmark, label: "Bookmarks", description: "Organized quick links" },
             search: { icon: Search, label: "Search Hub", description: "Multi-engine web search" },
             email: { icon: Mail, label: "Email", description: "Gmail inbox & compose" },
             calendar: { icon: Calendar, label: "Calendar", description: "Google Calendar events" },
-            "ai-workspace": { icon: MessageSquare, label: "AI Workspace", description: "Chat with Claude & local models" },
-            stocks: { icon: TrendingUp, label: "Paper Trading", description: "Practice stock trading" },
-            crypto: { icon: Bitcoin, label: "Crypto", description: "Live cryptocurrency prices" },
-            spacex: { icon: Rocket, label: "SpaceX Launches", description: "Track rocket launches" },
             "photo-gallery": { icon: Image, label: "Photo Gallery", description: "Photography portfolio" },
-            "github-activity": { icon: Github, label: "GitHub Activity", description: "GitHub events & repos" },
-            disasters: { icon: AlertCircle, label: "Disasters", description: "Earthquakes & alerts" },
-            tasks: { icon: CheckCircle2, label: "Scratchpad", description: "Quick notes and todos" },
-            projects: { icon: FolderGit2, label: "Projects", description: "GitHub & local repos" },
+            "github-activity": { icon: Github, label: "GitHub Activity", description: "Repos, contributions & events" },
             files: { icon: FolderOpen, label: "Files", description: "File browser & plugins" },
             kanban: { icon: LayoutGrid, label: "Kanban", description: "Visual task board" },
             jobs: { icon: Play, label: "Jobs", description: "Claude batch prompts" },
-            analytics: { icon: BarChart3, label: "Analytics", description: "Claude Code usage stats" },
             flowchart: { icon: GitBranch, label: "Flowchart", description: "Design workflows visually" },
-            "music-player": { icon: Music, label: "Music Player", description: "Synthwave music player" },
+            "music-player": { icon: Music, label: "Music Player", description: "Synthwave & ambient player" },
             "video-player": { icon: Video, label: "Video Player", description: "Media playback" },
             profile: { icon: User, label: "Profile", description: "Account & sync status" },
             govhound: { icon: Shield, label: "GovHound", description: "Federal IT contracts" },
-            uptime: { icon: Activity, label: "Uptime", description: "Service status monitoring" },
-            "prompt-library": { icon: BookOpen, label: "Prompt Library", description: "Browse and manage reusable prompts" },
-            "agent-swarm": { icon: Radar, label: "Agent Swarm", description: "AI agent session monitor" },
-            "architecture": { icon: Network, label: "Architecture", description: "Project ecosystem visualizer" },
-            "reading-queue": { icon: BookOpen, label: "Reading Queue", description: "Read later queue" },
+            "prompt-library": { icon: BookOpen, label: "Prompt Library", description: "Reusable prompt templates" },
+            "architecture": { icon: Network, label: "Architecture", description: "Project dependency graph" },
           }
 
           const config = tileConfig[sectionId]
