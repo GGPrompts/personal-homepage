@@ -29,7 +29,7 @@ Sections are organized into 6 collapsible categories:
 | Category | Default Sections |
 |----------|------------------|
 | **Information** | Weather, Search Hub, Disasters |
-| **Productivity** | Bookmarks, Scratchpad, Kanban |
+| **Productivity** | Bookmarks, Scratchpad, Kanban, Reading Queue |
 | **Development** | API Playground, AI Workspace, Prompts Playground, GitHub Activity, Projects, Files, Jobs, Analytics, Flowchart |
 | **Finance** | Market Pulse, Paper Trading, Crypto |
 | **Entertainment** | Daily Feed, SpaceX Launches, Photo Gallery, Music Player, Video Player |

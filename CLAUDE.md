@@ -41,6 +41,7 @@ Next.js 15 personal dashboard with accordion sidebar navigation. Features weathe
 | Profile | `app/sections/profile.tsx` | [docs/sections/profile.md](docs/sections/profile.md) |
 | Prompt Library | `app/sections/prompt-library.tsx` | [docs/sections/prompt-library.md](docs/sections/prompt-library.md) |
 | Projects | `app/sections/projects-dashboard.tsx` | [docs/sections/projects-dashboard.md](docs/sections/projects-dashboard.md) |
+| Reading Queue | `app/sections/reading-queue.tsx` | Read-later queue with queued/reading/done workflow |
 | Search Hub | `app/sections/search-hub.tsx` | [docs/sections/search-hub.md](docs/sections/search-hub.md) |
 | Scratchpad | `app/sections/tasks.tsx` | Tasks + Notes tabs (see below) |
 | Settings | `app/sections/settings.tsx` | [docs/sections/settings.md](docs/sections/settings.md) |
@@ -71,6 +72,13 @@ Next.js 15 personal dashboard with accordion sidebar navigation. Features weathe
 
 See [docs/navigation.md](docs/navigation.md) for complete guide.
 
+## Command Palette
+
+Global Ctrl+K (Cmd+K on Mac) command palette for keyboard navigation. Uses cmdk + shadcn Command component.
+- `components/CommandPalette.tsx` - Main component, always-mounted, hidden until triggered
+- Navigates sections (grouped by category), searches quick notes, searches bookmarks via TabzChrome
+- Also shows recent Reading Queue items as quick actions
+
 ## TabzChrome Integration
 
 All interactive elements have `data-tabz-*` attributes for MCP automation:
@@ -91,6 +99,7 @@ Some sections store data locally on the filesystem:
 |------|----------|-----|
 | Quick Notes | `~/.config/homepage/quicknotes.json` | `/api/quicknotes` |
 | Claude Stats | `~/.claude/stats-cache.json` | `/api/claude-stats` |
+| Reading Queue | localStorage `reading-queue-items` | - |
 | Section Preferences | localStorage `section-preferences` | - |
 | Tasks | localStorage `quick-tasks` | - |
 
