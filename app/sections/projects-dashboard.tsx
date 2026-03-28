@@ -280,7 +280,7 @@ export default function ProjectsDashboard({
     needsHuman?: boolean
   }[]>([])
 
-  // Handle sub-item navigation — if activeSubItem is a project slug, select it
+  // Handle sub-item navigation — store the raw value, resolved in selectedProject memo
   React.useEffect(() => {
     if (activeSubItem) {
       setSelectedProjectSlug(activeSubItem)
@@ -377,10 +377,15 @@ export default function ProjectsDashboard({
     }
   }, [metaConfigured, projectsMeta, metaSyncing, githubData, localData, backfillPinnedInfo])
 
-  // Find selected project for detail view
+  // Find selected project for detail view — match by slug, folder name, or path
   const selectedProject = React.useMemo(() => {
     if (!selectedProjectSlug) return null
-    return projects.find((p) => p.slug === selectedProjectSlug) || null
+    return projects.find((p) => p.slug === selectedProjectSlug) ||
+      projects.find((p) =>
+        p.name === selectedProjectSlug ||
+        p.local?.name === selectedProjectSlug ||
+        p.local?.path?.endsWith(`/${selectedProjectSlug}`)
+      ) || null
   }, [projects, selectedProjectSlug])
 
   // Get unique tech stacks for filter

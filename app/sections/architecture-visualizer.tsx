@@ -14,14 +14,17 @@ import {
 // Dynamic import — react-force-graph-3d uses WebGL/canvas, no SSR
 const ForceGraph3D = dynamic(() => import("react-force-graph-3d"), { ssr: false })
 
-// SpriteText — eagerly loaded client-side for persistent node labels
+// SpriteText — lazily loaded client-side for persistent node labels
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let SpriteTextClass: (new (text?: string) => any) | null = null
-if (typeof window !== "undefined") {
-  import("three-spritetext").then((mod) => {
-    SpriteTextClass = mod.default
-  })
-}
+let _spriteTextClass: (new (text?: string) => any) | null = null
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const _spriteTextPromise: Promise<(new (text?: string) => any)> | null =
+  typeof window !== "undefined"
+    ? import("three-spritetext").then((mod) => {
+        _spriteTextClass = mod.default
+        return mod.default
+      })
+    : null
 
 // ---------------------------------------------------------------------------
 // Types (mirror the API response)
@@ -293,8 +296,26 @@ export default function ArchitectureVisualizerSection({
   const [isFullscreen, setIsFullscreen] = React.useState(false)
   const [showLabels, setShowLabels] = React.useState(false)
   const [sizeMode, setSizeMode] = React.useState<SizeMode>("commits")
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [spriteText, setSpriteText] = React.useState<(new (text?: string) => any) | null>(_spriteTextClass)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const graphRef = React.useRef<any>(null)
   const containerRef = React.useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = React.useState({ width: 800, height: 500 })
+
+  // Load SpriteText class and store in state so React knows when it's ready
+  React.useEffect(() => {
+    if (!spriteText && _spriteTextPromise) {
+      _spriteTextPromise.then((cls) => setSpriteText(() => cls))
+    }
+  }, [spriteText])
+
+  // Force graph to rebuild node objects when labels toggle
+  React.useEffect(() => {
+    if (graphRef.current) {
+      graphRef.current.refresh()
+    }
+  }, [showLabels])
 
   // Measure container
   React.useEffect(() => {
@@ -534,6 +555,7 @@ export default function ArchitectureVisualizerSection({
         >
           <GraphErrorBoundary>
             <ForceGraph3D
+              ref={graphRef}
               graphData={forceGraphData}
               width={dimensions.width}
               height={dimensions.height}
@@ -550,10 +572,10 @@ export default function ArchitectureVisualizerSection({
                 return n.__color
               }}
               nodeOpacity={0.9}
-              nodeThreeObject={showLabels && SpriteTextClass ? (node: Record<string, unknown>) => {
+              nodeThreeObject={showLabels && spriteText ? (node: Record<string, unknown>) => {
                 const n = node as unknown as GraphNode & { __color: string; __size: number }
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const sprite = new (SpriteTextClass as any)(n.name) as any
+                const sprite = new (spriteText as any)(n.name) as any
                 sprite.color = n.__color
                 sprite.textHeight = 2.5
                 sprite.backgroundColor = "rgba(0,0,0,0.6)"
@@ -561,7 +583,7 @@ export default function ArchitectureVisualizerSection({
                 sprite.borderRadius = 2
                 return sprite
               } : undefined}
-              nodeThreeObjectExtend={showLabels && SpriteTextClass ? true : undefined}
+              nodeThreeObjectExtend={showLabels && spriteText ? true : undefined}
               linkSource="source"
               linkTarget="target"
               linkColor={() => "rgba(100, 116, 139, 0.3)"}

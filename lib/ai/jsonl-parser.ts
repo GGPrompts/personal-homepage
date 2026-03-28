@@ -67,6 +67,18 @@ export type ParsedBlock =
   | { kind: 'tool_use'; toolName: string; toolId: string; input: unknown }
   | { kind: 'tool_result'; toolId: string; text: string; isError: boolean }
 
+/** Strip known system-injected tags and their content from user message text */
+function stripSystemTags(text: string): string {
+  return text
+    .replace(/<local-command-stdout>[\s\S]*?<\/local-command-stdout>/g, '')
+    .replace(/<local-command-caveat>[\s\S]*?<\/local-command-caveat>/g, '')
+    .replace(/<command-name>[\s\S]*?<\/command-name>/g, '')
+    .replace(/<command-message>[\s\S]*?<\/command-message>/g, '')
+    .replace(/<command-args>[\s\S]*?<\/command-args>/g, '')
+    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '')
+    .trim()
+}
+
 export function isRealUserMessage(entry: UserEntry): boolean {
   if (entry.isMeta) return false
   const content = entry.message?.content
@@ -75,11 +87,10 @@ export function isRealUserMessage(entry: UserEntry): boolean {
   if (typeof content === 'string') {
     const trimmed = content.trim()
     if (!trimmed) return false
-    if (trimmed.startsWith('<command-name>') || trimmed.startsWith('<command-message>')) return false
-    if (trimmed === '<local-command-stdout></local-command-stdout>') return false
-    if (trimmed.startsWith('<local-command-caveat>')) return false
-    // Reject messages that are entirely XML tags with no meaningful text
-    const stripped = trimmed.replace(/<[^>]+>/g, '').trim()
+    // Strip system-injected tags with their content, then check for remaining meaningful text
+    const withoutSystem = stripSystemTags(trimmed)
+    if (!withoutSystem) return false
+    const stripped = withoutSystem.replace(/<[^>]+>/g, '').trim()
     if (!stripped) return false
     return true
   }
@@ -136,12 +147,12 @@ export function extractMessageContent(entry: ConversationEntry): ParsedMessage |
     let text = ''
 
     if (typeof content === 'string') {
-      text = content
+      text = stripSystemTags(content)
     } else if (Array.isArray(content)) {
       const textParts: string[] = []
       for (const block of content) {
         if (block.type === 'text') {
-          textParts.push(block.text)
+          textParts.push(stripSystemTags(block.text))
         }
       }
       text = textParts.join('\n')
@@ -264,8 +275,8 @@ export function extractFirstUserMessage(text: string): string | null {
         }
       }
 
-      // Strip all XML/HTML-like tags from the message text
-      msgText = msgText.replace(/<[^>]+>/g, '').trim()
+      // Strip system-injected tags with content, then any remaining tags
+      msgText = stripSystemTags(msgText).replace(/<[^>]+>/g, '').trim()
       if (!msgText) continue
 
       if (msgText.length > 100) {
