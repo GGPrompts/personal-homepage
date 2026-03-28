@@ -255,7 +255,7 @@ export default function ArchitectureVisualizerSection({
         const rect = containerRef.current.getBoundingClientRect()
         setDimensions({
           width: rect.width,
-          height: isFullscreen ? window.innerHeight - 160 : Math.min(rect.width * 0.6, 600),
+          height: isFullscreen ? window.innerHeight - 160 : Math.max(400, window.innerHeight - rect.top - 40),
         })
       }
     }

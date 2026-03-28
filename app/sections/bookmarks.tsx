@@ -852,6 +852,7 @@ export default function BookmarksSection({
           <BlueprintsView
             bookmarks={data.bookmarks}
             folders={data.folders}
+            defaultWorkingDir={globalWorkingDir}
           />
         ) : visibleFolders.length === 0 && visibleBookmarks.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">

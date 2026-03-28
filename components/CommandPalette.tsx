@@ -31,6 +31,7 @@ import {
 } from "lucide-react"
 import { type ReadingItem, STORAGE_KEY as READING_QUEUE_KEY } from "@/app/sections/reading-queue"
 import { type WorkspaceBlueprint, loadBlueprints } from "@/components/bookmarks/blueprints"
+import { useWorkingDirSafe } from "@/hooks/useWorkingDirectory"
 
 // ============================================================================
 // TYPES
@@ -68,6 +69,8 @@ export function CommandPalette({ navigationItems, setActiveSection }: CommandPal
   const [notesLoaded, setNotesLoaded] = useState(false)
   const [readingQueueItems, setReadingQueueItems] = useState<ReadingItem[]>([])
   const [blueprintItems, setBlueprintItems] = useState<WorkspaceBlueprint[]>([])
+  const wdCtx = useWorkingDirSafe()
+  const workingDir = wdCtx?.workingDir || "~"
 
   // Bookmark search via TabzChrome
   const {
@@ -200,6 +203,7 @@ export function CommandPalette({ navigationItems, setActiveSection }: CommandPal
           body: JSON.stringify({
             name: blueprint.name,
             windows: blueprint.windows,
+            defaultWorkingDir: workingDir,
           }),
         })
         const data = await res.json()

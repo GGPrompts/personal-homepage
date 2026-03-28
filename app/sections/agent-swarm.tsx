@@ -592,7 +592,7 @@ export default function AgentSwarmSection({
           <Bot className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-50" />
           <h3 className="text-lg font-medium mb-1">No agents detected</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            No Claude agent sessions found in tmux or state files.
+            No Claude agent sessions found in kitty, tmux, or state files.
             Spawn one using the button above.
           </p>
           <Button

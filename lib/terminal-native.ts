@@ -55,7 +55,7 @@ interface KittyWindowInfo {
   id: number
   title: string
   cwd: string
-  foreground_processes: Array<{ cmdline: string[] }>
+  foreground_processes: Array<{ pid: number; cmdline: string[] }>
   /** Which socket this window belongs to (needed for send-text/send-key) */
   socket: string
 }

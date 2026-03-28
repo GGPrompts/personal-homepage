@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { readdir, readFile, stat } from 'fs/promises'
 import { execSync } from 'child_process'
 import { join } from 'path'
+import { kittyListAllWindows } from '@/lib/terminal-native'
 
 export const dynamic = 'force-dynamic'
 
@@ -172,7 +173,44 @@ function extractIssueId(workingDir: string, sessionName: string): string | undef
 }
 
 /**
- * Cross-reference tmux sessions with worker state files
+ * Detect Claude agents running in kitty terminals (not tmux).
+ * Returns agents found via kitty remote control introspection.
+ */
+function listKittyClaudeAgents(): AgentInfo[] {
+  const agents: AgentInfo[] = []
+  try {
+    const windows = kittyListAllWindows()
+    for (const win of windows) {
+      const claudeProcess = win.foreground_processes.find(p =>
+        p.cmdline.some(arg => arg === 'claude' || arg.endsWith('/claude'))
+      )
+      if (!claudeProcess) continue
+
+      // Derive a session identifier from the window title or ID
+      const titleMatch = win.title.match(/claude-([a-f0-9]{8})/)
+      const sessionId = titleMatch ? titleMatch[1] : `kitty-${win.id}`
+
+      agents.push({
+        id: sessionId,
+        sessionName: win.title || `kitty-window-${win.id}`,
+        status: 'running',
+        lastActivity: new Date().toISOString(),
+        workingDir: win.cwd,
+        device: 'local',
+        deviceLabel: 'Local (Kitty)',
+        pid: claudeProcess.pid,
+        subagentCount: 0,
+        issueId: extractIssueId(win.cwd, win.title),
+      })
+    }
+  } catch {
+    // kitty not running or remote control not enabled
+  }
+  return agents
+}
+
+/**
+ * Cross-reference tmux sessions, kitty windows, and worker state files
  * to build a complete picture of running agents
  */
 async function buildAgentList(): Promise<AgentInfo[]> {
@@ -193,9 +231,23 @@ async function buildAgentList(): Promise<AgentInfo[]> {
         lastActivity: new Date().toISOString(),
         workingDir: '',
         device: 'local',
-        deviceLabel: 'Local (Kitty)',
+        deviceLabel: 'Local (tmux)',
         subagentCount: 0,
       })
+    }
+  }
+
+  // Get Claude agents running in kitty terminals
+  const kittyAgents = listKittyClaudeAgents()
+  for (const agent of kittyAgents) {
+    // Skip if already tracked by state files (match by PID or session ID prefix)
+    const alreadyTracked = stateAgents.some(a =>
+      (a.pid && a.pid === agent.pid) ||
+      (a.id === agent.id) ||
+      (agent.id.length === 8 && a.id.startsWith(agent.id))
+    )
+    if (!alreadyTracked) {
+      stateAgents.push(agent)
     }
   }
 

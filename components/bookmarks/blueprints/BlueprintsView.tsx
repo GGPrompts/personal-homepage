@@ -30,13 +30,14 @@ import type { BookmarkItem, FolderItem } from "../desktop/types"
 interface BlueprintsViewProps {
   bookmarks?: BookmarkItem[]
   folders?: FolderItem[]
+  defaultWorkingDir?: string
 }
 
 // ============================================================================
 // COMPONENT
 // ============================================================================
 
-export function BlueprintsView({ bookmarks, folders }: BlueprintsViewProps) {
+export function BlueprintsView({ bookmarks, folders, defaultWorkingDir }: BlueprintsViewProps) {
   const [blueprints, setBlueprints] = useState<WorkspaceBlueprint[]>([])
   const [editing, setEditing] = useState<WorkspaceBlueprint | null>(null)
   const [isCreating, setIsCreating] = useState(false)
@@ -161,6 +162,7 @@ export function BlueprintsView({ bookmarks, folders }: BlueprintsViewProps) {
           blueprint={editing}
           onSave={handleSave}
           onCancel={handleCancel}
+          bookmarks={bookmarks}
         />
       </div>
     )
@@ -178,6 +180,7 @@ export function BlueprintsView({ bookmarks, folders }: BlueprintsViewProps) {
           setIsCreating(true)
         }}
         onCreateFromFolder={handleCreateFromFolder}
+        defaultWorkingDir={defaultWorkingDir}
       />
 
       {/* Quick blueprint from folder buttons (if folders exist) */}

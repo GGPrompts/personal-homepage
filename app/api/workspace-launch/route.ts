@@ -21,6 +21,7 @@ interface BlueprintWindow {
 interface LaunchRequest {
   name: string
   windows: BlueprintWindow[]
+  defaultWorkingDir?: string
 }
 
 interface HyprWorkspace {
@@ -137,9 +138,26 @@ function getMonitorInfo(): { width: number; height: number; x: number; y: number
 // POST HANDLER
 // ============================================================================
 
+/**
+ * Set a one-shot Hyprland window rule that fires once then auto-removes.
+ * Uses title matching to target the specific window we're about to spawn.
+ */
+function setWindowRule(rule: string, titleMatch: string): void {
+  hyprctl(["keyword", "windowrulev2", `${rule}, title:^(${titleMatch})$`])
+}
+
+function removeWindowRule(rule: string, titleMatch: string): void {
+  try {
+    hyprctl(["keyword", "windowrulev2", `unset, ${rule}, title:^(${titleMatch})$`])
+  } catch {
+    // Rule may already be consumed
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as LaunchRequest
+    const defaultWorkingDir = body.defaultWorkingDir
 
     if (!body.windows || body.windows.length === 0) {
       return NextResponse.json(
@@ -157,32 +175,49 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 2. Switch to empty workspace
-    hyprctl(["dispatch", "workspace", String(workspaceId)])
-    await sleep(200)
-
-    // 3. Get monitor info for position calculations
+    // 2. Get monitor info for position calculations
     const monitor = getMonitorInfo()
 
-    // 4. Spawn each window with a delay between
-    const spawnedPids: number[] = []
+    // 3. Spawn each window with one-shot Hyprland rules for positioning
+    //    Rules are set BEFORE spawning so Hyprland applies them at window creation.
+    const spawnedTitles: string[] = []
 
-    for (const win of body.windows) {
+    for (let i = 0; i < body.windows.length; i++) {
+      const win = body.windows[i]
+
+      // Unique title so window rules target only this window
+      const title = `bp-${workspaceId}-${i}-${win.label.replace(/[^a-zA-Z0-9]/g, "")}`
+
+      // Convert percentage positions to pixel coords
+      const pixelX = Math.floor(monitor.x + (win.position.x / 100) * monitor.width)
+      const pixelY = Math.floor(monitor.y + (win.position.y / 100) * monitor.height)
+      const pixelW = Math.floor((win.position.w / 100) * monitor.width)
+      const pixelH = Math.floor((win.position.h / 100) * monitor.height)
+
+      // Set one-shot rules: float, position, size, and target workspace
+      setWindowRule(`workspace ${workspaceId} silent`, title)
+      setWindowRule("float", title)
+      setWindowRule(`move ${pixelX} ${pixelY}`, title)
+      setWindowRule(`size ${pixelW} ${pixelH}`, title)
+
       if (win.type === "browser") {
         if (!win.url) continue
-        // Launch Firefox with the URL
-        const child = spawn("firefox", [win.url], {
+        // Firefox: use --name for WM_CLASS matching isn't reliable, use kitty wrapper or
+        // launch via a script. Simpler: open in a kitty window running firefox.
+        const child = spawn("firefox", ["--new-window", win.url], {
           detached: true,
           stdio: "ignore",
         })
         child.unref()
-        if (child.pid) spawnedPids.push(child.pid)
+        // Firefox doesn't respect our title, so we need to re-match after spawn
+        spawnedTitles.push(title)
       } else if (win.type === "terminal") {
-        const args: string[] = ["--detach"]
-        if (win.label) {
-          args.push("--title", win.label)
-        }
-        const cwd = win.workingDir ? expandHome(win.workingDir) : undefined
+        const args: string[] = ["--detach", "--title", title]
+        const cwd = win.workingDir
+          ? expandHome(win.workingDir)
+          : defaultWorkingDir
+            ? expandHome(defaultWorkingDir)
+            : undefined
         if (cwd) {
           args.push("--working-directory", cwd)
         }
@@ -195,53 +230,59 @@ export async function POST(request: NextRequest) {
           stdio: "ignore",
         })
         child.unref()
-        if (child.pid) spawnedPids.push(child.pid)
+        spawnedTitles.push(title)
       }
 
-      // Small delay between window spawns
-      await sleep(300)
+      // Small delay between spawns so Hyprland processes each window
+      await sleep(400)
     }
 
-    // 5. Wait for windows to appear, then tile them
-    await sleep(800)
+    // 4. Wait for windows to settle, then handle Firefox windows.
+    //    Firefox ignores --title so we find its new windows by workspace + class and
+    //    reposition them. Kitty windows already have correct titles and got rules applied.
+    await sleep(1000)
 
-    // Get fresh client list to find our newly spawned windows
     const clients = hyprctlJson<HyprClient[]>(["clients"])
     const wsClients = clients.filter((c) => c.workspace.id === workspaceId)
 
-    // Position windows based on blueprint percentages
-    for (let i = 0; i < Math.min(body.windows.length, wsClients.length); i++) {
-      const win = body.windows[i]
-      const client = wsClients[i]
+    // Find Firefox clients that didn't get rules applied (no matching title)
+    const firefoxWindows = body.windows
+      .map((win, i) => ({ win, index: i }))
+      .filter(({ win }) => win.type === "browser")
 
+    const firefoxClients = wsClients.filter(
+      (c) => c.class === "firefox" || c.class === "Firefox" || c.class.toLowerCase().includes("firefox")
+    )
+
+    for (let i = 0; i < Math.min(firefoxWindows.length, firefoxClients.length); i++) {
+      const { win } = firefoxWindows[i]
+      const client = firefoxClients[i]
       if (!client?.address) continue
 
-      // Convert percentage positions to pixel coords
       const pixelX = Math.floor(monitor.x + (win.position.x / 100) * monitor.width)
       const pixelY = Math.floor(monitor.y + (win.position.y / 100) * monitor.height)
       const pixelW = Math.floor((win.position.w / 100) * monitor.width)
       const pixelH = Math.floor((win.position.h / 100) * monitor.height)
 
       try {
-        // Make it floating so we can position it
         hyprctl(["dispatch", "setfloating", `address:${client.address}`])
-        // Move and resize
-        hyprctl([
-          "dispatch",
-          "movewindowpixel",
-          `exact ${pixelX} ${pixelY}`,
-          `address:${client.address}`,
-        ])
-        hyprctl([
-          "dispatch",
-          "resizewindowpixel",
-          `exact ${pixelW} ${pixelH}`,
-          `address:${client.address}`,
-        ])
+        hyprctl(["dispatch", "movewindowpixel", `exact ${pixelX} ${pixelY}`, `address:${client.address}`])
+        hyprctl(["dispatch", "resizewindowpixel", `exact ${pixelW} ${pixelH}`, `address:${client.address}`])
       } catch {
-        // Window may have already closed or moved
+        // Window may have closed
       }
     }
+
+    // 5. Clean up one-shot rules that may not have been consumed
+    for (const title of spawnedTitles) {
+      removeWindowRule("float", title)
+      removeWindowRule(`workspace ${workspaceId} silent`, title)
+      removeWindowRule(`move .*`, title)
+      removeWindowRule(`size .*`, title)
+    }
+
+    // 6. Switch to the new workspace
+    hyprctl(["dispatch", "workspace", String(workspaceId)])
 
     return NextResponse.json({
       success: true,

@@ -8,6 +8,7 @@ import {
   Trash2,
   Plus,
   Layout,
+  Bookmark,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,6 +26,7 @@ import {
   LAYOUT_PRESETS,
   generateId,
 } from "./types"
+import type { BookmarkItem } from "../desktop/types"
 
 // ============================================================================
 // TYPES
@@ -34,6 +36,7 @@ interface BlueprintEditorProps {
   blueprint?: WorkspaceBlueprint | null
   onSave: (blueprint: WorkspaceBlueprint) => void
   onCancel: () => void
+  bookmarks?: BookmarkItem[]
 }
 
 type DragMode = "move" | "resize-br" | "resize-r" | "resize-b" | null
@@ -82,7 +85,7 @@ function clamp(value: number, min: number, max: number): number {
 // COMPONENT
 // ============================================================================
 
-export function BlueprintEditor({ blueprint, onSave, onCancel }: BlueprintEditorProps) {
+export function BlueprintEditor({ blueprint, onSave, onCancel, bookmarks }: BlueprintEditorProps) {
   const [name, setName] = useState(blueprint?.name || "")
   const [icon, setIcon] = useState(blueprint?.icon || "")
   const [windows, setWindows] = useState<BlueprintWindow[]>(
@@ -100,6 +103,8 @@ export function BlueprintEditor({ blueprint, onSave, onCancel }: BlueprintEditor
   // Window management
   // --------------------------------------------------------------------------
 
+  const [showBookmarkPicker, setShowBookmarkPicker] = useState(false)
+
   const addWindow = useCallback((type: "browser" | "terminal") => {
     const newWindow: BlueprintWindow = {
       id: generateId(),
@@ -108,6 +113,21 @@ export function BlueprintEditor({ blueprint, onSave, onCancel }: BlueprintEditor
       url: type === "browser" ? "https://" : undefined,
       command: type === "terminal" ? "" : undefined,
       workingDir: type === "terminal" ? "~" : undefined,
+      position: { x: 0, y: 0, w: 50, h: 50 },
+    }
+    setWindows((prev) => [...prev, newWindow])
+    setSelectedWindowId(newWindow.id)
+  }, [])
+
+  const addFromBookmark = useCallback((bm: BookmarkItem) => {
+    const isTerminal = bm.type === "terminal"
+    const newWindow: BlueprintWindow = {
+      id: generateId(),
+      type: isTerminal ? "terminal" : "browser",
+      label: bm.name,
+      url: isTerminal ? undefined : bm.url,
+      command: isTerminal ? bm.command : undefined,
+      workingDir: isTerminal ? bm.workingDir : undefined,
       position: { x: 0, y: 0, w: 50, h: 50 },
     }
     setWindows((prev) => [...prev, newWindow])
@@ -298,8 +318,42 @@ export function BlueprintEditor({ blueprint, onSave, onCancel }: BlueprintEditor
               <Terminal className="h-3 w-3 mr-1" />
               Terminal
             </Button>
+            {bookmarks && bookmarks.length > 0 && (
+              <Button
+                variant={showBookmarkPicker ? "default" : "outline"}
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setShowBookmarkPicker(!showBookmarkPicker)}
+                data-tabz-action="toggle-bookmark-picker"
+              >
+                <Bookmark className="h-3 w-3 mr-1" />
+                Bookmarks
+              </Button>
+            )}
           </div>
         </div>
+
+        {/* Bookmark picker */}
+        {showBookmarkPicker && bookmarks && bookmarks.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2 max-h-32 overflow-y-auto rounded-md border border-border/30 bg-muted/10 p-2">
+            {bookmarks.map((bm) => (
+              <button
+                key={bm.id}
+                onClick={() => addFromBookmark(bm)}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs border border-border/30 bg-card/60 hover:bg-primary/10 hover:border-primary/30 transition-colors truncate max-w-[200px]"
+                title={bm.type === "terminal" ? bm.command : bm.url}
+                data-tabz-action="add-from-bookmark"
+              >
+                {bm.type === "terminal" ? (
+                  <Terminal className="h-2.5 w-2.5 text-emerald-400 flex-shrink-0" />
+                ) : (
+                  <Globe className="h-2.5 w-2.5 text-blue-400 flex-shrink-0" />
+                )}
+                <span className="truncate">{bm.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Canvas area - represents a monitor */}
         <div

@@ -87,6 +87,7 @@ export default function AIWorkspaceSection({
   const didAutoExpandRef = React.useRef(false)
 
   const [activeSessionIds, setActiveSessionIds] = React.useState<Set<string>>(new Set())
+  const [activeSessionMap, setActiveSessionMap] = React.useState<Map<string, { windowId: number; socket: string }>>(new Map())
   const [filterActive, setFilterActive] = React.useState(false)
 
   const [promptInput, setPromptInput] = React.useState("")
@@ -133,10 +134,15 @@ export default function AIWorkspaceSection({
       if (res.ok) {
         const data = await res.json()
         const ids = new Set<string>()
+        const winMap = new Map<string, { windowId: number; socket: string }>()
         for (const a of data.active || []) {
-          if (a.sessionId) ids.add(a.sessionId)
+          if (a.sessionId) {
+            ids.add(a.sessionId)
+            winMap.set(a.sessionId, { windowId: a.windowId, socket: a.socket })
+          }
         }
         setActiveSessionIds(ids)
+        setActiveSessionMap(winMap)
       }
     } catch {
       // ignore
@@ -355,7 +361,7 @@ export default function AIWorkspaceSection({
       const res = await fetch('/api/ai/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ projectPath: expandTilde(workingDir) }),
       })
       if (res.ok) {
         const data = await res.json()
@@ -375,6 +381,19 @@ export default function AIWorkspaceSection({
 
   const handleResumeInTerminal = async (session: SessionInfo) => {
     try {
+      // If the session is already active in a terminal, focus that window
+      const activeInfo = activeSessionMap.get(session.sessionId)
+        || activeSessionMap.get(session.sessionId.slice(0, 8))
+      if (activeInfo) {
+        await fetch('/api/ai/sessions/focus', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ windowId: activeInfo.windowId, socket: activeInfo.socket }),
+        })
+        return
+      }
+
+      // Otherwise spawn a new terminal and resume the session
       await fetch('/api/terminal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
