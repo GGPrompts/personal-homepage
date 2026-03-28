@@ -280,9 +280,10 @@ export default function ProjectsDashboard({
     needsHuman?: boolean
   }[]>([])
 
-  // Handle sub-item navigation
+  // Handle sub-item navigation — if activeSubItem is a project slug, select it
   React.useEffect(() => {
     if (activeSubItem) {
+      setSelectedProjectSlug(activeSubItem)
       onSubItemHandled?.()
     }
   }, [activeSubItem, onSubItemHandled])

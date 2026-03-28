@@ -1446,7 +1446,10 @@ export default function PersonalHomepage() {
         if (!isLocal) {
           return <LocalOnlyOverlay sectionName="Architecture Visualizer" description="This feature scans local project directories and requires localhost access." />
         }
-        return <ArchitectureVisualizerSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
+        return <ArchitectureVisualizerSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} onNavigateToSection={(section, subItem) => {
+          if (subItem) setActiveSubItem(subItem)
+          setActiveSection(section as Section)
+        }} />
       case "reading-queue":
         return <ReadingQueueSection activeSubItem={activeSubItem} onSubItemHandled={clearSubItem} />
       case "profile":

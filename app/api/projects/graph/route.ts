@@ -20,6 +20,7 @@ interface GraphNode {
   path: string
   techStack: string[]
   commitVelocity: number
+  linesOfCode: number
   openIssues: number
   beadsPrefix?: string
   gitStatus: "clean" | "dirty" | "untracked"
@@ -71,6 +72,26 @@ function getCommitVelocity(projectPath: string): number {
     }).trim()
     if (!output) return 0
     return output.split("\n").length
+  } catch {
+    return 0
+  }
+}
+
+/** Count lines of code in tracked source files. Returns 0 on any error. */
+function getLinesOfCode(projectPath: string): number {
+  try {
+    const output = execSync(
+      "git ls-files -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.rs' '*.py' '*.go' '*.c' '*.cpp' '*.h' '*.java' '*.rb' '*.swift' '*.kt' | xargs wc -l 2>/dev/null | tail -1",
+      {
+        cwd: projectPath,
+        encoding: "utf-8",
+        timeout: 10000,
+        stdio: ["pipe", "pipe", "pipe"],
+      }
+    ).trim()
+    if (!output) return 0
+    const match = output.match(/^\s*(\d+)/)
+    return match ? parseInt(match[1], 10) : 0
   } catch {
     return 0
   }
@@ -196,6 +217,7 @@ function scanProjectForGraph(projectPath: string, name: string): GraphNode | nul
       path: projectPath,
       techStack: detectTechStack(files),
       commitVelocity: hasGit ? getCommitVelocity(projectPath) : 0,
+      linesOfCode: hasGit ? getLinesOfCode(projectPath) : 0,
       openIssues: 0, // populated later from beads
       gitStatus: hasGit ? getGitStatus(projectPath) : "untracked",
       lastModified: stat.mtime.toISOString(),

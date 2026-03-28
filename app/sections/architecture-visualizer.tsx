@@ -8,11 +8,20 @@ import { Button } from "@/components/ui/button"
 import {
   Network, RefreshCw, Loader2, AlertCircle, X,
   GitBranch, Clock, FolderGit2, Bug, Activity,
-  Maximize2, Minimize2,
+  Maximize2, Minimize2, Code, ExternalLink, Tag,
 } from "lucide-react"
 
 // Dynamic import — react-force-graph-3d uses WebGL/canvas, no SSR
 const ForceGraph3D = dynamic(() => import("react-force-graph-3d"), { ssr: false })
+
+// SpriteText — eagerly loaded client-side for persistent node labels
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let SpriteTextClass: (new (text?: string) => any) | null = null
+if (typeof window !== "undefined") {
+  import("three-spritetext").then((mod) => {
+    SpriteTextClass = mod.default
+  })
+}
 
 // ---------------------------------------------------------------------------
 // Types (mirror the API response)
@@ -24,6 +33,7 @@ interface GraphNode {
   path: string
   techStack: string[]
   commitVelocity: number
+  linesOfCode: number
   openIssues: number
   beadsPrefix?: string
   gitStatus: "clean" | "dirty" | "untracked"
@@ -53,8 +63,17 @@ function getNodeColor(node: GraphNode): string {
   return "#EF4444" // red
 }
 
-function getNodeSize(node: GraphNode): number {
-  return Math.max(4, 4 + node.commitVelocity * 0.8)
+type SizeMode = "commits" | "loc" | "issues"
+
+function getNodeSize(node: GraphNode, mode: SizeMode = "commits"): number {
+  switch (mode) {
+    case "commits":
+      return Math.max(4, 4 + node.commitVelocity * 0.8)
+    case "loc":
+      return Math.max(4, 4 + Math.log10(node.linesOfCode + 1) * 3)
+    case "issues":
+      return Math.max(4, 4 + node.openIssues * 2)
+  }
 }
 
 function getGitStatusLabel(status: GraphNode["gitStatus"]): string {
@@ -129,9 +148,11 @@ class GraphErrorBoundary extends React.Component<
 function NodeDetailPanel({
   node,
   onClose,
+  onNavigateToProject,
 }: {
   node: GraphNode
   onClose: () => void
+  onNavigateToProject?: (slug: string) => void
 }) {
   return (
     <motion.div
@@ -183,6 +204,15 @@ function NodeDetailPanel({
           </span>
         </div>
 
+        {/* Lines of code */}
+        <div className="flex items-center gap-2 text-sm">
+          <Code className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          <span className="text-muted-foreground">Lines of code:</span>
+          <span className="font-mono font-medium tabular-nums">
+            {node.linesOfCode > 0 ? node.linesOfCode.toLocaleString() : "n/a"}
+          </span>
+        </div>
+
         {/* Open issues */}
         <div className="flex items-center gap-2 text-sm">
           <Bug className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -222,6 +252,20 @@ function NodeDetailPanel({
             {shortenPath(node.path)}
           </span>
         </div>
+
+        {/* Open project button */}
+        {onNavigateToProject && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full mt-1 text-xs"
+            onClick={() => onNavigateToProject(node.id)}
+            data-tabz-action="open-project"
+          >
+            <ExternalLink className="h-3 w-3 mr-1.5" />
+            Open Project
+          </Button>
+        )}
       </div>
     </motion.div>
   )
@@ -234,9 +278,11 @@ function NodeDetailPanel({
 export default function ArchitectureVisualizerSection({
   activeSubItem,
   onSubItemHandled,
+  onNavigateToSection,
 }: {
   activeSubItem?: string | null
   onSubItemHandled?: () => void
+  onNavigateToSection?: (section: string, subItem?: string) => void
 }) {
   const [graphData, setGraphData] = React.useState<GraphResponse | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
@@ -245,6 +291,8 @@ export default function ArchitectureVisualizerSection({
   const [selectedNode, setSelectedNode] = React.useState<GraphNode | null>(null)
   const [hoveredNode, setHoveredNode] = React.useState<GraphNode | null>(null)
   const [isFullscreen, setIsFullscreen] = React.useState(false)
+  const [showLabels, setShowLabels] = React.useState(false)
+  const [sizeMode, setSizeMode] = React.useState<SizeMode>("commits")
   const containerRef = React.useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = React.useState({ width: 800, height: 500 })
 
@@ -347,7 +395,7 @@ export default function ArchitectureVisualizerSection({
       nodes: graphData.nodes.map((n) => ({
         ...n,
         __color: getNodeColor(n),
-        __size: getNodeSize(n),
+        __size: getNodeSize(n, sizeMode),
       })),
       links: graphData.edges.map((e) => ({
         source: e.source,
@@ -355,7 +403,7 @@ export default function ArchitectureVisualizerSection({
         type: e.type,
       })),
     }
-  }, [graphData])
+  }, [graphData, sizeMode])
 
   return (
     <div
@@ -375,6 +423,32 @@ export default function ArchitectureVisualizerSection({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Size mode selector */}
+          <div className="flex rounded-md border border-border/50 overflow-hidden">
+            {([["commits", "Commits"], ["loc", "LOC"], ["issues", "Issues"]] as const).map(([mode, label]) => (
+              <button
+                key={mode}
+                onClick={() => setSizeMode(mode)}
+                className={`px-2.5 py-1 text-xs transition-colors ${
+                  sizeMode === mode
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                }`}
+                data-tabz-action={`size-by-${mode}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <Button
+            variant={showLabels ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowLabels(!showLabels)}
+            data-tabz-action="toggle-labels"
+          >
+            <Tag className="h-4 w-4 mr-1" />
+            Labels
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -476,6 +550,18 @@ export default function ArchitectureVisualizerSection({
                 return n.__color
               }}
               nodeOpacity={0.9}
+              nodeThreeObject={showLabels && SpriteTextClass ? (node: Record<string, unknown>) => {
+                const n = node as unknown as GraphNode & { __color: string; __size: number }
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const sprite = new (SpriteTextClass as any)(n.name) as any
+                sprite.color = n.__color
+                sprite.textHeight = 2.5
+                sprite.backgroundColor = "rgba(0,0,0,0.6)"
+                sprite.padding = 1
+                sprite.borderRadius = 2
+                return sprite
+              } : undefined}
+              nodeThreeObjectExtend={showLabels && SpriteTextClass ? true : undefined}
               linkSource="source"
               linkTarget="target"
               linkColor={() => "rgba(100, 116, 139, 0.3)"}
@@ -521,6 +607,9 @@ export default function ArchitectureVisualizerSection({
               <NodeDetailPanel
                 node={selectedNode}
                 onClose={() => setSelectedNode(null)}
+                onNavigateToProject={onNavigateToSection ? (slug) => {
+                  onNavigateToSection("projects", slug)
+                } : undefined}
               />
             )}
           </AnimatePresence>
