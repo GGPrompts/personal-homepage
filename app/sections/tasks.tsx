@@ -17,9 +17,11 @@ import {
   User,
   Inbox,
   RotateCw,
+  Sparkles,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -30,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useAIDrawerTrigger } from "@/hooks/useAIDrawerChat"
 
 // ============================================================================
 // TYPES
@@ -242,7 +245,8 @@ function NotesTab() {
   const queryClient = useQueryClient()
   const [newNoteText, setNewNoteText] = React.useState("")
   const [selectedProject, setSelectedProject] = React.useState("general")
-  const inputRef = React.useRef<HTMLInputElement>(null)
+  const inputRef = React.useRef<HTMLTextAreaElement>(null)
+  const { isAvailable, openWithMessage } = useAIDrawerTrigger()
 
   // Fetch notes from local API
   const {
@@ -353,22 +357,27 @@ function NotesTab() {
               </SelectItem>
             </SelectContent>
           </Select>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              handleAddNote()
-            }}
-            className="flex gap-3 flex-1"
-          >
-            <Input
+          <div className="flex gap-3 flex-1">
+            <Textarea
               ref={inputRef}
-              placeholder="Quick note..."
+              placeholder="Quick note... (Shift+Enter for newline)"
               value={newNoteText}
               onChange={(e) => setNewNoteText(e.target.value)}
-              className="flex-1"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault()
+                  handleAddNote()
+                }
+              }}
+              rows={2}
+              className="flex-1 resize-none"
               disabled={isSaving}
             />
-            <Button type="submit" disabled={!newNoteText.trim() || isSaving}>
+            <Button
+              onClick={handleAddNote}
+              disabled={!newNoteText.trim() || isSaving}
+              className="self-end"
+            >
               {isSaving ? (
                 <RotateCw className="h-4 w-4 animate-spin" />
               ) : (
@@ -376,9 +385,27 @@ function NotesTab() {
               )}
               {!isSaving && "Add"}
             </Button>
-          </form>
+          </div>
         </div>
       </Card>
+
+      {/* Summarize with AI */}
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          disabled={!isAvailable || totalNotes === 0}
+          onClick={() => {
+            openWithMessage(
+              `Here are all my quick notes:\n\n\`\`\`json\n${JSON.stringify(notesData?.notes || [], null, 2)}\n\`\`\`\n\nSummarize these notes: find common themes, highlight stale items (older than 7 days), identify actionable items, and suggest which notes to prioritize this week. Group insights by project.`
+            )
+          }}
+        >
+          <Sparkles className="h-4 w-4" />
+          Summarize
+        </Button>
+      </div>
 
       {/* Loading State */}
       {notesLoading && (
