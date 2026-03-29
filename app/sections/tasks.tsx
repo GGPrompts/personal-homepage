@@ -29,10 +29,12 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
 import { useAIDrawerTrigger } from "@/hooks/useAIDrawerChat"
+import { useProjects } from "@/hooks/useProjects"
 
 // ============================================================================
 // TYPES
@@ -211,18 +213,79 @@ function TaskItem({
 function NoteItem({
   note,
   onDelete,
+  onUpdate,
 }: {
   note: QuickNote
   onDelete: () => void
+  onUpdate: (id: string, text: string) => void
 }) {
+  const [isEditing, setIsEditing] = React.useState(false)
+  const [editText, setEditText] = React.useState("")
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null)
+
+  const startEditing = () => {
+    setEditText(note.text)
+    setIsEditing(true)
+  }
+
+  const saveEdit = () => {
+    const trimmed = editText.trim()
+    if (!trimmed || trimmed === note.text) {
+      setIsEditing(false)
+      return
+    }
+    onUpdate(note.id, trimmed)
+    setIsEditing(false)
+  }
+
+  const cancelEdit = () => {
+    setIsEditing(false)
+  }
+
+  // Auto-focus textarea when entering edit mode
+  React.useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      const el = textareaRef.current
+      el.focus()
+      el.setSelectionRange(el.value.length, el.value.length)
+    }
+  }, [isEditing])
+
   return (
     <div className="group flex items-start gap-3 p-3 rounded-lg border border-border bg-background/50 hover:border-primary/30 transition-all">
       <StickyNote className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-foreground whitespace-pre-wrap">{note.text}</p>
+        {isEditing ? (
+          <Textarea
+            ref={textareaRef}
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault()
+                saveEdit()
+              } else if (e.key === "Escape") {
+                e.preventDefault()
+                cancelEdit()
+              }
+            }}
+            onBlur={saveEdit}
+            rows={3}
+            className="text-sm resize-none"
+          />
+        ) : (
+          <p
+            className="text-sm text-foreground whitespace-pre-wrap cursor-pointer hover:text-primary/80 transition-colors"
+            onClick={startEditing}
+            title="Click to edit"
+          >
+            {note.text}
+          </p>
+        )}
         <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
           <Clock className="h-3 w-3" />
-          {formatDate(note.createdAt)}
+          {formatDate(note.updatedAt || note.createdAt)}
+          {note.updatedAt && " (edited)"}
         </p>
       </div>
       <Button
@@ -247,6 +310,7 @@ function NotesTab() {
   const [selectedProject, setSelectedProject] = React.useState("general")
   const inputRef = React.useRef<HTMLTextAreaElement>(null)
   const { isAvailable, openWithMessage } = useAIDrawerTrigger()
+  const { localProjects } = useProjects()
 
   // Fetch notes from local API
   const {
@@ -278,6 +342,22 @@ function NotesTab() {
     },
   })
 
+  // Update note mutation
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, text }: { id: string; text: string }) => {
+      const res = await fetch("/api/quicknotes", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, text }),
+      })
+      if (!res.ok) throw new Error("Failed to update note")
+      return res.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quicknotes-local"] })
+    },
+  })
+
   // Delete note mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -297,6 +377,10 @@ function NotesTab() {
     addMutation.mutate({ project: selectedProject, text })
     setNewNoteText("")
     inputRef.current?.focus()
+  }
+
+  const handleUpdateNote = (id: string, text: string) => {
+    updateMutation.mutate({ id, text })
   }
 
   const handleDeleteNote = (id: string) => {
@@ -320,6 +404,9 @@ function NotesTab() {
   const getProjectDisplayName = (project: string) => {
     if (project === "general") return "General"
     if (project === "personal") return "Personal"
+    // Check if it matches a known local project and use its name
+    const match = localProjects.find(p => p.name === project)
+    if (match) return match.name
     return project
   }
 
@@ -331,7 +418,7 @@ function NotesTab() {
   }
 
   const totalNotes = notesData?.notes?.length || 0
-  const isSaving = addMutation.isPending || deleteMutation.isPending
+  const isSaving = addMutation.isPending || updateMutation.isPending || deleteMutation.isPending
 
   return (
     <div className="space-y-6">
@@ -355,6 +442,19 @@ function NotesTab() {
                   Personal
                 </div>
               </SelectItem>
+              {localProjects.length > 0 && (
+                <>
+                  <SelectSeparator />
+                  {localProjects.map((project) => (
+                    <SelectItem key={project.name} value={project.name}>
+                      <div className="flex items-center gap-2">
+                        <FolderGit2 className="h-4 w-4" />
+                        {project.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </>
+              )}
             </SelectContent>
           </Select>
           <div className="flex gap-3 flex-1">
@@ -439,6 +539,7 @@ function NotesTab() {
                 key={note.id}
                 note={note}
                 onDelete={() => handleDeleteNote(note.id)}
+                onUpdate={handleUpdateNote}
               />
             ))}
           </div>
