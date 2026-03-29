@@ -18,6 +18,7 @@ import {
   Inbox,
   RotateCw,
   Sparkles,
+  ArrowUpDown,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -308,9 +309,19 @@ function NotesTab() {
   const queryClient = useQueryClient()
   const [newNoteText, setNewNoteText] = React.useState("")
   const [selectedProject, setSelectedProject] = React.useState("general")
+  const [sortOrder, setSortOrder] = React.useState<'newest' | 'oldest'>(() => {
+    if (typeof window === "undefined") return "newest"
+    return (localStorage.getItem("notes-sort-order") as 'newest' | 'oldest') || "newest"
+  })
+  const [filterCategory, setFilterCategory] = React.useState<string>("all")
   const inputRef = React.useRef<HTMLTextAreaElement>(null)
   const { isAvailable, openWithMessage } = useAIDrawerTrigger()
   const { localProjects } = useProjects()
+
+  // Persist sort order to localStorage
+  React.useEffect(() => {
+    localStorage.setItem("notes-sort-order", sortOrder)
+  }, [sortOrder])
 
   // Fetch notes from local API
   const {
@@ -387,18 +398,42 @@ function NotesTab() {
     deleteMutation.mutate(id)
   }
 
-  // Group notes by project
+  // Unique categories from current notes
+  const uniqueCategories = React.useMemo(() => {
+    if (!notesData?.notes) return []
+    const cats = new Set(notesData.notes.map(n => n.project))
+    return Array.from(cats).sort()
+  }, [notesData?.notes])
+
+  // Sort comparator for notes
+  const sortNotes = React.useCallback((a: QuickNote, b: QuickNote) => {
+    const dateA = new Date(a.createdAt).getTime()
+    const dateB = new Date(b.createdAt).getTime()
+    return sortOrder === "newest" ? dateB - dateA : dateA - dateB
+  }, [sortOrder])
+
+  // Group notes by project (with sorting and filtering applied)
   const groupedNotes = React.useMemo(() => {
     if (!notesData?.notes) return new Map<string, QuickNote[]>()
 
+    const filtered = filterCategory === "all"
+      ? notesData.notes
+      : notesData.notes.filter(n => n.project === filterCategory)
+
     const groups = new Map<string, QuickNote[]>()
-    for (const note of notesData.notes) {
+    for (const note of filtered) {
       const existing = groups.get(note.project) || []
       existing.push(note)
       groups.set(note.project, existing)
     }
+
+    // Sort notes within each group
+    for (const [key, notes] of groups) {
+      groups.set(key, [...notes].sort(sortNotes))
+    }
+
     return groups
-  }, [notesData?.notes])
+  }, [notesData?.notes, filterCategory, sortNotes])
 
   // Get display name for project
   const getProjectDisplayName = (project: string) => {
@@ -489,8 +524,8 @@ function NotesTab() {
         </div>
       </Card>
 
-      {/* Summarize with AI */}
-      <div className="flex justify-end">
+      {/* AI Actions */}
+      <div className="flex justify-end gap-2">
         <Button
           variant="outline"
           size="sm"
@@ -505,7 +540,53 @@ function NotesTab() {
           <Sparkles className="h-4 w-4" />
           Summarize
         </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          disabled={!isAvailable || totalNotes === 0}
+          onClick={() => {
+            openWithMessage(
+              `Here are my quick notes:\n\n\`\`\`json\n${JSON.stringify(notesData?.notes || [], null, 2)}\n\`\`\`\n\nFor each note: suggest which project in ~/projects/ it belongs to (check if the note content relates to any project name), whether it's a personal note, or an actionable task that should become a todo. Group your recommendations by action type (move to project, keep as personal, convert to task). Be specific about which project directory each note should be filed under.`
+            )
+          }}
+        >
+          <ArrowUpDown className="h-4 w-4" />
+          AI Sort
+        </Button>
       </div>
+
+      {/* Sort & Filter Toolbar */}
+      {!notesLoading && totalNotes > 0 && (
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+            onClick={() => setSortOrder(prev => prev === "newest" ? "oldest" : "newest")}
+          >
+            <ArrowUpDown className="h-3 w-3" />
+            {sortOrder === "newest" ? "Newest first" : "Oldest first"}
+          </Button>
+          <Select value={filterCategory} onValueChange={setFilterCategory}>
+            <SelectTrigger className="h-7 w-[160px] text-xs text-muted-foreground">
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-xs">All Categories</SelectItem>
+              <SelectSeparator />
+              {uniqueCategories.map((cat) => (
+                <SelectItem key={cat} value={cat} className="text-xs">
+                  <div className="flex items-center gap-2">
+                    {getProjectIcon(cat)}
+                    {getProjectDisplayName(cat)}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Loading State */}
       {notesLoading && (
@@ -529,10 +610,12 @@ function NotesTab() {
       {/* Notes grouped by project */}
       {!notesLoading && Array.from(groupedNotes.entries()).map(([project, notes]) => (
         <div key={project} className="space-y-2">
-          <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            {getProjectIcon(project)}
-            {getProjectDisplayName(project)} ({notes.length})
-          </h3>
+          {filterCategory === "all" && (
+            <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              {getProjectIcon(project)}
+              {getProjectDisplayName(project)} ({notes.length})
+            </h3>
+          )}
           <div className="space-y-2">
             {notes.map((note) => (
               <NoteItem
