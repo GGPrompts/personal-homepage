@@ -43,7 +43,7 @@ Next.js 15 personal dashboard with accordion sidebar navigation. Features weathe
 | Projects | `app/sections/projects-dashboard.tsx` | [docs/sections/projects-dashboard.md](docs/sections/projects-dashboard.md) |
 | Reading Queue | `app/sections/reading-queue.tsx` | Read-later queue with queued/reading/done workflow |
 | Search Hub | `app/sections/search-hub.tsx` | [docs/sections/search-hub.md](docs/sections/search-hub.md) |
-| Scratchpad | `app/sections/tasks.tsx` | Tasks + Notes tabs (see below) |
+| Scratchpad | `app/sections/tasks.tsx` | Tasks + Notes with AI triage (see below) |
 | Settings | `app/sections/settings.tsx` | [docs/sections/settings.md](docs/sections/settings.md) |
 | SpaceX | `app/sections/spacex-tracker.tsx` | [docs/sections/spacex-tracker.md](docs/sections/spacex-tracker.md) |
 | Stocks | `app/sections/stocks-dashboard.tsx` | [docs/sections/stocks-dashboard.md](docs/sections/stocks-dashboard.md) |
@@ -102,10 +102,23 @@ Some sections store data locally on the filesystem:
 | Reading Queue | localStorage `reading-queue-items` | - |
 | Section Preferences | localStorage `section-preferences` | - |
 | Tasks | localStorage `quick-tasks` | - |
+| Notes Sort Order | localStorage `notes-sort-order` | - |
 
 The Scratchpad section (`app/sections/tasks.tsx`) has two tabs:
-- **Tasks**: Simple todos stored in localStorage
+- **Tasks**: Simple todos stored in localStorage with reorder/complete/delete
 - **Notes**: Quick notes stored at `~/.config/homepage/quicknotes.json` via `/api/quicknotes`
+  - **Three-pane layout**: Inbox (general), Projects (grouped by project), Personal sub-views with badge counts
+  - **Dynamic categories**: Dropdown populated from local projects API (`/api/projects/local`)
+  - **Inline editing**: Click note text to edit, Ctrl+Enter to save, Escape to cancel
+  - **Sort/filter toolbar**: Newest/oldest sort (persisted), category filter within Projects view
+  - **AI integration** (via AI Drawer sidebar):
+    - *AI Sort* — serializes all notes, asks AI to categorize by project/personal/task
+    - *Triage Inbox* — focused on inbox notes, requests structured JSON recommendations
+    - *Summarize* — thematic digest with stale item detection and weekly prioritization
+    - *Expand with AI* — per-note action to flesh out an idea via AI drawer
+  - **Per-note actions menu**: Expand with AI, Convert to task, Move to project, Delete
+  - **Auto-categorize**: Keyword matching against project names on add, toast suggestion to move
+  - **Convert to task**: Promotes a note to the Tasks tab (localStorage)
 
 ## AI Workspace Architecture
 
