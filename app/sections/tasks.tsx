@@ -19,6 +19,10 @@ import {
   RotateCw,
   Sparkles,
   ArrowUpDown,
+  MoreHorizontal,
+  Wand2,
+  ListChecks,
+  FolderInput,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,6 +38,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal,
+} from "@/components/ui/dropdown-menu"
+import { toast } from "sonner"
 import { useAIDrawerTrigger } from "@/hooks/useAIDrawerChat"
 import { useProjects } from "@/hooks/useProjects"
 
@@ -215,10 +231,18 @@ function NoteItem({
   note,
   onDelete,
   onUpdate,
+  onConvertToTask,
+  onMoveToProject,
+  openWithMessage,
+  availableProjects,
 }: {
   note: QuickNote
   onDelete: () => void
   onUpdate: (id: string, text: string) => void
+  onConvertToTask?: (id: string) => void
+  onMoveToProject?: (id: string, project: string) => void
+  openWithMessage?: (message: string) => void
+  availableProjects?: string[]
 }) {
   const [isEditing, setIsEditing] = React.useState(false)
   const [editText, setEditText] = React.useState("")
@@ -251,6 +275,11 @@ function NoteItem({
       el.setSelectionRange(el.value.length, el.value.length)
     }
   }, [isEditing])
+
+  // Projects the note can be moved to (exclude current)
+  const moveTargets = (availableProjects || ["general", "personal"]).filter(
+    (p) => p !== note.project
+  )
 
   return (
     <div className="group flex items-start gap-3 p-3 rounded-lg border border-border bg-background/50 hover:border-primary/30 transition-all">
@@ -289,14 +318,76 @@ function NoteItem({
           {note.updatedAt && " (edited)"}
         </p>
       </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-400"
-        onClick={onDelete}
-      >
-        <Trash2 className="h-4 w-4" />
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          {openWithMessage && (
+            <DropdownMenuItem
+              onClick={() =>
+                openWithMessage(
+                  `Expand on this idea and add context:\n\n${note.text}`
+                )
+              }
+            >
+              <Wand2 className="h-4 w-4" />
+              Expand with AI
+            </DropdownMenuItem>
+          )}
+          {onConvertToTask && (
+            <DropdownMenuItem onClick={() => onConvertToTask(note.id)}>
+              <ListChecks className="h-4 w-4" />
+              Convert to task
+            </DropdownMenuItem>
+          )}
+          {onMoveToProject && moveTargets.length > 0 && (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <FolderInput className="h-4 w-4" />
+                Move to...
+              </DropdownMenuSubTrigger>
+              <DropdownMenuPortal>
+                <DropdownMenuSubContent>
+                  {moveTargets.map((project) => (
+                    <DropdownMenuItem
+                      key={project}
+                      onClick={() => onMoveToProject(note.id, project)}
+                    >
+                      {project === "general" ? (
+                        <Inbox className="h-4 w-4" />
+                      ) : project === "personal" ? (
+                        <User className="h-4 w-4" />
+                      ) : (
+                        <FolderGit2 className="h-4 w-4" />
+                      )}
+                      {project === "general"
+                        ? "General"
+                        : project === "personal"
+                          ? "Personal"
+                          : project}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuPortal>
+            </DropdownMenuSub>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="text-red-400 focus:text-red-400"
+            onClick={onDelete}
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }
@@ -381,13 +472,34 @@ function NotesTab() {
     },
   })
 
-  const handleAddNote = () => {
+  const handleAddNote = async () => {
     const text = newNoteText.trim()
     if (!text) return
 
-    addMutation.mutate({ project: selectedProject, text })
+    const project = selectedProject
     setNewNoteText("")
     inputRef.current?.focus()
+
+    const data = await addMutation.mutateAsync({ project, text })
+
+    // Auto-suggest category when adding to General
+    if (project === "general" && data?.note?.id) {
+      const lowerText = text.toLowerCase()
+      const match = localProjects.find(p =>
+        lowerText.includes(p.name.toLowerCase())
+      )
+      if (match) {
+        toast(`File under "${match.name}"?`, {
+          duration: 8000,
+          action: {
+            label: "Move",
+            onClick: () => {
+              moveMutation.mutate({ id: data.note.id, project: match.name })
+            },
+          },
+        })
+      }
+    }
   }
 
   const handleUpdateNote = (id: string, text: string) => {
@@ -395,6 +507,42 @@ function NotesTab() {
   }
 
   const handleDeleteNote = (id: string) => {
+    deleteMutation.mutate(id)
+  }
+
+  // Move note to a different project/category
+  const moveMutation = useMutation({
+    mutationFn: async ({ id, project }: { id: string; project: string }) => {
+      const res = await fetch("/api/quicknotes", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, project }),
+      })
+      if (!res.ok) throw new Error("Failed to move note")
+      return res.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quicknotes-local"] })
+    },
+  })
+
+  const handleMoveToProject = (id: string, project: string) => {
+    moveMutation.mutate({ id, project })
+  }
+
+  // Convert note to a task: create task in localStorage, then delete the note
+  const handleConvertToTask = (id: string) => {
+    const note = notesData?.notes?.find((n) => n.id === id)
+    if (!note) return
+
+    const tasks = loadTasks()
+    const newTask: Task = {
+      id: generateId(),
+      text: note.text,
+      completed: false,
+      createdAt: new Date().toISOString(),
+    }
+    saveTasks([newTask, ...tasks])
     deleteMutation.mutate(id)
   }
 
@@ -452,8 +600,18 @@ function NotesTab() {
     return <FolderGit2 className="h-4 w-4" />
   }
 
+  // All available project names for the "Move to" menu
+  const allProjectNames = React.useMemo(() => {
+    const names = new Set(["general", "personal"])
+    for (const p of localProjects) names.add(p.name)
+    if (notesData?.notes) {
+      for (const n of notesData.notes) names.add(n.project)
+    }
+    return Array.from(names)
+  }, [localProjects, notesData?.notes])
+
   const totalNotes = notesData?.notes?.length || 0
-  const isSaving = addMutation.isPending || updateMutation.isPending || deleteMutation.isPending
+  const isSaving = addMutation.isPending || updateMutation.isPending || deleteMutation.isPending || moveMutation.isPending
 
   return (
     <div className="space-y-6">
@@ -623,6 +781,10 @@ function NotesTab() {
                 note={note}
                 onDelete={() => handleDeleteNote(note.id)}
                 onUpdate={handleUpdateNote}
+                onConvertToTask={handleConvertToTask}
+                onMoveToProject={handleMoveToProject}
+                openWithMessage={isAvailable ? openWithMessage : undefined}
+                availableProjects={allProjectNames}
               />
             ))}
           </div>
