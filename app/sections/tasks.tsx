@@ -400,6 +400,7 @@ function NotesTab() {
   const queryClient = useQueryClient()
   const [newNoteText, setNewNoteText] = React.useState("")
   const [selectedProject, setSelectedProject] = React.useState("general")
+  const [notesView, setNotesView] = React.useState<'inbox' | 'projects' | 'personal'>('inbox')
   const [sortOrder, setSortOrder] = React.useState<'newest' | 'oldest'>(() => {
     if (typeof window === "undefined") return "newest"
     return (localStorage.getItem("notes-sort-order") as 'newest' | 'oldest') || "newest"
@@ -408,6 +409,17 @@ function NotesTab() {
   const inputRef = React.useRef<HTMLTextAreaElement>(null)
   const { isAvailable, openWithMessage } = useAIDrawerTrigger()
   const { localProjects } = useProjects()
+
+  // Sync selectedProject default when switching views
+  React.useEffect(() => {
+    if (notesView === 'inbox') setSelectedProject("general")
+    else if (notesView === 'personal') setSelectedProject("personal")
+  }, [notesView])
+
+  // Reset filter when switching views
+  React.useEffect(() => {
+    setFilterCategory("all")
+  }, [notesView])
 
   // Persist sort order to localStorage
   React.useEffect(() => {
@@ -546,43 +558,6 @@ function NotesTab() {
     deleteMutation.mutate(id)
   }
 
-  // Unique categories from current notes
-  const uniqueCategories = React.useMemo(() => {
-    if (!notesData?.notes) return []
-    const cats = new Set(notesData.notes.map(n => n.project))
-    return Array.from(cats).sort()
-  }, [notesData?.notes])
-
-  // Sort comparator for notes
-  const sortNotes = React.useCallback((a: QuickNote, b: QuickNote) => {
-    const dateA = new Date(a.createdAt).getTime()
-    const dateB = new Date(b.createdAt).getTime()
-    return sortOrder === "newest" ? dateB - dateA : dateA - dateB
-  }, [sortOrder])
-
-  // Group notes by project (with sorting and filtering applied)
-  const groupedNotes = React.useMemo(() => {
-    if (!notesData?.notes) return new Map<string, QuickNote[]>()
-
-    const filtered = filterCategory === "all"
-      ? notesData.notes
-      : notesData.notes.filter(n => n.project === filterCategory)
-
-    const groups = new Map<string, QuickNote[]>()
-    for (const note of filtered) {
-      const existing = groups.get(note.project) || []
-      existing.push(note)
-      groups.set(note.project, existing)
-    }
-
-    // Sort notes within each group
-    for (const [key, notes] of groups) {
-      groups.set(key, [...notes].sort(sortNotes))
-    }
-
-    return groups
-  }, [notesData?.notes, filterCategory, sortNotes])
-
   // Get display name for project
   const getProjectDisplayName = (project: string) => {
     if (project === "general") return "General"
@@ -610,7 +585,64 @@ function NotesTab() {
     return Array.from(names)
   }, [localProjects, notesData?.notes])
 
+  // Badge counts for sub-tabs (computed from full list, not affected by sort/filter)
+  const viewCounts = React.useMemo(() => {
+    const notes = notesData?.notes || []
+    return {
+      inbox: notes.filter(n => n.project === "general").length,
+      projects: notes.filter(n => n.project !== "general" && n.project !== "personal").length,
+      personal: notes.filter(n => n.project === "personal").length,
+    }
+  }, [notesData?.notes])
+
+  // Filter notes by current view before applying category/sort
+  const viewFilteredNotes = React.useMemo(() => {
+    const notes = notesData?.notes || []
+    switch (notesView) {
+      case 'inbox': return notes.filter(n => n.project === "general")
+      case 'personal': return notes.filter(n => n.project === "personal")
+      case 'projects': return notes.filter(n => n.project !== "general" && n.project !== "personal")
+    }
+  }, [notesData?.notes, notesView])
+
+  // Categories relevant to the current view
+  const viewCategories = React.useMemo(() => {
+    const cats = new Set(viewFilteredNotes.map(n => n.project))
+    return Array.from(cats).sort()
+  }, [viewFilteredNotes])
+
+  // Sort comparator for notes
+  const sortNotes = React.useCallback((a: QuickNote, b: QuickNote) => {
+    const dateA = new Date(a.createdAt).getTime()
+    const dateB = new Date(b.createdAt).getTime()
+    return sortOrder === "newest" ? dateB - dateA : dateA - dateB
+  }, [sortOrder])
+
+  // Group notes by project (with view, sorting and filtering applied)
+  const groupedNotes = React.useMemo(() => {
+    if (viewFilteredNotes.length === 0) return new Map<string, QuickNote[]>()
+
+    const filtered = filterCategory === "all"
+      ? viewFilteredNotes
+      : viewFilteredNotes.filter(n => n.project === filterCategory)
+
+    const groups = new Map<string, QuickNote[]>()
+    for (const note of filtered) {
+      const existing = groups.get(note.project) || []
+      existing.push(note)
+      groups.set(note.project, existing)
+    }
+
+    // Sort notes within each group
+    for (const [key, notes] of groups) {
+      groups.set(key, [...notes].sort(sortNotes))
+    }
+
+    return groups
+  }, [viewFilteredNotes, filterCategory, sortNotes])
+
   const totalNotes = notesData?.notes?.length || 0
+  const viewNoteCount = viewFilteredNotes.length
   const isSaving = addMutation.isPending || updateMutation.isPending || deleteMutation.isPending || moveMutation.isPending
 
   return (
@@ -682,6 +714,35 @@ function NotesTab() {
         </div>
       </Card>
 
+      {/* Sub-tab pills: Inbox / Projects / Personal */}
+      <div className="flex items-center gap-1.5">
+        {([
+          { key: 'inbox' as const, label: 'Inbox', icon: <Inbox className="h-3 w-3" />, count: viewCounts.inbox },
+          { key: 'projects' as const, label: 'Projects', icon: <FolderGit2 className="h-3 w-3" />, count: viewCounts.projects },
+          { key: 'personal' as const, label: 'Personal', icon: <User className="h-3 w-3" />, count: viewCounts.personal },
+        ]).map(({ key, label, icon, count }) => (
+          <button
+            key={key}
+            onClick={() => setNotesView(key)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all ${
+              notesView === key
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
+          >
+            {icon}
+            {label}
+            {count > 0 && (
+              <span className={`ml-0.5 text-[10px] tabular-nums ${
+                notesView === key ? 'text-primary-foreground/80' : 'text-muted-foreground'
+              }`}>
+                {count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
       {/* AI Actions */}
       <div className="flex justify-end gap-2">
         <Button
@@ -702,10 +763,27 @@ function NotesTab() {
           variant="outline"
           size="sm"
           className="gap-2"
+          disabled={!isAvailable || viewCounts.inbox === 0}
+          onClick={() => {
+            const inboxNotes = (notesData?.notes || []).filter(n => n.project === "general")
+            const availableTargets = localProjects.map(p => p.name)
+            openWithMessage(
+              `I have ${inboxNotes.length} unprocessed notes in my inbox that need triage. Available project categories: ${availableTargets.length > 0 ? availableTargets.join(", ") : "(none yet)"}.\n\nHere are the inbox notes:\n\n\`\`\`json\n${JSON.stringify(inboxNotes, null, 2)}\n\`\`\`\n\nFor each note, suggest one action: move to a specific project, convert to a task, or keep in inbox. Be decisive — most notes should be routed somewhere.\n\nRespond with a JSON block in this format:\n\`\`\`json\n{ "recommendations": [{ "noteId": "...", "noteText": "first 50 chars...", "action": "move" | "convert-task" | "keep", "target": "project-name or null", "reason": "brief reason" }] }\n\`\`\`\nThen explain your reasoning below the JSON.`
+            )
+          }}
+        >
+          <Inbox className="h-4 w-4" />
+          Triage Inbox
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
           disabled={!isAvailable || totalNotes === 0}
           onClick={() => {
+            const availableTargets = localProjects.map(p => p.name)
             openWithMessage(
-              `Here are my quick notes:\n\n\`\`\`json\n${JSON.stringify(notesData?.notes || [], null, 2)}\n\`\`\`\n\nFor each note: suggest which project in ~/projects/ it belongs to (check if the note content relates to any project name), whether it's a personal note, or an actionable task that should become a todo. Group your recommendations by action type (move to project, keep as personal, convert to task). Be specific about which project directory each note should be filed under.`
+              `Here are my quick notes:\n\n\`\`\`json\n${JSON.stringify(notesData?.notes || [], null, 2)}\n\`\`\`\n\nAvailable project categories: ${availableTargets.length > 0 ? availableTargets.join(", ") : "(none yet)"}.\n\nFor each note: suggest which project in ~/projects/ it belongs to (check if the note content relates to any project name), whether it's a personal note, or an actionable task that should become a todo. Group your recommendations by action type (move to project, keep as personal, convert to task). Be specific about which project directory each note should be filed under.\n\nRespond with a JSON block in this format:\n\`\`\`json\n{ "recommendations": [{ "noteId": "...", "noteText": "first 50 chars...", "action": "move" | "convert-task" | "keep", "target": "project-name or null", "reason": "brief reason" }] }\n\`\`\`\nThen explain your reasoning below the JSON.`
             )
           }}
         >
@@ -715,7 +793,7 @@ function NotesTab() {
       </div>
 
       {/* Sort & Filter Toolbar */}
-      {!notesLoading && totalNotes > 0 && (
+      {!notesLoading && viewNoteCount > 0 && (
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
@@ -726,23 +804,25 @@ function NotesTab() {
             <ArrowUpDown className="h-3 w-3" />
             {sortOrder === "newest" ? "Newest first" : "Oldest first"}
           </Button>
-          <Select value={filterCategory} onValueChange={setFilterCategory}>
-            <SelectTrigger className="h-7 w-[160px] text-xs text-muted-foreground">
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" className="text-xs">All Categories</SelectItem>
-              <SelectSeparator />
-              {uniqueCategories.map((cat) => (
-                <SelectItem key={cat} value={cat} className="text-xs">
-                  <div className="flex items-center gap-2">
-                    {getProjectIcon(cat)}
-                    {getProjectDisplayName(cat)}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {notesView === 'projects' && viewCategories.length > 1 && (
+            <Select value={filterCategory} onValueChange={setFilterCategory}>
+              <SelectTrigger className="h-7 w-[160px] text-xs text-muted-foreground">
+                <SelectValue placeholder="All Projects" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs">All Projects</SelectItem>
+                <SelectSeparator />
+                {viewCategories.map((cat) => (
+                  <SelectItem key={cat} value={cat} className="text-xs">
+                    <div className="flex items-center gap-2">
+                      {getProjectIcon(cat)}
+                      {getProjectDisplayName(cat)}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       )}
 
@@ -755,20 +835,27 @@ function NotesTab() {
       )}
 
       {/* Empty State */}
-      {!notesLoading && totalNotes === 0 && (
+      {!notesLoading && viewNoteCount === 0 && (
         <Card className="glass p-8 text-center">
           <StickyNote className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-          <h3 className="text-lg font-medium mb-2">No notes yet</h3>
+          <h3 className="text-lg font-medium mb-2">
+            {notesView === 'inbox' ? 'Inbox is empty' : notesView === 'personal' ? 'No personal notes' : 'No project notes'}
+          </h3>
           <p className="text-sm text-muted-foreground">
-            Add a quick note above to get started
+            {notesView === 'inbox'
+              ? 'Capture a quick thought above'
+              : notesView === 'personal'
+                ? 'Add a personal note to get started'
+                : 'Notes filed under projects will appear here'}
           </p>
         </Card>
       )}
 
-      {/* Notes grouped by project */}
+      {/* Notes list */}
       {!notesLoading && Array.from(groupedNotes.entries()).map(([project, notes]) => (
         <div key={project} className="space-y-2">
-          {filterCategory === "all" && (
+          {/* Show group headers only in projects view with multiple groups */}
+          {notesView === 'projects' && filterCategory === "all" && (
             <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               {getProjectIcon(project)}
               {getProjectDisplayName(project)} ({notes.length})
