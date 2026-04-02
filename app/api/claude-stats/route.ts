@@ -78,6 +78,7 @@ export interface ClaudeStatsResponse {
     liveData?: {
       lastUpdated: string
       tokensByModel: Record<string, number>
+      toolCountsByName: Record<string, number>
     }
   }
   error?: string
@@ -182,7 +183,8 @@ export async function GET(_request: NextRequest): Promise<Response> {
         ...(liveData && {
           liveData: {
             lastUpdated: liveData.lastUpdated,
-            tokensByModel: liveData.tokensByModel
+            tokensByModel: liveData.tokensByModel,
+            toolCountsByName: liveData.toolCountsByName
           }
         })
       }

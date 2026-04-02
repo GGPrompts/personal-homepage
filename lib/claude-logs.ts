@@ -23,6 +23,7 @@ export interface LiveUsageData {
   sessionCount: number
   toolCallCount: number
   tokensByModel: Record<string, number>
+  toolCountsByName: Record<string, number>
   isLive: true
   lastUpdated: string
 }
@@ -39,6 +40,10 @@ interface SessionLogEntry {
       cache_creation_input_tokens?: number
     }
     role?: string
+    content?: Array<{
+      type?: string
+      name?: string
+    }>
   }
   // Tool use entries
   toolUseID?: string
@@ -72,6 +77,7 @@ async function parseSessionFile(filePath: string): Promise<{
   messageCount: number
   toolCallCount: number
   tokensByModel: Record<string, number>
+  toolCountsByName: Record<string, number>
   hasActivity: boolean
 }> {
   const result = {
@@ -82,6 +88,7 @@ async function parseSessionFile(filePath: string): Promise<{
     messageCount: 0,
     toolCallCount: 0,
     tokensByModel: {} as Record<string, number>,
+    toolCountsByName: {} as Record<string, number>,
     hasActivity: false
   }
 
@@ -99,6 +106,15 @@ async function parseSessionFile(filePath: string): Promise<{
         }
 
         result.hasActivity = true
+
+        // Extract tool names from assistant tool_use content blocks
+        if (entry.type === 'assistant' && entry.message?.content) {
+          for (const block of entry.message.content) {
+            if (block.type === 'tool_use' && block.name) {
+              result.toolCountsByName[block.name] = (result.toolCountsByName[block.name] || 0) + 1
+            }
+          }
+        }
 
         // Count assistant messages with usage data
         if (entry.type === 'assistant' && entry.message?.usage) {
@@ -227,6 +243,7 @@ export async function getTodayUsage(): Promise<LiveUsageData | null> {
     sessionCount: 0,
     toolCallCount: 0,
     tokensByModel: {},
+    toolCountsByName: {},
     isLive: true,
     lastUpdated: new Date().toISOString()
   }
@@ -253,6 +270,11 @@ export async function getTodayUsage(): Promise<LiveUsageData | null> {
       // Merge tokens by model
       for (const [model, tokens] of Object.entries(data.tokensByModel)) {
         aggregated.tokensByModel[model] = (aggregated.tokensByModel[model] || 0) + tokens
+      }
+
+      // Merge tool counts by name
+      for (const [tool, count] of Object.entries(data.toolCountsByName)) {
+        aggregated.toolCountsByName[tool] = (aggregated.toolCountsByName[tool] || 0) + count
       }
     }
   }

@@ -82,6 +82,7 @@ interface ClaudeStatsData {
   liveData?: {
     lastUpdated: string
     tokensByModel: Record<string, number>
+    toolCountsByName: Record<string, number>
   }
 }
 
@@ -458,14 +459,20 @@ export default function AnalyticsSection({ activeSubItem, onSubItemHandled }: An
       )
       const totalToolCalls = claudeStats.dailyActivity.reduce((sum, d) => sum + d.toolCallCount, 0)
 
-      // Most used tools (estimated from total tool calls)
-      const mostUsedTools = [
-        { name: "Edit", count: Math.floor(totalToolCalls * 0.35) },
-        { name: "Read", count: Math.floor(totalToolCalls * 0.25) },
-        { name: "Bash", count: Math.floor(totalToolCalls * 0.2) },
-        { name: "Grep", count: Math.floor(totalToolCalls * 0.12) },
-        { name: "Write", count: Math.floor(totalToolCalls * 0.08) },
-      ]
+      // Most used tools - use real data from live JSONL parsing if available
+      const toolCountsByName = claudeStats.liveData?.toolCountsByName
+      const mostUsedTools = toolCountsByName && Object.keys(toolCountsByName).length > 0
+        ? Object.entries(toolCountsByName)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 8)
+            .map(([name, count]) => ({ name, count }))
+        : [
+            { name: "Edit", count: Math.floor(totalToolCalls * 0.35) },
+            { name: "Read", count: Math.floor(totalToolCalls * 0.25) },
+            { name: "Bash", count: Math.floor(totalToolCalls * 0.2) },
+            { name: "Grep", count: Math.floor(totalToolCalls * 0.12) },
+            { name: "Write", count: Math.floor(totalToolCalls * 0.08) },
+          ]
 
       return {
         totalConversations: claudeStats.totalSessions,
