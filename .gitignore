@@ -61,3 +61,8 @@ next-env.d.ts
 # Git worktrees
 .worktrees/
 personal-homepage-*/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
