@@ -56,7 +56,6 @@ next-env.d.ts
 # Issue tracking (beads) - local workspace data
 .beads/*
 !.beads/config.yaml
-!.beads/metadata.json
 
 # Git worktrees
 .worktrees/
